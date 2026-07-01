@@ -153,8 +153,20 @@ router.get('/article/:slug', async (req, res) => {
 });
 
 router.post('/subscribe', async (req, res) => {
-  // Placeholder — wire up to an email provider (Mailchimp, Resend, Supabase table) later.
-  console.log('Newsletter signup:', req.body.email);
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.redirect('/?subscribed=error');
+  }
+  if (supabase) {
+    const { error } = await supabase.from('subscribers').upsert(
+      { email: email.toLowerCase().trim(), active: true },
+      { onConflict: 'email' }
+    );
+    if (error) {
+      console.error('Newsletter signup error:', error.message);
+      return res.redirect('/?subscribed=error');
+    }
+  }
   res.redirect('/?subscribed=1');
 });
 
