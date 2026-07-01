@@ -34,3 +34,17 @@ if (process.env.ANTHROPIC_API_KEY) {
 } else {
   console.log('Automation NOT scheduled — set ANTHROPIC_API_KEY to enable.');
 }
+
+// Sends the weekly digest every Monday at 8am. Disabled until RESEND_API_KEY is set.
+if (process.env.RESEND_API_KEY) {
+  cron.schedule('0 8 * * 1', () => {
+    console.log('Running scheduled newsletter send...');
+    require('child_process').exec('node scripts/newsletter.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  });
+  console.log('Newsletter scheduled: Mondays at 8am.');
+} else {
+  console.log('Newsletter NOT scheduled — set RESEND_API_KEY to enable.');
+}
