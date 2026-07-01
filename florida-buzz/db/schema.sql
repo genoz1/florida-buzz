@@ -26,3 +26,11 @@ create table if not exists seen_feed_items (
   guid text unique not null,
   created_at timestamptz default now()
 );
+
+-- Newsletter subscribers
+create table if not exists subscribers (
+  id uuid primary key default gen_random_uuid(),
+  email text unique not null,
+  subscribed_at timestamptz default now(),
+  active boolean default true
+);
