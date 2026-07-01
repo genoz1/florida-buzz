@@ -70,15 +70,15 @@ Respond with ONLY the image prompt text, nothing else — no preamble, no quotes
     return null;
   }
 
-  let tempUrl;
+  let imageBuffer;
   try {
-    tempUrl = await generateImage(`${imagePrompt}. Photorealistic, warm natural lighting, editorial photography style.`);
+    imageBuffer = await generateImage(`${imagePrompt}. Photorealistic, warm natural lighting, editorial photography style.`);
   } catch (err) {
     console.error(`  [error] Image generation failed: ${err.message}`);
     return null;
   }
 
-  return storeGeneratedImage(tempUrl, `${slug}.png`);
+  return storeGeneratedImage(imageBuffer, `${slug}.png`);
 }
 
 function slugify(title) {
