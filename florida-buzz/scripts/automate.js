@@ -58,7 +58,10 @@ coastline, however moody or dramatic that might otherwise look.
 
 Write a prompt for a generic, warm, photorealistic scene that captures the general mood
 and setting of the story's category while staying geographically accurate to Florida.
-Respond with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
+For theme-parks specifically, aim for the scale and energy of an actual major park —
+crowds, large thrill rides, colorful queue areas, string lights, nighttime park glow —
+not a quiet resort walkway. Respond with ONLY the image prompt text, nothing else —
+no preamble, no quotes.`;
 
   const promptUser = `Headline: ${title}\nCategory: ${category}`;
 
@@ -272,13 +275,18 @@ async function run() {
 
     const slug = `${slugify(article.title)}-${Date.now().toString(36)}`;
 
-    console.log(`  Generating image...`);
-    const aiImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+    let finalImage = realImage;
+    if (finalImage) {
+      console.log(`  Using real photo from source article.`);
+    } else {
+      console.log(`  No real photo found — generating one...`);
+      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+    }
 
     if (DRY_RUN) {
       console.log(`  [dry-run] Title: ${article.title}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
-      console.log(`  [dry-run] Image: (skipped in dry-run — costs real money per image)`);
+      console.log(`  [dry-run] Image: ${realImage ? 'real photo found' : '(would generate — skipped in dry-run, costs real money)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
     } else if (supabase) {
       const { error } = await supabase.from('articles').insert({
@@ -289,7 +297,7 @@ async function run() {
         category: source.category,
         source_name: actualSourceName,
         source_url: item.link,
-        image_url: aiImage || realImage,
+        image_url: finalImage,
         fb_caption: article.fb_caption,
       });
       if (error) {
