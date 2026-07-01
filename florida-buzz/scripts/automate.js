@@ -1,7 +1,8 @@
 require('dotenv').config();
 const Parser = require('rss-parser');
-const { supabase } = require('../lib/supabase');
+const { supabase, storeGeneratedImage } = require('../lib/supabase');
 const { askClaude } = require('../lib/anthropic');
+const { generateImage } = require('../lib/openai');
 const SOURCES = require('./sources');
 
 const parser = new Parser({
@@ -32,6 +33,42 @@ function extractImage(item) {
   const html = item.content || item['content:encoded'] || '';
   const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
   return match ? match[1] : null;
+}
+
+// Writes a DALL-E prompt for the article, and generates + permanently stores the image.
+// Deliberately generic/thematic rather than trying to depict the specific real event,
+// and explicitly avoids real people, brand logos, and copyrighted characters —
+// DALL-E's own content policy blocks most of this anyway, but we ask cleanly up front
+// rather than relying on that as the only safeguard.
+async function generateArticleImage({ title, category, slug }) {
+  const promptSystem = `You write concise, vivid prompts for an AI image generator, for
+a Florida lifestyle news site called The Florida Buzz. The image accompanies a news
+article but must NOT depict the specific real event, any real named person, or any
+copyrighted/trademarked character, logo, or architecture (e.g. no Disney castle, no
+Mickey Mouse, no branded theme park attractions by name or unmistakable likeness).
+Instead, write a prompt for a generic, warm, photorealistic scene that captures the
+general mood and setting of the story's category. Respond with ONLY the image prompt
+text, nothing else — no preamble, no quotes.`;
+
+  const promptUser = `Headline: ${title}\nCategory: ${category}`;
+
+  let imagePrompt;
+  try {
+    imagePrompt = await askClaude(promptSystem, promptUser, 150);
+  } catch (err) {
+    console.error(`  [error] Could not write image prompt: ${err.message}`);
+    return null;
+  }
+
+  let tempUrl;
+  try {
+    tempUrl = await generateImage(`${imagePrompt}. Photorealistic, warm natural lighting, editorial photography style.`);
+  } catch (err) {
+    console.error(`  [error] Image generation failed: ${err.message}`);
+    return null;
+  }
+
+  return storeGeneratedImage(tempUrl, `${slug}.png`);
 }
 
 function slugify(title) {
@@ -225,10 +262,13 @@ async function run() {
 
     const slug = `${slugify(article.title)}-${Date.now().toString(36)}`;
 
+    console.log(`  Generating image...`);
+    const aiImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+
     if (DRY_RUN) {
       console.log(`  [dry-run] Title: ${article.title}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
-      console.log(`  [dry-run] Image: ${realImage || '(none found — will use category placeholder)'}`);
+      console.log(`  [dry-run] Image: (skipped in dry-run — costs real money per image)`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
     } else if (supabase) {
       const { error } = await supabase.from('articles').insert({
@@ -239,7 +279,7 @@ async function run() {
         category: source.category,
         source_name: actualSourceName,
         source_url: item.link,
-        image_url: realImage,
+        image_url: aiImage || realImage,
         fb_caption: article.fb_caption,
       });
       if (error) {
