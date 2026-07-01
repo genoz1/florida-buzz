@@ -275,9 +275,13 @@ async function run() {
 
     const slug = `${slugify(article.title)}-${Date.now().toString(36)}`;
 
-    let finalImage = realImage;
-    if (finalImage) {
+    let finalImage;
+    if (source.preferAI) {
+      console.log(`  This source is set to always use AI images — generating...`);
+      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+    } else if (realImage) {
       console.log(`  Using real photo from source article.`);
+      finalImage = realImage;
     } else {
       console.log(`  No real photo found — generating one...`);
       finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
@@ -286,7 +290,7 @@ async function run() {
     if (DRY_RUN) {
       console.log(`  [dry-run] Title: ${article.title}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
-      console.log(`  [dry-run] Image: ${realImage ? 'real photo found' : '(would generate — skipped in dry-run, costs real money)'}`);
+      console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? 'real photo found' : '(would generate — no real photo, skipped in dry-run)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
     } else if (supabase) {
       const { error } = await supabase.from('articles').insert({
