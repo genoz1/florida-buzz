@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "automate": "node scripts/automate.js",
-    "automate:dry": "DRY_RUN=true node scripts/automate.js"
+    "automate:dry": "DRY_RUN=true node scripts/automate.js",
+    "newsletter": "node scripts/newsletter.js",
+    "newsletter:dry": "DRY_RUN=true node scripts/newsletter.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
