@@ -21,12 +21,14 @@ module.exports = [
     category: 'wildlife',
     name: 'Florida wildlife news (mixed)',
     mixedSource: true, // local news coverage — the safety filter screens out attack/tragedy stories
+    preferAI: true, // real photos from orgs like Live Wildly can have baked-in borders/branding
   },
   {
     url: 'https://rss.app/feeds/tLphQShMugwaR7ui.xml',
     category: 'beaches',
     name: 'Florida beaches news (mixed)',
     mixedSource: true,
+    preferAI: true, // same risk as wildlife — mixed local news sources with inconsistent photo styling
   },
   {
     url: 'https://rss.app/feeds/tvYOAhQRw6xwta3w.xml',
