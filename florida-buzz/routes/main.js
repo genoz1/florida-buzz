@@ -158,4 +158,49 @@ router.post('/subscribe', async (req, res) => {
   res.redirect('/?subscribed=1');
 });
 
+router.get('/sitemap.xml', async (req, res) => {
+  const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
+  const articles = await getArticles({ limit: 1000 });
+
+  const staticUrls = [
+    { loc: siteUrl, priority: '1.0' },
+    ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
+  ];
+
+  const articleUrls = articles
+    .filter((a) => !a.slug.startsWith('sample-')) // never index placeholder content
+    .map((a) => ({
+      loc: `${siteUrl}/article/${a.slug}`,
+      lastmod: new Date(a.published_at).toISOString().split('T')[0],
+      priority: '0.6',
+    }));
+
+  const allUrls = [...staticUrls, ...articleUrls];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${allUrls
+  .map(
+    (u) => `  <url>
+    <loc>${u.loc}</loc>
+    ${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}
+    <priority>${u.priority}</priority>
+  </url>`
+  )
+  .join('\n')}
+</urlset>`;
+
+  res.set('Content-Type', 'application/xml');
+  res.send(xml);
+});
+
+router.get('/robots.txt', (req, res) => {
+  const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
+  res.set('Content-Type', 'text/plain');
+  res.send(`User-agent: *
+Allow: /
+
+Sitemap: ${siteUrl}/sitemap.xml`);
+});
+
 module.exports = router;
