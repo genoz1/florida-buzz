@@ -163,7 +163,7 @@ img { max-width: 100%; display: block; }
 }
 .hero-image {
   aspect-ratio: 4/3;
-  background: var(--teal-700);
+  background: var(--sand-100);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -227,7 +227,7 @@ img { max-width: 100%; display: block; }
 }
 .card-image {
   aspect-ratio: 16/10;
-  background: var(--teal-700);
+  background: var(--sand-100);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 12px;
