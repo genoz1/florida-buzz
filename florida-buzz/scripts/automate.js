@@ -4,8 +4,35 @@ const { supabase } = require('../lib/supabase');
 const { askClaude } = require('../lib/anthropic');
 const SOURCES = require('./sources');
 
-const parser = new Parser({ timeout: 15000 });
+const parser = new Parser({
+  timeout: 15000,
+  customFields: {
+    item: [
+      ['media:content', 'mediaContent', { keepArray: true }],
+      ['media:thumbnail', 'mediaThumbnail'],
+    ],
+  },
+});
 const DRY_RUN = process.env.DRY_RUN === 'true';
+
+// Pulls the real article image out of an RSS item, checking the common places
+// feeds put it. Falls back to null, which the site already handles by showing
+// a generic category stock photo instead.
+function extractImage(item) {
+  if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) {
+    return item.enclosure.url;
+  }
+  if (Array.isArray(item.mediaContent) && item.mediaContent[0]?.$?.url) {
+    return item.mediaContent[0].$.url;
+  }
+  if (item.mediaThumbnail?.$?.url) {
+    return item.mediaThumbnail.$.url;
+  }
+  // Last resort: pull the first <img> src out of the HTML content, if present.
+  const html = item.content || item['content:encoded'] || '';
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return match ? match[1] : null;
+}
 
 function slugify(title) {
   return title
@@ -181,6 +208,7 @@ async function run() {
 
     console.log(`  Writing article...`);
     const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
+    const realImage = extractImage(item);
     let article;
     try {
       article = await writeArticle({
@@ -200,6 +228,7 @@ async function run() {
     if (DRY_RUN) {
       console.log(`  [dry-run] Title: ${article.title}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
+      console.log(`  [dry-run] Image: ${realImage || '(none found — will use category placeholder)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
     } else if (supabase) {
       const { error } = await supabase.from('articles').insert({
@@ -210,6 +239,7 @@ async function run() {
         category: source.category,
         source_name: actualSourceName,
         source_url: item.link,
+        image_url: realImage,
         fb_caption: article.fb_caption,
       });
       if (error) {
