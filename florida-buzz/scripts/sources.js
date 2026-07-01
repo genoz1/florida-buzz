@@ -1,25 +1,54 @@
 // Official, reputable sources only — per the original brief, this is what keeps us
 // on the right side of copyright (we summarize + link back, never copy).
-// Verify each feed URL still resolves periodically — official orgs sometimes change RSS paths.
 
 module.exports = [
-  // Verified working as of this build:
+  // CONFIRMED WORKING as of the first live test run (July 2026):
   { url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss', category: 'space', name: 'NASA' },
+  {
+    url: 'https://rss.app/feeds/t0EWr4IpNbId7gMY.xml',
+    category: 'theme-parks',
+    name: 'Disney blogs (mixed)',
+    mixedSource: true, // pulls from Disney Parks Blog + independent fan sites — attribute per-article, not to one fixed name
+  },
+  {
+    url: 'https://rss.app/feeds/t1kxNdMt6YHMBt6G.xml',
+    category: 'theme-parks',
+    name: 'Universal Orlando blogs (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/trmkgJaBIXkr8mGp.xml',
+    category: 'wildlife',
+    name: 'Florida wildlife news (mixed)',
+    mixedSource: true, // local news coverage — the safety filter screens out attack/tragedy stories
+  },
+  {
+    url: 'https://rss.app/feeds/tLphQShMugwaR7ui.xml',
+    category: 'beaches',
+    name: 'Florida beaches news (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/tvYOAhQRw6xwta3w.xml',
+    category: 'events',
+    name: 'Florida festivals & events (mixed)',
+    mixedSource: true,
+  },
 
-  // NOT YET VERIFIED — I wrote these from the most likely official RSS path, but
-  // I did not confirm each one resolves. Run `npm run automate:dry` after setup
-  // and check the console output: any feed that 404s or returns empty will be
-  // logged so you know which ones to fix or replace. Do this BEFORE turning on
-  // live posting so you're not silently missing categories.
-  { url: 'https://www.kennedyspacecenter.com/feed', category: 'space', name: 'Kennedy Space Center' },
-  { url: 'https://www.floridastateparks.org/rss.xml', category: 'florida-living', name: 'Florida State Parks' },
-  { url: 'https://myfwc.com/news/rss/', category: 'wildlife', name: 'Florida Fish & Wildlife' },
-  { url: 'https://www.weather.gov/source/mlb/mlbrss.xml', category: 'florida-living', name: 'National Weather Service (Melbourne)' },
-  { url: 'https://www.visitflorida.com/en-us/travel-ideas.rss', category: 'florida-living', name: 'Visit Florida' },
+  // NOT added — the "florida cruise news" keyword feed was dominated by a disturbing
+  // active criminal case (not appropriate for this site regardless of the safety filter,
+  // since it was the majority of the feed's content, not an occasional item to skip).
+  // If you want cruise content, a narrower feed pointed at an actual cruise-line blog
+  // (e.g. Royal Caribbean's or Carnival's official blog) would be a better source.
 
-  // Disney Parks Blog, Universal Orlando Blog, and cruise line newsrooms don't
-  // publish reliable public RSS feeds — they change often and aren't consistent.
-  // Best fix: use a feed-generator service (e.g. RSS.app or FetchRSS) pointed at
-  // their blog/news page, which gives you a stable RSS URL to drop in here.
-  // I'm not adding a guessed URL for these — better to leave them out than silently break.
+  // REMOVED after testing — these returned 403/404 errors:
+  // - Kennedy Space Center, Florida State Parks, FWC, NWS Melbourne, Visit Florida
+  // None of these publish a simple public RSS feed at a predictable URL. FWC in particular
+  // only offers email subscriptions (GovDelivery), not RSS at all.
+  //
+  // TO ADD MORE SOURCES: the reliable path is a feed-generator service like RSS.app or
+  // FetchRSS — point it at the source's news/blog page (e.g. myfwc.com/news/all-news/,
+  // floridastateparks.org, visitflorida.com/travel-ideas, disneyparksblog.com,
+  // universalorlandoblog.com) and it hands you back a stable RSS URL to paste in below.
+  // Most have a free tier that covers a handful of feeds, which is all this needs.
 ];
