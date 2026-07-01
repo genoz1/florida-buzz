@@ -67,6 +67,12 @@ function sampleArticles() {
   ];
 }
 
+async function hasAnyRealArticles() {
+  if (!supabase) return false;
+  const { count } = await supabase.from('articles').select('*', { count: 'exact', head: true });
+  return !!count && count > 0;
+}
+
 async function getArticles({ category, limit } = {}) {
   if (supabase) {
     let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
@@ -75,7 +81,14 @@ async function getArticles({ category, limit } = {}) {
     const { data, error } = await query;
     if (!error && data && data.length) return data;
   }
-  // Fallback to sample data if Supabase isn't configured yet or has no rows
+
+  // Only fall back to sample data before the automation has EVER produced real
+  // content site-wide. Once any real articles exist, an empty category should
+  // show "nothing published yet" rather than an unrelated sample article that
+  // isn't actually reachable via its own link (which is what caused 404s here).
+  const hasReal = await hasAnyRealArticles();
+  if (hasReal) return [];
+
   let sample = sampleArticles();
   if (category) sample = sample.filter((a) => a.category === category);
   return limit ? sample.slice(0, limit) : sample;
