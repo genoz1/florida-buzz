@@ -8,19 +8,14 @@ const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   : null;
 
-// Downloads a (temporary) generated image and re-uploads it to Supabase Storage,
-// since DALL-E's URLs expire in about an hour and we need this to last forever.
+// Uploads generated image bytes to Supabase Storage for permanent hosting.
 // Returns the permanent public URL, or null if anything fails.
-async function storeGeneratedImage(tempUrl, filename) {
+async function storeGeneratedImage(imageBuffer, filename) {
   if (!supabase) return null;
   try {
-    const res = await fetch(tempUrl);
-    if (!res.ok) throw new Error(`Failed to download generated image: ${res.status}`);
-    const buffer = Buffer.from(await res.arrayBuffer());
-
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(filename, buffer, { contentType: 'image/png', upsert: false });
+      .upload(filename, imageBuffer, { contentType: 'image/png', upsert: false });
 
     if (uploadError) throw uploadError;
 
