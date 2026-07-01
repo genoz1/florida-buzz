@@ -46,9 +46,19 @@ a Florida lifestyle news site called The Florida Buzz. The image accompanies a n
 article but must NOT depict the specific real event, any real named person, or any
 copyrighted/trademarked character, logo, or architecture (e.g. no Disney castle, no
 Mickey Mouse, no branded theme park attractions by name or unmistakable likeness).
-Instead, write a prompt for a generic, warm, photorealistic scene that captures the
-general mood and setting of the story's category. Respond with ONLY the image prompt
-text, nothing else — no preamble, no quotes.`;
+
+CRITICAL — this must look unmistakably like Florida, not a generic or wrong-region scene:
+Florida is famously flat with NO cliffs, NO mountains, NO rocky/pebble beaches, and NO
+snow. Correct Florida terrain and features to draw from: flat sandy white or tan beaches,
+palm trees, live oaks draped in Spanish moss, mangroves, flat marshland/wetlands,
+Everglades-style saw grass, low-rise Florida architecture, orange/citrus groves, lakes,
+springs. A "cold front" story should still show a recognizably Florida scene (e.g. a
+Florida beach or oak canopy under grey winter light) — never a European or mountainous
+coastline, however moody or dramatic that might otherwise look.
+
+Write a prompt for a generic, warm, photorealistic scene that captures the general mood
+and setting of the story's category while staying geographically accurate to Florida.
+Respond with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
 
   const promptUser = `Headline: ${title}\nCategory: ${category}`;
 
