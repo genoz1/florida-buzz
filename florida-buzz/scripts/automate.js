@@ -15,6 +15,63 @@ function slugify(title) {
     .slice(0, 80);
 }
 
+// Turns a URL's domain into a readable source name, e.g.
+// "disneyparksblog.com" -> "Disney Parks Blog", "blogmickey.com" -> "Blogmickey"
+// Used for mixed/aggregated feeds (like RSS.app keyword feeds) where a single
+// feed pulls from multiple real sites, so a fixed per-feed name would misattribute.
+// Known domains get a clean, properly-formatted name. Anything else falls back
+// to auto-deriving from the domain, which is readable but not always pretty.
+const KNOWN_SOURCE_NAMES = {
+  'disneyparksblog.com': 'Disney Parks Blog',
+  'disneytouristblog.com': 'Disney Tourist Blog',
+  'blogmickey.com': 'BlogMickey',
+  'wdwmagic.com': 'WDW Magic',
+  'disneyfoodblog.com': 'Disney Food Blog',
+  'universalorlandoblog.com': 'Universal Orlando Blog',
+  'nasa.gov': 'NASA',
+};
+
+function nameFromUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (KNOWN_SOURCE_NAMES[host]) return KNOWN_SOURCE_NAMES[host];
+    const base = host.split('.')[0];
+    return base
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .split(/[-_]/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  } catch {
+    return 'Unknown Source';
+  }
+}
+
+// Screens each item before writing. Real local news feeds naturally include crime,
+// death, and tragedy mixed in with lifestyle content — this keeps that off a
+// lighthearted travel/lifestyle brand without needing a human to pre-curate every feed.
+async function isAppropriate(title, summary) {
+  const system = `You screen news items for The Florida Buzz, a lighthearted Florida
+lifestyle and travel site. Answer ONLY "YES" or "NO" — nothing else.
+Answer NO for: deaths, fatal accidents or attacks, violent crime, sexual assault,
+active criminal cases or trials, disasters with casualties, or anything involving
+serious harm to a real named person.
+Answer YES for: theme park news, travel deals, wildlife sightings/conservation,
+weather, festivals, food, beaches, cruises, space launches — the normal, upbeat
+local news and lifestyle content this site covers.
+When genuinely unsure, answer NO — it's better to skip a borderline story than
+publish something insensitive.`;
+
+  const user = `Headline: ${title}\nSummary: ${summary}`;
+
+  try {
+    const raw = await askClaude(system, user, 10);
+    return raw.trim().toUpperCase().startsWith('YES');
+  } catch (err) {
+    console.error(`  [error] Safety check failed, skipping item to be safe: ${err.message}`);
+    return false;
+  }
+}
+
 // Asks Claude to write the article body, dek, and a Facebook caption in one call,
 // returning structured JSON so we don't need extra parsing logic.
 async function writeArticle({ sourceTitle, sourceSummary, sourceName, sourceUrl, category }) {
@@ -113,13 +170,23 @@ async function run() {
       continue;
     }
 
-    console.log(`  New item: "${item.title}" — writing article...`);
+    console.log(`  New item: "${item.title}" — checking content...`);
+    const summary = item.contentSnippet || item.content || item.title;
+    const ok = await isAppropriate(item.title, summary);
+    if (!ok) {
+      console.log(`  [skip] Flagged as not a fit for the site's tone — skipping.`);
+      await markSeen(guid);
+      continue;
+    }
+
+    console.log(`  Writing article...`);
+    const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
     let article;
     try {
       article = await writeArticle({
         sourceTitle: item.title,
-        sourceSummary: item.contentSnippet || item.content || item.title,
-        sourceName: source.name,
+        sourceSummary: summary,
+        sourceName: actualSourceName,
         sourceUrl: item.link,
         category: source.category,
       });
@@ -141,7 +208,7 @@ async function run() {
         dek: article.dek,
         body_html: article.body_html,
         category: source.category,
-        source_name: source.name,
+        source_name: actualSourceName,
         source_url: item.link,
         fb_caption: article.fb_caption,
       });
