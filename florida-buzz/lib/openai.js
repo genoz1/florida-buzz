@@ -11,7 +11,7 @@ async function generateImage(prompt) {
       model: 'dall-e-3',
       prompt,
       n: 1,
-      size: '1024x1024',
+      size: '1792x1024', // widescreen, matches the site's card/hero aspect ratios much better than square
       quality: 'standard',
     }),
   });
