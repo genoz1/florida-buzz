@@ -1,0 +1,38 @@
+<%- include('partials/header', { pageTitle: article.title + ' — The Florida Buzz', pageDescription: article.dek, category: article.category, tickerItems: ticker }) %>
+
+<main class="wrap">
+  <article class="article-page">
+    <span class="eyebrow"><%= categoryLabels[article.category] %></span>
+    <h1><%= article.title %></h1>
+    <p class="dek"><%= article.dek %></p>
+    <p class="byline">By The Florida Buzz staff &middot; <%= timeAgo(article.published_at) %></p>
+
+    <div class="hero-image" style="margin: 22px 0;">
+      <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>">
+    </div>
+
+    <div class="article-body"><%- article.body_html %></div>
+
+    <p class="source-note">
+      Originally reported by <a href="<%= article.source_url %>" target="_blank" rel="noopener"><%= article.source_name %></a>.
+      The Florida Buzz summarizes official announcements in our own words and links back to the source.
+    </p>
+  </article>
+
+  <% if (related && related.length) { %>
+  <section class="section">
+    <div class="section-head"><span class="section-title">More <%= categoryLabels[article.category] %></span></div>
+    <div class="grid">
+      <% related.forEach(a => { %>
+        <a href="/article/<%= a.slug %>" class="card">
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+          <h3><%= a.title %></h3>
+          <p class="dek-sm"><%= a.dek %></p>
+        </a>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
+</main>
+
+<%- include('partials/footer') %>

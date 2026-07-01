@@ -1,0 +1,27 @@
+<%- include('partials/header', { pageTitle: categoryLabels[category] + ' — The Florida Buzz', category, tickerItems: ticker }) %>
+
+<main class="wrap">
+  <section class="section" style="border-bottom:none; padding-bottom:0;">
+    <span class="eyebrow"><%= articles.length %> stories</span>
+    <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;"><%= categoryLabels[category] %></h1>
+  </section>
+
+  <section class="section">
+    <% if (!articles.length) { %>
+      <p style="color:var(--ink-600);">Nothing published in this category yet — check back soon, or see <a href="/" style="color:var(--coral-600); font-weight:600;">everything we've got</a>.</p>
+    <% } else { %>
+    <div class="grid">
+      <% articles.forEach(a => { %>
+        <a href="/article/<%= a.slug %>" class="card">
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+          <h3><%= a.title %></h3>
+          <p class="dek-sm"><%= a.dek %></p>
+          <p class="byline"><%= timeAgo(a.published_at) %></p>
+        </a>
+      <% }) %>
+    </div>
+    <% } %>
+  </section>
+</main>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'The Florida Buzz' %></title>
+  <meta name="description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'Florida theme parks, beaches, space launches, wildlife, and travel — sourced straight from the official channels.' %>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <div class="utility-bar">
+    <div class="wrap">
+      <span><%= new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) %> &middot; Orlando, FL</span>
+      <a href="/#newsletter">Get the daily roundup &rarr;</a>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="wrap">
+      <a href="/" class="logo">Florida <em>Buzz</em></a>
+      <div class="nav-links">
+        <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
+        <a href="/category/space" class="<%= category === 'space' ? 'active' : '' %>">Space</a>
+        <a href="/category/beaches" class="<%= category === 'beaches' ? 'active' : '' %>">Beaches</a>
+        <a href="/category/florida-living" class="<%= category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
+        <a href="/category/wildlife" class="<%= category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
+        <a href="/category/cruises" class="<%= category === 'cruises' ? 'active' : '' %>">Cruises</a>
+        <a href="/category/food" class="<%= category === 'food' ? 'active' : '' %>">Food</a>
+        <a href="/category/events" class="<%= category === 'events' ? 'active' : '' %>">Events</a>
+      </div>
+    </div>
+  </nav>
+
+  <% if (typeof tickerItems !== 'undefined' && tickerItems.length) { %>
+  <div class="ticker">
+    <div class="ticker-inner">
+      <span class="ticker-label">THE BUZZ &rarr;</span>
+      <% [...tickerItems, ...tickerItems].forEach(item => { %>
+        <a href="/article/<%= item.slug %>" class="ticker-item"><%= item.title %></a>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>

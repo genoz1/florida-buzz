@@ -1,0 +1,22 @@
+{
+  "name": "florida-buzz",
+  "version": "1.0.0",
+  "description": "The Florida Buzz - automated Florida lifestyle & travel news site",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "automate": "node scripts/automate.js",
+    "automate:dry": "DRY_RUN=true node scripts/automate.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "rss-parser": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

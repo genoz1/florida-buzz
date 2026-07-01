@@ -1,0 +1,57 @@
+<%- include('partials/header', { pageTitle: 'The Florida Buzz — Florida Theme Parks, Beaches, Space & More', category: null, tickerItems: ticker }) %>
+
+<main class="wrap">
+
+  <% if (featured) { %>
+  <section class="hero">
+    <a href="/article/<%= featured.slug %>" class="hero-image">
+      <img src="<%= featured.image_url || placeholderImg(featured.category) %>" alt="<%= featured.title %>">
+    </a>
+    <div>
+      <span class="eyebrow"><%= categoryLabels[featured.category] %></span>
+      <a href="/article/<%= featured.slug %>"><h1><%= featured.title %></h1></a>
+      <p class="dek"><%= featured.dek %></p>
+      <p class="byline">Sourced from <%= featured.source_name %> &middot; <%= timeAgo(featured.published_at) %></p>
+    </div>
+  </section>
+  <% } %>
+
+  <% if (secondary && secondary.length) { %>
+  <section class="section">
+    <div class="grid">
+      <% secondary.forEach(a => { %>
+        <a href="/article/<%= a.slug %>" class="card">
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+          <span class="tag <%= a.featured ? 'featured' : '' %>"><%= categoryLabels[a.category] %></span>
+          <h3><%= a.title %></h3>
+          <p class="dek-sm"><%= a.dek %></p>
+        </a>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
+
+  <% Object.keys(byCategory).forEach(cat => { %>
+    <% if (byCategory[cat].length) { %>
+    <section class="section">
+      <div class="section-head">
+        <span class="section-title"><%= categoryLabels[cat] %></span>
+        <a href="/category/<%= cat %>">See all &rarr;</a>
+      </div>
+      <div class="grid">
+        <% byCategory[cat].forEach(a => { %>
+          <a href="/article/<%= a.slug %>" class="card">
+            <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+            <h3><%= a.title %></h3>
+            <p class="dek-sm"><%= a.dek %></p>
+            <p class="byline"><%= timeAgo(a.published_at) %></p>
+          </a>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+  <% }) %>
+
+</main>
+
+<%- include('partials/footer') %>
