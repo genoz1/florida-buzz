@@ -61,6 +61,12 @@ module.exports = [
     name: 'Florida vacation secrets (mixed)',
     mixedSource: true,
   },
+  {
+    url: 'https://rss.app/feeds/taJC69mJkbPUrRnX.xml',
+    category: 'cruises',
+    name: 'Disney Cruise Line (mixed)',
+    mixedSource: true, // mostly clean DCL news/deals; a couple of items per month are serious enough for the safety filter to (correctly) skip
+  },
 
   // NOT added — the "florida cruise news" keyword feed was dominated by a disturbing
   // active criminal case (not appropriate for this site regardless of the safety filter,
