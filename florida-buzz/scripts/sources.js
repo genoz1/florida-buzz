@@ -35,6 +35,31 @@ module.exports = [
     category: 'events',
     name: 'Florida festivals & events (mixed)',
     mixedSource: true,
+    preferAI: true, // source images here are often promotional graphics/banners, not real photos — bad hero-image material
+  },
+  {
+    url: 'https://rss.app/feeds/tmBqHlnbyDVRIqnl.xml',
+    category: 'food',
+    name: 'Orlando restaurant news (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/tVXNguf66O8zGJpB.xml',
+    category: 'theme-parks',
+    name: 'Disney Vacations (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/tZHmgfK0Qz7zYI29.xml',
+    category: 'florida-living',
+    name: 'Florida state parks news (mixed)',
+    mixedSource: true, // occasional serious wildlife-incident stories mixed in — the safety filter handles those
+  },
+  {
+    url: 'https://rss.app/feeds/tQSaP9Jh08uDlp6X.xml',
+    category: 'florida-living',
+    name: 'Florida vacation secrets (mixed)',
+    mixedSource: true,
   },
 
   // NOT added — the "florida cruise news" keyword feed was dominated by a disturbing
