@@ -15,8 +15,6 @@ const CATEGORY_LABELS = {
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS);
 
 function placeholderImg(category) {
-  // picsum.photos with a seed keeps the same image per category (consistent look)
-  // until you wire up real AI-generated featured images per article.
   const seedMap = {
     'theme-parks': 'fc-theme-parks',
     space: 'fc-space',
@@ -39,7 +37,6 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
-// ---- Sample data so the site looks complete before the automation has run ----
 function sampleArticles() {
   const now = new Date();
   const mk = (i, category, title, dek, source) => ({
@@ -73,19 +70,17 @@ async function hasAnyRealArticles() {
   return !!count && count > 0;
 }
 
-async function getArticles({ category, limit } = {}) {
+async function getArticles({ category, limit, evergreenOnly, excludeEvergreen } = {}) {
   if (supabase) {
     let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
     if (category) query = query.eq('category', category);
+    if (evergreenOnly) query = query.eq('is_evergreen', true);
+    if (excludeEvergreen) query = query.eq('is_evergreen', false);
     if (limit) query = query.limit(limit);
     const { data, error } = await query;
     if (!error && data && data.length) return data;
   }
 
-  // Only fall back to sample data before the automation has EVER produced real
-  // content site-wide. Once any real articles exist, an empty category should
-  // show "nothing published yet" rather than an unrelated sample article that
-  // isn't actually reachable via its own link (which is what caused 404s here).
   const hasReal = await hasAnyRealArticles();
   if (hasReal) return [];
 
@@ -152,6 +147,19 @@ router.get('/article/:slug', async (req, res) => {
   });
 });
 
+router.get('/guides', async (req, res) => {
+  const guides = await getArticles({ evergreenOnly: true, limit: 50 });
+  const ticker = await getArticles({ limit: 8 });
+
+  res.render('guides', {
+    guides,
+    ticker,
+    categoryLabels: CATEGORY_LABELS,
+    placeholderImg,
+    timeAgo,
+  });
+});
+
 router.post('/subscribe', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
@@ -180,7 +188,7 @@ router.get('/sitemap.xml', async (req, res) => {
   ];
 
   const articleUrls = articles
-    .filter((a) => !a.slug.startsWith('sample-')) // never index placeholder content
+    .filter((a) => !a.slug.startsWith('sample-'))
     .map((a) => ({
       loc: `${siteUrl}/article/${a.slug}`,
       lastmod: new Date(a.published_at).toISOString().split('T')[0],
