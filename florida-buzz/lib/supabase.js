@@ -15,7 +15,7 @@ async function storeGeneratedImage(imageBuffer, filename) {
   try {
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(filename, imageBuffer, { contentType: 'image/png', upsert: false });
+      .upload(filename, imageBuffer, { contentType: 'image/png', upsert: true });
 
     if (uploadError) throw uploadError;
 
