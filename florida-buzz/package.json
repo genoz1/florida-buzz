@@ -8,7 +8,8 @@
     "automate": "node scripts/automate.js",
     "automate:dry": "DRY_RUN=true node scripts/automate.js",
     "newsletter": "node scripts/newsletter.js",
-    "newsletter:dry": "DRY_RUN=true node scripts/newsletter.js"
+    "newsletter:dry": "DRY_RUN=true node scripts/newsletter.js",
+    "guide-images": "node scripts/generate-guide-images.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
