@@ -139,7 +139,6 @@ async function postToFacebook({ title, fb_caption, source_url, slug }) {
   }
 
   const articleUrl = `${process.env.SITE_URL}/article/${slug}`;
-  const message = `${fb_caption}\n\n${articleUrl}`;
 
   const res = await fetch(
     `https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`,
@@ -147,7 +146,8 @@ async function postToFacebook({ title, fb_caption, source_url, slug }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message,
+        message: fb_caption,
+        link: articleUrl,
         access_token: process.env.FB_PAGE_ACCESS_TOKEN,
       }),
     }
@@ -251,7 +251,7 @@ async function run() {
       });
     } catch (err) {
       console.error(`  [error] AI writing failed: ${err.message}`);
-      await markSeen(guid); // don't retry forever — this item likely has too little content to ever succeed
+      await markSeen(guid);
       continue;
     }
 
