@@ -17,9 +17,6 @@ const parser = new Parser({
 });
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
-// Pulls the real article image out of an RSS item, checking the common places
-// feeds put it. Falls back to null, which the site already handles by showing
-// a generic category stock photo instead.
 function extractImage(item) {
   if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) {
     return item.enclosure.url;
@@ -30,7 +27,6 @@ function extractImage(item) {
   if (item.mediaThumbnail?.$?.url) {
     return item.mediaThumbnail.$.url;
   }
-  // Last resort: pull the first <img> src out of the HTML content, if present.
   const html = item.content || item['content:encoded'] || '';
   const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
   return match ? match[1] : null;
@@ -44,12 +40,6 @@ function slugify(title) {
     .slice(0, 80);
 }
 
-// Turns a URL's domain into a readable source name, e.g.
-// "disneyparksblog.com" -> "Disney Parks Blog", "blogmickey.com" -> "Blogmickey"
-// Used for mixed/aggregated feeds (like RSS.app keyword feeds) where a single
-// feed pulls from multiple real sites, so a fixed per-feed name would misattribute.
-// Known domains get a clean, properly-formatted name. Anything else falls back
-// to auto-deriving from the domain, which is readable but not always pretty.
 const KNOWN_SOURCE_NAMES = {
   'disneyparksblog.com': 'Disney Parks Blog',
   'disneytouristblog.com': 'Disney Tourist Blog',
@@ -75,9 +65,6 @@ function nameFromUrl(url) {
   }
 }
 
-// Screens each item before writing. Real local news feeds naturally include crime,
-// death, and tragedy mixed in with lifestyle content — this keeps that off a
-// lighthearted travel/lifestyle brand without needing a human to pre-curate every feed.
 async function isAppropriate(title, summary) {
   const system = `You screen news items for The Florida Buzz, a lighthearted Florida
 lifestyle and travel site. Answer ONLY "YES" or "NO" — nothing else.
@@ -101,8 +88,6 @@ publish something insensitive.`;
   }
 }
 
-// Asks Claude to write the article body, dek, and a Facebook caption in one call,
-// returning structured JSON so we don't need extra parsing logic.
 async function writeArticle({ sourceTitle, sourceSummary, sourceName, sourceUrl, category }) {
   const system = `You are a staff writer for The Florida Buzz, a Florida lifestyle and travel news site.
 You write original, factual summaries of official press releases and announcements — never copying
@@ -130,8 +115,6 @@ Source link (for context only, do not include in body_html): ${sourceUrl}`;
   try {
     return JSON.parse(cleaned);
   } catch {
-    // Claude occasionally wraps the JSON in a sentence or explanation despite
-    // instructions not to. Try pulling out just the {...} block before giving up.
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -237,8 +220,6 @@ async function run() {
       continue;
     }
 
-    // Only process the single newest item per source per run, to keep volume sane
-    // and match the ~8-posts-a-day cadence from the original plan.
     const item = feed.items[0];
     const guid = item.guid || item.link;
 
@@ -270,6 +251,7 @@ async function run() {
       });
     } catch (err) {
       console.error(`  [error] AI writing failed: ${err.message}`);
+      await markSeen(guid); // don't retry forever — this item likely has too little content to ever succeed
       continue;
     }
 
