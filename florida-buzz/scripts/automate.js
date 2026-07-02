@@ -3,6 +3,7 @@ const Parser = require('rss-parser');
 const { supabase, storeGeneratedImage } = require('../lib/supabase');
 const { askClaude } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
+const { createPin } = require('../lib/pinterest');
 const SOURCES = require('./sources');
 
 const parser = new Parser({
@@ -112,7 +113,9 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "title": "string, original headline, under 70 characters",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, 3-5 short paragraphs as <p> tags, original wording, ends with a sentence crediting the source by name",
-  "fb_caption": "string, Facebook post: 1-2 punchy sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags"
+  "fb_caption": "string, Facebook post: 1-2 punchy sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags",
+  "pin_title": "string, under 100 characters, descriptive and keyword-rich (Pinterest is a search engine, not a feed — favor clarity over punchiness)",
+  "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type (e.g. category, location, activity) without keyword-stuffing"
 }`;
 
   const user = `Source: ${sourceName}
@@ -123,7 +126,23 @@ Source link (for context only, do not include in body_html): ${sourceUrl}`;
 
   const raw = await askClaude(system, user, 1200);
   const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
-  return JSON.parse(cleaned);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Claude occasionally wraps the JSON in a sentence or explanation despite
+    // instructions not to. Try pulling out just the {...} block before giving up.
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        // fall through to the error below
+      }
+    }
+    console.error(`  [debug] Raw response was not valid JSON: "${cleaned.slice(0, 150)}..."`);
+    throw new Error('Could not parse a valid article from the AI response');
+  }
 }
 
 async function postToFacebook({ title, fb_caption, source_url, slug }) {
@@ -156,6 +175,36 @@ async function postToFacebook({ title, fb_caption, source_url, slug }) {
     return false;
   }
   return true;
+}
+
+async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
+  if (DRY_RUN) {
+    console.log(`  [dry-run] Would create Pin: "${pin_title}"`);
+    return true;
+  }
+  if (!process.env.PINTEREST_ACCESS_TOKEN || !process.env.PINTEREST_BOARD_ID) {
+    console.log('  [skip] PINTEREST_ACCESS_TOKEN / PINTEREST_BOARD_ID not set — skipping Pinterest.');
+    return false;
+  }
+  if (!imageUrl) {
+    console.log('  [skip] No image available for this article — Pinterest requires one, skipping.');
+    return false;
+  }
+
+  const articleUrl = `${process.env.SITE_URL}/article/${slug}`;
+
+  try {
+    await createPin({
+      imageUrl,
+      title: pin_title,
+      description: pin_description,
+      link: articleUrl,
+    });
+    return true;
+  } catch (err) {
+    console.error(`  [error] Pinterest post failed: ${err.message}`);
+    return false;
+  }
 }
 
 async function alreadySeen(guid) {
@@ -243,6 +292,8 @@ async function run() {
       console.log(`  [dry-run] Dek: ${article.dek}`);
       console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? 'real photo found' : '(would generate — no real photo, skipped in dry-run)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
+      console.log(`  [dry-run] Pin title: ${article.pin_title}`);
+      console.log(`  [dry-run] Pin description: ${article.pin_description}`);
     } else if (supabase) {
       const { error } = await supabase.from('articles').insert({
         slug,
@@ -263,6 +314,7 @@ async function run() {
     }
 
     await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
+    await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
     await markSeen(guid);
   }
 
