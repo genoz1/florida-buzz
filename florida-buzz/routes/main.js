@@ -160,6 +160,10 @@ router.get('/guides', async (req, res) => {
   });
 });
 
+router.get('/privacy', (req, res) => {
+  res.render('privacy');
+});
+
 router.post('/subscribe', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
