@@ -48,7 +48,6 @@ img { max-width: 100%; display: block; }
   padding: 0 24px;
 }
 
-/* ---------- Utility bar ---------- */
 .utility-bar {
   background: var(--ink-900);
   color: var(--sand-50);
@@ -66,7 +65,6 @@ img { max-width: 100%; display: block; }
 .utility-bar a { opacity: 0.85; }
 .utility-bar a:hover { opacity: 1; text-decoration: underline; }
 
-/* ---------- Nav ---------- */
 .nav {
   background: var(--sand-50);
   border-bottom: 1px solid var(--line);
@@ -110,7 +108,6 @@ img { max-width: 100%; display: block; }
   border-bottom-color: var(--coral-500);
 }
 
-/* ---------- Ticker (signature element) ---------- */
 .ticker {
   background: var(--teal-900);
   color: var(--sand-50);
@@ -153,7 +150,6 @@ img { max-width: 100%; display: block; }
   .ticker-inner { animation: none; overflow-x: auto; }
 }
 
-/* ---------- Hero ---------- */
 .hero {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
@@ -194,7 +190,6 @@ img { max-width: 100%; display: block; }
   color: var(--ink-600);
 }
 
-/* ---------- Cards / grid ---------- */
 .section {
   padding: 40px 0;
   border-bottom: 1px solid var(--line);
@@ -261,7 +256,6 @@ img { max-width: 100%; display: block; }
 }
 .tag.featured { background: var(--gold-500); color: var(--ink-900); }
 
-/* ---------- Article page ---------- */
 .article-page { padding: 40px 0 60px; max-width: 760px; margin: 0 auto; }
 .article-page h1 {
   font-family: var(--font-display);
@@ -273,6 +267,34 @@ img { max-width: 100%; display: block; }
 .article-page .dek { font-size: 19px; color: var(--ink-600); margin-bottom: 18px; }
 .article-body { font-size: 18px; line-height: 1.7; }
 .article-body p { margin: 0 0 20px; }
+.article-body h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--teal-900);
+  margin: 36px 0 14px;
+}
+.article-body h3 {
+  font-family: var(--font-display);
+  font-size: 21px;
+  color: var(--teal-900);
+  margin: 28px 0 10px;
+}
+.article-body ul, .article-body ol { margin: 0 0 20px; padding-left: 22px; }
+.article-body li { margin-bottom: 8px; }
+.article-body strong { color: var(--ink-900); }
+.article-body a { color: var(--coral-600); text-decoration: underline; }
+.article-body a.shop-link {
+  display: inline-block;
+  background: var(--coral-500);
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+  padding: 3px 12px 3px 8px;
+  border-radius: 4px;
+  font-size: 15px;
+}
+.article-body a.shop-link:hover { background: var(--coral-600); }
+.article-body a.shop-link::before { content: '🛒 '; }
 .source-note {
   margin-top: 32px;
   padding-top: 20px;
@@ -282,7 +304,6 @@ img { max-width: 100%; display: block; }
 }
 .source-note a { color: var(--coral-600); font-weight: 600; }
 
-/* ---------- Newsletter / footer ---------- */
 .newsletter {
   background: var(--teal-900);
   color: var(--sand-50);
@@ -328,7 +349,6 @@ footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; g
 footer a { opacity: 0.8; }
 footer a:hover { opacity: 1; }
 
-/* ---------- Responsive ---------- */
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; }
   .grid { grid-template-columns: 1fr 1fr; }
