@@ -13,10 +13,22 @@
 
     <div class="article-body"><%- article.body_html %></div>
 
+    <% if (article.is_evergreen) { %>
+    <p style="background: var(--sand-100); border-left: 3px solid var(--gold-500); padding: 12px 16px; font-size: 13px; color: var(--ink-600); margin-top: 24px;">
+      <strong>Heads up:</strong> this guide may contain affiliate links. If you book or buy through them, we may earn a small commission at no extra cost to you — it helps keep The Florida Buzz running.
+    </p>
+    <% } %>
+
+    <% if (article.is_evergreen) { %>
+    <p class="source-note">
+      Written and researched by The Florida Buzz staff.
+    </p>
+    <% } else { %>
     <p class="source-note">
       Originally reported by <a href="<%= article.source_url %>" target="_blank" rel="noopener"><%= article.source_name %></a>.
       The Florida Buzz summarizes official announcements in our own words and links back to the source.
     </p>
+    <% } %>
   </article>
 
   <% if (related && related.length) { %>
