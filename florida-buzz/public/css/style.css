@@ -284,17 +284,10 @@ img { max-width: 100%; display: block; }
 .article-body strong { color: var(--ink-900); }
 .article-body a { color: var(--coral-600); text-decoration: underline; }
 .article-body a.shop-link {
-  display: inline-block;
-  background: var(--coral-500);
-  color: white;
-  text-decoration: none;
+  color: var(--coral-600);
   font-weight: 700;
-  padding: 3px 12px 3px 8px;
-  border-radius: 4px;
-  font-size: 15px;
+  text-decoration: underline;
 }
-.article-body a.shop-link:hover { background: var(--coral-600); }
-.article-body a.shop-link::before { content: '🛒 '; }
 .source-note {
   margin-top: 32px;
   padding-top: 20px;
