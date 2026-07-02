@@ -1,0 +1,28 @@
+<%- include('partials/header', { pageTitle: 'Florida Travel Guides — The Florida Buzz', pageDescription: 'In-depth, evergreen guides to Florida — springs, theme parks, beaches, and more.', category: null, tickerItems: ticker, canonicalPath: '/guides' }) %>
+
+<main class="wrap">
+  <section class="section" style="border-bottom:none; padding-bottom:0;">
+    <span class="eyebrow">Guides</span>
+    <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;">Florida Travel Guides</h1>
+    <p style="color:var(--ink-600); margin-top:10px; max-width:640px;">Deeper, researched guides that don't go stale — the stuff you'd actually plan a trip around.</p>
+  </section>
+
+  <section class="section">
+    <% if (!guides.length) { %>
+      <p style="color:var(--ink-600);">No guides published yet — check back soon.</p>
+    <% } else { %>
+    <div class="grid">
+      <% guides.forEach(g => { %>
+        <a href="/article/<%= g.slug %>" class="card">
+          <div class="card-image"><img src="<%= g.image_url || placeholderImg(g.category) %>" alt="<%= g.title %>"></div>
+          <span class="tag"><%= categoryLabels[g.category] %></span>
+          <h3><%= g.title %></h3>
+          <p class="dek-sm"><%= g.dek %></p>
+        </a>
+      <% }) %>
+    </div>
+    <% } %>
+  </section>
+</main>
+
+<%- include('partials/footer') %>
