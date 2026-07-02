@@ -8,6 +8,40 @@ const { generateImage } = require('./openai');
 // the image model's own content policy blocks most of this anyway, but we ask
 // cleanly up front rather than relying on that as the only safeguard.
 async function generateArticleImage({ title, category, slug }) {
+  // Theme parks get a different treatment: attempts at a generic "big thrill ride"
+  // scene kept drifting into unrelated territory (or risked looking too close to
+  // real, trademarked parks). A travel-planning flat-lay sidesteps both problems —
+  // it's about the trip, not the place, so there's no real scene to get wrong.
+  if (category === 'theme-parks') {
+    const flatLaySystem = `You write concise, vivid prompts for an AI image generator,
+for a Florida travel site called The Florida Buzz. Write a prompt for an overhead
+flat-lay photo of travel-planning essentials on a wooden table or beach towel:
+things like a paper park map or brochure (blank/generic, no real logos or text),
+sunglasses, a phone showing a blank map app, a wristband or lanyard (no branding),
+ticket stubs (generic, no real park or airline names/logos), a small palm leaf,
+sunscreen, maybe a passport. Bright, warm, editorial travel-blog photography style.
+Absolutely no real logos, no readable brand names, no copyrighted characters.
+Respond with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
+
+    let imagePrompt;
+    try {
+      imagePrompt = await askClaude(flatLaySystem, `Headline: ${title}`, 150);
+    } catch (err) {
+      console.error(`  [error] Could not write image prompt: ${err.message}`);
+      return null;
+    }
+
+    let imageBuffer;
+    try {
+      imageBuffer = await generateImage(`${imagePrompt}. Photorealistic, warm natural lighting, overhead flat-lay editorial photography style.`);
+    } catch (err) {
+      console.error(`  [error] Image generation failed: ${err.message}`);
+      return null;
+    }
+
+    return storeGeneratedImage(imageBuffer, `${slug}.png`);
+  }
+
   const promptSystem = `You write concise, vivid prompts for an AI image generator, for
 a Florida lifestyle news site called The Florida Buzz. The image accompanies an article
 but must NOT depict the specific real event, any real named person, or any
@@ -25,14 +59,11 @@ coastline, however moody or dramatic that might otherwise look.
 
 Use the specific headline to pick a specific, relevant scene — not just the category.
 A springs guide should show a natural spring (clear blue-green water, limestone, tubers
-or swimmers), not a generic beach. A theme park guide should show a busy theme park.
+or swimmers), not a generic beach.
 
 Write a prompt for a generic, warm, photorealistic scene that captures the general mood
-and setting of the article while staying geographically accurate to Florida.
-For theme-parks specifically, aim for the scale and energy of an actual major park —
-crowds, large thrill rides, colorful queue areas, string lights, nighttime park glow —
-not a quiet resort walkway. Respond with ONLY the image prompt text, nothing else —
-no preamble, no quotes.`;
+and setting of the article while staying geographically accurate to Florida. Respond
+with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
 
   const promptUser = `Headline: ${title}\nCategory: ${category}`;
 
