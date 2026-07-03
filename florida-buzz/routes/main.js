@@ -182,6 +182,71 @@ router.post('/subscribe', async (req, res) => {
   res.redirect('/?subscribed=1');
 });
 
+function escapeXml(str) {
+  return (str || '').replace(/[<>&'"]/g, (c) => ({
+    '<': '&lt;',
+    '>': '&gt;',
+    '&': '&amp;',
+    "'": '&apos;',
+    '"': '&quot;',
+  }[c]));
+}
+
+function cdata(str) {
+  return `<![CDATA[${(str || '').replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+}
+
+function guessImageMime(url) {
+  if (!url) return 'image/jpeg';
+  if (url.endsWith('.png')) return 'image/png';
+  if (url.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+// Full-content RSS feed of real site articles — this is what Flipboard (and
+// similar RSS-based distribution platforms) needs to pull from. Flipboard
+// specifically requires: full content (not just an excerpt), at least one
+// image per item, and enough items in the feed for review. All handled here.
+router.get('/feed.xml', async (req, res) => {
+  const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
+  const articles = (await getArticles({ limit: 50 })).filter((a) => !a.slug.startsWith('sample-'));
+
+  const items = articles
+    .map((a) => {
+      const url = `${siteUrl}/article/${a.slug}`;
+      const pubDate = new Date(a.published_at).toUTCString();
+      const image = a.image_url || placeholderImg(a.category);
+      const fullBody = image ? `<img src="${image}" alt="${escapeXml(a.title)}" />\n${a.body_html}` : a.body_html;
+
+      return `  <item>
+    <title>${escapeXml(a.title)}</title>
+    <link>${url}</link>
+    <guid isPermaLink="true">${url}</guid>
+    <pubDate>${pubDate}</pubDate>
+    <category>${escapeXml(CATEGORY_LABELS[a.category] || a.category)}</category>
+    <description>${cdata(a.dek)}</description>
+    <content:encoded>${cdata(fullBody)}</content:encoded>
+    ${image ? `<enclosure url="${image}" type="${guessImageMime(image)}" length="0" />` : ''}
+  </item>`;
+    })
+    .join('\n');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+  <title>The Florida Buzz</title>
+  <link>${siteUrl}</link>
+  <description>Florida travel, theme parks, beaches, and lifestyle news and guides.</description>
+  <language>en-us</language>
+  <atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="${siteUrl}/feed.xml" rel="self" type="application/rss+xml" />
+${items}
+</channel>
+</rss>`;
+
+  res.set('Content-Type', 'application/rss+xml; charset=UTF-8');
+  res.send(xml);
+});
+
 router.get('/sitemap.xml', async (req, res) => {
   const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
   const articles = await getArticles({ limit: 1000 });
