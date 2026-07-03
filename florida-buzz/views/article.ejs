@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: article.title + ' — The Florida Buzz', pageDescription: article.dek, category: article.category, tickerItems: ticker, canonicalPath: '/article/' + article.slug, pageImage: article.image_url || placeholderImg(article.category), ogType: 'article' }) %>
+<%- include('partials/header', { pageTitle: (article.meta_title || article.title) + ' — The Florida Buzz', pageDescription: article.dek, category: article.category, tickerItems: ticker, canonicalPath: '/article/' + article.slug, pageImage: article.image_url || placeholderImg(article.category), ogType: 'article' }) %>
 
 <main class="wrap">
   <article class="article-page">
