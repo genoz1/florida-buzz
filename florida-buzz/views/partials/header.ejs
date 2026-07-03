@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'The Florida Buzz' %></title>
   <meta name="description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'Florida theme parks, beaches, space launches, wildlife, and travel — sourced straight from the official channels.' %>">
+  <meta name="robots" content="max-image-preview:large">
   <link rel="canonical" href="<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') + (typeof canonicalPath !== 'undefined' ? canonicalPath : '') %>">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
