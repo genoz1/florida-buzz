@@ -38,6 +38,15 @@ function pickWeightedByline() {
   return entries[0][0];
 }
 
+// Theme park guides skew heavily toward your byline, and anything specifically
+// about Disney always uses it — everything else keeps the general ~33% mix above.
+function pickByline(category, topicText) {
+  const isDisney = /disney/i.test(topicText || '');
+  if (category === 'theme-parks' && isDisney) return 'Gene Zentko';
+  if (category === 'theme-parks') return Math.random() < 0.75 ? 'Gene Zentko' : 'The Florida Buzz Team';
+  return pickWeightedByline();
+}
+
 function slugify(title) {
   return title
     .toLowerCase()
@@ -279,9 +288,6 @@ async function run() {
   const category = pickWeightedCategory();
   console.log(`Category for today: ${category}`);
 
-  const byline = pickWeightedByline();
-  console.log(`Byline for today: ${byline}`);
-
   const existingTitles = await getExistingGuideTitles();
   console.log(`Found ${existingTitles.length} existing guide(s) on record.`);
 
@@ -295,6 +301,9 @@ async function run() {
   }
   console.log(`  Topic: ${topicPick.topic}`);
   console.log(`  Working title: ${topicPick.working_title}`);
+
+  const byline = pickByline(category, `${topicPick.topic} ${topicPick.working_title}`);
+  console.log(`Byline for today: ${byline}`);
 
   console.log('Researching and writing the guide (this can take a minute)...');
   let guide;
