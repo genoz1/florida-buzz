@@ -90,6 +90,14 @@ img { max-width: 100%; display: block; }
   font-style: italic;
   color: var(--coral-600);
 }
+.logo .tm {
+  font-size: 12px;
+  font-weight: 400;
+  vertical-align: super;
+  margin-left: 1px;
+  color: var(--teal-900);
+  opacity: 0.7;
+}
 .nav-links {
   display: flex;
   gap: 26px;
