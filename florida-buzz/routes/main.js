@@ -164,6 +164,14 @@ router.get('/privacy', (req, res) => {
   res.render('privacy');
 });
 
+router.get('/about', (req, res) => {
+  res.render('about');
+});
+
+router.get('/terms', (req, res) => {
+  res.render('terms');
+});
+
 router.post('/subscribe', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
@@ -254,6 +262,9 @@ router.get('/sitemap.xml', async (req, res) => {
   const staticUrls = [
     { loc: siteUrl, priority: '1.0' },
     ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
+    { loc: `${siteUrl}/about`, priority: '0.5' },
+    { loc: `${siteUrl}/privacy`, priority: '0.3' },
+    { loc: `${siteUrl}/terms`, priority: '0.3' },
   ];
 
   const articleUrls = articles
