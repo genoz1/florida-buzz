@@ -96,6 +96,7 @@ You ONLY use facts present in the source material. You never invent quotes, date
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "title": "string, original headline, under 70 characters",
+  "meta_title": "string, under 60 characters, written the way a person would phrase a Google search for this topic — lead with the specific place, attraction, or subject name, plus what changed (e.g. 'Magic Kingdom Lightning Lane Prices July 2026' not a clever headline). This is for the browser tab and Google search result, not the on-page headline — it should read naturally, not keyword-stuffed.",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, 3-5 short paragraphs as <p> tags, original wording, ends with a sentence crediting the source by name",
   "fb_caption": "string, Facebook post: 1-2 punchy sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags",
@@ -271,6 +272,7 @@ async function run() {
 
     if (DRY_RUN) {
       console.log(`  [dry-run] Title: ${article.title}`);
+      console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
       console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? 'real photo found' : '(would generate — no real photo, skipped in dry-run)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
@@ -280,6 +282,7 @@ async function run() {
       const { error } = await supabase.from('articles').insert({
         slug,
         title: article.title,
+        meta_title: article.meta_title,
         dek: article.dek,
         body_html: article.body_html,
         category: source.category,
