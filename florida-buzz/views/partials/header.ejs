@@ -6,6 +6,7 @@
   <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'The Florida Buzz' %></title>
   <meta name="description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'Florida theme parks, beaches, space launches, wildlife, and travel — sourced straight from the official channels.' %>">
   <link rel="canonical" href="<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') + (typeof canonicalPath !== 'undefined' ? canonicalPath : '') %>">
+  <link rel="alternate" type="application/rss+xml" title="The Florida Buzz" href="<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/feed.xml">
 
   <meta property="og:title" content="<%= typeof pageTitle !== 'undefined' ? pageTitle : 'The Florida Buzz' %>">
   <meta property="og:description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'Florida theme parks, beaches, space launches, wildlife, and travel — sourced straight from the official channels.' %>">
