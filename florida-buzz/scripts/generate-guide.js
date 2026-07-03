@@ -20,6 +20,24 @@ const CATEGORY_WEIGHTS = {
   space: 1,
 };
 
+// Byline shown as the guide's author — mostly the team byline, with your name
+// on roughly a third of guides. Adjust the weights any time to shift the mix.
+const BYLINE_WEIGHTS = {
+  'The Florida Buzz Team': 67,
+  'Gene Zentko': 33,
+};
+
+function pickWeightedByline() {
+  const entries = Object.entries(BYLINE_WEIGHTS);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (const [byline, weight] of entries) {
+    if (roll < weight) return byline;
+    roll -= weight;
+  }
+  return entries[0][0];
+}
+
 function slugify(title) {
   return title
     .toLowerCase()
@@ -241,6 +259,9 @@ async function run() {
   const category = pickWeightedCategory();
   console.log(`Category for today: ${category}`);
 
+  const byline = pickWeightedByline();
+  console.log(`Byline for today: ${byline}`);
+
   const existingTitles = await getExistingGuideTitles();
   console.log(`Found ${existingTitles.length} existing guide(s) on record.`);
 
@@ -275,6 +296,7 @@ async function run() {
 
   if (DRY_RUN) {
     console.log(`\n[dry-run] Title: ${guide.title}`);
+    console.log(`[dry-run] Byline: ${byline}`);
     console.log(`[dry-run] Dek: ${guide.dek}`);
     console.log(`[dry-run] Body HTML:\n${guide.body_html}`);
     console.log(`[dry-run] FB caption: ${guide.fb_caption}`);
@@ -295,7 +317,7 @@ async function run() {
     dek: guide.dek,
     body_html: guide.body_html,
     category,
-    source_name: 'The Florida Buzz Team',
+    source_name: byline,
     source_url: SITE_URL,
     image_url: imageUrl,
     fb_caption: guide.fb_caption,
