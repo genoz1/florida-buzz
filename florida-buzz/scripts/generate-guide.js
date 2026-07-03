@@ -75,6 +75,15 @@ function parseJsonResponse(text, label) {
   }
 }
 
+// Safety net: the model is instructed not to leave citation markup in body_html,
+// but web-search-grounded writing occasionally leaks text
+// wrappers anyway. Strip the tags while keeping the wrapped text, so a published
+// guide never shows raw citation syntax even if the prompt instruction gets missed.
+function stripCitationTags(html) {
+  if (!html) return html;
+  return html.replace(/<cite[^>]*>([\s\S]*?)<\/cite>/gi, '$1');
+}
+
 async function pickTopic(category, existingTitles) {
   const sameCategory = existingTitles.filter((g) => g.category === category).map((g) => g.title);
   const otherTitles = existingTitles.filter((g) => g.category !== category).map((g) => g.title);
@@ -140,6 +149,11 @@ charger, a cooling towel, etc.), insert a placeholder link instead of naming a r
 product: <a href="AFFILIATE_LINK_PLACEHOLDER" class="shop-link">short descriptive
 text</a>. Use at most 2-3 of these, only where genuinely natural — don't force it.
 
+CRITICAL: body_html is published directly on the site as-is. Never include 
+tags, citation indices, footnote markers, or any other research/citation annotation
+syntax — write plain narrative HTML only. Facts from your research should read as
+confident, natural prose with no visible trace of the research process itself.
+
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "title": "string, under 70 characters",
@@ -156,7 +170,9 @@ Working title idea: ${workingTitle}`;
 
   const { text, searchesUsed } = await askClaudeWithSearch(system, user, 3000, 12);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
-  return parseJsonResponse(text, 'guide');
+  const guide = parseJsonResponse(text, 'guide');
+  guide.body_html = stripCitationTags(guide.body_html);
+  return guide;
 }
 
 async function postToFacebook({ fb_caption, slug }) {
