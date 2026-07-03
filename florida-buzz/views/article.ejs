@@ -13,6 +13,35 @@
 
     <div class="article-body"><%- article.body_html %></div>
 
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      "headline": <%- JSON.stringify(article.title) %>,
+      "description": <%- JSON.stringify(article.dek) %>,
+      "image": [<%- JSON.stringify(article.image_url || placeholderImg(article.category)) %>],
+      "datePublished": <%- JSON.stringify(new Date(article.published_at).toISOString()) %>,
+      "dateModified": <%- JSON.stringify(new Date(article.published_at).toISOString()) %>,
+      "author": {
+        "@type": "Organization",
+        "name": "Florida Buzz",
+        "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Florida Buzz",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/apple-touch-icon.png"
+        }
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') + '/article/' + article.slug %>"
+      }
+    }
+    </script>
+
     <% if (article.is_evergreen) { %>
     <p style="background: var(--sand-100); border-left: 3px solid var(--gold-500); padding: 12px 16px; font-size: 13px; color: var(--ink-600); margin-top: 24px;">
       <strong>Heads up:</strong> this guide may contain affiliate links. If you book or buy through them, we may earn a small commission at no extra cost to you — it helps keep The Florida Buzz running.
