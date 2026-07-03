@@ -102,6 +102,22 @@ function stripCitationTags(html) {
   return html.replace(/<cite[^>]*>([\s\S]*?)<\/cite>/gi, '$1');
 }
 
+const AMAZON_ASSOCIATES_TAG = process.env.AMAZON_ASSOCIATES_TAG || 'floridabuzz-20';
+
+// Converts the model's href="AFFILIATE_SEARCH:some product" markers into real,
+// working Amazon search links with your Associates tag attached — no product
+// picking or API calls needed, just a keyword search results page. Also adds
+// target/rel attributes, which Amazon's program terms and search engines both
+// expect on sponsored/affiliate links.
+function convertAffiliateLinks(html) {
+  if (!html) return html;
+  return html.replace(/href="AFFILIATE_SEARCH:([^"]+)"/gi, (match, query) => {
+    const cleanQuery = query.trim();
+    const url = `https://www.amazon.com/s?k=${encodeURIComponent(cleanQuery)}&tag=${AMAZON_ASSOCIATES_TAG}`;
+    return `href="${url}" target="_blank" rel="nofollow sponsored noopener"`;
+  });
+}
+
 async function pickTopic(category, existingTitles) {
   const sameCategory = existingTitles.filter((g) => g.category === category).map((g) => g.title);
   const otherTitles = existingTitles.filter((g) => g.category !== category).map((g) => g.title);
@@ -163,9 +179,12 @@ the parks. Where a rule or process could plausibly change over time, add a brief
 current details before you go" caveat rather than stating it as permanently fixed.
 
 For any specific product it would be natural to recommend (a lanyard, a portable
-charger, a cooling towel, etc.), insert a placeholder link instead of naming a real
-product: <a href="AFFILIATE_LINK_PLACEHOLDER" class="shop-link">short descriptive
-text</a>. Use at most 2-3 of these, only where genuinely natural — don't force it.
+charger, a cooling towel, etc.), insert a link using this exact format instead of a
+real product URL: <a href="AFFILIATE_SEARCH:short product search term" class="shop-link">
+short descriptive text</a> — where "short product search term" is 2-4 plain words
+someone would type into a shopping search bar (e.g. "polarized sunglasses" or
+"water resistant phone pouch"), NOT a full sentence. Use at most 2-3 of these, only
+where genuinely natural — don't force it.
 
 CRITICAL: body_html is published directly on the site as-is. Never include 
 tags, citation indices, footnote markers, or any other research/citation annotation
@@ -190,6 +209,7 @@ Working title idea: ${workingTitle}`;
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   const guide = parseJsonResponse(text, 'guide');
   guide.body_html = stripCitationTags(guide.body_html);
+  guide.body_html = convertAffiliateLinks(guide.body_html);
   return guide;
 }
 
