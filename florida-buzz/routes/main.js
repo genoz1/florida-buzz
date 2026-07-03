@@ -14,6 +14,49 @@ const CATEGORY_LABELS = {
 };
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS);
 
+const CATEGORY_SEO = {
+  'theme-parks': {
+    title: 'Disney World & Universal Orlando News',
+    description: 'Daily news, ride updates, price changes, and planning tips for Walt Disney World, Universal Orlando, and Central Florida\u2019s theme parks.',
+    intro: 'The latest on Walt Disney World, Universal Orlando, and Central Florida\u2019s theme parks \u2014 ride closures, price changes, new attractions, and planning tips.',
+  },
+  space: {
+    title: 'Florida Space Launches & NASA News',
+    description: 'Launch schedules, NASA updates, and Space Coast news from Cape Canaveral and Kennedy Space Center.',
+    intro: 'Live launch schedules, NASA updates, and Space Coast news from Cape Canaveral and Kennedy Space Center.',
+  },
+  beaches: {
+    title: 'Florida Beaches Guide & News',
+    description: 'Beach conditions, top spots, and coastal news from the Gulf Coast to the Atlantic side of Florida.',
+    intro: 'Beach conditions, top spots, and coastal news from the Gulf Coast to the Atlantic side of Florida.',
+  },
+  'florida-living': {
+    title: 'Florida Living News & Lifestyle',
+    description: 'Weather, local culture, and everyday Florida living \u2014 news for residents and transplants alike.',
+    intro: 'Weather, local culture, and everyday Florida living \u2014 news for residents and transplants alike.',
+  },
+  wildlife: {
+    title: 'Florida Wildlife News',
+    description: 'Manatee sightings, gator news, conservation updates, and wildlife encounters from across Florida.',
+    intro: 'Manatee sightings, gator news, conservation updates, and wildlife encounters from across Florida.',
+  },
+  cruises: {
+    title: 'Florida Cruise News',
+    description: 'Port Canaveral and Florida cruise line news, new itineraries, and sailing updates.',
+    intro: 'Port Canaveral and Florida cruise line news, new itineraries, and sailing updates.',
+  },
+  food: {
+    title: 'Florida Food & Restaurant News',
+    description: 'New restaurants, food festivals, and dining news from across Florida.',
+    intro: 'New restaurants, food festivals, and dining news from across Florida.',
+  },
+  events: {
+    title: 'Florida Events & Festivals',
+    description: 'Festivals, fireworks, holiday events, and things to do across Florida.',
+    intro: 'Festivals, fireworks, holiday events, and things to do across Florida.',
+  },
+};
+
 function placeholderImg(category) {
   const seedMap = {
     'theme-parks': 'fc-theme-parks',
@@ -117,12 +160,16 @@ router.get('/category/:cat', async (req, res) => {
 
   const articles = await getArticles({ category: cat });
   const ticker = await getArticles({ limit: 8 });
+  const seo = CATEGORY_SEO[cat] || {};
 
   res.render('category', {
     category: cat,
     articles,
     ticker,
     categoryLabels: CATEGORY_LABELS,
+    seoTitle: seo.title,
+    seoDescription: seo.description,
+    seoIntro: seo.intro,
     placeholderImg,
     timeAgo,
   });
