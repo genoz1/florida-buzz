@@ -13,6 +13,7 @@ create table if not exists articles (
   fb_caption text,                    -- the social caption generated alongside the article
   fb_posted boolean default false,
   featured boolean default false,
+  is_evergreen boolean default false, -- true for reference guides (vs. dated news items); already live in Supabase, documented here for reference
   published_at timestamptz default now(),
   created_at timestamptz default now()
 );
