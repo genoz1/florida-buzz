@@ -40,6 +40,20 @@ function slugify(title) {
     .slice(0, 80);
 }
 
+async function generateUniqueSlug(baseTitle) {
+  const base = slugify(baseTitle);
+  if (!supabase) return `${base}-${Date.now().toString(36)}`;
+
+  let candidate = base;
+  let suffix = 2;
+  while (true) {
+    const { data } = await supabase.from('articles').select('slug').eq('slug', candidate).maybeSingle();
+    if (!data) return candidate;
+    candidate = `${base}-${suffix}`;
+    suffix += 1;
+  }
+}
+
 const KNOWN_SOURCE_NAMES = {
   'disneyparksblog.com': 'Disney Parks Blog',
   'disneytouristblog.com': 'Disney Tourist Blog',
@@ -256,7 +270,7 @@ async function run() {
       continue;
     }
 
-    const slug = `${slugify(article.title)}-${Date.now().toString(36)}`;
+    const slug = await generateUniqueSlug(article.meta_title || article.title);
 
     let finalImage;
     if (source.preferAI) {
