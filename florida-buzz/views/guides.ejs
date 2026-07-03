@@ -14,7 +14,7 @@
     <div class="grid">
       <% guides.forEach(g => { %>
         <a href="/article/<%= g.slug %>" class="card">
-          <div class="card-image"><img src="<%= g.image_url || placeholderImg(g.category) %>" alt="<%= g.title %>"></div>
+          <div class="card-image"><img src="<%= g.image_url || placeholderImg(g.category) %>" alt="<%= g.title %>" width="480" height="300" loading="lazy"></div>
           <span class="tag"><%= categoryLabels[g.category] %></span>
           <h3><%= g.title %></h3>
           <p class="dek-sm"><%= g.dek %></p>
