@@ -16,7 +16,7 @@
     <div class="grid">
       <% articles.forEach(a => { %>
         <a href="/article/<%= a.slug %>" class="card">
-          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy"></div>
           <h3><%= a.title %></h3>
           <p class="dek-sm"><%= a.dek %></p>
           <p class="byline"><%= timeAgo(a.published_at) %></p>
