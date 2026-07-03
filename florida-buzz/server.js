@@ -35,6 +35,23 @@ if (process.env.ANTHROPIC_API_KEY) {
   console.log('Automation NOT scheduled — set ANTHROPIC_API_KEY to enable.');
 }
 
+// Generates one new evergreen guide per day (web-search-grounded research, then
+// writes, images, and posts it), so the weekly newsletter and /guides page keep
+// getting fresh reference content alongside the news items. Runs before the first
+// news automation pass. Disabled until ANTHROPIC_API_KEY and OPENAI_API_KEY are set.
+if (process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY) {
+  cron.schedule('30 5 * * *', () => {
+    console.log('Running scheduled evergreen guide generation...');
+    require('child_process').exec('node scripts/generate-guide.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  });
+  console.log('Evergreen guide generation scheduled: 5:30am daily.');
+} else {
+  console.log('Evergreen guide generation NOT scheduled — set ANTHROPIC_API_KEY and OPENAI_API_KEY to enable.');
+}
+
 // Sends the weekly digest every Monday at 8am. Disabled until RESEND_API_KEY is set.
 if (process.env.RESEND_API_KEY) {
   cron.schedule('0 8 * * 1', () => {
