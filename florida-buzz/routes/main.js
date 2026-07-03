@@ -68,7 +68,7 @@ function placeholderImg(category) {
     food: 'fc-food',
     events: 'fc-events',
   };
-  return `https://picsum.photos/seed/${seedMap[category] || 'florida'}/800/600`;
+  return `https://picsum.photos/seed/${seedMap[category] || 'florida'}/1600/900`;
 }
 
 function timeAgo(dateStr) {
