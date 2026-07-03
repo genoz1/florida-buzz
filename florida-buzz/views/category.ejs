@@ -1,9 +1,12 @@
-<%- include('partials/header', { pageTitle: categoryLabels[category] + ' — The Florida Buzz', category, tickerItems: ticker, canonicalPath: '/category/' + category }) %>
+<%- include('partials/header', { pageTitle: (typeof seoTitle !== 'undefined' && seoTitle ? seoTitle : categoryLabels[category]) + ' — The Florida Buzz', pageDescription: typeof seoDescription !== 'undefined' ? seoDescription : undefined, category, tickerItems: ticker, canonicalPath: '/category/' + category }) %>
 
 <main class="wrap">
   <section class="section" style="border-bottom:none; padding-bottom:0;">
     <span class="eyebrow"><%= articles.length %> stories</span>
     <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;"><%= categoryLabels[category] %></h1>
+    <% if (typeof seoIntro !== 'undefined' && seoIntro) { %>
+    <p style="color:var(--ink-600); max-width:640px; margin-top:10px;"><%= seoIntro %></p>
+    <% } %>
   </section>
 
   <section class="section">
