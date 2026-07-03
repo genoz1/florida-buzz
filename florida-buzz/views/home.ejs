@@ -5,7 +5,7 @@
   <% if (featured) { %>
   <section class="hero">
     <a href="/article/<%= featured.slug %>" class="hero-image">
-      <img src="<%= featured.image_url || placeholderImg(featured.category) %>" alt="<%= featured.title %>">
+      <img src="<%= featured.image_url || placeholderImg(featured.category) %>" alt="<%= featured.title %>" width="800" height="600" loading="eager">
     </a>
     <div>
       <span class="eyebrow"><%= categoryLabels[featured.category] %></span>
@@ -21,7 +21,7 @@
     <div class="grid">
       <% secondary.forEach(a => { %>
         <a href="/article/<%= a.slug %>" class="card">
-          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy"></div>
           <span class="tag <%= a.featured ? 'featured' : '' %>"><%= categoryLabels[a.category] %></span>
           <h3><%= a.title %></h3>
           <p class="dek-sm"><%= a.dek %></p>
@@ -41,7 +41,7 @@
       <div class="grid">
         <% byCategory[cat].forEach(a => { %>
           <a href="/article/<%= a.slug %>" class="card">
-            <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>"></div>
+            <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy"></div>
             <h3><%= a.title %></h3>
             <p class="dek-sm"><%= a.dek %></p>
             <p class="byline"><%= timeAgo(a.published_at) %></p>
