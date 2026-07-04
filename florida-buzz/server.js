@@ -29,8 +29,8 @@ if (process.env.ANTHROPIC_API_KEY) {
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     });
-  });
-  console.log('Automation scheduled: 6am, 11am, 3pm, 7pm daily.');
+  }, { timezone: 'America/New_York' });
+  console.log('Automation scheduled: 6am, 11am, 3pm, 7pm daily (Eastern time).');
 } else {
   console.log('Automation NOT scheduled — set ANTHROPIC_API_KEY to enable.');
 }
@@ -46,8 +46,8 @@ if (process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY) {
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     });
-  });
-  console.log('Evergreen guide generation scheduled: 5:30am daily.');
+  }, { timezone: 'America/New_York' });
+  console.log('Evergreen guide generation scheduled: 5:30am daily (Eastern time).');
 } else {
   console.log('Evergreen guide generation NOT scheduled — set ANTHROPIC_API_KEY and OPENAI_API_KEY to enable.');
 }
@@ -60,8 +60,8 @@ if (process.env.RESEND_API_KEY) {
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     });
-  });
-  console.log('Newsletter scheduled: Mondays at 8am.');
+  }, { timezone: 'America/New_York' });
+  console.log('Newsletter scheduled: Mondays at 8am (Eastern time).');
 } else {
   console.log('Newsletter NOT scheduled — set RESEND_API_KEY to enable.');
 }
