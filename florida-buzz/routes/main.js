@@ -350,4 +350,16 @@ Allow: /
 Sitemap: ${siteUrl}/sitemap.xml`);
 });
 
+// Required by AdSense once approved. ADSENSE_CLIENT_ID should be the full
+// value Google gives you, like "ca-pub-1234567890123456" — this route pulls
+// out just the "pub-..." part ads.txt expects. Returns an empty file (still
+// valid) until the env var is set, so this is safe to deploy ahead of time.
+router.get('/ads.txt', (req, res) => {
+  res.set('Content-Type', 'text/plain');
+  const clientId = process.env.ADSENSE_CLIENT_ID; // e.g. "ca-pub-1234567890123456"
+  if (!clientId) return res.send('');
+  const pubId = clientId.replace(/^ca-/, '');
+  res.send(`google.com, ${pubId}, DIRECT, f08c47fec0942fa0`);
+});
+
 module.exports = router;
