@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { imageSize } = require('image-size');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   console.warn('[supabase] SUPABASE_URL / SUPABASE_SERVICE_KEY not set yet — site will run with sample data only.');
@@ -7,6 +8,27 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
 const supabase = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
   : null;
+
+// Standard IAB ad-unit dimensions. A real editorial/hero photo essentially
+// never happens to match one of these exact pixel sizes — these are specific,
+// widely-used ad banner specs, not coincidental photo dimensions. Any download
+// matching one of these (or too small to be a real hero image) is almost
+// certainly an ad or icon that slipped through a source's feed metadata,
+// not the article's actual photo.
+const AD_DIMENSIONS = [
+  '300x250', '336x280', '728x90', '970x250', '160x600', '300x600',
+  '320x50', '320x100', '970x90', '468x60', '234x60', '88x31', '300x50',
+  '250x250', '200x200', '180x150', '125x125',
+];
+const MIN_HERO_WIDTH = 400;
+const MIN_HERO_HEIGHT = 300;
+
+function looksLikeAd(width, height) {
+  if (!width || !height) return false;
+  if (AD_DIMENSIONS.includes(`${width}x${height}`)) return true;
+  if (width < MIN_HERO_WIDTH || height < MIN_HERO_HEIGHT) return true;
+  return false;
+}
 
 // Uploads generated image bytes to Supabase Storage for permanent hosting.
 // Returns the permanent public URL, or null if anything fails.
@@ -52,6 +74,19 @@ async function storeImageFromUrl(sourceUrl, filename) {
     const contentType = res.headers.get('content-type') || 'image/jpeg';
     const arrayBuffer = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    try {
+      const dims = imageSize(buffer);
+      if (looksLikeAd(dims.width, dims.height)) {
+        console.log(`  [reject] Downloaded image is ${dims.width}x${dims.height} — matches a known ad size or is too small to be a real hero photo. Skipping.`);
+        return null;
+      }
+    } catch (dimErr) {
+      // If we can't even read the dimensions, treat it the same as a rejected
+      // ad image rather than risk storing something broken or unreadable.
+      console.log(`  [reject] Could not read image dimensions (${dimErr.message}) — skipping rather than risk a bad file.`);
+      return null;
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')
