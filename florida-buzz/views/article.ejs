@@ -5,7 +5,7 @@
     <span class="eyebrow"><%= categoryLabels[article.category] %></span>
     <h1><%= article.title %></h1>
     <p class="dek"><%= article.dek %></p>
-    <p class="byline">By The Florida Buzz staff &middot; <%= timeAgo(article.published_at) %></p>
+    <p class="byline">By <%= article.is_evergreen ? article.source_name : 'The Florida Buzz staff' %> &middot; <%= timeAgo(article.published_at) %></p>
 
     <div class="hero-image" style="margin: 22px 0;">
       <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>" width="800" height="600" loading="eager" onerror="this.onerror=null;this.src='<%= placeholderImg(article.category) %>';">
@@ -58,7 +58,7 @@
 
     <% if (article.is_evergreen) { %>
     <p class="source-note">
-      Written and researched by The Florida Buzz staff.
+      Written and researched by <%= article.source_name %>.
     </p>
     <% } else { %>
     <p class="source-note">
