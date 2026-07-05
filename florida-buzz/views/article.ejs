@@ -8,10 +8,18 @@
     <p class="byline">By The Florida Buzz staff &middot; <%= timeAgo(article.published_at) %></p>
 
     <div class="hero-image" style="margin: 22px 0;">
-      <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>" width="800" height="600" loading="eager">
+      <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>" width="800" height="600" loading="eager" onerror="this.onerror=null;this.src='<%= placeholderImg(article.category) %>';">
     </div>
 
     <div class="article-body"><%- article.body_html %></div>
+
+    <% if (article.category === 'theme-parks' && process.env.UNDERCOVER_TOURIST_URL) { %>
+    <div style="margin: 28px 0; padding: 20px; background: var(--sand-100); border-radius: 4px; text-align: center;">
+      <p style="margin: 0 0 12px; font-size: 15px; color: var(--ink-900);">Planning a trip? Compare current ticket prices before you book.</p>
+      <a href="<%= process.env.UNDERCOVER_TOURIST_URL %>" target="_blank" rel="nofollow sponsored noopener" class="btn" style="display: inline-block;">Check Ticket Prices at Undercover Tourist &rarr;</a>
+      <p style="margin: 12px 0 0; font-size: 12px; color: var(--ink-600);">We may earn a commission if you book through this link, at no extra cost to you.</p>
+    </div>
+    <% } %>
 
     <script type="application/ld+json">
     {
@@ -66,7 +74,7 @@
     <div class="grid">
       <% related.forEach(a => { %>
         <a href="/article/<%= a.slug %>" class="card">
-          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy"></div>
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy" onerror="this.onerror=null;this.src='<%= placeholderImg(a.category) %>';"></div>
           <h3><%= a.title %></h3>
           <p class="dek-sm"><%= a.dek %></p>
         </a>
