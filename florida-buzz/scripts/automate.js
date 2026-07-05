@@ -1,9 +1,10 @@
 require('dotenv').config();
 const Parser = require('rss-parser');
-const { supabase, storeGeneratedImage } = require('../lib/supabase');
+const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/supabase');
 const { askClaude } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
+const { postToFacebookPage } = require('../lib/facebook');
 const SOURCES = require('./sources');
 
 const parser = new Parser({
@@ -144,35 +145,8 @@ Source link (for context only, do not include in body_html): ${sourceUrl}`;
 }
 
 async function postToFacebook({ title, fb_caption, source_url, slug }) {
-  if (DRY_RUN) {
-    console.log(`  [dry-run] Would post to Facebook: "${fb_caption}"`);
-    return true;
-  }
-  if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
-    console.log('  [skip] FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN not set — skipping Facebook post.');
-    return false;
-  }
-
   const articleUrl = `${process.env.SITE_URL}/article/${slug}`;
-
-  const res = await fetch(
-    `https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: fb_caption,
-        link: articleUrl,
-        access_token: process.env.FB_PAGE_ACCESS_TOKEN,
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    console.error(`  [error] Facebook post failed: ${await res.text()}`);
-    return false;
-  }
-  return true;
+  return postToFacebookPage({ message: fb_caption, link: articleUrl, dryRun: DRY_RUN });
 }
 
 async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
@@ -277,8 +251,20 @@ async function run() {
       console.log(`  This source is set to always use AI images — generating...`);
       finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
     } else if (realImage) {
-      console.log(`  Using real photo from source article.`);
-      finalImage = realImage;
+      if (DRY_RUN) {
+        console.log(`  [dry-run] Would download and permanently store real photo from source.`);
+        finalImage = null;
+      } else {
+        console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
+        const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`);
+        if (storedUrl) {
+          console.log(`  Stored real photo permanently.`);
+          finalImage = storedUrl;
+        } else {
+          console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
+          finalImage = await generateArticleImage({ title: article.title, category: source.category, slug });
+        }
+      }
     } else {
       console.log(`  No real photo found — generating one...`);
       finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
@@ -288,7 +274,7 @@ async function run() {
       console.log(`  [dry-run] Title: ${article.title}`);
       console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
-      console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? 'real photo found' : '(would generate — no real photo, skipped in dry-run)'}`);
+      console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
       console.log(`  [dry-run] Pin title: ${article.pin_title}`);
       console.log(`  [dry-run] Pin description: ${article.pin_description}`);
