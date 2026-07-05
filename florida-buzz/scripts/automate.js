@@ -23,6 +23,17 @@ const DRY_RUN = process.env.DRY_RUN === 'true';
 // checked item costs a safety-check call, and if it passes, a writing call
 // and possibly an image-generation call). Tune based on cost comfort.
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
+// Minutes to wait between Facebook posts within a single run, so a burst of
+// several new articles doesn't all hit the Page in the same minute. Articles
+// still save to the site immediately either way — only the Facebook posting
+// is spread out. Keep this modest: with up to 14 sources x 3 items, a run
+// could have a dozen+ posts, and a long delay could push a run's total time
+// close to the ~4-5 hour gap between scheduled runs.
+const FB_POST_DELAY_MINUTES = parseInt(process.env.FB_POST_DELAY_MINUTES, 10) || 10;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function extractImage(item) {
   if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) {
@@ -203,6 +214,9 @@ async function markSeen(guid) {
 async function run() {
   console.log(`=== The Florida Buzz automation run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
+  if (!DRY_RUN) console.log(`Facebook posts will be spaced ${FB_POST_DELAY_MINUTES} minute(s) apart within this run.\n`);
+
+  let fbPostCount = 0;
 
   for (const source of SOURCES) {
     console.log(`Checking ${source.name} (${source.category})...`);
@@ -309,7 +323,12 @@ async function run() {
         console.log(`  Saved article: /article/${slug}`);
       }
 
+      if (!DRY_RUN && fbPostCount > 0) {
+        console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before the next Facebook post...`);
+        await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
+      }
       await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
+      fbPostCount += 1;
       await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
       await markSeen(guid);
     }
