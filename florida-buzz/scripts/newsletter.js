@@ -36,7 +36,7 @@ function buildDigestHtml(articles) {
   <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, sans-serif; background: #f2e8d5; padding: 24px;">
     <div style="background: #0e3b43; padding: 24px; text-align: center; border-radius: 4px 4px 0 0;">
       <h1 style="color: #f8f3e8; font-family: Georgia, serif; margin: 0; font-size: 26px;">Florida <span style="color: #ff6452; font-style: italic;">Buzz</span></h1>
-      <p style="color: #f2e8d5; font-size: 13px; margin: 6px 0 0;">This week's roundup</p>
+      <p style="color: #f2e8d5; font-size: 13px; margin: 6px 0 0;">Today's roundup</p>
     </div>
     <div style="background: #f8f3e8; padding: 8px 24px; border-radius: 0 0 4px 4px;">
       <table style="width: 100%; border-collapse: collapse;">
@@ -60,11 +60,11 @@ async function run() {
     return;
   }
 
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: articles, error: articlesError } = await supabase
     .from('articles')
     .select('*')
-    .gte('published_at', oneWeekAgo)
+    .gte('published_at', oneDayAgo)
     .order('published_at', { ascending: false })
     .limit(10);
 
@@ -74,11 +74,11 @@ async function run() {
   }
 
   if (!articles || articles.length === 0) {
-    console.log('No articles published in the past week — skipping send.');
+    console.log('No articles published in the past day — skipping send.');
     return;
   }
 
-  console.log(`Found ${articles.length} articles from the past week.`);
+  console.log(`Found ${articles.length} articles from the past day.`);
 
   const { data: subscribers, error: subsError } = await supabase
     .from('subscribers')
@@ -97,7 +97,7 @@ async function run() {
 
   console.log(`Sending to ${subscribers.length} subscribers...`);
   const html = buildDigestHtml(articles);
-  const subject = `Florida Buzz: ${articles.length} stories from this week`;
+  const subject = `Florida Buzz: ${articles.length} stories from today`;
 
   let sent = 0;
   let failed = 0;
