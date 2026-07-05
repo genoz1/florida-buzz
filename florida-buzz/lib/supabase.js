@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { imageSize } = require('image-size');
+const { Jimp } = require('jimp');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   console.warn('[supabase] SUPABASE_URL / SUPABASE_SERVICE_KEY not set yet — site will run with sample data only.');
@@ -56,7 +57,7 @@ async function storeGeneratedImage(imageBuffer, filename) {
 // that server ever removes the image, changes its URL, or blocks hotlinking.
 // Returns the permanent public URL, or null if the download/store fails for
 // any reason (caller should fall back to AI generation in that case).
-async function storeImageFromUrl(sourceUrl, filename) {
+async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}) {
   if (!supabase) return null;
   try {
     // Some publisher CDNs (Dotdash Meredith properties like Travel + Leisure
@@ -71,9 +72,21 @@ async function storeImageFromUrl(sourceUrl, filename) {
     });
     if (!res.ok) throw new Error(`Source image fetch failed: HTTP ${res.status}`);
 
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    let contentType = res.headers.get('content-type') || 'image/jpeg';
+    let buffer = Buffer.from(await res.arrayBuffer());
+
+    // For sources known to bake a branding banner across the bottom of every
+    // image (e.g. WDW Magic's video-roundup thumbnails), crop that strip off
+    // before doing anything else, rather than discarding the whole real photo
+    // for an AI-generated one. The percentage here is a first-pass estimate —
+    // easy to adjust if it turns out to cut too much or too little.
+    if (cropBottomPercent) {
+      const img = await Jimp.read(buffer);
+      const keepHeight = Math.round(img.height * (1 - cropBottomPercent));
+      img.crop({ x: 0, y: 0, w: img.width, h: keepHeight });
+      buffer = await img.getBuffer('image/jpeg');
+      contentType = 'image/jpeg';
+    }
 
     try {
       const dims = imageSize(buffer);
