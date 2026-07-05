@@ -35,33 +35,54 @@ if (process.env.ANTHROPIC_API_KEY) {
   console.log('Automation NOT scheduled — set ANTHROPIC_API_KEY to enable.');
 }
 
-// Generates one new evergreen guide per day (web-search-grounded research, then
-// writes, images, and posts it), so the weekly newsletter and /guides page keep
-// getting fresh reference content alongside the news items. Runs before the first
-// news automation pass. Disabled until ANTHROPIC_API_KEY and OPENAI_API_KEY are set.
+// Generates new evergreen guides (web-search-grounded research, then writes,
+// images, and posts them), 2x/day, so the daily newsletter and /guides page
+// keep getting fresh reference content alongside the news items. Spaced away
+// from the article automation and promo post times above. Disabled until
+// ANTHROPIC_API_KEY and OPENAI_API_KEY are set.
 if (process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY) {
-  cron.schedule('30 5 * * *', () => {
+  cron.schedule('30 5,16 * * *', () => {
     console.log('Running scheduled evergreen guide generation...');
     require('child_process').exec('node scripts/generate-guide.js', (err, stdout, stderr) => {
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     });
   }, { timezone: 'America/New_York' });
-  console.log('Evergreen guide generation scheduled: 5:30am daily (Eastern time).');
+  console.log('Evergreen guide generation scheduled: 5:30am and 4:30pm daily (Eastern time).');
 } else {
   console.log('Evergreen guide generation NOT scheduled — set ANTHROPIC_API_KEY and OPENAI_API_KEY to enable.');
 }
 
-// Sends the weekly digest every Monday at 8am. Disabled until RESEND_API_KEY is set.
+// Sends the daily digest every day at 8am. Disabled until RESEND_API_KEY is set.
+// NOTE: daily sending is currently blocked upstream by the Wix-to-Cloudflare
+// domain transfer needed for MX records / Resend domain verification — this
+// schedule is set correctly now so it's already right once that unblocks.
 if (process.env.RESEND_API_KEY) {
-  cron.schedule('0 8 * * 1', () => {
+  cron.schedule('0 8 * * *', () => {
     console.log('Running scheduled newsletter send...');
     require('child_process').exec('node scripts/newsletter.js', (err, stdout, stderr) => {
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     });
   }, { timezone: 'America/New_York' });
-  console.log('Newsletter scheduled: Mondays at 8am (Eastern time).');
+  console.log('Newsletter scheduled: daily at 8am (Eastern time).');
 } else {
   console.log('Newsletter NOT scheduled — set RESEND_API_KEY to enable.');
+}
+
+// Posts a promotional (non-article) message to the Facebook Page twice a day,
+// rotating between: general brand awareness, newsletter signup, and a random
+// evergreen guide highlight. Spaced away from the article posting times above.
+// Disabled until FB_PAGE_ID and FB_PAGE_ACCESS_TOKEN are set.
+if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
+  cron.schedule('0 9,20 * * *', () => {
+    console.log('Running scheduled promo post...');
+    require('child_process').exec('node scripts/promo-post.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  }, { timezone: 'America/New_York' });
+  console.log('Promo posts scheduled: 9am and 8pm daily (Eastern time).');
+} else {
+  console.log('Promo posts NOT scheduled — set FB_PAGE_ID and FB_PAGE_ACCESS_TOKEN to enable.');
 }
