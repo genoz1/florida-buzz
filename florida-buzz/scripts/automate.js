@@ -17,6 +17,12 @@ const parser = new Parser({
   },
 });
 const DRY_RUN = process.env.DRY_RUN === 'true';
+// How many of a source's most recent items to check per run, not just the
+// single newest one. Raising this catches posts you'd otherwise silently miss
+// from fast-publishing sources, at the cost of more AI calls per run (each
+// checked item costs a safety-check call, and if it passes, a writing call
+// and possibly an image-generation call). Tune based on cost comfort.
+const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
 
 function extractImage(item) {
   if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) {
@@ -209,98 +215,100 @@ async function run() {
       continue;
     }
 
-    const item = feed.items[0];
-    const guid = item.guid || item.link;
+    const itemsToCheck = feed.items.slice(0, MAX_ITEMS_PER_SOURCE);
+    for (const item of itemsToCheck) {
+      const guid = item.guid || item.link;
 
-    if (await alreadySeen(guid)) {
-      console.log(`  Already covered: "${item.title}"`);
-      continue;
-    }
-
-    console.log(`  New item: "${item.title}" — checking content...`);
-    const summary = item.contentSnippet || item.content || item.title;
-    const ok = await isAppropriate(item.title, summary);
-    if (!ok) {
-      console.log(`  [skip] Flagged as not a fit for the site's tone — skipping.`);
-      await markSeen(guid);
-      continue;
-    }
-
-    console.log(`  Writing article...`);
-    const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
-    const realImage = extractImage(item);
-    let article;
-    try {
-      article = await writeArticle({
-        sourceTitle: item.title,
-        sourceSummary: summary,
-        sourceName: actualSourceName,
-        sourceUrl: item.link,
-        category: source.category,
-      });
-    } catch (err) {
-      console.error(`  [error] AI writing failed: ${err.message}`);
-      await markSeen(guid);
-      continue;
-    }
-
-    const slug = await generateUniqueSlug(article.meta_title || article.title);
-
-    let finalImage;
-    if (source.preferAI) {
-      console.log(`  This source is set to always use AI images — generating...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
-    } else if (realImage) {
-      if (DRY_RUN) {
-        console.log(`  [dry-run] Would download and permanently store real photo from source.`);
-        finalImage = null;
-      } else {
-        console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
-        const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`);
-        if (storedUrl) {
-          console.log(`  Stored real photo permanently.`);
-          finalImage = storedUrl;
-        } else {
-          console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
-          finalImage = await generateArticleImage({ title: article.title, category: source.category, slug });
-        }
-      }
-    } else {
-      console.log(`  No real photo found — generating one...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
-    }
-
-    if (DRY_RUN) {
-      console.log(`  [dry-run] Title: ${article.title}`);
-      console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
-      console.log(`  [dry-run] Dek: ${article.dek}`);
-      console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
-      console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
-      console.log(`  [dry-run] Pin title: ${article.pin_title}`);
-      console.log(`  [dry-run] Pin description: ${article.pin_description}`);
-    } else if (supabase) {
-      const { error } = await supabase.from('articles').insert({
-        slug,
-        title: article.title,
-        meta_title: article.meta_title,
-        dek: article.dek,
-        body_html: article.body_html,
-        category: source.category,
-        source_name: actualSourceName,
-        source_url: item.link,
-        image_url: finalImage,
-        fb_caption: article.fb_caption,
-      });
-      if (error) {
-        console.error(`  [error] Could not save article: ${error.message}`);
+      if (await alreadySeen(guid)) {
+        console.log(`  Already covered: "${item.title}"`);
         continue;
       }
-      console.log(`  Saved article: /article/${slug}`);
-    }
 
-    await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
-    await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
-    await markSeen(guid);
+      console.log(`  New item: "${item.title}" — checking content...`);
+      const summary = item.contentSnippet || item.content || item.title;
+      const ok = await isAppropriate(item.title, summary);
+      if (!ok) {
+        console.log(`  [skip] Flagged as not a fit for the site's tone — skipping.`);
+        await markSeen(guid);
+        continue;
+      }
+
+      console.log(`  Writing article...`);
+      const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
+      const realImage = extractImage(item);
+      let article;
+      try {
+        article = await writeArticle({
+          sourceTitle: item.title,
+          sourceSummary: summary,
+          sourceName: actualSourceName,
+          sourceUrl: item.link,
+          category: source.category,
+        });
+      } catch (err) {
+        console.error(`  [error] AI writing failed: ${err.message}`);
+        await markSeen(guid);
+        continue;
+      }
+
+      const slug = await generateUniqueSlug(article.meta_title || article.title);
+
+      let finalImage;
+      if (source.preferAI) {
+        console.log(`  This source is set to always use AI images — generating...`);
+        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+      } else if (realImage) {
+        if (DRY_RUN) {
+          console.log(`  [dry-run] Would download and permanently store real photo from source.`);
+          finalImage = null;
+        } else {
+          console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
+          const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`);
+          if (storedUrl) {
+            console.log(`  Stored real photo permanently.`);
+            finalImage = storedUrl;
+          } else {
+            console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
+            finalImage = await generateArticleImage({ title: article.title, category: source.category, slug });
+          }
+        }
+      } else {
+        console.log(`  No real photo found — generating one...`);
+        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+      }
+
+      if (DRY_RUN) {
+        console.log(`  [dry-run] Title: ${article.title}`);
+        console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
+        console.log(`  [dry-run] Dek: ${article.dek}`);
+        console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
+        console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
+        console.log(`  [dry-run] Pin title: ${article.pin_title}`);
+        console.log(`  [dry-run] Pin description: ${article.pin_description}`);
+      } else if (supabase) {
+        const { error } = await supabase.from('articles').insert({
+          slug,
+          title: article.title,
+          meta_title: article.meta_title,
+          dek: article.dek,
+          body_html: article.body_html,
+          category: source.category,
+          source_name: actualSourceName,
+          source_url: item.link,
+          image_url: finalImage,
+          fb_caption: article.fb_caption,
+        });
+        if (error) {
+          console.error(`  [error] Could not save article: ${error.message}`);
+          continue;
+        }
+        console.log(`  Saved article: /article/${slug}`);
+      }
+
+      await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
+      await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
+      await markSeen(guid);
+    }
   }
 
   console.log('\n=== Run complete ===');
