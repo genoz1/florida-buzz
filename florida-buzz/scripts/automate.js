@@ -45,9 +45,11 @@ function extractImage(item) {
   if (item.mediaThumbnail?.$?.url) {
     return item.mediaThumbnail.$.url;
   }
-  const html = item.content || item['content:encoded'] || '';
-  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return match ? match[1] : null;
+  // Deliberately no fallback to scanning raw content HTML for the first <img>
+  // tag — that used to grab embedded ad images from some sources' feed content
+  // instead of the real article photo. Better to fall through to AI generation
+  // (handled by the caller) than risk publishing an unrelated ad photo.
+  return null;
 }
 
 function slugify(title) {
@@ -94,6 +96,28 @@ function nameFromUrl(url) {
       .join(' ');
   } catch {
     return 'Unknown Source';
+  }
+}
+
+// Specific origin sites known to publish images with their own branding/logo
+// baked in (e.g. WDW Magic's "What You Missed" video-roundup thumbnails carry
+// a "WDW MAGIC" banner across the bottom). Rather than discard the whole real
+// photo for an AI-generated one, crop that bottom strip off before storing.
+// These sites show up mixed in alongside good sources within the aggregator
+// feeds, so this is checked by actual origin domain rather than by which feed
+// the item came through — unlike source.preferAI, which applies to an entire
+// configured feed. Percentages are a first-pass estimate — adjust here if a
+// site's actual banner turns out taller or shorter than this.
+const CROP_BOTTOM_PERCENT_BY_DOMAIN = {
+  'wdwmagic.com': 0.20, // ~20% off the bottom for the "What You Missed" banner
+};
+
+function originCropPercent(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return CROP_BOTTOM_PERCENT_BY_DOMAIN[host] || null;
+  } catch {
+    return null;
   }
 }
 
@@ -270,6 +294,7 @@ async function run() {
       }
 
       const slug = await generateUniqueSlug(article.meta_title || article.title);
+      const cropBottomPercent = originCropPercent(item.link);
 
       let finalImage;
       if (source.preferAI) {
@@ -277,11 +302,14 @@ async function run() {
         finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
       } else if (realImage) {
         if (DRY_RUN) {
-          console.log(`  [dry-run] Would download and permanently store real photo from source.`);
+          console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
           finalImage = null;
         } else {
           console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
-          const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`);
+          if (cropBottomPercent) {
+            console.log(`  This origin site bakes a branding banner into its images — cropping bottom ${Math.round(cropBottomPercent * 100)}%...`);
+          }
+          const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`, { cropBottomPercent });
           if (storedUrl) {
             console.log(`  Stored real photo permanently.`);
             finalImage = storedUrl;
