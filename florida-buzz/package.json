@@ -11,7 +11,11 @@
     "newsletter:dry": "DRY_RUN=true node scripts/newsletter.js",
     "guide-images": "node scripts/generate-guide-images.js",
     "guide:daily": "node scripts/generate-guide.js",
-    "guide:daily:dry": "DRY_RUN=true node scripts/generate-guide.js"
+    "guide:daily:dry": "DRY_RUN=true node scripts/generate-guide.js",
+    "promo": "node scripts/promo-post.js",
+    "promo:dry": "DRY_RUN=true node scripts/promo-post.js",
+    "backfill-images": "node scripts/backfill-images.js",
+    "backfill-images:dry": "DRY_RUN=true node scripts/backfill-images.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
