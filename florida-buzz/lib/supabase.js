@@ -37,7 +37,16 @@ async function storeGeneratedImage(imageBuffer, filename) {
 async function storeImageFromUrl(sourceUrl, filename) {
   if (!supabase) return null;
   try {
-    const res = await fetch(sourceUrl);
+    // Some publisher CDNs (Dotdash Meredith properties like Travel + Leisure
+    // in particular) block image requests that don't look like a real browser.
+    // A realistic User-Agent and Referer resolves this for most of them.
+    const res = await fetch(sourceUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Referer: new URL(sourceUrl).origin + '/',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      },
+    });
     if (!res.ok) throw new Error(`Source image fetch failed: HTTP ${res.status}`);
 
     const contentType = res.headers.get('content-type') || 'image/jpeg';
