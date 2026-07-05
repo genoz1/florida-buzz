@@ -17,7 +17,8 @@
     "backfill-images": "node scripts/backfill-images.js",
     "backfill-images:dry": "DRY_RUN=true node scripts/backfill-images.js",
     "fix-images": "node scripts/fix-specific-images.js",
-    "fix-images:dry": "DRY_RUN=true node scripts/fix-specific-images.js"
+    "fix-images:dry": "DRY_RUN=true node scripts/fix-specific-images.js",
+    "crop-image": "node scripts/crop-existing-image.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
