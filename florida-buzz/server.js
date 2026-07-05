@@ -41,14 +41,14 @@ if (process.env.ANTHROPIC_API_KEY) {
 // from the article automation and promo post times above. Disabled until
 // ANTHROPIC_API_KEY and OPENAI_API_KEY are set.
 if (process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY) {
-  cron.schedule('30 5,16 * * *', () => {
+  cron.schedule('45 7,18 * * *', () => {
     console.log('Running scheduled evergreen guide generation...');
     require('child_process').exec('node scripts/generate-guide.js', (err, stdout, stderr) => {
       if (stdout) console.log(stdout);
       if (stderr) console.error(stderr);
     });
   }, { timezone: 'America/New_York' });
-  console.log('Evergreen guide generation scheduled: 5:30am and 4:30pm daily (Eastern time).');
+  console.log('Evergreen guide generation scheduled: 7:45am and 6:45pm daily (Eastern time).');
 } else {
   console.log('Evergreen guide generation NOT scheduled — set ANTHROPIC_API_KEY and OPENAI_API_KEY to enable.');
 }
