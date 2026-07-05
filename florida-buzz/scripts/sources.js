@@ -67,6 +67,25 @@ module.exports = [
     name: 'Disney Cruise Line (mixed)',
     mixedSource: true, // mostly clean DCL news/deals; a couple of items per month are serious enough for the safety filter to (correctly) skip
   },
+  {
+    url: 'https://rss.app/feeds/tmqe2r9o3h5ePgFx.xml',
+    category: 'theme-parks',
+    name: 'Disney World resorts (mixed)',
+    mixedSource: true, // very active — allears.net, disneytouristblog.com, wdwnt.com, insidethemagic.net, mickeyvisit.com, disneyfoodblog.com, and official Disney/press sources
+  },
+  {
+    url: 'https://rss.app/feeds/tadTQJB5j1tLS0NI.xml',
+    category: 'food',
+    name: 'Disney World food (mixed)',
+    mixedSource: true, // mostly disneyfoodblog.com plus allears.net/mickeyvisit.com — Disney dining specifically, distinct from the general Orlando restaurant feed above
+  },
+  {
+    url: 'https://rss.app/feeds/tuElQs5KVtjXxzPM.xml',
+    category: 'theme-parks',
+    name: 'Legoland Florida news (mixed)',
+    mixedSource: true, // this topic feed also carries Legoland California/NY/Michigan/Germany content —
+    // relies on the safety filter's Florida-relevance check (added alongside this source) to skip non-Florida items
+  },
 
   // NOT added — the "florida cruise news" keyword feed was dominated by a disturbing
   // active criminal case (not appropriate for this site regardless of the safety filter,
