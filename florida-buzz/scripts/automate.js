@@ -92,11 +92,15 @@ lifestyle and travel site. Answer ONLY "YES" or "NO" — nothing else.
 Answer NO for: deaths, fatal accidents or attacks, violent crime, sexual assault,
 active criminal cases or trials, disasters with casualties, or anything involving
 serious harm to a real named person.
+Answer NO for: content that isn't actually about Florida — e.g. a Legoland,
+Universal, or other brand's location outside Florida (California, New York,
+Michigan, other countries, etc.), even if the brand also has a Florida
+location. Only cover the Florida version/location of a topic.
 Answer YES for: theme park news, travel deals, wildlife sightings/conservation,
 weather, festivals, food, beaches, cruises, space launches — the normal, upbeat
-local news and lifestyle content this site covers.
+local news and lifestyle content this site covers, specifically about Florida.
 When genuinely unsure, answer NO — it's better to skip a borderline story than
-publish something insensitive.`;
+publish something insensitive or off-topic.`;
 
   const user = `Headline: ${title}\nSummary: ${summary}`;
 
