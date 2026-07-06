@@ -86,6 +86,101 @@ module.exports = [
     mixedSource: true, // this topic feed also carries Legoland California/NY/Michigan/Germany content —
     // relies on the safety filter's Florida-relevance check (added alongside this source) to skip non-Florida items
   },
+  {
+    url: 'https://rss.app/feeds/t7SwuJdn9DjHB8gZ.xml',
+    category: 'cruises',
+    name: 'Royal Caribbean Port Canaveral (mixed)',
+    mixedSource: true, // tampabay.com, people.com, seattletimes.com, royalcaribbeanpresscenter.com
+  },
+  {
+    url: 'https://rss.app/feeds/trkxfnsThPflXD2D.xml',
+    category: 'space',
+    name: 'SpaceX Cape Canaveral (mixed)',
+    mixedSource: true, // very active — floridatoday.com (dedicated Space Coast beat reporter), orlandosentinel.com,
+    // tcpalm.com, naplesnews.com, tallahassee.com, spaceflightnow.com, and SpaceX's own official site
+  },
+  {
+    url: 'https://rss.app/feeds/OH3TPs5E8HmQGnVb.xml',
+    category: 'theme-parks',
+    name: 'WDWNT',
+    // single dedicated site, not a mixed aggregator — no mixedSource/nameFromUrl guessing needed,
+    // always attributed to WDWNT directly. Very active, high-volume Disney World news.
+  },
+
+  // City-specific events feeds — each tagged with `city` so these can power dedicated
+  // city event pages, in addition to the general /category/events page. All are
+  // mixedSource since each keyword feed pulls from several real local outlets.
+  {
+    url: 'https://rss.app/feeds/tDtirk9M7U6xt371.xml',
+    category: 'events',
+    city: 'jacksonville',
+    name: 'Jacksonville events (mixed)',
+    mixedSource: true, // WOKV, News4Jax, Florida Politics, First Coast News, Jacksonville.com —
+    // occasionally pulls "Jacksonville, Illinois" content too; the Florida-relevance safety check handles that
+  },
+  {
+    url: 'https://rss.app/feeds/tcTBK3DRxT2EhyZd.xml',
+    category: 'events',
+    city: 'jacksonville',
+    name: 'Jacksonville Beach events (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/t0Ar9zjtWdRpShqh.xml',
+    category: 'events',
+    city: 'jacksonville',
+    name: 'Ponte Vedra events (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/tnsQqQWMundkdQ36.xml',
+    category: 'events',
+    city: 'jacksonville',
+    name: 'Amelia Island events (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/tgLPWfOUOPXOoLZd.xml',
+    category: 'events',
+    city: 'jacksonville',
+    name: 'St. Augustine events (mixed)',
+    mixedSource: true, // some overlap with the general Florida festivals feed — dedup by guid handles exact repeats
+  },
+  {
+    url: 'https://rss.app/feeds/tunFpw9PT3ckwPbj.xml',
+    category: 'events',
+    city: 'tampa',
+    name: 'Tampa events (mixed)',
+    mixedSource: true, // WUSF, Tampa Bay Times, Fox 13, Patch, Carnival Cruise Line's own announcements
+  },
+  {
+    url: 'https://rss.app/feeds/tKQoaFbTORLngzxW.xml',
+    category: 'events',
+    city: 'tampa',
+    name: 'St. Pete events (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/ticZm2EOKuFqiISV.xml',
+    category: 'events',
+    city: 'orlando',
+    name: 'Orlando events (mixed)',
+    mixedSource: true, // mostly civic/community events — minimal theme-park overlap
+  },
+  {
+    url: 'https://rss.app/feeds/t6uJp2Ct5bZIaDSh.xml',
+    category: 'events',
+    city: 'orlando',
+    name: 'Orlando sport events (mixed)',
+    mixedSource: true,
+  },
+  {
+    url: 'https://rss.app/feeds/tvHLWaW1HhHoNTpk.xml',
+    category: 'events',
+    city: 'miami',
+    name: 'Things to do in Miami (mixed)',
+    mixedSource: true, // Timeout Miami, Axios Miami, Miami New Times, Garden & Gun, Business Insider
+  },
 
   // NOT added — the "florida cruise news" keyword feed was dominated by a disturbing
   // active criminal case (not appropriate for this site regardless of the safety filter,
