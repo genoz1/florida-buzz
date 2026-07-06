@@ -1,0 +1,36 @@
+<%- include('partials/header', { pageTitle: (typeof seoTitle !== 'undefined' && seoTitle ? seoTitle : cityLabels[city]) + ' — The Florida Buzz', pageDescription: typeof seoDescription !== 'undefined' ? seoDescription : undefined, category: null, tickerItems: ticker, canonicalPath: '/city/' + city }) %>
+
+<main class="wrap">
+  <section class="section" style="border-bottom:none; padding-bottom:0;">
+    <span class="eyebrow"><%= articles.length %> stories</span>
+    <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;"><%= cityLabels[city] %> Events</h1>
+    <% if (typeof seoIntro !== 'undefined' && seoIntro) { %>
+    <p style="color:var(--ink-600); max-width:640px; margin-top:10px;"><%= seoIntro %></p>
+    <% } %>
+    <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="/category/events" style="font-size:13px; font-weight:600; padding:6px 12px; background:var(--teal-900); border-radius:20px; color:var(--sand-50);">&larr; All Florida Events</a>
+      <% Object.keys(cityLabels).filter(c => c !== city).forEach(otherCity => { %>
+        <a href="/city/<%= otherCity %>" style="font-size:13px; font-weight:600; padding:6px 12px; background:var(--sand-100); border-radius:20px; color:var(--teal-900);"><%= cityLabels[otherCity] %></a>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="section">
+    <% if (!articles.length) { %>
+      <p style="color:var(--ink-600);">Nothing published for this area yet — check back soon, or see <a href="/category/events" style="color:var(--coral-600); font-weight:600;">everything in Events</a>.</p>
+    <% } else { %>
+    <div class="grid">
+      <% articles.forEach(a => { %>
+        <a href="/article/<%= a.slug %>" class="card">
+          <div class="card-image"><img src="<%= a.image_url || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy" onerror="this.onerror=null;this.src='<%= placeholderImg(a.category) %>';"></div>
+          <h3><%= a.title %></h3>
+          <p class="dek-sm"><%= a.dek %></p>
+          <p class="byline"><%= timeAgo(a.published_at) %></p>
+        </a>
+      <% }) %>
+    </div>
+    <% } %>
+  </section>
+</main>
+
+<%- include('partials/footer') %>
