@@ -7,6 +7,14 @@
     <% if (typeof seoIntro !== 'undefined' && seoIntro) { %>
     <p style="color:var(--ink-600); max-width:640px; margin-top:10px;"><%= seoIntro %></p>
     <% } %>
+    <% if (typeof cityLabels !== 'undefined' && cityLabels) { %>
+    <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span style="font-family:var(--font-mono); font-size:12px; color:var(--ink-600); align-self:center;">Browse by area:</span>
+      <% Object.keys(cityLabels).forEach(city => { %>
+        <a href="/city/<%= city %>" style="font-size:13px; font-weight:600; padding:6px 12px; background:var(--sand-100); border-radius:20px; color:var(--teal-900);"><%= cityLabels[city] %></a>
+      <% }) %>
+    </div>
+    <% } %>
   </section>
 
   <section class="section">
