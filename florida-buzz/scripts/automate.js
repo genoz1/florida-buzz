@@ -347,6 +347,7 @@ async function run() {
           dek: article.dek,
           body_html: article.body_html,
           category: realCategory,
+          city: source.city || null,
           source_name: actualSourceName,
           source_url: item.link,
           image_url: finalImage,
