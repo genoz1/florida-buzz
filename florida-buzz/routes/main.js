@@ -14,6 +14,37 @@ const CATEGORY_LABELS = {
 };
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS);
 
+const CITY_LABELS = {
+  jacksonville: 'Jacksonville Area',
+  tampa: 'Tampa Bay',
+  orlando: 'Orlando',
+  miami: 'Miami',
+};
+const CITY_ORDER = Object.keys(CITY_LABELS);
+
+const CITY_SEO = {
+  jacksonville: {
+    title: 'Jacksonville Area Events & Things to Do',
+    description: 'Festivals, concerts, and local events in Jacksonville, Jacksonville Beach, Ponte Vedra, Amelia Island, and St. Augustine.',
+    intro: 'Festivals, concerts, and local events across Northeast Florida \u2014 Jacksonville, Jacksonville Beach, Ponte Vedra, Amelia Island, and St. Augustine.',
+  },
+  tampa: {
+    title: 'Tampa Bay Events & Things to Do',
+    description: 'Festivals, concerts, and local events in Tampa and St. Petersburg.',
+    intro: 'Festivals, concerts, and local events across the Tampa Bay area \u2014 Tampa and St. Petersburg.',
+  },
+  orlando: {
+    title: 'Orlando Events & Things to Do',
+    description: 'Local festivals, concerts, sports, and community events in and around Orlando, beyond the theme parks.',
+    intro: 'Local festivals, concerts, sports, and community events in and around Orlando \u2014 separate from our theme park coverage.',
+  },
+  miami: {
+    title: 'Miami Events & Things to Do',
+    description: 'Festivals, concerts, and local events in and around Miami.',
+    intro: 'Festivals, concerts, and local events in and around Miami.',
+  },
+};
+
 const CATEGORY_SEO = {
   'theme-parks': {
     title: 'Disney World & Universal Orlando News',
@@ -113,10 +144,11 @@ async function hasAnyRealArticles() {
   return !!count && count > 0;
 }
 
-async function getArticles({ category, limit, evergreenOnly, excludeEvergreen } = {}) {
+async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen } = {}) {
   if (supabase) {
     let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
     if (category) query = query.eq('category', category);
+    if (city) query = query.eq('city', city);
     if (evergreenOnly) query = query.eq('is_evergreen', true);
     if (excludeEvergreen) query = query.eq('is_evergreen', false);
     if (limit) query = query.limit(limit);
@@ -166,6 +198,29 @@ router.get('/category/:cat', async (req, res) => {
     category: cat,
     articles,
     ticker,
+    categoryLabels: CATEGORY_LABELS,
+    seoTitle: seo.title,
+    seoDescription: seo.description,
+    seoIntro: seo.intro,
+    cityLabels: cat === 'events' ? CITY_LABELS : null,
+    placeholderImg,
+    timeAgo,
+  });
+});
+
+router.get('/city/:city', async (req, res) => {
+  const { city } = req.params;
+  if (!CITY_LABELS[city]) return res.status(404).render('404');
+
+  const articles = await getArticles({ city });
+  const ticker = await getArticles({ limit: 8 });
+  const seo = CITY_SEO[city] || {};
+
+  res.render('city', {
+    city,
+    articles,
+    ticker,
+    cityLabels: CITY_LABELS,
     categoryLabels: CATEGORY_LABELS,
     seoTitle: seo.title,
     seoDescription: seo.description,
@@ -309,6 +364,7 @@ router.get('/sitemap.xml', async (req, res) => {
   const staticUrls = [
     { loc: siteUrl, priority: '1.0' },
     ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
+    ...CITY_ORDER.map((city) => ({ loc: `${siteUrl}/city/${city}`, priority: '0.7' })),
     { loc: `${siteUrl}/about`, priority: '0.5' },
     { loc: `${siteUrl}/privacy`, priority: '0.3' },
     { loc: `${siteUrl}/terms`, priority: '0.3' },
