@@ -214,7 +214,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 Topic: ${topic}
 Working title idea: ${workingTitle}`;
 
-  const { text, searchesUsed } = await askClaudeWithSearch(system, user, 3000, 12);
+  const { text, searchesUsed } = await askClaudeWithSearch(system, user, 6000, 12);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   const guide = parseJsonResponse(text, 'guide');
   guide.body_html = stripCitationTags(guide.body_html);
