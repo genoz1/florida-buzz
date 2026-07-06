@@ -157,6 +157,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "title": "string, original headline, under 70 characters",
   "meta_title": "string, under 60 characters, written the way a person would phrase a Google search for this topic — lead with the specific place, attraction, or subject name, plus what changed (e.g. 'Magic Kingdom Lightning Lane Prices July 2026' not a clever headline). This is for the browser tab and Google search result, not the on-page headline — it should read naturally, not keyword-stuffed.",
+  "category": "string, exactly one of: theme-parks, space, beaches, florida-living, wildlife, cruises, food, events — pick whichever ACTUALLY matches this specific story's real subject, regardless of which feed it came from (a ride closure is theme-parks even if it came through a food-focused feed; a restaurant opening is food even if it came through a general Disney feed)",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, 3-5 short paragraphs as <p> tags, original wording, ends with a sentence crediting the source by name",
   "fb_caption": "string, Facebook post: 1-2 punchy sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags",
@@ -167,7 +168,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   const user = `Source: ${sourceName}
 Original headline: ${sourceTitle}
 Source summary/content: ${sourceSummary}
-Category: ${category}
+This feed is generally about: ${category} (but classify based on this specific story's actual subject, not this hint, if they differ)
 Source link (for context only, do not include in body_html): ${sourceUrl}`;
 
   const raw = await askClaude(system, user, 1200);
@@ -296,10 +297,16 @@ async function run() {
       const slug = await generateUniqueSlug(article.meta_title || article.title);
       const cropBottomPercent = originCropPercent(item.link);
 
+      const VALID_CATEGORIES = ['theme-parks', 'space', 'beaches', 'florida-living', 'wildlife', 'cruises', 'food', 'events'];
+      const realCategory = VALID_CATEGORIES.includes(article.category) ? article.category : source.category;
+      if (realCategory !== source.category) {
+        console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
+      }
+
       let finalImage;
       if (source.preferAI) {
         console.log(`  This source is set to always use AI images — generating...`);
-        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
       } else if (realImage) {
         if (DRY_RUN) {
           console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
@@ -315,17 +322,18 @@ async function run() {
             finalImage = storedUrl;
           } else {
             console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
-            finalImage = await generateArticleImage({ title: article.title, category: source.category, slug });
+            finalImage = await generateArticleImage({ title: article.title, category: realCategory, slug });
           }
         }
       } else {
         console.log(`  No real photo found — generating one...`);
-        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: source.category, slug });
+        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
       }
 
       if (DRY_RUN) {
         console.log(`  [dry-run] Title: ${article.title}`);
         console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
+        console.log(`  [dry-run] Category: ${realCategory}`);
         console.log(`  [dry-run] Dek: ${article.dek}`);
         console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
         console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
@@ -338,7 +346,7 @@ async function run() {
           meta_title: article.meta_title,
           dek: article.dek,
           body_html: article.body_html,
-          category: source.category,
+          category: realCategory,
           source_name: actualSourceName,
           source_url: item.link,
           image_url: finalImage,
