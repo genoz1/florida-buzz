@@ -102,6 +102,21 @@ function placeholderImg(category) {
   return `https://picsum.photos/seed/${seedMap[category] || 'florida'}/1600/900`;
 }
 
+// Rewrites a Supabase Storage URL to request a resized/compressed version via
+// Supabase's built-in image transformation endpoint, instead of serving the
+// full-size original (AI-generated images are 1536x1024; real downloaded
+// photos can be several MB) on every single page view. This is what was
+// driving Supabase bandwidth usage well over the free tier's monthly limit.
+// Non-Supabase URLs (e.g. the picsum.photos placeholders) pass through
+// untouched — they're already small and hosted elsewhere.
+function resizeImg(url, width) {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('/storage/v1/object/public/')) return url;
+  const rendered = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+  const sep = rendered.includes('?') ? '&' : '?';
+  return `${rendered}${sep}width=${width}&quality=75`;
+}
+
 function timeAgo(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
   const hrs = Math.floor(diffMs / 3600000);
@@ -168,12 +183,17 @@ router.get('/', async (req, res) => {
   const all = await getArticles({ limit: 30 });
   const featured = all[0];
   const secondary = all.slice(1, 4);
-  const rest = all.slice(4);
 
   const byCategory = {};
-  CATEGORY_ORDER.forEach((cat) => {
-    byCategory[cat] = rest.filter((a) => a.category === cat).slice(0, 3);
-  });
+  await Promise.all(
+    CATEGORY_ORDER.map(async (cat) => {
+      const categoryArticles = await getArticles({ category: cat, limit: 6 });
+      // Exclude anything already shown in the featured/secondary slots above,
+      // so the same article doesn't appear twice on the homepage.
+      const usedSlugs = new Set([featured, ...secondary].filter(Boolean).map((a) => a.slug));
+      byCategory[cat] = categoryArticles.filter((a) => !usedSlugs.has(a.slug)).slice(0, 3);
+    })
+  );
 
   res.render('home', {
     featured,
@@ -182,6 +202,7 @@ router.get('/', async (req, res) => {
     ticker: all.slice(0, 8),
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    resizeImg,
     timeAgo,
   });
 });
@@ -204,6 +225,7 @@ router.get('/category/:cat', async (req, res) => {
     seoIntro: seo.intro,
     cityLabels: cat === 'events' ? CITY_LABELS : null,
     placeholderImg,
+    resizeImg,
     timeAgo,
   });
 });
@@ -226,6 +248,7 @@ router.get('/city/:city', async (req, res) => {
     seoDescription: seo.description,
     seoIntro: seo.intro,
     placeholderImg,
+    resizeImg,
     timeAgo,
   });
 });
@@ -245,6 +268,7 @@ router.get('/article/:slug', async (req, res) => {
     ticker,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    resizeImg,
     timeAgo,
   });
 });
@@ -258,6 +282,7 @@ router.get('/guides', async (req, res) => {
     ticker,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    resizeImg,
     timeAgo,
   });
 });
@@ -325,7 +350,7 @@ router.get('/feed.xml', async (req, res) => {
     .map((a) => {
       const url = `${siteUrl}/article/${a.slug}`;
       const pubDate = new Date(a.published_at).toUTCString();
-      const image = a.image_url || placeholderImg(a.category);
+      const image = resizeImg(a.image_url || placeholderImg(a.category), 1000);
       const fullBody = image ? `<img src="${image}" alt="${escapeXml(a.title)}" />\n${a.body_html}` : a.body_html;
 
       return `  <item>
