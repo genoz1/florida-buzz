@@ -17,18 +17,7 @@ const parser = new Parser({
   },
 });
 const DRY_RUN = process.env.DRY_RUN === 'true';
-// How many of a source's most recent items to check per run, not just the
-// single newest one. Raising this catches posts you'd otherwise silently miss
-// from fast-publishing sources, at the cost of more AI calls per run (each
-// checked item costs a safety-check call, and if it passes, a writing call
-// and possibly an image-generation call). Tune based on cost comfort.
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
-// Minutes to wait between Facebook posts within a single run, so a burst of
-// several new articles doesn't all hit the Page in the same minute. Articles
-// still save to the site immediately either way — only the Facebook posting
-// is spread out. Keep this modest: with up to 14 sources x 3 items, a run
-// could have a dozen+ posts, and a long delay could push a run's total time
-// close to the ~4-5 hour gap between scheduled runs.
 const FB_POST_DELAY_MINUTES = parseInt(process.env.FB_POST_DELAY_MINUTES, 10) || 10;
 
 function sleep(ms) {
@@ -45,10 +34,6 @@ function extractImage(item) {
   if (item.mediaThumbnail?.$?.url) {
     return item.mediaThumbnail.$.url;
   }
-  // Deliberately no fallback to scanning raw content HTML for the first <img>
-  // tag — that used to grab embedded ad images from some sources' feed content
-  // instead of the real article photo. Better to fall through to AI generation
-  // (handled by the caller) than risk publishing an unrelated ad photo.
   return null;
 }
 
@@ -99,17 +84,8 @@ function nameFromUrl(url) {
   }
 }
 
-// Specific origin sites known to publish images with their own branding/logo
-// baked in (e.g. WDW Magic's "What You Missed" video-roundup thumbnails carry
-// a "WDW MAGIC" banner across the bottom). Rather than discard the whole real
-// photo for an AI-generated one, crop that bottom strip off before storing.
-// These sites show up mixed in alongside good sources within the aggregator
-// feeds, so this is checked by actual origin domain rather than by which feed
-// the item came through — unlike source.preferAI, which applies to an entire
-// configured feed. Percentages are a first-pass estimate — adjust here if a
-// site's actual banner turns out taller or shorter than this.
 const CROP_BOTTOM_PERCENT_BY_DOMAIN = {
-  'wdwmagic.com': 0.20, // ~20% off the bottom for the "What You Missed" banner
+  'wdwmagic.com': 0.20,
 };
 
 function originCropPercent(url) {
@@ -131,6 +107,9 @@ Answer NO for: content that isn't actually about Florida — e.g. a Legoland,
 Universal, or other brand's location outside Florida (California, New York,
 Michigan, other countries, etc.), even if the brand also has a Florida
 location. Only cover the Florida version/location of a topic.
+Answer NO for: Pride parades, festivals, or other LGBTQ-themed community
+events — this site avoids this topic area as an editorial scope decision,
+regardless of tone.
 Answer YES for: theme park news, travel deals, wildlife sightings/conservation,
 weather, festivals, food, beaches, cruises, space launches — the normal, upbeat
 local news and lifestyle content this site covers, specifically about Florida.
@@ -236,6 +215,37 @@ async function markSeen(guid) {
   await supabase.from('seen_feed_items').insert({ guid });
 }
 
+// Catches cross-feed duplicates: the same real-world story picked up
+// independently by two different source feeds (e.g. a Disney Cruise Line item
+// and a Royal Caribbean item both covering the same port-call news). Each has
+// its own distinct RSS guid, so alreadySeen() alone won't catch this — this
+// compares the newly-written title against recently published titles in the
+// same category using simple word-overlap similarity.
+function normalizeForSimilarity(text) {
+  return (text || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+}
+
+function titleSimilarity(a, b) {
+  const wordsA = new Set(normalizeForSimilarity(a));
+  const wordsB = new Set(normalizeForSimilarity(b));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
+  const union = new Set([...wordsA, ...wordsB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+async function isDuplicateOfRecent(title, category) {
+  if (!supabase) return false;
+  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase
+    .from('articles')
+    .select('title')
+    .eq('category', category)
+    .gte('published_at', since);
+  if (!data) return false;
+  return data.some((a) => titleSimilarity(title, a.title) > 0.6);
+}
+
 async function run() {
   console.log(`=== The Florida Buzz automation run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
@@ -294,7 +304,6 @@ async function run() {
         continue;
       }
 
-      const slug = await generateUniqueSlug(article.meta_title || article.title);
       const cropBottomPercent = originCropPercent(item.link);
 
       const VALID_CATEGORIES = ['theme-parks', 'space', 'beaches', 'florida-living', 'wildlife', 'cruises', 'food', 'events'];
@@ -302,6 +311,14 @@ async function run() {
       if (realCategory !== source.category) {
         console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
       }
+
+      if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
+        console.log(`  [skip] This looks like the same story as something published in the last 3 days (likely picked up from a different feed) — skipping to avoid a duplicate.`);
+        await markSeen(guid);
+        continue;
+      }
+
+      const slug = await generateUniqueSlug(article.meta_title || article.title);
 
       let finalImage;
       if (source.preferAI) {
