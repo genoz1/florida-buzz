@@ -86,3 +86,22 @@ if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
 } else {
   console.log('Promo posts NOT scheduled — set FB_PAGE_ID and FB_PAGE_ACCESS_TOKEN to enable.');
 }
+
+// Posts a "what to do this week/weekend" roundup for each of the 4 city pages
+// to Facebook only — never saved as an article on the site. Monday runs the
+// "this week" version, Friday runs the "this weekend" version (the script
+// itself checks which day it is; the cron day-of-week filter here is a second
+// layer so it doesn't even fire on other days). Disabled until FB_PAGE_ID and
+// FB_PAGE_ACCESS_TOKEN are set.
+if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
+  cron.schedule('0 10 * * 1,5', () => {
+    console.log('Running scheduled city roundup...');
+    require('child_process').exec('node scripts/city-roundup.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  }, { timezone: 'America/New_York' });
+  console.log('City roundups scheduled: Mondays and Fridays at 10am (Eastern time).');
+} else {
+  console.log('City roundups NOT scheduled — set FB_PAGE_ID and FB_PAGE_ACCESS_TOKEN to enable.');
+}
