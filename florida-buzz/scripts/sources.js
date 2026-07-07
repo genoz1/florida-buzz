@@ -50,6 +50,11 @@ module.exports = [
     category: 'theme-parks',
     name: 'WDWMAGIC',
   },
+  {
+    url: 'https://www.disneyfanatic.com/feed',
+    category: 'theme-parks',
+    name: 'Disney Fanatic',
+  },
 
   // ── CITY EVENTS ─────────────────────────────────────────────────────────
   {
