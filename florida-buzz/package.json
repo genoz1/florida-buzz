@@ -18,7 +18,9 @@
     "backfill-images:dry": "DRY_RUN=true node scripts/backfill-images.js",
     "fix-images": "node scripts/fix-specific-images.js",
     "fix-images:dry": "DRY_RUN=true node scripts/fix-specific-images.js",
-    "crop-image": "node scripts/crop-existing-image.js"
+    "crop-image": "node scripts/crop-existing-image.js",
+    "city-roundup": "node scripts/city-roundup.js",
+    "city-roundup:dry": "DRY_RUN=true node scripts/city-roundup.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
