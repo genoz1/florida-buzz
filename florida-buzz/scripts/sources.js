@@ -106,6 +106,20 @@ module.exports = [
     // single dedicated site, not a mixed aggregator — no mixedSource/nameFromUrl guessing needed,
     // always attributed to WDWNT directly. Very active, high-volume Disney World news.
   },
+  {
+    url: 'https://rss.app/feeds/TSa5MAwulqAkalmW.xml',
+    category: 'theme-parks',
+    name: 'WDWMAGIC',
+    // single dedicated site, same pattern as WDWNT above. Very active — construction
+    // updates, ride/weather closures, dining changes, merchandise.
+  },
+  {
+    url: 'https://rss.app/feeds/w6p0MQtag8GrTY2H.xml',
+    category: 'cruises',
+    name: 'Royal Caribbean Blog',
+    // single dedicated site (royalcaribbeanblog.com) — the cruise blog referenced in the
+    // note below finally added. Real editorial voice, not a marketing funnel.
+  },
 
   // City-specific events feeds — each tagged with `city` so these can power dedicated
   // city event pages, in addition to the general /category/events page. All are
@@ -185,8 +199,15 @@ module.exports = [
   // NOT added — the "florida cruise news" keyword feed was dominated by a disturbing
   // active criminal case (not appropriate for this site regardless of the safety filter,
   // since it was the majority of the feed's content, not an occasional item to skip).
-  // If you want cruise content, a narrower feed pointed at an actual cruise-line blog
-  // (e.g. Royal Caribbean's or Carnival's official blog) would be a better source.
+  // (Resolved: Royal Caribbean Blog added above as a proper dedicated cruise source.)
+
+  // NOT added — a batch of 5 candidate feeds checked July 2026:
+  // - "Daily Disney" (Facebook page via rss.app): a travel agency's marketing/lead-gen
+  //   content, not news — nearly every post pitches their own paid trip-planning service.
+  // - VisitFlorida.com Beaches section: legitimate official source, but static evergreen
+  //   "things to do" pages, not a news stream — better suited as guide-topic inspiration.
+  // - Eater Miami: reputable, but almost entirely evergreen "best of" listicles published
+  //   weeks/months apart — same mismatch as VisitFlorida above.
 
   // REMOVED after testing — these returned 403/404 errors:
   // - Kennedy Space Center, Florida State Parks, FWC, NWS Melbourne, Visit Florida
