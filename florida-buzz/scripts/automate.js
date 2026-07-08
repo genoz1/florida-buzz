@@ -225,6 +225,16 @@ async function postToInstagram({ caption, imageUrl }) {
   }
 }
 
+// Facebook captions end with "Full story ↓" since Facebook supports a real
+// clickable link right there in the post. Instagram has no clickable links in
+// captions at all — the only clickable spot on the whole platform is the
+// profile's bio link — so that phrasing is actively misleading on Instagram.
+// This swaps it for wording that points people to the right place instead.
+function toInstagramCaption(fbCaption) {
+  if (!fbCaption) return fbCaption;
+  return fbCaption.replace(/Full story\s*↓\s*$/i, 'Full story — link in bio');
+}
+
 async function alreadySeen(guid) {
   if (!supabase) return false;
   const { data } = await supabase.from('seen_feed_items').select('id').eq('guid', guid).maybeSingle();
@@ -405,7 +415,7 @@ async function run() {
       await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
       fbPostCount += 1;
       await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
-      await postToInstagram({ caption: article.fb_caption, imageUrl: finalImage });
+      await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
       await markSeen(guid);
     }
   }
