@@ -1,7 +1,15 @@
 // Thin wrapper around Pinterest's v5 API for creating pins.
+// While on Pinterest's "Trial" access tier, pin creation is blocked on the
+// production API (returns a 403) — Pinterest requires using their Sandbox API
+// instead until "Standard" access is approved. Set PINTEREST_USE_SANDBOX=true
+// to test/demo against Sandbox; remove it (or set to false) once Standard
+// access is granted to switch back to production automatically.
+const PINTEREST_API_BASE = process.env.PINTEREST_USE_SANDBOX === 'true'
+  ? 'https://api-sandbox.pinterest.com'
+  : 'https://api.pinterest.com';
 
 async function createPin({ imageUrl, title, description, link }) {
-  const res = await fetch('https://api.pinterest.com/v5/pins', {
+  const res = await fetch(`${PINTEREST_API_BASE}/v5/pins`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
