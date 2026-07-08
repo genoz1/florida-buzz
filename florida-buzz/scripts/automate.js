@@ -4,6 +4,7 @@ const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/sup
 const { askClaude } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
+const { createPost: createInstagramPost } = require('../lib/instagram');
 const { postToFacebookPage } = require('../lib/facebook');
 const SOURCES = require('./sources');
 
@@ -107,9 +108,6 @@ Answer NO for: content that isn't actually about Florida — e.g. a Legoland,
 Universal, or other brand's location outside Florida (California, New York,
 Michigan, other countries, etc.), even if the brand also has a Florida
 location. Only cover the Florida version/location of a topic.
-Answer NO for: Pride parades, festivals, or other LGBTQ-themed community
-events — this site avoids this topic area as an editorial scope decision,
-regardless of tone.
 Answer YES for: theme park news, travel deals, wildlife sightings/conservation,
 weather, festivals, food, beaches, cruises, space launches — the normal, upbeat
 local news and lifestyle content this site covers, specifically about Florida.
@@ -200,6 +198,29 @@ async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
     return true;
   } catch (err) {
     console.error(`  [error] Pinterest post failed: ${err.message}`);
+    return false;
+  }
+}
+
+async function postToInstagram({ caption, imageUrl }) {
+  if (DRY_RUN) {
+    console.log(`  [dry-run] Would post to Instagram: "${caption}"`);
+    return true;
+  }
+  if (!process.env.INSTAGRAM_ACCESS_TOKEN || !process.env.INSTAGRAM_USER_ID) {
+    console.log('  [skip] INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_USER_ID not set — skipping Instagram.');
+    return false;
+  }
+  if (!imageUrl) {
+    console.log('  [skip] No image available for this article — Instagram requires one, skipping.');
+    return false;
+  }
+
+  try {
+    await createInstagramPost({ imageUrl, caption });
+    return true;
+  } catch (err) {
+    console.error(`  [error] Instagram post failed: ${err.message}`);
     return false;
   }
 }
@@ -384,6 +405,7 @@ async function run() {
       await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
       fbPostCount += 1;
       await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
+      await postToInstagram({ caption: article.fb_caption, imageUrl: finalImage });
       await markSeen(guid);
     }
   }
