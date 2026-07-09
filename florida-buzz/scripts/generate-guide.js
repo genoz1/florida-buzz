@@ -3,12 +3,11 @@ const { supabase } = require('../lib/supabase');
 const { askClaudeWithSearch } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
+const { notifyIndexNow } = require('../lib/indexnow');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
 
-// Theme parks get the largest share since that's what most vacation-planning
-// searches are about — adjust these numbers any time to shift the mix.
 const CATEGORY_WEIGHTS = {
   'theme-parks': 45,
   beaches: 18,
@@ -20,8 +19,6 @@ const CATEGORY_WEIGHTS = {
   space: 1,
 };
 
-// Byline shown as the guide's author — mostly the team byline, with your name
-// on roughly a third of guides. Adjust the weights any time to shift the mix.
 const BYLINE_WEIGHTS = {
   'The Florida Buzz Team': 67,
   'Gene Zentko': 33,
@@ -38,8 +35,6 @@ function pickWeightedByline() {
   return entries[0][0];
 }
 
-// Theme park guides skew heavily toward your byline, and anything specifically
-// about Disney always uses it — everything else keeps the general ~33% mix above.
 function pickByline(category, topicText) {
   const isDisney = /disney/i.test(topicText || '');
   if (category === 'theme-parks' && isDisney) return 'Gene Zentko';
@@ -66,9 +61,6 @@ function pickWeightedCategory() {
   return entries[0][0];
 }
 
-// Pulls existing evergreen guide titles so the topic picker can avoid
-// repeating itself. No separate "topics" table needed — the articles table
-// (filtered to is_evergreen) is already the record of what's been covered.
 async function getExistingGuideTitles() {
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -102,10 +94,6 @@ function parseJsonResponse(text, label) {
   }
 }
 
-// Safety net: the model is instructed not to leave citation markup in body_html,
-// but web-search-grounded writing occasionally leaks text
-// wrappers anyway. Strip the tags while keeping the wrapped text, so a published
-// guide never shows raw citation syntax even if the prompt instruction gets missed.
 function stripCitationTags(html) {
   if (!html) return html;
   return html.replace(/<cite[^>]*>([\s\S]*?)<\/cite>/gi, '$1');
@@ -113,11 +101,6 @@ function stripCitationTags(html) {
 
 const AMAZON_ASSOCIATES_TAG = process.env.AMAZON_ASSOCIATES_TAG || 'floridabuzz-20';
 
-// Converts the model's href="AFFILIATE_SEARCH:some product" markers into real,
-// working Amazon search links with your Associates tag attached — no product
-// picking or API calls needed, just a keyword search results page. Also adds
-// target/rel attributes, which Amazon's program terms and search engines both
-// expect on sponsored/affiliate links.
 function convertAffiliateLinks(html) {
   if (!html) return html;
   return html.replace(/href="AFFILIATE_SEARCH:([^"]+)"/gi, (match, query) => {
@@ -358,6 +341,7 @@ async function run() {
     process.exit(1);
   }
   console.log(`Saved guide: /article/${slug}`);
+  await notifyIndexNow(`${SITE_URL}/article/${slug}`);
 
   await postToFacebook({ fb_caption: guide.fb_caption, slug });
   await postToPinterest({
