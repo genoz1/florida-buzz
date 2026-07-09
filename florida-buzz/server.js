@@ -11,6 +11,16 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// IndexNow key verification file — must be served at the site root with a
+// filename matching the key itself, containing just the key as plain text.
+// This is how Bing/IndexNow confirms you actually control this domain.
+if (process.env.INDEXNOW_KEY) {
+  app.get(`/${process.env.INDEXNOW_KEY}.txt`, (req, res) => {
+    res.set('Content-Type', 'text/plain');
+    res.send(process.env.INDEXNOW_KEY);
+  });
+}
+
 app.use('/', require('./routes/main'));
 
 app.use((req, res) => res.status(404).render('404'));
