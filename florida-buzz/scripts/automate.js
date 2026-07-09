@@ -5,6 +5,7 @@ const { askClaude } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
+const { createPost: createThreadsPost } = require('../lib/threads');
 const { postToFacebookPage } = require('../lib/facebook');
 const { notifyIndexNow } = require('../lib/indexnow');
 const SOURCES = require('./sources');
@@ -226,6 +227,35 @@ async function postToInstagram({ caption, imageUrl }) {
   }
 }
 
+async function postToThreads({ text, imageUrl }) {
+  if (DRY_RUN) {
+    console.log(`  [dry-run] Would post to Threads: "${text}"`);
+    return true;
+  }
+  if (!process.env.THREADS_ACCESS_TOKEN || !process.env.THREADS_USER_ID) {
+    console.log('  [skip] THREADS_ACCESS_TOKEN / THREADS_USER_ID not set — skipping Threads.');
+    return false;
+  }
+
+  try {
+    await createThreadsPost({ text, imageUrl });
+    return true;
+  } catch (err) {
+    console.error(`  [error] Threads post failed: ${err.message}`);
+    return false;
+  }
+}
+
+// Unlike Instagram, Threads posts DO support real clickable links directly in
+// the text — so instead of the "link in bio" workaround, this drops the
+// Facebook-specific "Full story ↓" phrasing (which implied a separate link
+// preview card Threads doesn't have) and appends the actual article URL
+// directly, where Threads will auto-link it.
+function toThreadsPost(fbCaption, articleUrl) {
+  const withoutSuffix = (fbCaption || '').replace(/Full story\s*↓\s*$/i, '').trim();
+  return withoutSuffix ? `${withoutSuffix}\n\n${articleUrl}` : articleUrl;
+}
+
 // Facebook captions end with "Full story ↓" since Facebook supports a real
 // clickable link right there in the post. Instagram has no clickable links in
 // captions at all — the only clickable spot on the whole platform is the
@@ -418,6 +448,7 @@ async function run() {
       fbPostCount += 1;
       await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
       await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
+      await postToThreads({ text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`), imageUrl: finalImage });
       await markSeen(guid);
     }
   }
