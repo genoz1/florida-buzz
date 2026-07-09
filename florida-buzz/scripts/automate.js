@@ -6,6 +6,7 @@ const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
 const { postToFacebookPage } = require('../lib/facebook');
+const { notifyIndexNow } = require('../lib/indexnow');
 const SOURCES = require('./sources');
 
 const parser = new Parser({
@@ -406,6 +407,7 @@ async function run() {
           continue;
         }
         console.log(`  Saved article: /article/${slug}`);
+        await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
       }
 
       if (!DRY_RUN && fbPostCount > 0) {
