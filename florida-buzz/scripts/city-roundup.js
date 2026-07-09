@@ -3,6 +3,7 @@ const { supabase } = require('../lib/supabase');
 const { askClaude } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
 const { postToFacebookPage } = require('../lib/facebook');
+const { notifyIndexNow } = require('../lib/indexnow');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
@@ -212,6 +213,7 @@ async function run() {
         continue;
       }
       console.log(`  Saved article: /article/${slug}`);
+      await notifyIndexNow(`${SITE_URL}/article/${slug}`);
     }
 
     if (postCount > 0) {
