@@ -26,17 +26,17 @@ const CITY_SEO = {
   jacksonville: {
     title: 'Jacksonville Area Events & Things to Do',
     description: 'Festivals, concerts, and local events in Jacksonville, Jacksonville Beach, Ponte Vedra, Amelia Island, and St. Augustine.',
-    intro: 'Festivals, concerts, and local events across Northeast Florida \u2014 Jacksonville, Jacksonville Beach, Ponte Vedra, Amelia Island, and St. Augustine.',
+    intro: 'Festivals, concerts, and local events across Northeast Florida — Jacksonville, Jacksonville Beach, Ponte Vedra, Amelia Island, and St. Augustine.',
   },
   tampa: {
     title: 'Tampa Bay Events & Things to Do',
     description: 'Festivals, concerts, and local events in Tampa and St. Petersburg.',
-    intro: 'Festivals, concerts, and local events across the Tampa Bay area \u2014 Tampa and St. Petersburg.',
+    intro: 'Festivals, concerts, and local events across the Tampa Bay area — Tampa and St. Petersburg.',
   },
   orlando: {
     title: 'Orlando Events & Things to Do',
     description: 'Local festivals, concerts, sports, and community events in and around Orlando, beyond the theme parks.',
-    intro: 'Local festivals, concerts, sports, and community events in and around Orlando \u2014 separate from our theme park coverage.',
+    intro: 'Local festivals, concerts, sports, and community events in and around Orlando — separate from our theme park coverage.',
   },
   miami: {
     title: 'Miami Events & Things to Do',
@@ -49,7 +49,7 @@ const CATEGORY_SEO = {
   'theme-parks': {
     title: 'Disney World & Universal Orlando News',
     description: 'Daily news, ride updates, price changes, and planning tips for Walt Disney World, Universal Orlando, and Central Florida\u2019s theme parks.',
-    intro: 'The latest on Walt Disney World, Universal Orlando, and Central Florida\u2019s theme parks \u2014 ride closures, price changes, new attractions, and planning tips.',
+    intro: 'The latest on Walt Disney World, Universal Orlando, and Central Florida\u2019s theme parks — ride closures, price changes, new attractions, and planning tips.',
   },
   space: {
     title: 'Florida Space Launches & NASA News',
@@ -63,8 +63,8 @@ const CATEGORY_SEO = {
   },
   'florida-living': {
     title: 'Florida Living News & Lifestyle',
-    description: 'Weather, local culture, and everyday Florida living \u2014 news for residents and transplants alike.',
-    intro: 'Weather, local culture, and everyday Florida living \u2014 news for residents and transplants alike.',
+    description: 'Weather, local culture, and everyday Florida living — news for residents and transplants alike.',
+    intro: 'Weather, local culture, and everyday Florida living — news for residents and transplants alike.',
   },
   wildlife: {
     title: 'Florida Wildlife News',
@@ -85,6 +85,23 @@ const CATEGORY_SEO = {
     title: 'Florida Events & Festivals',
     description: 'Festivals, fireworks, holiday events, and things to do across Florida.',
     intro: 'Festivals, fireworks, holiday events, and things to do across Florida.',
+  },
+};
+
+// Pillar pages: hand-curated "hub" pages that round up every guide on a
+// specific subject in one place, with internal links to each. Good for SEO
+// (signals topical authority) once linked. For now these are sitemap-only —
+// not linked from anywhere in the site nav/UI — until affiliate links are
+// set up. Adding a new pillar is just a new entry here — no new routes,
+// templates, or DB fields needed. `keywords` are matched case-insensitively
+// against each guide's title/dek within `category` to decide what belongs.
+const PILLARS = {
+  'disney-world-planning': {
+    title: 'The Complete Walt Disney World Planning Guide',
+    description:
+      "Every Walt Disney World guide we've published, in one place — tickets and park hopping, hotels, dining, and the money-saving strategies worth knowing before you book.",
+    category: 'theme-parks',
+    keywords: ['disney', 'magic kingdom', 'epcot', 'hollywood studios', 'animal kingdom', 'walt disney world'],
   },
 };
 
@@ -287,6 +304,28 @@ router.get('/guides', async (req, res) => {
   });
 });
 
+router.get('/guide/:pillarSlug', async (req, res) => {
+  const { pillarSlug } = req.params;
+  const pillar = PILLARS[pillarSlug];
+  if (!pillar) return res.status(404).render('404');
+
+  const categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true, limit: 200 });
+  const keywordRegex = new RegExp(pillar.keywords.join('|'), 'i');
+  const guides = categoryGuides.filter((g) => keywordRegex.test(g.title) || keywordRegex.test(g.dek));
+  const ticker = await getArticles({ limit: 8 });
+
+  res.render('pillar', {
+    pillar,
+    pillarSlug,
+    guides,
+    ticker,
+    categoryLabels: CATEGORY_LABELS,
+    placeholderImg,
+    resizeImg,
+    timeAgo,
+  });
+});
+
 router.get('/privacy', (req, res) => {
   res.render('privacy');
 });
@@ -390,6 +429,7 @@ router.get('/sitemap.xml', async (req, res) => {
     { loc: siteUrl, priority: '1.0' },
     ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
     ...CITY_ORDER.map((city) => ({ loc: `${siteUrl}/city/${city}`, priority: '0.7' })),
+    ...Object.keys(PILLARS).map((slug) => ({ loc: `${siteUrl}/guide/${slug}`, priority: '0.8' })),
     { loc: `${siteUrl}/about`, priority: '0.5' },
     { loc: `${siteUrl}/privacy`, priority: '0.3' },
     { loc: `${siteUrl}/terms`, priority: '0.3' },
