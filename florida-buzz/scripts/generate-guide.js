@@ -24,6 +24,21 @@ const BYLINE_WEIGHTS = {
   'Gene Zentko': 33,
 };
 
+// Which categories to pull from if a guide's own category doesn't have
+// enough other guides yet to fill out a "Related Guides" block.
+const CATEGORY_AFFINITY = {
+  'theme-parks': ['food', 'events', 'florida-living'],
+  beaches: ['wildlife', 'florida-living', 'events'],
+  events: ['theme-parks', 'florida-living', 'food'],
+  wildlife: ['beaches', 'florida-living', 'events'],
+  food: ['theme-parks', 'florida-living', 'events'],
+  'florida-living': ['events', 'food', 'beaches'],
+  cruises: ['beaches', 'food', 'events'],
+  space: ['theme-parks', 'events', 'florida-living'],
+};
+
+const RELATED_GUIDES_COUNT = 3;
+
 function pickWeightedByline() {
   const entries = Object.entries(BYLINE_WEIGHTS);
   const total = entries.reduce((sum, [, w]) => sum + w, 0);
@@ -61,11 +76,11 @@ function pickWeightedCategory() {
   return entries[0][0];
 }
 
-async function getExistingGuideTitles() {
+async function getExistingGuides() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('articles')
-    .select('title, category')
+    .select('slug, title, dek, category')
     .eq('is_evergreen', true)
     .order('published_at', { ascending: false })
     .limit(200);
@@ -76,7 +91,47 @@ async function getExistingGuideTitles() {
   return data || [];
 }
 
-function parseJsonResponse(text, label) {
+// Picks up to `count` related guides for internal linking: same-category
+// first (already most-recent-first from the query), then fills any
+// remaining slots from affinity categories, most recent first.
+function pickRelatedGuides(category, existingGuides, count = RELATED_GUIDES_COUNT) {
+  const sameCategory = existingGuides.filter((g) => g.category === category);
+  const picked = sameCategory.slice(0, count);
+
+  if (picked.length < count) {
+    const pickedSlugs = new Set(picked.map((g) => g.slug));
+    const fallbackCategories = CATEGORY_AFFINITY[category] || [];
+    for (const fallbackCategory of fallbackCategories) {
+      if (picked.length >= count) break;
+      const candidates = existingGuides.filter(
+        (g) => g.category === fallbackCategory && !pickedSlugs.has(g.slug)
+      );
+      for (const candidate of candidates) {
+        if (picked.length >= count) break;
+        picked.push(candidate);
+        pickedSlugs.add(candidate.slug);
+      }
+    }
+  }
+
+  return picked;
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function buildRelatedGuidesHtml(relatedGuides) {
+  if (!relatedGuides.length) return '';
+  const items = relatedGuides
+    .map(
+      (g) => `    <li><a href="/article/${g.slug}">${escapeHtml(g.title)}</a></li>`
+    )
+    .join('\n');
+  return `\n<div class="related-guides">\n  <h3>You Might Also Like</h3>\n  <ul>\n${items}\n  </ul>\n</div>`;
+}
+
+async function parseJsonResponse(text, label) {
   const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
   try {
     return JSON.parse(cleaned);
@@ -110,9 +165,9 @@ function convertAffiliateLinks(html) {
   });
 }
 
-async function pickTopic(category, existingTitles) {
-  const sameCategory = existingTitles.filter((g) => g.category === category).map((g) => g.title);
-  const otherTitles = existingTitles.filter((g) => g.category !== category).map((g) => g.title);
+async function pickTopic(category, existingGuides) {
+  const sameCategory = existingGuides.filter((g) => g.category === category).map((g) => g.title);
+  const otherTitles = existingGuides.filter((g) => g.category !== category).map((g) => g.title);
 
   const system = `You are the topic editor for The Florida Buzz, a Florida travel and
 lifestyle site. You pick ONE specific, high-search-intent evergreen guide topic for
@@ -199,7 +254,7 @@ Working title idea: ${workingTitle}`;
 
   const { text, searchesUsed } = await askClaudeWithSearch(system, user, 6000, 12);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
-  const guide = parseJsonResponse(text, 'guide');
+  const guide = await parseJsonResponse(text, 'guide');
   guide.body_html = stripCitationTags(guide.body_html);
   guide.body_html = convertAffiliateLinks(guide.body_html);
   return guide;
@@ -271,13 +326,13 @@ async function run() {
   const category = pickWeightedCategory();
   console.log(`Category for today: ${category}`);
 
-  const existingTitles = await getExistingGuideTitles();
-  console.log(`Found ${existingTitles.length} existing guide(s) on record.`);
+  const existingGuides = await getExistingGuides();
+  console.log(`Found ${existingGuides.length} existing guide(s) on record.`);
 
   console.log("Choosing today's topic...");
   let topicPick;
   try {
-    topicPick = await pickTopic(category, existingTitles);
+    topicPick = await pickTopic(category, existingGuides);
   } catch (err) {
     console.error(`[error] Topic selection failed: ${err.message}`);
     process.exit(1);
@@ -299,6 +354,14 @@ async function run() {
   } catch (err) {
     console.error(`[error] Guide writing failed: ${err.message}`);
     process.exit(1);
+  }
+
+  const relatedGuides = pickRelatedGuides(category, existingGuides);
+  if (relatedGuides.length) {
+    console.log(`  Linking to ${relatedGuides.length} related guide(s): ${relatedGuides.map((g) => g.slug).join(', ')}`);
+    guide.body_html = `${guide.body_html}${buildRelatedGuidesHtml(relatedGuides)}`;
+  } else {
+    console.log('  No related guides yet to link to (this is expected early on).');
   }
 
   const slug = `${slugify(guide.title)}-${Date.now().toString(36)}`;
