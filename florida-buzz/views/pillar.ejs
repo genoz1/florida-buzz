@@ -1,0 +1,45 @@
+<%- include('partials/header', { pageTitle: pillar.title + ' — The Florida Buzz', pageDescription: pillar.description, category: pillar.category, tickerItems: ticker, canonicalPath: '/guide/' + pillarSlug, pageImage: guides[0] ? (guides[0].image_url || placeholderImg(pillar.category)) : placeholderImg(pillar.category) }) %>
+
+<main class="wrap">
+  <section class="section" style="border-bottom:none; padding-bottom:0;">
+    <span class="eyebrow">Planning Guide</span>
+    <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;"><%= pillar.title %></h1>
+    <p style="color:var(--ink-600); margin-top:10px; max-width:640px;"><%= pillar.description %></p>
+  </section>
+
+  <section class="section">
+    <% if (!guides.length) { %>
+      <p style="color:var(--ink-600);">We're still building out this guide collection — check back soon, or see <a href="/guides" style="color:var(--coral-600); font-weight:600;">all our guides</a>.</p>
+    <% } else { %>
+    <div class="grid">
+      <% guides.forEach(g => { %>
+        <a href="/article/<%= g.slug %>" class="card">
+          <div class="card-image"><img src="<%= g.image_url || placeholderImg(g.category) %>" alt="<%= g.title %>" width="480" height="300" loading="lazy" onerror="this.onerror=null;this.src='<%= placeholderImg(g.category) %>';"></div>
+          <span class="tag"><%= categoryLabels[g.category] %></span>
+          <h3><%= g.title %></h3>
+          <p class="dek-sm"><%= g.dek %></p>
+        </a>
+      <% }) %>
+    </div>
+    <% } %>
+  </section>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": <%- JSON.stringify(pillar.title) %>,
+    "description": <%- JSON.stringify(pillar.description) %>,
+    "url": <%- JSON.stringify((process.env.SITE_URL || 'https://thefloridabuzz.com') + '/guide/' + pillarSlug) %>,
+    "hasPart": [
+      <%- guides.map(g => JSON.stringify({
+        "@type": "Article",
+        "headline": g.title,
+        "url": (process.env.SITE_URL || 'https://thefloridabuzz.com') + '/article/' + g.slug
+      })).join(',\n      ') %>
+    ]
+  }
+  </script>
+</main>
+
+<%- include('partials/footer') %>
