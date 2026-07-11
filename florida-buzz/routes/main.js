@@ -490,22 +490,25 @@ router.get('/ads.txt', (req, res) => {
 // running commands by hand in the DigitalOcean console. Protected by
 // ADMIN_PASSWORD env var — set that before using this in production.
 router.get('/admin/submit-topic', (req, res) => {
+  const { key } = req.query;
+
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return res.status(404).render('404');
+  }
+
   res.render('admin-submit-topic', {
     categoryLabels: CATEGORY_LABELS,
     result: null,
     error: null,
+    adminKey: key,
   });
 });
 
 router.post('/admin/submit-topic', (req, res) => {
-  const { password, category, topic, title } = req.body;
+  const { key, category, topic, title } = req.body;
 
-  if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
-    return res.render('admin-submit-topic', {
-      categoryLabels: CATEGORY_LABELS,
-      result: null,
-      error: 'Incorrect password.',
-    });
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return res.status(404).render('404');
   }
 
   if (!category || !topic || !title) {
@@ -513,6 +516,7 @@ router.post('/admin/submit-topic', (req, res) => {
       categoryLabels: CATEGORY_LABELS,
       result: null,
       error: 'Please fill in category, topic, and title.',
+      adminKey: key,
     });
   }
 
@@ -536,6 +540,7 @@ router.post('/admin/submit-topic', (req, res) => {
     categoryLabels: CATEGORY_LABELS,
     result: `Started generating "${title}" in the background. This takes a couple minutes — check the site or your Facebook Page shortly to confirm it published.`,
     error: null,
+    adminKey: key,
   });
 });
 
