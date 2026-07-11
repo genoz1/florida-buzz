@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../lib/supabase');
+const { spawn } = require('child_process');
+const path = require('path');
 
 const CATEGORY_LABELS = {
   'theme-parks': '🏰 Theme Parks',
@@ -481,6 +483,60 @@ router.get('/ads.txt', (req, res) => {
   if (!clientId) return res.send('');
   const pubId = clientId.replace(/^ca-/, '');
   res.send(`google.com, ${pubId}, DIRECT, f08c47fec0942fa0`);
+});
+
+// Simple password-gated form to manually trigger evergreen guide generation
+// on a specific topic, instead of waiting for the random daily picker or
+// running commands by hand in the DigitalOcean console. Protected by
+// ADMIN_PASSWORD env var — set that before using this in production.
+router.get('/admin/submit-topic', (req, res) => {
+  res.render('admin-submit-topic', {
+    categoryLabels: CATEGORY_LABELS,
+    result: null,
+    error: null,
+  });
+});
+
+router.post('/admin/submit-topic', (req, res) => {
+  const { password, category, topic, title } = req.body;
+
+  if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
+    return res.render('admin-submit-topic', {
+      categoryLabels: CATEGORY_LABELS,
+      result: null,
+      error: 'Incorrect password.',
+    });
+  }
+
+  if (!category || !topic || !title) {
+    return res.render('admin-submit-topic', {
+      categoryLabels: CATEGORY_LABELS,
+      result: null,
+      error: 'Please fill in category, topic, and title.',
+    });
+  }
+
+  // Fire the guide generator in the background and respond immediately —
+  // research + writing + image generation can take a couple minutes, well
+  // past a typical HTTP request timeout, so we don't wait for it here.
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'generate-guide.js');
+  const child = spawn('node', [scriptPath], {
+    env: {
+      ...process.env,
+      FORCE_CATEGORY: category,
+      FORCE_TOPIC: topic,
+      FORCE_TITLE: title,
+    },
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+
+  res.render('admin-submit-topic', {
+    categoryLabels: CATEGORY_LABELS,
+    result: `Started generating "${title}" in the background. This takes a couple minutes — check the site or your Facebook Page shortly to confirm it published.`,
+    error: null,
+  });
 });
 
 module.exports = router;
