@@ -8,6 +8,16 @@ const { notifyIndexNow } = require('../lib/indexnow');
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
 
+// Manual topic override: set these three env vars together to force today's
+// run to write on a specific subject instead of letting the weighted
+// category picker + AI topic picker choose. Useful for time-sensitive or
+// fact-checked topics (e.g. policy pages you want live before a promo video
+// goes out) rather than waiting for the random rotation to land on them.
+// Example: FORCE_CATEGORY=theme-parks FORCE_TOPIC="How DAS registration works in 2026" FORCE_TITLE="Disney World DAS: How to Register in 2026" node scripts/generate-guide.js
+const FORCE_CATEGORY = process.env.FORCE_CATEGORY || null;
+const FORCE_TOPIC = process.env.FORCE_TOPIC || null;
+const FORCE_TITLE = process.env.FORCE_TITLE || null;
+
 const CATEGORY_WEIGHTS = {
   'theme-parks': 45,
   beaches: 18,
@@ -323,19 +333,24 @@ async function run() {
   console.log(`=== Daily evergreen guide generation — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
 
-  const category = pickWeightedCategory();
-  console.log(`Category for today: ${category}`);
+  const category = FORCE_CATEGORY || pickWeightedCategory();
+  console.log(FORCE_CATEGORY ? `Category forced for today: ${category}` : `Category for today: ${category}`);
 
   const existingGuides = await getExistingGuides();
   console.log(`Found ${existingGuides.length} existing guide(s) on record.`);
 
   console.log("Choosing today's topic...");
   let topicPick;
-  try {
-    topicPick = await pickTopic(category, existingGuides);
-  } catch (err) {
-    console.error(`[error] Topic selection failed: ${err.message}`);
-    process.exit(1);
+  if (FORCE_TOPIC && FORCE_TITLE) {
+    console.log('  Topic forced via FORCE_TOPIC/FORCE_TITLE — skipping AI topic selection.');
+    topicPick = { topic: FORCE_TOPIC, working_title: FORCE_TITLE };
+  } else {
+    try {
+      topicPick = await pickTopic(category, existingGuides);
+    } catch (err) {
+      console.error(`[error] Topic selection failed: ${err.message}`);
+      process.exit(1);
+    }
   }
   console.log(`  Topic: ${topicPick.topic}`);
   console.log(`  Working title: ${topicPick.working_title}`);
