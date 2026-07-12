@@ -1,0 +1,58 @@
+<%- include('partials/header', { pageTitle: 'Posting Report — Florida Buzz Admin', category: null, tickerItems: [], canonicalPath: null }) %>
+
+<main class="wrap">
+  <section class="section" style="max-width:720px; margin:0 auto;">
+    <h1 style="font-family:var(--font-display); font-size:28px; color:var(--teal-900);">Posting Report</h1>
+    <p style="color:var(--ink-600); margin-top:6px;">Post volume and success/failure across all platforms, tracked automatically every time a post goes out.</p>
+
+    <% if (!hasData) { %>
+      <div style="background:#fdecea; color:#b3261e; padding:12px 16px; border-radius:8px; margin-top:16px; font-size:14px;">Supabase isn't configured — no data available.</div>
+    <% } %>
+
+    <div style="margin-top:24px; overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead>
+          <tr style="background:var(--teal-900); color:white;">
+            <th style="padding:10px 12px; text-align:left;">Platform</th>
+            <th style="padding:10px 12px; text-align:center;">Yesterday (24h) ✅</th>
+            <th style="padding:10px 12px; text-align:center;">Yesterday (24h) ❌</th>
+            <th style="padding:10px 12px; text-align:center;">Rolling 7 Days ✅</th>
+            <th style="padding:10px 12px; text-align:center;">Rolling 7 Days ❌</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% platforms.forEach((platform, i) => { %>
+            <tr style="background:<%= i % 2 === 0 ? '#fff' : 'var(--sand-100)' %>;">
+              <td style="padding:10px 12px; font-weight:600; text-transform:capitalize;"><%= platform %></td>
+              <td style="padding:10px 12px; text-align:center; color:#1b5e20; font-weight:600;"><%= summary[platform].last24h.success %></td>
+              <td style="padding:10px 12px; text-align:center; color:<%= summary[platform].last24h.failed > 0 ? '#b3261e' : '#999' %>; font-weight:600;"><%= summary[platform].last24h.failed %></td>
+              <td style="padding:10px 12px; text-align:center; color:#1b5e20; font-weight:600;"><%= summary[platform].last7d.success %></td>
+              <td style="padding:10px 12px; text-align:center; color:<%= summary[platform].last7d.failed > 0 ? '#b3261e' : '#999' %>; font-weight:600;"><%= summary[platform].last7d.failed %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (recentFailures.length) { %>
+      <div style="margin-top:32px;">
+        <h2 style="font-size:16px; color:var(--teal-900);">Recent Failures (last 7 days)</h2>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+          <% recentFailures.forEach(f => { %>
+            <div style="background:#fdecea; border-radius:6px; padding:10px 14px; font-size:13px;">
+              <strong style="text-transform:capitalize;"><%= f.platform %></strong>
+              — <%= new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }) %> ET
+              <div style="color:#7a2018; margin-top:4px;"><%= f.detail || '(no detail)' %></div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    <% } else { %>
+      <p style="color:var(--ink-600); margin-top:24px; font-size:14px;">No failures in the last 7 days. 🎉</p>
+    <% } %>
+
+    <p style="color:#999; font-size:12px; margin-top:32px;">Refresh this page anytime — nothing to submit, just reload with the same link to see updated numbers.</p>
+  </section>
+</main>
+
+<%- include('partials/footer') %>
