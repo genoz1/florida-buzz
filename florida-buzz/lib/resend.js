@@ -1,6 +1,6 @@
 // Thin wrapper around Resend's email API.
 
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, from }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -8,7 +8,7 @@ async function sendEmail({ to, subject, html }) {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: process.env.NEWSLETTER_FROM_EMAIL || 'Florida Buzz <newsletter@thefloridabuzz.com>',
+      from: from || process.env.NEWSLETTER_FROM_EMAIL || 'Florida Buzz <newsletter@thefloridabuzz.com>',
       to,
       subject,
       html,
