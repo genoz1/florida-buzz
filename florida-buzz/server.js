@@ -134,3 +134,21 @@ if (process.env.ANTHROPIC_API_KEY && process.env.FB_PAGE_ID && process.env.FB_PA
 } else {
   console.log('Engagement post NOT scheduled — set ANTHROPIC_API_KEY, FB_PAGE_ID, and FB_PAGE_ACCESS_TOKEN to enable.');
 }
+
+// Sends a daily email confirming whether every platform (Facebook, Instagram,
+// Pinterest, Threads) posted successfully in the last 24 hours — a genuine
+// pass/fail confirmation, not just an alert-on-failure. Runs at 8:15am,
+// after the prior day's full posting cycle has completed. Disabled until
+// RESEND_API_KEY and ALERT_EMAIL_TO are set.
+if (process.env.RESEND_API_KEY && process.env.ALERT_EMAIL_TO) {
+  cron.schedule('15 8 * * *', () => {
+    console.log('Running scheduled post health check...');
+    require('child_process').exec('node scripts/post-health-check.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  }, { timezone: 'America/New_York' });
+  console.log('Post health check scheduled: 8:15am daily (Eastern time).');
+} else {
+  console.log('Post health check NOT scheduled — set RESEND_API_KEY and ALERT_EMAIL_TO to enable.');
+}
