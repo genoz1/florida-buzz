@@ -4,6 +4,8 @@
 // instead until "Standard" access is approved. Set PINTEREST_USE_SANDBOX=true
 // to test/demo against Sandbox; remove it (or set to false) once Standard
 // access is granted to switch back to production automatically.
+const { logPost } = require('./postLog');
+
 const PINTEREST_API_BASE = process.env.PINTEREST_USE_SANDBOX === 'true'
   ? 'https://api-sandbox.pinterest.com'
   : 'https://api.pinterest.com';
@@ -29,9 +31,11 @@ async function createPin({ imageUrl, title, description, link }) {
 
   if (!res.ok) {
     const errText = await res.text();
+    await logPost({ platform: 'pinterest', status: 'failed', detail: errText });
     throw new Error(`Pinterest API error ${res.status}: ${errText}`);
   }
 
+  await logPost({ platform: 'pinterest', status: 'success', detail: title ? title.slice(0, 100) : null });
   return res.json();
 }
 

@@ -1,5 +1,6 @@
 // Shared Facebook Page posting helper, used by scripts/automate.js (article posts)
 // and scripts/promo-post.js (brand/newsletter/guide promo posts).
+const { logPost } = require('./postLog');
 
 async function postToFacebookPage({ message, link, dryRun = false }) {
   if (dryRun) {
@@ -24,9 +25,13 @@ async function postToFacebookPage({ message, link, dryRun = false }) {
   });
 
   if (!res.ok) {
-    console.error(`  [error] Facebook post failed: ${await res.text()}`);
+    const errText = await res.text();
+    console.error(`  [error] Facebook post failed: ${errText}`);
+    await logPost({ platform: 'facebook', status: 'failed', detail: errText });
     return false;
   }
+
+  await logPost({ platform: 'facebook', status: 'success', detail: message.slice(0, 100) });
   return true;
 }
 

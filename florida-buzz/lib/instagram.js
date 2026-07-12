@@ -6,6 +6,7 @@
 // Publishing is a two-step process: create a media "container" pointing at
 // an image URL, then publish that container. Containers can take a few
 // seconds to process, so we poll their status before publishing.
+const { logPost } = require('./postLog');
 
 const GRAPH_BASE = 'https://graph.instagram.com/v21.0';
 
@@ -33,48 +34,54 @@ async function waitForContainerReady(containerId, accessToken, maxAttempts = 10)
 }
 
 async function createPost({ imageUrl, caption }) {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-  const igUserId = process.env.INSTAGRAM_USER_ID;
+  try {
+    const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+    const igUserId = process.env.INSTAGRAM_USER_ID;
 
-  if (!accessToken || !igUserId) {
-    throw new Error('INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_USER_ID not set.');
+    if (!accessToken || !igUserId) {
+      throw new Error('INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_USER_ID not set.');
+    }
+
+    // Step 1: create the media container.
+    const createRes = await fetch(`${GRAPH_BASE}/${igUserId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_url: imageUrl,
+        caption,
+        access_token: accessToken,
+      }),
+    });
+    const createData = await createRes.json();
+    if (!createRes.ok) {
+      throw new Error(`Instagram container creation failed: ${JSON.stringify(createData)}`);
+    }
+
+    const containerId = createData.id;
+
+    // Step 2: wait for Instagram to finish processing the image.
+    await waitForContainerReady(containerId, accessToken);
+
+    // Step 3: publish the container.
+    const publishRes = await fetch(`${GRAPH_BASE}/${igUserId}/media_publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        creation_id: containerId,
+        access_token: accessToken,
+      }),
+    });
+    const publishData = await publishRes.json();
+    if (!publishRes.ok) {
+      throw new Error(`Instagram publish failed: ${JSON.stringify(publishData)}`);
+    }
+
+    await logPost({ platform: 'instagram', status: 'success', detail: caption ? caption.slice(0, 100) : null });
+    return publishData;
+  } catch (err) {
+    await logPost({ platform: 'instagram', status: 'failed', detail: err.message });
+    throw err;
   }
-
-  // Step 1: create the media container.
-  const createRes = await fetch(`${GRAPH_BASE}/${igUserId}/media`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image_url: imageUrl,
-      caption,
-      access_token: accessToken,
-    }),
-  });
-  const createData = await createRes.json();
-  if (!createRes.ok) {
-    throw new Error(`Instagram container creation failed: ${JSON.stringify(createData)}`);
-  }
-
-  const containerId = createData.id;
-
-  // Step 2: wait for Instagram to finish processing the image.
-  await waitForContainerReady(containerId, accessToken);
-
-  // Step 3: publish the container.
-  const publishRes = await fetch(`${GRAPH_BASE}/${igUserId}/media_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      creation_id: containerId,
-      access_token: accessToken,
-    }),
-  });
-  const publishData = await publishRes.json();
-  if (!publishRes.ok) {
-    throw new Error(`Instagram publish failed: ${JSON.stringify(publishData)}`);
-  }
-
-  return publishData;
 }
 
 module.exports = { createPost };
