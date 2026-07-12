@@ -115,3 +115,22 @@ if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
 } else {
   console.log('City roundups NOT scheduled — set FB_PAGE_ID and FB_PAGE_ACCESS_TOKEN to enable.');
 }
+
+// Posts one lightweight "vote in the comments" engagement post per day to
+// Facebook — separate from news, guides, and promo content. Starting at
+// ONE per day deliberately (not the 10/day some tools suggest) since the
+// Page is still small; scale this up later only if it's clearly working.
+// Spaced away from every other scheduled post above. Disabled until
+// ANTHROPIC_API_KEY, FB_PAGE_ID, and FB_PAGE_ACCESS_TOKEN are set.
+if (process.env.ANTHROPIC_API_KEY && process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
+  cron.schedule('30 13 * * *', () => {
+    console.log('Running scheduled engagement post...');
+    require('child_process').exec('node scripts/engagement-post.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  }, { timezone: 'America/New_York' });
+  console.log('Engagement post scheduled: 1:30pm daily (Eastern time).');
+} else {
+  console.log('Engagement post NOT scheduled — set ANTHROPIC_API_KEY, FB_PAGE_ID, and FB_PAGE_ACCESS_TOKEN to enable.');
+}
