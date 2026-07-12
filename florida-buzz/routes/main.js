@@ -544,4 +544,63 @@ router.post('/admin/submit-topic', (req, res) => {
   });
 });
 
+// Reporting dashboard showing post volume and success/failure per platform,
+// for the last 24 hours and rolling 7 days. Reads from post_log, which is
+// written automatically by lib/facebook.js, lib/pinterest.js,
+// lib/instagram.js, and lib/threads.js on every real post attempt.
+// Password-gated the same way as /admin/submit-topic.
+const PLATFORMS = ['facebook', 'instagram', 'pinterest', 'threads'];
+
+router.get('/admin/post-report', async (req, res) => {
+  const { key } = req.query;
+
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return res.status(404).render('404');
+  }
+
+  let logs = [];
+  if (supabase) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('post_log')
+      .select('platform, status, detail, created_at')
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error(`  [error] Could not fetch post_log: ${error.message}`);
+    } else {
+      logs = data || [];
+    }
+  }
+
+  const oneDayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+
+  const summary = {};
+  PLATFORMS.forEach((platform) => {
+    summary[platform] = {
+      last24h: { success: 0, failed: 0 },
+      last7d: { success: 0, failed: 0 },
+    };
+  });
+
+  logs.forEach((row) => {
+    if (!summary[row.platform]) return; // ignore unexpected platform values
+    const bucket = summary[row.platform];
+    const isRecent = new Date(row.created_at).getTime() >= oneDayAgoMs;
+    const statusKey = row.status === 'success' ? 'success' : 'failed';
+    bucket.last7d[statusKey] += 1;
+    if (isRecent) bucket.last24h[statusKey] += 1;
+  });
+
+  const recentFailures = logs.filter((row) => row.status === 'failed').slice(0, 20);
+
+  res.render('admin-post-report', {
+    summary,
+    platforms: PLATFORMS,
+    recentFailures,
+    hasData: !!supabase,
+    adminKey: key,
+  });
+});
+
 module.exports = router;
