@@ -31,6 +31,56 @@ function looksLikeAd(width, height) {
   return false;
 }
 
+// Instagram rejects images outside a 4:5 (portrait) to 1.91:1 (landscape)
+// aspect ratio range — real downloaded source photos can be any shape
+// (panoramas, tall crops, etc.), unlike our AI-generated images which are
+// always requested at a safe fixed ratio. Rather than discarding an
+// otherwise-good real photo just because Instagram would reject the raw
+// shape, center-crop it into the nearest allowed ratio. Returns the
+// original buffer unchanged if it's already within range.
+const INSTAGRAM_MIN_RATIO = 4 / 5;   // 0.8 — tallest allowed (portrait)
+const INSTAGRAM_MAX_RATIO = 1.91;    // widest allowed (landscape)
+
+async function normalizeAspectRatio(buffer) {
+  let dims;
+  try {
+    dims = imageSize(buffer);
+  } catch {
+    return buffer; // can't read dims — leave as-is, the caller already handles unreadable images separately
+  }
+
+  const ratio = dims.width / dims.height;
+  if (ratio >= INSTAGRAM_MIN_RATIO && ratio <= INSTAGRAM_MAX_RATIO) {
+    return buffer; // already within Instagram's accepted range, nothing to do
+  }
+
+  const img = await Jimp.read(buffer);
+  let targetWidth = img.width;
+  let targetHeight = img.height;
+
+  if (ratio < INSTAGRAM_MIN_RATIO) {
+    // Too tall/narrow (e.g. a skinny vertical crop) — trim height down to
+    // the tallest ratio Instagram allows for this width.
+    targetHeight = Math.round(img.width / INSTAGRAM_MIN_RATIO);
+  } else {
+    // Too wide (e.g. a wide panorama) — trim width down to the widest
+    // ratio Instagram allows for this height.
+    targetWidth = Math.round(img.height * INSTAGRAM_MAX_RATIO);
+  }
+
+  const x = Math.max(0, Math.round((img.width - targetWidth) / 2));
+  const y = Math.max(0, Math.round((img.height - targetHeight) / 2));
+  img.crop({
+    x,
+    y,
+    w: Math.min(targetWidth, img.width),
+    h: Math.min(targetHeight, img.height),
+  });
+
+  console.log(`  Cropped image from ${dims.width}x${dims.height} (ratio ${ratio.toFixed(2)}) to fit Instagram's supported aspect ratio range.`);
+  return img.getBuffer('image/jpeg');
+}
+
 // Uploads generated image bytes to Supabase Storage for permanent hosting.
 // Returns the permanent public URL, or null if anything fails.
 async function storeGeneratedImage(imageBuffer, filename) {
@@ -100,6 +150,12 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
       console.log(`  [reject] Could not read image dimensions (${dimErr.message}) — skipping rather than risk a bad file.`);
       return null;
     }
+
+    // Fix the aspect ratio if needed so Instagram doesn't reject this image
+    // later at posting time — cheaper to fix once here than to fail silently
+    // on every future post attempt using this image.
+    buffer = await normalizeAspectRatio(buffer);
+    contentType = 'image/jpeg';
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')
