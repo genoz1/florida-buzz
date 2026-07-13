@@ -3,6 +3,7 @@ const { supabase } = require('../lib/supabase');
 const { askClaudeWithSearch } = require('../lib/anthropic');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
+const { postToFacebookPage } = require('../lib/facebook');
 const { notifyIndexNow } = require('../lib/indexnow');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -270,33 +271,9 @@ Working title idea: ${workingTitle}`;
   return guide;
 }
 
-async function postToFacebook({ fb_caption, slug }) {
-  if (DRY_RUN) {
-    console.log(`  [dry-run] Would post to Facebook: "${fb_caption}"`);
-    return true;
-  }
-  if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
-    console.log('  [skip] FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN not set — skipping Facebook post.');
-    return false;
-  }
-
+async function postToFacebook({ fb_caption, slug, imageUrl }) {
   const articleUrl = `${SITE_URL}/article/${slug}`;
-
-  const res = await fetch(`https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: fb_caption,
-      link: articleUrl,
-      access_token: process.env.FB_PAGE_ACCESS_TOKEN,
-    }),
-  });
-
-  if (!res.ok) {
-    console.error(`  [error] Facebook post failed: ${await res.text()}`);
-    return false;
-  }
-  return true;
+  return postToFacebookPage({ message: fb_caption, link: articleUrl, imageUrl, dryRun: DRY_RUN });
 }
 
 async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
@@ -421,7 +398,7 @@ async function run() {
   console.log(`Saved guide: /article/${slug}`);
   await notifyIndexNow(`${SITE_URL}/article/${slug}`);
 
-  await postToFacebook({ fb_caption: guide.fb_caption, slug });
+  await postToFacebook({ fb_caption: guide.fb_caption, slug, imageUrl });
   await postToPinterest({
     pin_title: guide.pin_title,
     pin_description: guide.pin_description,

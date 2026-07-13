@@ -169,9 +169,9 @@ Source link (for context only, do not include in body_html): ${sourceUrl}`;
   }
 }
 
-async function postToFacebook({ title, fb_caption, source_url, slug }) {
+async function postToFacebook({ title, fb_caption, source_url, slug, imageUrl }) {
   const articleUrl = `${process.env.SITE_URL}/article/${slug}`;
-  return postToFacebookPage({ message: fb_caption, link: articleUrl, dryRun: DRY_RUN });
+  return postToFacebookPage({ message: fb_caption, link: articleUrl, imageUrl, dryRun: DRY_RUN });
 }
 
 async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
@@ -444,7 +444,7 @@ async function run() {
         console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before the next Facebook post...`);
         await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
       }
-      await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug });
+      await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
       fbPostCount += 1;
       await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
       await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
