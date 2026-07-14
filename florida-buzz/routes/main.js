@@ -429,6 +429,7 @@ router.get('/sitemap.xml', async (req, res) => {
 
   const staticUrls = [
     { loc: siteUrl, priority: '1.0' },
+    { loc: `${siteUrl}/wait-times`, priority: '0.9' },
     ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
     ...CITY_ORDER.map((city) => ({ loc: `${siteUrl}/city/${city}`, priority: '0.7' })),
     ...Object.keys(PILLARS).map((slug) => ({ loc: `${siteUrl}/guide/${slug}`, priority: '0.8' })),
@@ -601,6 +602,69 @@ router.get('/admin/post-report', async (req, res) => {
     hasData: !!supabase,
     adminKey: key,
   });
+});
+
+// Live theme park wait times, powered by the free Queue Times API
+// (https://queue-times.com). Their terms require a visible "Powered by
+// Queue-Times.com" attribution link — kept in the wait-times.ejs template.
+// Data refreshes every 5 minutes on their end, so we cache server-side for
+// 2 minutes rather than re-fetching on every single page load or client
+// poll — keeps us a good API citizen and keeps the page fast.
+const WAIT_TIME_PARKS = [
+  { id: 6, name: 'Magic Kingdom' },
+  { id: 5, name: 'EPCOT' },
+  { id: 7, name: 'Hollywood Studios' },
+  { id: 8, name: 'Animal Kingdom' },
+  { id: 65, name: 'Universal Studios Florida' },
+  { id: 64, name: 'Islands of Adventure' },
+  { id: 334, name: 'Epic Universe' },
+];
+
+const WAIT_TIMES_CACHE_MS = 2 * 60 * 1000; // 2 minutes
+let waitTimesCache = { data: null, fetchedAt: 0 };
+
+async function fetchWaitTimesFresh() {
+  return Promise.all(
+    WAIT_TIME_PARKS.map(async (park) => {
+      try {
+        const res = await fetch(`https://queue-times.com/parks/${park.id}/queue_times.json`);
+        if (!res.ok) return { ...park, lands: [], rides: [], error: true };
+        const data = await res.json();
+        return { ...park, lands: data.lands || [], rides: data.rides || [] };
+      } catch {
+        return { ...park, lands: [], rides: [], error: true };
+      }
+    })
+  );
+}
+
+async function getWaitTimes() {
+  const now = Date.now();
+  if (!waitTimesCache.data || now - waitTimesCache.fetchedAt > WAIT_TIMES_CACHE_MS) {
+    try {
+      waitTimesCache = { data: await fetchWaitTimesFresh(), fetchedAt: now };
+    } catch (err) {
+      console.error(`  [error] Could not fetch wait times: ${err.message}`);
+    }
+  }
+  return waitTimesCache;
+}
+
+router.get('/wait-times', async (req, res) => {
+  const { data, fetchedAt } = await getWaitTimes();
+  res.render('wait-times', {
+    parks: data || [],
+    fetchedAt,
+    categoryLabels: CATEGORY_LABELS,
+  });
+});
+
+// Client-side polling hits this for live updates without a full page reload.
+router.get('/api/wait-times', async (req, res) => {
+  const { data, fetchedAt } = await getWaitTimes();
+  if (!data) return res.status(502).json({ error: 'Could not fetch wait times right now.' });
+  res.set('Cache-Control', 'no-store');
+  res.json({ parks: data, fetchedAt });
 });
 
 module.exports = router;
