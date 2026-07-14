@@ -33,11 +33,40 @@ async function waitForContainerReady(containerId, accessToken, maxAttempts = 10)
   throw new Error('Instagram container did not finish processing in time.');
 }
 
-async function createPost({ imageUrl, caption }) {
+// Under rate-limiting conditions, Meta's API has a known, documented quirk:
+// the media_publish call can actually succeed in creating the post, but the
+// confirmation response comes back as an error anyway (commonly "Application
+// request limit reached", code 4 / subcode 2207051). Taking that error
+// response at face value produces exactly the symptom we hit in practice:
+// posts genuinely landing on Instagram while every attempt gets logged as a
+// failure. Rather than trust a single unreliable response, double-check
+// Instagram's own recent media list for a post matching what we just tried
+// to publish before concluding it actually failed.
+async function verifyRecentPublish(igUserId, accessToken, caption) {
   try {
-    const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-    const igUserId = process.env.INSTAGRAM_USER_ID;
+    const res = await fetch(
+      `${GRAPH_BASE}/${igUserId}/media?fields=caption,timestamp&limit=5&access_token=${accessToken}`
+    );
+    if (!res.ok) return false;
+    const data = await res.json();
+    const recentCaptionStart = (caption || '').slice(0, 40);
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
+    return (data.data || []).some((item) => {
+      const postedRecently = new Date(item.timestamp).getTime() >= fiveMinutesAgo;
+      const captionMatches = recentCaptionStart && (item.caption || '').startsWith(recentCaptionStart);
+      return postedRecently && captionMatches;
+    });
+  } catch {
+    return false; // verification itself failing just means we fall back to trusting the original error
+  }
+}
+
+async function createPost({ imageUrl, caption }) {
+  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const igUserId = process.env.INSTAGRAM_USER_ID;
+
+  try {
     if (!accessToken || !igUserId) {
       throw new Error('INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_USER_ID not set.');
     }
@@ -72,7 +101,17 @@ async function createPost({ imageUrl, caption }) {
       }),
     });
     const publishData = await publishRes.json();
+
     if (!publishRes.ok) {
+      // Meta said this failed — but under rate limiting, that response can be
+      // wrong. Check Instagram's actual recent posts before believing it.
+      console.log('  Instagram reported an error on publish — double-checking whether it actually posted anyway...');
+      const actuallyPosted = await verifyRecentPublish(igUserId, accessToken, caption);
+      if (actuallyPosted) {
+        console.log('  Confirmed: it posted successfully despite the error response. Logging as success.');
+        await logPost({ platform: 'instagram', status: 'success', detail: `${(caption || '').slice(0, 100)} (recovered after false-error response)` });
+        return { recovered: true };
+      }
       throw new Error(`Instagram publish failed: ${JSON.stringify(publishData)}`);
     }
 
