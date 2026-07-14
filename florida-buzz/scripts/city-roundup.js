@@ -112,10 +112,16 @@ events already covered on the site. You ONLY reference the specific articles pro
 — never invent an event, date, or detail not present in them. Do not invent facts beyond
 what's in each article's title/dek.
 
+IMPORTANT: never include a specific date or date range (like "July 10-12") anywhere in the
+title or meta_title, even if one of the source articles below has a date in its own title.
+The exact current date range gets added automatically after you write the title — if you
+also include one, it will appear twice. Just write "This Week"/"This Weekend" and the city
+name, nothing more specific than that.
+
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
-  "title": "string, under 70 characters, e.g. 'What to Do ${timeframe === 'this weekend' ? 'This Weekend' : 'This Week'} in ${cityLabel}'",
-  "meta_title": "string, under 60 characters, search-friendly version of the title including the timeframe and city",
+  "title": "string, under 70 characters, e.g. 'What to Do ${timeframe === 'this weekend' ? 'This Weekend' : 'This Week'} in ${cityLabel}' — NO dates",
+  "meta_title": "string, under 60 characters, search-friendly version of the title including the timeframe and city — NO dates",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, a short warm intro paragraph as a <p> tag, then a <ul> with one <li> per article — each li should briefly describe the event in original wording (not copied from the dek) and include a real <a href> link to that article's URL (provided below) with descriptive link text — end with a brief closing <p> tag",
   "fb_caption": "string, Facebook post: 2-3 warm, inviting sentences teasing a couple of these events for ${timeframe} in ${cityLabel}, no hashtags, ends with a relevant emoji"
@@ -174,6 +180,16 @@ async function run() {
       console.error(`  [error] Could not compose roundup: ${err.message}`);
       continue;
     }
+
+    // Defensive strip: even with the prompt instruction above, the model can
+    // occasionally still echo a date range it saw in one of the source
+    // articles' own titles (e.g. "Top 5 things to do in Jacksonville July
+    // 10-12"). Remove any trailing "(Month Day-Day)"-style parenthetical
+    // before appending the correct, freshly-computed one below, so we never
+    // end up with two date ranges stacked in the same title.
+    const datePattern = /\s*\([A-Z][a-z]+\.?\s+\d{1,2}(-\d{1,2})?\)\s*$/;
+    roundup.title = roundup.title.replace(datePattern, '').trim();
+    roundup.meta_title = roundup.meta_title.replace(datePattern, '').trim();
 
     const dateRangeLabel = getDateRangeLabel(today.mode);
     roundup.title = `${roundup.title} (${dateRangeLabel})`;
