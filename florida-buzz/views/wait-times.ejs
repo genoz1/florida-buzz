@@ -1,0 +1,143 @@
+<%- include('partials/header', { pageTitle: 'Live Disney World & Universal Orlando Wait Times — The Florida Buzz', pageDescription: 'Real-time ride wait times for Magic Kingdom, EPCOT, Hollywood Studios, Animal Kingdom, Universal Studios, Islands of Adventure, and Epic Universe — updated every few minutes.', category: null, tickerItems: [], canonicalPath: '/wait-times' }) %>
+
+<style>
+  .wt-header { text-align: center; padding: 8px 0 20px; }
+  .wt-updated { color: var(--ink-600); font-size: 13px; margin-top: 6px; }
+  .wt-park { margin-bottom: 36px; }
+  .wt-park-name { font-family: var(--font-display); font-size: 22px; color: var(--teal-900); margin-bottom: 10px; border-bottom: 2px solid var(--sand-100); padding-bottom: 6px; }
+  .wt-land-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-600); margin: 14px 0 6px; }
+  .wt-ride-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+  .wt-ride { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fff; border: 1px solid var(--sand-100); border-radius: 6px; font-size: 14px; }
+  .wt-ride-name { color: var(--ink-900); }
+  .wt-badge { font-weight: 700; padding: 3px 10px; border-radius: 12px; font-size: 13px; white-space: nowrap; margin-left: 10px; }
+  .wt-badge-low { background: #e8f5e9; color: #1b5e20; }
+  .wt-badge-mid { background: #fff8e1; color: #8d6e00; }
+  .wt-badge-high { background: #fdecea; color: #b3261e; }
+  .wt-badge-closed { background: #f0f0f0; color: #999; }
+  .wt-attribution { text-align: center; font-size: 12px; color: var(--ink-600); margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--sand-100); }
+  .wt-error { text-align: center; color: var(--ink-600); padding: 40px 0; }
+</style>
+
+<main class="wrap">
+  <div class="wt-header">
+    <span class="eyebrow">🎢 Live Wait Times</span>
+    <h1 style="font-family:var(--font-display); font-size:32px; color:var(--teal-900); margin:8px 0 0;">Disney World &amp; Universal Orlando, Right Now</h1>
+    <p class="wt-updated" id="wt-updated-label">
+      <% if (fetchedAt) { %>Last updated <span id="wt-updated-time"><%= new Date(fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) %> ET</span> · refreshes automatically<% } %>
+    </p>
+  </div>
+
+  <div id="wt-parks-container">
+    <% if (!parks || !parks.length) { %>
+      <p class="wt-error">Wait times aren't available right now — try refreshing in a minute.</p>
+    <% } else { %>
+      <% parks.forEach(park => { %>
+        <div class="wt-park">
+          <div class="wt-park-name"><%= park.name %></div>
+          <% if (park.error) { %>
+            <p style="color:var(--ink-600); font-size:14px;">Wait times temporarily unavailable for this park.</p>
+          <% } else { %>
+            <% (park.lands || []).forEach(land => { %>
+              <% if (land.rides && land.rides.length) { %>
+                <div class="wt-land-name"><%= land.name %></div>
+                <div class="wt-ride-list">
+                  <% land.rides.forEach(ride => { %>
+                    <div class="wt-ride">
+                      <span class="wt-ride-name"><%= ride.name %></span>
+                      <span class="wt-badge <%= !ride.is_open ? 'wt-badge-closed' : (ride.wait_time <= 20 ? 'wt-badge-low' : (ride.wait_time <= 45 ? 'wt-badge-mid' : 'wt-badge-high')) %>">
+                        <%= !ride.is_open ? 'Closed' : ride.wait_time + ' min' %>
+                      </span>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
+            <% }) %>
+            <% if (park.rides && park.rides.length) { %>
+              <div class="wt-ride-list">
+                <% park.rides.forEach(ride => { %>
+                  <div class="wt-ride">
+                    <span class="wt-ride-name"><%= ride.name %></span>
+                    <span class="wt-badge <%= !ride.is_open ? 'wt-badge-closed' : (ride.wait_time <= 20 ? 'wt-badge-low' : (ride.wait_time <= 45 ? 'wt-badge-mid' : 'wt-badge-high')) %>">
+                      <%= !ride.is_open ? 'Closed' : ride.wait_time + ' min' %>
+                    </span>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+          <% } %>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+
+  <p class="wt-attribution">
+    Wait time data powered by <a href="https://queue-times.com/en-US" target="_blank" rel="noopener">Queue-Times.com</a> · updates roughly every 5 minutes
+  </p>
+</main>
+
+<script>
+(function () {
+  function badgeClass(wait, isOpen) {
+    if (!isOpen) return 'wt-badge-closed';
+    if (wait <= 20) return 'wt-badge-low';
+    if (wait <= 45) return 'wt-badge-mid';
+    return 'wt-badge-high';
+  }
+  function badgeLabel(wait, isOpen) {
+    if (!isOpen) return 'Closed';
+    return wait + ' min';
+  }
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderRide(ride) {
+    return '<div class="wt-ride"><span class="wt-ride-name">' + escapeHtml(ride.name) + '</span>' +
+      '<span class="wt-badge ' + badgeClass(ride.wait_time, ride.is_open) + '">' + badgeLabel(ride.wait_time, ride.is_open) + '</span></div>';
+  }
+
+  function renderPark(park) {
+    if (park.error) {
+      return '<div class="wt-park"><div class="wt-park-name">' + escapeHtml(park.name) + '</div><p style="color:var(--ink-600); font-size:14px;">Wait times temporarily unavailable for this park.</p></div>';
+    }
+    let html = '<div class="wt-park"><div class="wt-park-name">' + escapeHtml(park.name) + '</div>';
+    if (park.lands && park.lands.length) {
+      park.lands.forEach(function (land) {
+        if (!land.rides || !land.rides.length) return;
+        html += '<div class="wt-land-name">' + escapeHtml(land.name) + '</div><div class="wt-ride-list">';
+        land.rides.forEach(function (ride) { html += renderRide(ride); });
+        html += '</div>';
+      });
+    }
+    if (park.rides && park.rides.length) {
+      html += '<div class="wt-ride-list">';
+      park.rides.forEach(function (ride) { html += renderRide(ride); });
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderAll(parks) {
+    document.getElementById('wt-parks-container').innerHTML = parks.map(renderPark).join('');
+  }
+
+  function refresh() {
+    fetch('/api/wait-times')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data.parks) return;
+        renderAll(data.parks);
+        var time = new Date(data.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+        document.getElementById('wt-updated-time').textContent = time + ' ET';
+      })
+      .catch(function () { /* silently keep showing last known data */ });
+  }
+
+  // Refresh every 2 minutes — the underlying data only updates every ~5
+  // minutes anyway, no need to poll more aggressively than that.
+  setInterval(refresh, 2 * 60 * 1000);
+})();
+</script>
+
+<%- include('partials/footer') %>
