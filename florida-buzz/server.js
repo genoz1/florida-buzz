@@ -140,6 +140,11 @@ if (process.env.ANTHROPIC_API_KEY && process.env.FB_PAGE_ID && process.env.FB_PA
 // pass/fail confirmation, not just an alert-on-failure. Runs at 8:15am,
 // after the prior day's full posting cycle has completed. Disabled until
 // RESEND_API_KEY and ALERT_EMAIL_TO are set.
+// Sends a daily email confirming whether every platform (Facebook, Instagram,
+// Pinterest, Threads) posted successfully in the last 24 hours — a genuine
+// pass/fail confirmation, not just an alert-on-failure. Runs at 8:15am,
+// after the prior day's full posting cycle has completed. Disabled until
+// RESEND_API_KEY and ALERT_EMAIL_TO are set.
 if (process.env.RESEND_API_KEY && process.env.ALERT_EMAIL_TO) {
   cron.schedule('15 8 * * *', () => {
     console.log('Running scheduled post health check...');
@@ -151,4 +156,33 @@ if (process.env.RESEND_API_KEY && process.env.ALERT_EMAIL_TO) {
   console.log('Post health check scheduled: 8:15am daily (Eastern time).');
 } else {
   console.log('Post health check NOT scheduled — set RESEND_API_KEY and ALERT_EMAIL_TO to enable.');
+}
+
+// Refreshes the dining directory (scripts/generate-dining-directory.js) once
+// a month for each park it currently covers — restaurants close, menus
+// change, and dining plan status shifts often enough that a static one-time
+// list would go stale. Runs on the 1st of each month. NOTE: since this
+// replaces a park's entire restaurant list in one shot rather than updating
+// individual entries, it's worth occasionally spot-checking the live page
+// after a refresh rather than assuming it's always perfect — add new park
+// slugs to the list below as you add them to DINING_PARK_LABELS in
+// routes/main.js. Disabled until ANTHROPIC_API_KEY is set.
+const DINING_DIRECTORY_PARKS = ['magic-kingdom'];
+
+if (process.env.ANTHROPIC_API_KEY) {
+  cron.schedule('0 5 1 * *', () => {
+    DINING_DIRECTORY_PARKS.forEach((park) => {
+      console.log(`Running scheduled dining directory refresh for ${park}...`);
+      require('child_process').exec(
+        `PARK=${park} node scripts/generate-dining-directory.js`,
+        (err, stdout, stderr) => {
+          if (stdout) console.log(stdout);
+          if (stderr) console.error(stderr);
+        }
+      );
+    });
+  }, { timezone: 'America/New_York' });
+  console.log(`Dining directory refresh scheduled: 1st of each month at 5am (Eastern time), covering: ${DINING_DIRECTORY_PARKS.join(', ')}.`);
+} else {
+  console.log('Dining directory refresh NOT scheduled — set ANTHROPIC_API_KEY to enable.');
 }
