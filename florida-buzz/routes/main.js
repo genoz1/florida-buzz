@@ -430,6 +430,8 @@ router.get('/sitemap.xml', async (req, res) => {
   const staticUrls = [
     { loc: siteUrl, priority: '1.0' },
     { loc: `${siteUrl}/wait-times`, priority: '0.9' },
+    { loc: `${siteUrl}/dining`, priority: '0.8' },
+    ...Object.keys(DINING_PARK_LABELS).map((park) => ({ loc: `${siteUrl}/dining/${park}`, priority: '0.8' })),
     ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
     ...CITY_ORDER.map((city) => ({ loc: `${siteUrl}/city/${city}`, priority: '0.7' })),
     ...Object.keys(PILLARS).map((slug) => ({ loc: `${siteUrl}/guide/${slug}`, priority: '0.8' })),
@@ -665,6 +667,55 @@ router.get('/api/wait-times', async (req, res) => {
   if (!data) return res.status(502).json({ error: 'Could not fetch wait times right now.' });
   res.set('Cache-Control', 'no-store');
   res.json({ parks: data, fetchedAt });
+});
+
+// Dining directory: filterable restaurant listings per park, populated
+// separately by scripts/generate-dining-directory.js (run manually, not on
+// a schedule — see that file's comments for how to (re)populate a park).
+const DINING_PARK_LABELS = {
+  'magic-kingdom': 'Magic Kingdom',
+  epcot: 'EPCOT',
+  'hollywood-studios': "Disney's Hollywood Studios",
+  'animal-kingdom': "Disney's Animal Kingdom",
+};
+
+router.get('/dining', async (req, res) => {
+  let availableParks = [];
+  if (supabase) {
+    const { data } = await supabase.from('restaurants').select('park');
+    availableParks = [...new Set((data || []).map((r) => r.park))];
+  }
+  res.render('dining-hub', {
+    parkLabels: DINING_PARK_LABELS,
+    availableParks,
+    categoryLabels: CATEGORY_LABELS,
+  });
+});
+
+router.get('/dining/:park', async (req, res) => {
+  const { park } = req.params;
+  if (!DINING_PARK_LABELS[park]) return res.status(404).render('404');
+
+  let restaurants = [];
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('*')
+      .eq('park', park)
+      .order('name', { ascending: true });
+    if (error) {
+      console.error(`  [error] Could not fetch restaurants for ${park}: ${error.message}`);
+    } else {
+      restaurants = data || [];
+    }
+  }
+
+  res.render('dining', {
+    park,
+    parkLabel: DINING_PARK_LABELS[park],
+    restaurants,
+    categoryLabels: CATEGORY_LABELS,
+  });
 });
 
 module.exports = router;
