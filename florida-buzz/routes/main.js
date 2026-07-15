@@ -677,6 +677,7 @@ const DINING_PARK_LABELS = {
   epcot: 'EPCOT',
   'hollywood-studios': "Disney's Hollywood Studios",
   'animal-kingdom': "Disney's Animal Kingdom",
+  resorts: 'Disney Resort Hotels',
 };
 
 router.get('/dining', async (req, res) => {
