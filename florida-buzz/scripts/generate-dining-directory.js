@@ -17,6 +17,7 @@ const PARK_LABELS = {
   epcot: 'EPCOT at Walt Disney World',
   'hollywood-studios': "Disney's Hollywood Studios at Walt Disney World",
   'animal-kingdom': "Disney's Animal Kingdom at Walt Disney World",
+  resorts: 'Walt Disney World Resort Hotels',
 };
 
 function parseJsonResponse(text) {
@@ -37,7 +38,24 @@ function parseJsonResponse(text) {
   }
 }
 
-async function researchDiningDirectory(parkLabel) {
+// Shared JSON schema instructions used by both the per-park and resorts
+// prompts below — kept in one place so the two stay in sync.
+const SCHEMA_INSTRUCTIONS = `Respond ONLY with a valid JSON array, no markdown fences, no preamble:
+[
+  {
+    "name": "string",
+    "land": "string",
+    "service_type": "quick-service" | "table-service",
+    "reservations": "required" | "recommended" | "not-accepted" | "walk-up-only",
+    "dining_plan": "string or null",
+    "character_dining": true | false,
+    "characters": "string or null",
+    "meal_periods": ["breakfast", "lunch", "dinner", "snacks"],
+    "description": "string"
+  }
+]`;
+
+async function researchParkDining(parkLabel) {
   const system = `You are a meticulous Disney dining researcher compiling a complete,
 CURRENT restaurant directory for ${parkLabel}. Accuracy matters more than speed here —
 someone could plan their whole day around this list, so verify with web search rather
@@ -66,20 +84,7 @@ location in the park, provide:
 - description: 2-3 sentences, warm and specific, in your own original wording — what
   makes this place worth knowing about, not just a restated fact list
 
-Respond ONLY with a valid JSON array, no markdown fences, no preamble:
-[
-  {
-    "name": "string",
-    "land": "string",
-    "service_type": "quick-service" | "table-service",
-    "reservations": "required" | "recommended" | "not-accepted" | "walk-up-only",
-    "dining_plan": "string or null",
-    "character_dining": true | false,
-    "characters": "string or null",
-    "meal_periods": ["breakfast", "lunch", "dinner", "snacks"],
-    "description": "string"
-  }
-]`;
+${SCHEMA_INSTRUCTIONS}`;
 
   const user = `Research and list every current restaurant, quick-service spot, and snack
 location at ${parkLabel}. Use enough web searches to be confident the list is accurate
@@ -88,6 +93,57 @@ and current as of today.`;
   const { text, searchesUsed } = await askClaudeWithSearch(system, user, 8000, 15);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   return parseJsonResponse(text);
+}
+
+// Resort dining is a fundamentally bigger, differently-shaped research task
+// than a single park — roughly 25+ resorts across Value, Moderate, and
+// Deluxe tiers, each with its own restaurants. Listing every quick-service
+// grab-and-go counter at every resort would produce an unwieldy, low-signal
+// page, so this deliberately scopes to what's actually worth knowing about:
+// every table-service and signature restaurant, plus each resort's single
+// main quick-service food court — not every minor snack stand. This mirrors
+// how a real editorial dining guide curates rather than exhaustively lists
+// every logistics detail.
+async function researchResortDining() {
+  const system = `You are a meticulous Disney dining researcher compiling a CURRENT
+directory of notable dining across Walt Disney World's resort hotels — Value, Moderate,
+and Deluxe tiers, plus Disney Springs-area hotels. Accuracy matters more than speed —
+verify with web search rather than relying on memory, since resort restaurants open,
+close, and rebrand fairly often.
+
+Scope deliberately: for EACH resort, include every table-service and signature-dining
+restaurant, plus that resort's main quick-service food court (one entry, not every
+individual counter within it). Skip minor grab-and-go snack kiosks and pool bars unless
+genuinely notable — the goal is a useful, readable directory, not an exhaustive list of
+every logistics detail.
+
+For each entry, provide:
+- name: the restaurant's actual current name
+- land: the name of the RESORT it's located at (e.g. "Disney's Grand Floridian Resort & Spa") — this is used to group entries by resort on the page
+- service_type: "quick-service" or "table-service"
+- reservations: "required" | "recommended" | "not-accepted" | "walk-up-only"
+- dining_plan: current Disney Dining Plan status if verifiable, or null
+- character_dining: true only if characters regularly appear during the meal
+- characters: which characters, if character_dining is true, otherwise null
+- meal_periods: array from ["breakfast","lunch","dinner","snacks"]
+- description: 2-3 sentences, warm and specific, in your own original wording, and
+  briefly note which resort it's at and that resort's tier (Value/Moderate/Deluxe)
+
+${SCHEMA_INSTRUCTIONS}`;
+
+  const user = `Research and list notable table-service, signature, and main quick-service
+dining across Walt Disney World's resort hotels — covering a representative, genuinely
+current spread of Value, Moderate, and Deluxe resorts. Use enough web searches to be
+confident the list is accurate as of today.`;
+
+  const { text, searchesUsed } = await askClaudeWithSearch(system, user, 14000, 25);
+  console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
+  return parseJsonResponse(text);
+}
+
+async function researchDiningDirectory(park, parkLabel) {
+  if (park === 'resorts') return researchResortDining();
+  return researchParkDining(parkLabel);
 }
 
 async function run() {
@@ -102,7 +158,7 @@ async function run() {
 
   let restaurants;
   try {
-    restaurants = await researchDiningDirectory(PARK_LABELS[park]);
+    restaurants = await researchDiningDirectory(park, PARK_LABELS[park]);
   } catch (err) {
     console.error(`[error] Research failed: ${err.message}`);
     process.exit(1);
