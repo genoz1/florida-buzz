@@ -1,0 +1,95 @@
+<%- include('partials/header', { pageTitle: parkLabel + ' Dining Guide — The Florida Buzz', pageDescription: 'Every restaurant at ' + parkLabel + ' — service type, reservations, dining plan status, and character dining, all in one place.', category: 'theme-parks', tickerItems: [], canonicalPath: '/dining/' + park }) %>
+
+<style>
+  .dn-header { text-align: center; padding: 8px 0 20px; }
+  .dn-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
+  .dn-filter-btn { background: #fff; border: 1.5px solid var(--sand-100); border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink-600); }
+  .dn-filter-btn.active { background: var(--teal-900); color: #fff; border-color: var(--teal-900); }
+  .dn-count { text-align: center; color: var(--ink-600); font-size: 13px; margin-bottom: 20px; }
+  .dn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .dn-card { background: #fff; border: 1px solid var(--sand-100); border-radius: 10px; padding: 18px; }
+  .dn-card-land { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--coral-600); }
+  .dn-card-name { font-family: var(--font-display); font-size: 19px; color: var(--teal-900); margin: 4px 0 8px; }
+  .dn-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .dn-tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
+  .dn-tag-service { background: #e3f2fd; color: #1565c0; }
+  .dn-tag-res-required { background: #fdecea; color: #b3261e; }
+  .dn-tag-res-recommended { background: #fff8e1; color: #8d6e00; }
+  .dn-tag-res-none { background: #e8f5e9; color: #1b5e20; }
+  .dn-tag-character { background: #f3e5f5; color: #7b1fa2; }
+  .dn-tag-plan { background: #f0f0f0; color: #555; }
+  .dn-desc { font-size: 14px; color: #333; line-height: 1.5; }
+  .dn-meals { font-size: 12px; color: var(--ink-600); margin-top: 8px; }
+  .dn-empty { text-align: center; padding: 40px 0; color: var(--ink-600); }
+</style>
+
+<main class="wrap">
+  <div class="dn-header">
+    <span class="eyebrow">🍽️ Dining Guide</span>
+    <h1 style="font-family:var(--font-display); font-size:32px; color:var(--teal-900); margin:8px 0 0;"><%= parkLabel %> Dining, All in One Place</h1>
+    <p style="color:var(--ink-600); max-width:600px; margin:10px auto 0;">Every restaurant, filtered by what actually matters when you're planning — service type, reservations, and character dining.</p>
+  </div>
+
+  <% if (!restaurants.length) { %>
+    <p class="dn-empty">This park's dining directory is still being put together — check back soon.</p>
+  <% } else { %>
+    <div class="dn-filters">
+      <button class="dn-filter-btn active" data-filter="all" onclick="dnFilter('all', this)">All</button>
+      <button class="dn-filter-btn" data-filter="table-service" onclick="dnFilter('table-service', this)">Table Service</button>
+      <button class="dn-filter-btn" data-filter="quick-service" onclick="dnFilter('quick-service', this)">Quick Service</button>
+      <button class="dn-filter-btn" data-filter="character" onclick="dnFilter('character', this)">Character Dining</button>
+      <button class="dn-filter-btn" data-filter="no-reservation" onclick="dnFilter('no-reservation', this)">No Reservation Needed</button>
+    </div>
+
+    <p class="dn-count" id="dn-count"><%= restaurants.length %> restaurants</p>
+
+    <div class="dn-grid" id="dn-grid">
+      <% restaurants.forEach(r => { %>
+        <div class="dn-card"
+          data-service="<%= r.service_type %>"
+          data-character="<%= r.character_dining %>"
+          data-reservations="<%= r.reservations %>">
+          <div class="dn-card-land"><%= r.land %></div>
+          <div class="dn-card-name"><%= r.name %></div>
+          <div class="dn-tags">
+            <span class="dn-tag dn-tag-service"><%= r.service_type === 'table-service' ? 'Table Service' : 'Quick Service' %></span>
+            <span class="dn-tag <%= r.reservations === 'required' ? 'dn-tag-res-required' : (r.reservations === 'recommended' ? 'dn-tag-res-recommended' : 'dn-tag-res-none') %>">
+              <%= r.reservations === 'required' ? 'Reservation Required' : (r.reservations === 'recommended' ? 'Reservation Recommended' : 'Walk-Up OK') %>
+            </span>
+            <% if (r.character_dining) { %><span class="dn-tag dn-tag-character">Character Dining</span><% } %>
+            <% if (r.dining_plan) { %><span class="dn-tag dn-tag-plan"><%= r.dining_plan %></span><% } %>
+          </div>
+          <p class="dn-desc"><%= r.description %></p>
+          <% if (r.meal_periods && r.meal_periods.length) { %>
+            <p class="dn-meals">Open for: <%= r.meal_periods.join(', ') %></p>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</main>
+
+<script>
+function dnFilter(type, btn) {
+  document.querySelectorAll('.dn-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const cards = document.querySelectorAll('#dn-grid .dn-card');
+  let visibleCount = 0;
+
+  cards.forEach(card => {
+    let show = true;
+    if (type === 'table-service') show = card.dataset.service === 'table-service';
+    else if (type === 'quick-service') show = card.dataset.service === 'quick-service';
+    else if (type === 'character') show = card.dataset.character === 'true';
+    else if (type === 'no-reservation') show = card.dataset.reservations === 'not-accepted' || card.dataset.reservations === 'walk-up-only';
+
+    card.style.display = show ? '' : 'none';
+    if (show) visibleCount++;
+  });
+
+  document.getElementById('dn-count').textContent = visibleCount + ' restaurant' + (visibleCount === 1 ? '' : 's');
+}
+</script>
+
+<%- include('partials/footer') %>

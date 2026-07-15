@@ -1,0 +1,27 @@
+<%- include('partials/header', { pageTitle: 'Disney & Universal Dining Guides — The Florida Buzz', pageDescription: 'Filterable restaurant directories for Walt Disney World and Universal Orlando parks.', category: null, tickerItems: [], canonicalPath: '/dining' }) %>
+
+<main class="wrap">
+  <section class="section" style="text-align:center;">
+    <span class="eyebrow">🍽️ Dining Guides</span>
+    <h1 style="font-family:var(--font-display); font-size:32px; color:var(--teal-900); margin:8px 0 0;">Park Dining Directories</h1>
+    <p style="color:var(--ink-600); max-width:600px; margin:10px auto 0;">Every restaurant, filtered by service type, reservations, and character dining.</p>
+  </section>
+
+  <section class="section">
+    <div class="grid">
+      <% Object.entries(parkLabels).forEach(([slug, label]) => { %>
+        <% if (availableParks.includes(slug)) { %>
+          <a href="/dining/<%= slug %>" class="card">
+            <h3><%= label %></h3>
+            <p class="dek-sm">View the full dining directory</p>
+          </a>
+        <% } %>
+      <% }) %>
+    </div>
+    <% if (!availableParks.length) { %>
+      <p style="text-align:center; color:var(--ink-600);">Dining directories are being put together — check back soon.</p>
+    <% } %>
+  </section>
+</main>
+
+<%- include('partials/footer') %>
