@@ -31,6 +31,17 @@
   </section>
   <% } %>
 
+  <section class="section" style="padding-top:0;">
+    <a href="/wait-times" style="display:flex; align-items:center; justify-content:space-between; gap:16px; background:var(--teal-900); color:#fff; border-radius:12px; padding:20px 24px; text-decoration:none; flex-wrap:wrap;">
+      <div>
+        <span style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#ffb37a;">🎢 Live Right Now</span>
+        <div style="font-family:var(--font-display); font-size:22px; margin-top:4px;">Check Current Disney &amp; Universal Wait Times</div>
+        <p style="color:#c9dedd; font-size:14px; margin-top:4px;">Real-time ride waits for all 7 major Orlando parks, updated every few minutes.</p>
+      </div>
+      <span style="background:#fff; color:var(--teal-900); font-weight:700; padding:10px 20px; border-radius:24px; white-space:nowrap;">View Wait Times →</span>
+    </a>
+  </section>
+
   <% Object.keys(byCategory).forEach(cat => { %>
     <% if (byCategory[cat].length) { %>
     <section class="section">
