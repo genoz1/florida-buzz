@@ -167,7 +167,7 @@ if (process.env.RESEND_API_KEY && process.env.ALERT_EMAIL_TO) {
 // after a refresh rather than assuming it's always perfect — add new park
 // slugs to the list below as you add them to DINING_PARK_LABELS in
 // routes/main.js. Disabled until ANTHROPIC_API_KEY is set.
-const DINING_DIRECTORY_PARKS = ['magic-kingdom'];
+const DINING_DIRECTORY_PARKS = ['magic-kingdom', 'epcot', 'hollywood-studios', 'animal-kingdom', 'resorts'];
 
 if (process.env.ANTHROPIC_API_KEY) {
   cron.schedule('0 5 1 * *', () => {
