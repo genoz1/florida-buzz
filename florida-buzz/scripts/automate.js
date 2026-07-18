@@ -27,6 +27,75 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// RSS feeds often only provide a short, truncated teaser as their summary —
+// sometimes just the opening sentence or a generic meta description, not the
+// actual body content. Relying on that alone can starve the writer of real
+// specifics, which is especially bad for "best of"/roundup topics (a list of
+// named hotels, restaurants, etc.) where the real list only exists on the
+// actual source page. This fetches that real page and extracts its visible
+// text, giving the writer much more to work with. Falls back gracefully —
+// returns null on any failure (blocked, timeout, paywall) so the caller can
+// fall back to the RSS snippet instead.
+async function fetchFullSourceText(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+
+    const html = await res.text();
+
+    // Strip out non-content blocks first (scripts, styles, nav/header/footer
+    // chrome, etc.) so they don't pollute the extracted text.
+    let text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+      .replace(/<header[\s\S]*?<\/header>/gi, ' ')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      // Add a newline where block-level tags close, so paragraphs/list items
+      // don't all run together into one unreadable wall of text.
+      .replace(/<\/(p|div|li|h[1-6]|br)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&rsquo;/g, "'")
+      .replace(/&lsquo;/g, "'")
+      .replace(/&rdquo;/g, '"')
+      .replace(/&ldquo;/g, '"')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
+      .trim();
+
+    // Cap the length — this is going into an AI prompt, not being displayed,
+    // so a few thousand characters of real article text is plenty without
+    // needlessly inflating token usage on boilerplate that inevitably slips
+    // through (comment sections, related-article lists, etc. further down
+    // the page).
+    if (text.length > 8000) text = text.slice(0, 8000);
+
+    // If after all that cleanup there's barely any text, the fetch probably
+    // hit a paywall, a cookie-consent wall, or a JS-rendered page with no
+    // server-side content — not worth using over the RSS snippet.
+    if (text.length < 200) return null;
+
+    return text;
+  } catch {
+    return null; // network error, timeout, blocked — caller falls back to the RSS snippet
+  }
+}
+
 function extractImage(item) {
   if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) {
     return item.enclosure.url;
@@ -351,11 +420,20 @@ async function run() {
       console.log(`  Writing article...`);
       const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
       const realImage = extractImage(item);
+
+      const fullSourceText = await fetchFullSourceText(item.link);
+      const summaryForWriter = fullSourceText || summary;
+      if (fullSourceText) {
+        console.log(`  Fetched full source article (${fullSourceText.length} chars) instead of relying on the short RSS summary.`);
+      } else {
+        console.log(`  Could not fetch the full source page — using the RSS feed's summary instead.`);
+      }
+
       let article;
       try {
         article = await writeArticle({
           sourceTitle: item.title,
-          sourceSummary: summary,
+          sourceSummary: summaryForWriter,
           sourceName: actualSourceName,
           sourceUrl: item.link,
           category: source.category,
