@@ -9,7 +9,56 @@
       <div style="background:#fdecea; color:#b3261e; padding:12px 16px; border-radius:8px; margin-top:16px; font-size:14px;">Supabase isn't configured — no data available.</div>
     <% } %>
 
-    <div style="margin-top:24px; overflow-x:auto;">
+    <h2 style="font-size:16px; color:var(--teal-900); margin-top:28px;">Content</h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:12px;">
+      <div style="background:var(--teal-900); color:#fff; border-radius:10px; padding:16px; text-align:center;">
+        <div style="font-family:var(--font-display); font-size:30px;"><%= totalArticles %></div>
+        <div style="font-size:12px; color:#c9dedd; margin-top:4px;">Total Published</div>
+      </div>
+      <div style="background:#fff; border:1px solid var(--sand-100); border-radius:10px; padding:16px; text-align:center;">
+        <div style="font-family:var(--font-display); font-size:30px; color:var(--teal-900);"><%= totalNews %></div>
+        <div style="font-size:12px; color:var(--ink-600); margin-top:4px;">News Articles</div>
+      </div>
+      <div style="background:#fff; border:1px solid var(--sand-100); border-radius:10px; padding:16px; text-align:center;">
+        <div style="font-family:var(--font-display); font-size:30px; color:var(--teal-900);"><%= totalGuides %></div>
+        <div style="font-size:12px; color:var(--ink-600); margin-top:4px;">Evergreen Guides</div>
+      </div>
+    </div>
+
+    <div style="background:var(--sand-100); border-radius:10px; padding:14px 18px; margin-top:12px; text-align:center;">
+      <span style="font-size:14px; color:var(--ink-600);">
+        🎯 <strong style="color:var(--teal-900);"><%= nextArticleMilestone - totalArticles %></strong> more to reach <strong style="color:var(--teal-900);"><%= nextArticleMilestone %></strong> total articles/guides
+      </span>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:12px;">
+      <div style="flex:1; background:#fff; border:1px solid var(--sand-100); border-radius:10px; padding:14px; text-align:center;">
+        <div style="font-family:var(--font-display); font-size:22px; color:var(--coral-600);"><%= last7DaysContent %></div>
+        <div style="font-size:12px; color:var(--ink-600);">Published, last 7 days</div>
+      </div>
+      <div style="flex:1; background:#fff; border:1px solid var(--sand-100); border-radius:10px; padding:14px; text-align:center;">
+        <div style="font-family:var(--font-display); font-size:22px; color:var(--coral-600);"><%= last30DaysContent %></div>
+        <div style="font-size:12px; color:var(--ink-600);">Published, last 30 days</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <% categoryBreakdown.forEach(c => { %>
+        <% const pct = totalArticles ? Math.round((c.count / totalArticles) * 100) : 0; %>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px; font-size:13px;">
+          <div style="width:130px; flex-shrink:0;"><%= c.label %></div>
+          <div style="flex:1; background:var(--sand-100); border-radius:6px; height:16px; position:relative; overflow:hidden;">
+            <div style="background:var(--teal-900); height:100%; width:<%= pct %>%;"></div>
+          </div>
+          <div style="width:40px; text-align:right; color:var(--ink-600);"><%= c.count %></div>
+        </div>
+      <% }) %>
+    </div>
+
+    <h2 style="font-size:16px; color:var(--teal-900); margin-top:32px;">Posting Health</h2>
+    <p style="color:var(--ink-600); font-size:13px; margin-top:2px;">Success/failure across all platforms, tracked automatically every time a post goes out.</p>
+
+    <div style="margin-top:16px; overflow-x:auto;">
       <table style="width:100%; border-collapse:collapse; font-size:14px;">
         <thead>
           <tr style="background:var(--teal-900); color:white;">
