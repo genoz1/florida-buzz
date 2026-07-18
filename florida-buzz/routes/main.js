@@ -3,6 +3,15 @@ const router = express.Router();
 const { supabase } = require('../lib/supabase');
 const { spawn } = require('child_process');
 const path = require('path');
+const { logNotFound } = require('../lib/notFoundLog');
+
+// Logs the 404 and renders the page — a drop-in replacement for the old
+// `res.status(404).render('404')`, used everywhere a route matches but the
+// specific requested item (article slug, category, etc.) doesn't exist.
+function render404(req, res) {
+  logNotFound(req.originalUrl, req.get('referer'));
+  return res.status(404).render('404');
+}
 
 const CATEGORY_LABELS = {
   'theme-parks': '🏰 Theme Parks',
@@ -228,7 +237,7 @@ router.get('/', async (req, res) => {
 
 router.get('/category/:cat', async (req, res) => {
   const { cat } = req.params;
-  if (!CATEGORY_LABELS[cat]) return res.status(404).render('404');
+  if (!CATEGORY_LABELS[cat]) return render404(req, res);
 
   const articles = await getArticles({ category: cat });
   const ticker = await getArticles({ limit: 8 });
@@ -251,7 +260,7 @@ router.get('/category/:cat', async (req, res) => {
 
 router.get('/city/:city', async (req, res) => {
   const { city } = req.params;
-  if (!CITY_LABELS[city]) return res.status(404).render('404');
+  if (!CITY_LABELS[city]) return render404(req, res);
 
   const articles = await getArticles({ city });
   const ticker = await getArticles({ limit: 8 });
@@ -276,7 +285,7 @@ router.get('/article/:slug', async (req, res) => {
   const { slug } = req.params;
   const all = await getArticles({ limit: 200 });
   const article = all.find((a) => a.slug === slug);
-  if (!article) return res.status(404).render('404');
+  if (!article) return render404(req, res);
 
   const related = all.filter((a) => a.category === article.category && a.slug !== slug).slice(0, 3);
   const ticker = all.slice(0, 8);
@@ -309,7 +318,7 @@ router.get('/guides', async (req, res) => {
 router.get('/guide/:pillarSlug', async (req, res) => {
   const { pillarSlug } = req.params;
   const pillar = PILLARS[pillarSlug];
-  if (!pillar) return res.status(404).render('404');
+  if (!pillar) return render404(req, res);
 
   const categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true, limit: 200 });
   const keywordRegex = new RegExp(pillar.keywords.join('|'), 'i');
@@ -496,7 +505,7 @@ router.get('/admin/submit-topic', (req, res) => {
   const { key } = req.query;
 
   if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
-    return res.status(404).render('404');
+    return render404(req, res);
   }
 
   res.render('admin-submit-topic', {
@@ -511,7 +520,7 @@ router.post('/admin/submit-topic', (req, res) => {
   const { key, category, topic, title } = req.body;
 
   if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
-    return res.status(404).render('404');
+    return render404(req, res);
   }
 
   if (!category || !topic || !title) {
@@ -558,7 +567,7 @@ router.get('/admin/post-report', async (req, res) => {
   const { key } = req.query;
 
   if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
-    return res.status(404).render('404');
+    return render404(req, res);
   }
 
   let logs = [];
@@ -650,6 +659,31 @@ router.get('/admin/post-report', async (req, res) => {
     return milestones.find((m) => m > n) || Math.ceil((n + 1) / 5000) * 5000;
   }
 
+  // 404 stats: top broken paths in the last 30 days, so broken links can be
+  // found directly here instead of digging through GA4/Search Console.
+  let top404s = [];
+  let total404sLast7d = 0;
+  if (supabase) {
+    const thirtyDaysAgoFor404 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgoFor404 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: notFoundRows } = await supabase
+      .from('not_found_log')
+      .select('path, referrer, created_at')
+      .gte('created_at', thirtyDaysAgoFor404)
+      .order('created_at', { ascending: false });
+
+    const rows = notFoundRows || [];
+    total404sLast7d = rows.filter((r) => r.created_at >= sevenDaysAgoFor404).length;
+
+    const counts = {};
+    rows.forEach((r) => {
+      if (!counts[r.path]) counts[r.path] = { path: r.path, count: 0, lastSeen: r.created_at, referrer: r.referrer };
+      counts[r.path].count += 1;
+    });
+    top404s = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 15);
+  }
+
   res.render('admin-post-report', {
     summary,
     platforms: PLATFORMS,
@@ -663,6 +697,8 @@ router.get('/admin/post-report', async (req, res) => {
     last7DaysContent,
     last30DaysContent,
     nextArticleMilestone: nextMilestone(totalArticles),
+    top404s,
+    total404sLast7d,
   });
 });
 
@@ -755,7 +791,7 @@ router.get('/dining', async (req, res) => {
 
 router.get('/dining/:park', async (req, res) => {
   const { park } = req.params;
-  if (!DINING_PARK_LABELS[park]) return res.status(404).render('404');
+  if (!DINING_PARK_LABELS[park]) return render404(req, res);
 
   let restaurants = [];
   if (supabase) {
