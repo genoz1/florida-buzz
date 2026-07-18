@@ -5,13 +5,15 @@ const { postToFacebookPage } = require('../lib/facebook');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
-// V1 of Florida Buzz's "Engagement Posts" — lightweight, comment-driving
+// V1 of Florida Buzz's "Engagement Posts" — lightweight, engagement-driving
 // posts distinct from news articles/guides. Native Facebook/Instagram polls
 // aren't creatable through the standard posting API, so this mimics a poll
-// with a "vote in the comments" style this-or-that post instead. Starting
-// with ONE post per day and ONE format (this-or-that) deliberately — more
-// formats (trivia, emoji reactions, guess-the-location) can be added as
-// their own functions later once this format's performance is known.
+// with a "react to vote" this-or-that post instead — reacting is much
+// lower-friction than commenting, which matters a lot for a smaller,
+// newer account still building an audience. Starting with ONE post per day
+// and ONE format (this-or-that) deliberately — more formats (trivia, guess-
+// the-location) can be added as their own functions later once this
+// format's performance is known.
 
 async function getRecentTopics(limit = 15) {
   if (!supabase) return [];
@@ -30,14 +32,19 @@ async function getRecentTopics(limit = 15) {
 async function generateThisOrThat(recentTopics) {
   const system = `You write short, fun "this or that" engagement posts for The
 Florida Buzz, a Florida travel and lifestyle Facebook page. These posts ask
-readers to vote in the comments between two Florida-related options — beaches,
-theme parks, food, wildlife, road trips, etc. They should feel light and
-inviting, never like an ad or a news item.
+readers to vote between two Florida-related options — beaches, theme parks,
+food, wildlife, road trips, etc. — using a REACTION, not a comment. Reacting
+is much lower-friction than typing a comment, especially for a smaller,
+newer account, so voting must always be framed as a tap/react action.
 
 Format rules:
-- Two options only, each with one relevant emoji
-- End with a short line inviting comments, like "Comment your pick!" or
-  "Drop a 🏖️ or a 🎢 below!"
+- Two options only, each paired with a DIFFERENT native Facebook/Instagram
+  reaction emoji as the vote — e.g. "❤️ for the beach, 👍 for the theme
+  park" or "😍 for Disney, 😮 for Universal". Never ask people to comment
+  their pick; always ask them to react with one of the two specified emojis.
+- End with a short line explicitly framing it as a reaction, like "React
+  with your pick!" or "Tap ❤️ or 👍 below!" — not "comment your pick" or
+  "drop a comment."
 - No links, no hashtags, no mention of TheFloridaBuzz.com — this is a pure
   engagement post, not a promotional one
 - Keep it under 300 characters total
