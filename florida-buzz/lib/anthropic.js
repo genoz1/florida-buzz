@@ -66,6 +66,7 @@ async function askClaudeWithSearch(systemPrompt, userPrompt, maxTokens = 3000, m
   return {
     text: textBlocks.map((b) => b.text).join('\n').trim(),
     searchesUsed,
+    stopReason: data.stop_reason,
   };
 }
 
