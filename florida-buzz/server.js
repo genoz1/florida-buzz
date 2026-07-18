@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cron = require('node-cron');
+const { logNotFound } = require('./lib/notFoundLog');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -23,7 +24,10 @@ if (process.env.INDEXNOW_KEY) {
 
 app.use('/', require('./routes/main'));
 
-app.use((req, res) => res.status(404).render('404'));
+app.use((req, res) => {
+  logNotFound(req.originalUrl, req.get('referer'));
+  res.status(404).render('404');
+});
 
 app.listen(PORT, () => {
   console.log(`The Florida Buzz running on port ${PORT}`);
