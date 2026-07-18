@@ -186,3 +186,31 @@ if (process.env.ANTHROPIC_API_KEY) {
 } else {
   console.log('Dining directory refresh NOT scheduled — set ANTHROPIC_API_KEY to enable.');
 }
+
+// Promotes the site's own tools (wait times, dining directories) rather than
+// a specific article — one post per topic per day, each to all 4 platforms,
+// with a fresh AI-written caption every time but a reused cached image (see
+// scripts/promo-feature-post.js). Spaced well away from every other
+// scheduled post above. Disabled until ANTHROPIC_API_KEY, OPENAI_API_KEY,
+// FB_PAGE_ID, and FB_PAGE_ACCESS_TOKEN are all set.
+if (process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY && process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
+  cron.schedule('30 12 * * *', () => {
+    console.log('Running scheduled wait-times promo post...');
+    require('child_process').exec('TOPIC=wait-times node scripts/promo-feature-post.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  }, { timezone: 'America/New_York' });
+
+  cron.schedule('30 16 * * *', () => {
+    console.log('Running scheduled dining promo post...');
+    require('child_process').exec('TOPIC=dining node scripts/promo-feature-post.js', (err, stdout, stderr) => {
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+    });
+  }, { timezone: 'America/New_York' });
+
+  console.log('Feature promo posts scheduled: wait-times at 12:30pm, dining at 4:30pm daily (Eastern time).');
+} else {
+  console.log('Feature promo posts NOT scheduled — set ANTHROPIC_API_KEY, OPENAI_API_KEY, FB_PAGE_ID, and FB_PAGE_ACCESS_TOKEN to enable.');
+}
