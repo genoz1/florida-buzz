@@ -66,6 +66,11 @@ Research thoroughly: search for "current" or "2026" restaurant lists for this sp
 park, cross-check against official Disney dining pages where possible, and if you're
 genuinely unsure whether a restaurant is still open, leave it out rather than guess.
 
+CRITICAL: do all of your searching and reasoning silently. Do not narrate your research
+process, do not describe your search plan, do not write things like "let me search for
+more specifics" or "good data so far" anywhere in your response. Your entire text
+response must be ONLY the final JSON array below — nothing before it, nothing after it.
+
 For EVERY currently-operating restaurant, quick-service window, and dedicated snack
 location in the park, provide:
 - name: the restaurant's actual current name
@@ -88,10 +93,14 @@ ${SCHEMA_INSTRUCTIONS}`;
 
   const user = `Research and list every current restaurant, quick-service spot, and snack
 location at ${parkLabel}. Use enough web searches to be confident the list is accurate
-and current as of today.`;
+and current as of today. Remember: respond with ONLY the final JSON array, no narration
+or commentary before or after it.`;
 
-  const { text, searchesUsed } = await askClaudeWithSearch(system, user, 8000, 15);
+  const { text, searchesUsed, stopReason } = await askClaudeWithSearch(system, user, 16000, 15);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
+  if (stopReason === 'max_tokens') {
+    throw new Error('Response was cut off before finishing (hit the token limit) — the model was likely still narrating its research when it ran out of room. Try again; if it keeps happening, this prompt may need an even higher token budget.');
+  }
   return parseJsonResponse(text);
 }
 
@@ -117,6 +126,11 @@ individual counter within it). Skip minor grab-and-go snack kiosks and pool bars
 genuinely notable — the goal is a useful, readable directory, not an exhaustive list of
 every logistics detail.
 
+CRITICAL: do all of your searching and reasoning silently. Do not narrate your research
+process, do not describe your search plan, do not write things like "let me search for
+more specifics" or "good data so far" anywhere in your response. Your entire text
+response must be ONLY the final JSON array below — nothing before it, nothing after it.
+
 For each entry, provide:
 - name: the restaurant's actual current name
 - land: the name of the RESORT it's located at (e.g. "Disney's Grand Floridian Resort & Spa") — this is used to group entries by resort on the page
@@ -134,10 +148,14 @@ ${SCHEMA_INSTRUCTIONS}`;
   const user = `Research and list notable table-service, signature, and main quick-service
 dining across Walt Disney World's resort hotels — covering a representative, genuinely
 current spread of Value, Moderate, and Deluxe resorts. Use enough web searches to be
-confident the list is accurate as of today.`;
+confident the list is accurate as of today. Remember: respond with ONLY the final JSON
+array, no narration or commentary before or after it.`;
 
-  const { text, searchesUsed } = await askClaudeWithSearch(system, user, 14000, 25);
+  const { text, searchesUsed, stopReason } = await askClaudeWithSearch(system, user, 24000, 25);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
+  if (stopReason === 'max_tokens') {
+    throw new Error('Response was cut off before finishing (hit the token limit) — the model was likely still narrating its research or listing restaurants when it ran out of room. Try again; if it keeps happening, this prompt may need an even higher token budget or a narrower scope.');
+  }
   return parseJsonResponse(text);
 }
 
