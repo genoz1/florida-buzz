@@ -597,12 +597,72 @@ router.get('/admin/post-report', async (req, res) => {
 
   const recentFailures = logs.filter((row) => row.status === 'failed').slice(0, 20);
 
+  // Content stats: total articles/guides published, category breakdown, and
+  // a milestone tracker — shown alongside the posting stats on this same
+  // dashboard rather than as a separate page.
+  let totalArticles = 0;
+  let totalGuides = 0;
+  let categoryBreakdown = [];
+  let last7DaysContent = 0;
+  let last30DaysContent = 0;
+
+  if (supabase) {
+    const { count: allCount } = await supabase
+      .from('articles')
+      .select('*', { count: 'exact', head: true });
+    totalArticles = allCount || 0;
+
+    const { count: guideCount } = await supabase
+      .from('articles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_evergreen', true);
+    totalGuides = guideCount || 0;
+
+    const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgoDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { count: week } = await supabase
+      .from('articles')
+      .select('*', { count: 'exact', head: true })
+      .gte('published_at', sevenDaysAgoDate);
+    last7DaysContent = week || 0;
+
+    const { count: month } = await supabase
+      .from('articles')
+      .select('*', { count: 'exact', head: true })
+      .gte('published_at', thirtyDaysAgoDate);
+    last30DaysContent = month || 0;
+
+    categoryBreakdown = await Promise.all(
+      CATEGORY_ORDER.map(async (cat) => {
+        const { count } = await supabase
+          .from('articles')
+          .select('*', { count: 'exact', head: true })
+          .eq('category', cat);
+        return { category: cat, label: CATEGORY_LABELS[cat], count: count || 0 };
+      })
+    );
+    categoryBreakdown.sort((a, b) => b.count - a.count);
+  }
+
+  function nextMilestone(n) {
+    const milestones = [50, 100, 250, 500, 750, 1000, 1500, 2000, 2500, 5000, 7500, 10000];
+    return milestones.find((m) => m > n) || Math.ceil((n + 1) / 5000) * 5000;
+  }
+
   res.render('admin-post-report', {
     summary,
     platforms: PLATFORMS,
     recentFailures,
     hasData: !!supabase,
     adminKey: key,
+    totalArticles,
+    totalGuides,
+    totalNews: totalArticles - totalGuides,
+    categoryBreakdown,
+    last7DaysContent,
+    last30DaysContent,
+    nextArticleMilestone: nextMilestone(totalArticles),
   });
 });
 
