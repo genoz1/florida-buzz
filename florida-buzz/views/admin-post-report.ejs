@@ -100,6 +100,36 @@
       <p style="color:var(--ink-600); margin-top:24px; font-size:14px;">No failures in the last 7 days. 🎉</p>
     <% } %>
 
+    <h2 style="font-size:16px; color:var(--teal-900); margin-top:32px;">Broken Links (404s)</h2>
+    <p style="color:var(--ink-600); font-size:13px; margin-top:2px;">Logged directly on the server whenever a request doesn't resolve — <%= total404sLast7d %> hit(s) in the last 7 days.</p>
+
+    <% if (top404s.length) { %>
+      <div style="margin-top:12px; overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="background:var(--teal-900); color:white;">
+              <th style="padding:8px 12px; text-align:left;">Path</th>
+              <th style="padding:8px 12px; text-align:center;">Hits (30d)</th>
+              <th style="padding:8px 12px; text-align:left;">Referrer</th>
+              <th style="padding:8px 12px; text-align:left;">Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% top404s.forEach((r, i) => { %>
+              <tr style="background:<%= i % 2 === 0 ? '#fff' : 'var(--sand-100)' %>;">
+                <td style="padding:8px 12px; font-family:monospace; word-break:break-all;"><%= r.path %></td>
+                <td style="padding:8px 12px; text-align:center; font-weight:600; color:#b3261e;"><%= r.count %></td>
+                <td style="padding:8px 12px; color:var(--ink-600); word-break:break-all;"><%= r.referrer || '—' %></td>
+                <td style="padding:8px 12px; color:var(--ink-600); white-space:nowrap;"><%= new Date(r.lastSeen).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <p style="color:var(--ink-600); margin-top:12px; font-size:14px;">No 404s logged in the last 30 days. 🎉</p>
+    <% } %>
+
     <p style="color:#999; font-size:12px; margin-top:32px;">Refresh this page anytime — nothing to submit, just reload with the same link to see updated numbers.</p>
   </section>
 </main>
