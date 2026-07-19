@@ -150,7 +150,8 @@ img { max-width: 100%; display: block; }
   transition: max-height 0.25s ease;
 }
 .mobile-menu.open {
-  max-height: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 .mobile-menu a {
   padding: 14px 24px;
