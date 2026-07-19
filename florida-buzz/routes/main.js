@@ -187,13 +187,14 @@ async function hasAnyRealArticles() {
   return !!count && count > 0;
 }
 
-async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen } = {}) {
+async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen, slug } = {}) {
   if (supabase) {
     let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
     if (category) query = query.eq('category', category);
     if (city) query = query.eq('city', city);
     if (evergreenOnly) query = query.eq('is_evergreen', true);
     if (excludeEvergreen) query = query.eq('is_evergreen', false);
+    if (slug) query = query.eq('slug', slug); // exact match — not subject to `limit`, so old articles are always findable
     if (limit) query = query.limit(limit);
     const { data, error } = await query;
     if (!error && data && data.length) return data;
@@ -204,6 +205,7 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
 
   let sample = sampleArticles();
   if (category) sample = sample.filter((a) => a.category === category);
+  if (slug) sample = sample.filter((a) => a.slug === slug);
   return limit ? sample.slice(0, limit) : sample;
 }
 
@@ -283,12 +285,18 @@ router.get('/city/:city', async (req, res) => {
 
 router.get('/article/:slug', async (req, res) => {
   const { slug } = req.params;
-  const all = await getArticles({ limit: 200 });
-  const article = all.find((a) => a.slug === slug);
+
+  // Fetch this specific article directly by slug — NOT by fetching a
+  // capped "200 most recent" list and searching in memory. That older
+  // approach silently 404'd any article older than your 200 most recent
+  // posts, which becomes a real, growing problem as the site accumulates
+  // more content (the exact bug behind the site-wide 404 pattern).
+  const [article] = await getArticles({ slug, limit: 1 });
   if (!article) return render404(req, res);
 
-  const related = all.filter((a) => a.category === article.category && a.slug !== slug).slice(0, 3);
-  const ticker = all.slice(0, 8);
+  const categoryArticles = await getArticles({ category: article.category, limit: 4 });
+  const related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
+  const ticker = await getArticles({ limit: 8 });
 
   res.render('article', {
     article,
