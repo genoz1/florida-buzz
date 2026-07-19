@@ -34,6 +34,16 @@
 
       <h2>Contact</h2>
       <p>For professional inquiries, connect with Gene on <a href="https://www.linkedin.com/in/gene-zentko-092b3327/" target="_blank" rel="noopener">LinkedIn</a>, or reach out via <a href="mailto:floridabuzzonline@gmail.com">floridabuzzonline@gmail.com</a>.</p>
+
+      <% if (typeof recentArticles !== 'undefined' && recentArticles && recentArticles.length) { %>
+      <h2>Recent Articles on Florida Buzz</h2>
+      <p>A selection of recent Florida Buzz pieces published under Gene's byline:</p>
+      <ul>
+        <% recentArticles.forEach(function(a) { %>
+          <li><a href="/article/<%= a.slug %>"><%= a.title %></a></li>
+        <% }) %>
+      </ul>
+      <% } %>
     </div>
   </article>
 </main>
