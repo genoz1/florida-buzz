@@ -187,7 +187,7 @@ async function hasAnyRealArticles() {
   return !!count && count > 0;
 }
 
-async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen, slug } = {}) {
+async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen, slug, author } = {}) {
   if (supabase) {
     let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
     if (category) query = query.eq('category', category);
@@ -195,6 +195,7 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
     if (evergreenOnly) query = query.eq('is_evergreen', true);
     if (excludeEvergreen) query = query.eq('is_evergreen', false);
     if (slug) query = query.eq('slug', slug); // exact match — not subject to `limit`, so old articles are always findable
+    if (author) query = query.eq('source_name', author);
     if (limit) query = query.limit(limit);
     const { data, error } = await query;
     if (!error && data && data.length) return data;
@@ -206,6 +207,7 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
   let sample = sampleArticles();
   if (category) sample = sample.filter((a) => a.category === category);
   if (slug) sample = sample.filter((a) => a.slug === slug);
+  if (author) sample = sample.filter((a) => a.source_name === author);
   return limit ? sample.slice(0, limit) : sample;
 }
 
@@ -353,8 +355,9 @@ router.get('/about', (req, res) => {
   res.render('about');
 });
 
-router.get('/gene-zentko', (req, res) => {
-  res.render('gene-zentko');
+router.get('/gene-zentko', async (req, res) => {
+  const recentArticles = await getArticles({ author: 'Gene Zentko', limit: 6 });
+  res.render('gene-zentko', { recentArticles });
 });
 
 router.get('/terms', (req, res) => {
