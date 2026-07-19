@@ -353,6 +353,10 @@ router.get('/about', (req, res) => {
   res.render('about');
 });
 
+router.get('/gene-zentko', (req, res) => {
+  res.render('gene-zentko');
+});
+
 router.get('/terms', (req, res) => {
   res.render('terms');
 });
@@ -453,6 +457,7 @@ router.get('/sitemap.xml', async (req, res) => {
     ...CITY_ORDER.map((city) => ({ loc: `${siteUrl}/city/${city}`, priority: '0.7' })),
     ...Object.keys(PILLARS).map((slug) => ({ loc: `${siteUrl}/guide/${slug}`, priority: '0.8' })),
     { loc: `${siteUrl}/about`, priority: '0.5' },
+    { loc: `${siteUrl}/gene-zentko`, priority: '0.5' },
     { loc: `${siteUrl}/privacy`, priority: '0.3' },
     { loc: `${siteUrl}/terms`, priority: '0.3' },
   ];
