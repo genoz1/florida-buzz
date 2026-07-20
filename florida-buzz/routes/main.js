@@ -692,8 +692,27 @@ router.get('/admin/post-report', async (req, res) => {
     const rows = notFoundRows || [];
     total404sLast7d = rows.filter((r) => r.created_at >= sevenDaysAgoFor404).length;
 
+    // Automated vulnerability-scanning bots constantly probe every public
+    // website for common WordPress/CMS exploit paths (wp-login.php,
+    // wp-admin, random .php file guesses, etc.) — this happens to every
+    // site on the internet regardless of what it's built on, and Florida
+    // Buzz is Node/Express, so none of it was ever going to find anything.
+    // Without filtering it out, this bot noise drowns out genuine broken
+    // content links (the actual thing this report exists to catch) since
+    // bots hit guessed paths far more repetitively than real visitors hit
+    // any single broken article link.
+    const isBotNoise = (p) =>
+      /\.php$/i.test(p) ||
+      /^\/wp-/i.test(p) ||
+      /wp-content|wp-includes|wp-admin/i.test(p) ||
+      /^\/apple-touch-icon/i.test(p) ||
+      /^\/favicon/i.test(p) ||
+      /\.(env|git|sql|bak|asp|aspx|jsp)$/i.test(p);
+
+    const contentRows = rows.filter((r) => !isBotNoise(r.path));
+
     const counts = {};
-    rows.forEach((r) => {
+    contentRows.forEach((r) => {
       if (!counts[r.path]) counts[r.path] = { path: r.path, count: 0, lastSeen: r.created_at, referrer: r.referrer };
       counts[r.path].count += 1;
     });
