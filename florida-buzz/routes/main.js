@@ -854,11 +854,54 @@ router.get('/dining/:park', async (req, res) => {
 // Printable/downloadable Disney day-planner — helps people organize a plan
 // (dining reservations, Lightning Lane times, must-do rides) into a clean
 // schedule BEFORE their trip, since Disney's own Genie itinerary tool only
-// works same-day with live wait times. Entirely client-side — nothing here
-// is saved server-side, it's just a form that renders a print-friendly
-// schedule in the browser.
-router.get('/planner', (req, res) => {
-  res.render('planner', { categoryLabels: CATEGORY_LABELS });
+// works same-day with live wait times. Entirely client-side — nothing typed
+// into the form is saved server-side. Ride and dining options come from the
+// same real data already powering /wait-times and /dining, so the dropdowns
+// are actual current ride/restaurant names, not a hand-maintained list.
+const PARK_NAME_TO_DINING_SLUG = {
+  'Magic Kingdom': 'magic-kingdom',
+  EPCOT: 'epcot',
+  'Hollywood Studios': 'hollywood-studios',
+  'Animal Kingdom': 'animal-kingdom',
+  // Universal parks intentionally have no entry here — the dining directory
+  // only covers Disney parks/resorts right now, so those fields just fall
+  // back to free typing (no matching datalist options), same as any park
+  // where dining data hasn't been populated yet.
+};
+
+router.get('/planner', async (req, res) => {
+  const { data: waitTimesData } = await getWaitTimes();
+
+  // Each entry is { name, land } now, not just a name — the land is what
+  // lets the schedule-builder cluster wishlist rides with nearby fixed
+  // appointments (dining/Lightning Lane) that happen to be in the same
+  // themed area, instead of just tacking them onto the end of the day.
+  const ridesByPark = {};
+  (waitTimesData || []).forEach((park) => {
+    const items = [];
+    (park.lands || []).forEach((land) => (land.rides || []).forEach((r) => items.push({ name: r.name, land: land.name, waitTime: r.is_open ? r.wait_time : null })));
+    (park.rides || []).forEach((r) => items.push({ name: r.name, land: null, waitTime: r.is_open ? r.wait_time : null }));
+    ridesByPark[park.name] = items;
+  });
+
+  const diningByPark = {};
+  if (supabase) {
+    const { data: restaurants } = await supabase.from('restaurants').select('park, name, land').order('name');
+    (restaurants || []).forEach((r) => {
+      const parkDisplayName = Object.keys(PARK_NAME_TO_DINING_SLUG).find(
+        (name) => PARK_NAME_TO_DINING_SLUG[name] === r.park
+      );
+      if (!parkDisplayName) return; // e.g. 'resorts' — not applicable to a single-park planner
+      if (!diningByPark[parkDisplayName]) diningByPark[parkDisplayName] = [];
+      diningByPark[parkDisplayName].push({ name: r.name, land: r.land });
+    });
+  }
+
+  res.render('planner', {
+    categoryLabels: CATEGORY_LABELS,
+    ridesByPark,
+    diningByPark,
+  });
 });
 
 module.exports = router;
