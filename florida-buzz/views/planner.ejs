@@ -6,46 +6,79 @@
   .pl-form-section { background: #fff; border: 1px solid var(--sand-100); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
   .pl-form-section h2 { font-family: var(--font-display); font-size: 18px; color: var(--teal-900); margin: 0 0 4px; }
   .pl-form-hint { font-size: 13px; color: var(--ink-600); margin-bottom: 14px; }
-  .pl-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+  .pl-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
   .pl-row input[type="time"] { width: 120px; flex-shrink: 0; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
   .pl-row input[type="text"] { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
   .pl-row button.pl-remove { background: none; border: none; color: #b3261e; font-size: 18px; cursor: pointer; padding: 4px 8px; flex-shrink: 0; }
+  .pl-row button.pl-move { background: var(--sand-100); border: none; color: var(--teal-900); font-size: 13px; cursor: pointer; padding: 6px 9px; border-radius: 5px; flex-shrink: 0; }
+  .pl-row button.pl-move:disabled { opacity: 0.3; cursor: default; }
   .pl-add-btn { background: var(--sand-100); border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--teal-900); cursor: pointer; }
   .pl-top-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .pl-top-fields label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-600); margin-bottom: 4px; }
   .pl-top-fields input, .pl-top-fields select { width: 100%; padding: 9px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
   .pl-generate-btn { display: block; width: 100%; background: var(--coral-600); color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+  .pl-note { background: #fff8e6; border: 1px solid #e8d9a8; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #6b5a1e; margin-bottom: 20px; }
 
   /* Printable schedule output */
   #pl-schedule { display: none; margin-top: 30px; }
   #pl-schedule.visible { display: block; }
-  .pl-schedule-box { background: #fff; border: 2px solid var(--teal-900); border-radius: 10px; padding: 30px; }
-  .pl-schedule-header { text-align: center; border-bottom: 2px solid var(--sand-100); padding-bottom: 16px; margin-bottom: 20px; }
-  .pl-schedule-header h2 { font-family: var(--font-display); font-size: 26px; color: var(--teal-900); margin: 0; }
-  .pl-schedule-header p { color: var(--ink-600); margin: 4px 0 0; }
+  .pl-schedule-box { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .pl-schedule-banner { padding: 28px 30px; color: #fff; text-align: center; }
+  .pl-schedule-banner .pl-emoji { font-size: 40px; display: block; margin-bottom: 6px; }
+  .pl-schedule-banner h2 { font-family: var(--font-display); font-size: 30px; margin: 0; }
+  .pl-schedule-banner p { margin: 6px 0 0; opacity: 0.92; font-size: 14px; }
+  .pl-schedule-body { padding: 26px 30px 30px; }
+
   .pl-schedule-item { display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid #f0ece0; }
   .pl-schedule-time { width: 90px; flex-shrink: 0; font-weight: 700; color: var(--teal-900); }
-  .pl-schedule-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 4px; margin-right: 8px; }
+  .pl-schedule-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 4px; margin-right: 8px; }
   .pl-label-dining { background: #fff3e0; color: #b3620a; }
   .pl-label-lightning { background: #e3f2fd; color: #1565c0; }
-  .pl-schedule-section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-600); margin: 24px 0 8px; }
-  .pl-wishlist-item { padding: 6px 0; }
+
+  .pl-section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--teal-900); margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
+  .pl-section-title::after { content: ''; flex: 1; height: 2px; background: var(--sand-100); }
+
+  .pl-land-group { margin-bottom: 16px; }
+  .pl-land-name { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 12px; background: var(--sand-100); color: var(--teal-900); margin-bottom: 6px; }
+  .pl-ride-item { padding: 5px 0 5px 4px; font-size: 14px; color: #333; }
+  .pl-ride-item .pl-rank { display: inline-block; width: 20px; color: var(--coral-600); font-weight: 700; }
+
   .pl-print-btn { display: block; width: 100%; background: var(--teal-900); color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 24px; }
   .pl-print-hint { text-align: center; font-size: 12px; color: var(--ink-600); margin-top: 8px; }
 
   @media print {
-    header, .pl-form-section, .pl-generate-btn, .pl-print-btn, .pl-print-hint, footer, .newsletter, .eyebrow { display: none !important; }
+    header, .pl-form-section, .pl-generate-btn, .pl-print-btn, .pl-print-hint, footer, .newsletter, .eyebrow, .pl-note { display: none !important; }
     body { background: #fff; }
-    .pl-schedule-box { border: none; padding: 0; }
+    .pl-schedule-box { box-shadow: none; }
     #pl-schedule { display: block !important; margin-top: 0; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
+
+<script>
+  window.PLANNER_DATA = {
+    rides: <%- JSON.stringify(ridesByPark) %>,
+    dining: <%- JSON.stringify(diningByPark) %>,
+  };
+
+  // Original decorative theme per park — emoji + brand color, not Disney
+  // artwork/characters. Purely for a colorful, friendly-looking printout.
+  var PL_PARK_THEME = {
+    'Magic Kingdom': { color: '#c0554a', emoji: '🏰' },
+    'EPCOT': { color: '#3d7a9e', emoji: '🌍' },
+    'Hollywood Studios': { color: '#7a4f9e', emoji: '🎬' },
+    'Animal Kingdom': { color: '#4f8f52', emoji: '🌴' },
+    'Universal Studios Florida': { color: '#2f5f9e', emoji: '🎥' },
+    'Islands of Adventure': { color: '#3f8f6f', emoji: '🏝️' },
+    'Epic Universe': { color: '#8f4f9e', emoji: '✨' },
+  };
+</script>
 
 <main class="wrap">
   <div class="pl-header">
     <span class="eyebrow">🗓️ Trip Planning</span>
     <h1 style="font-family:var(--font-display); font-size:32px; color:var(--teal-900); margin:8px 0 0;">Disney Day Planner</h1>
-    <p class="pl-intro">Disney's own app only builds your itinerary the day you're there. Plan ahead instead — enter your dining reservations, Lightning Lane times, and must-do rides, and get a clean schedule you can print or save as a PDF before you go.</p>
+    <p class="pl-intro">Disney's own app only builds your itinerary the day you're there. Plan ahead instead — enter your dining reservations, Lightning Lane times, and rank your must-do rides, and get a clean plan you can print or save as a PDF before you go.</p>
   </div>
 
   <div class="pl-form-section">
@@ -67,11 +100,17 @@
         <input type="date" id="pl-date">
       </div>
       <div>
+        <label for="pl-arrival">Arrival / Park Opens</label>
+        <input type="time" id="pl-arrival" value="08:00">
+      </div>
+      <div>
         <label for="pl-party">Party Name (optional)</label>
         <input type="text" id="pl-party" placeholder="e.g. The Smith Family">
       </div>
     </div>
   </div>
+
+  <div class="pl-note">📊 Ride order reflects <strong>your own priorities</strong> — we don't invent exact clock times for rides, since real wait times on your actual visit day can vary a lot from any estimate. Dining and Lightning Lane times are shown exactly as you enter them.</div>
 
   <div class="pl-form-section">
     <h2>🍽️ Dining Reservations</h2>
@@ -89,23 +128,32 @@
 
   <div class="pl-form-section">
     <h2>🎢 Rides & To-Do Wishlist</h2>
-    <p class="pl-form-hint">No specific time needed — just what you don't want to miss.</p>
+    <p class="pl-form-hint">Add everything you want to do, then use ↑ / ↓ to put them in priority order — top of the list is your highest priority.</p>
     <div id="pl-wishlist-rows"></div>
     <button type="button" class="pl-add-btn" onclick="plAddRow('wishlist')">+ Add to Wishlist</button>
   </div>
 
-  <button type="button" class="pl-generate-btn" onclick="plGenerateSchedule()">Build My Schedule</button>
+  <button type="button" class="pl-generate-btn" onclick="plGenerateSchedule()">Build My Plan</button>
+
+  <datalist id="pl-datalist-dining"></datalist>
+  <datalist id="pl-datalist-rides"></datalist>
 
   <div id="pl-schedule">
     <div class="pl-schedule-box">
-      <div class="pl-schedule-header">
+      <div class="pl-schedule-banner" id="pl-out-banner">
+        <span class="pl-emoji" id="pl-out-emoji">🏰</span>
         <h2 id="pl-out-park">Magic Kingdom</h2>
         <p id="pl-out-meta"></p>
       </div>
-      <div id="pl-out-timed"></div>
-      <div id="pl-out-wishlist-section" style="display:none;">
-        <div class="pl-schedule-section-title">Also Want To Do</div>
-        <div id="pl-out-wishlist"></div>
+      <div class="pl-schedule-body">
+        <div id="pl-out-timed-section" style="display:none;">
+          <div class="pl-section-title">Reservations &amp; Lightning Lane</div>
+          <div id="pl-out-timed"></div>
+        </div>
+        <div id="pl-out-wishlist-section" style="display:none;">
+          <div class="pl-section-title">Ride Priority List</div>
+          <div id="pl-out-wishlist"></div>
+        </div>
       </div>
     </div>
     <button type="button" class="pl-print-btn" onclick="window.print()">🖨️ Print or Save as PDF</button>
@@ -120,21 +168,52 @@
     row.className = 'pl-row';
 
     if (type === 'wishlist') {
-      row.innerHTML = '<input type="text" placeholder="e.g. Space Mountain" class="pl-name">' +
+      row.innerHTML =
+        '<button type="button" class="pl-move" onclick="plMoveRow(this, -1)">↑</button>' +
+        '<button type="button" class="pl-move" onclick="plMoveRow(this, 1)">↓</button>' +
+        '<input type="text" list="pl-datalist-rides" placeholder="e.g. Space Mountain" class="pl-name">' +
+        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
+    } else if (type === 'dining') {
+      row.innerHTML = '<input type="time" class="pl-time">' +
+        '<input type="text" list="pl-datalist-dining" placeholder="e.g. Be Our Guest Restaurant" class="pl-name">' +
         '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
     } else {
-      const placeholder = type === 'dining' ? 'e.g. Be Our Guest Restaurant' : 'e.g. Seven Dwarfs Mine Train';
       row.innerHTML = '<input type="time" class="pl-time">' +
-        '<input type="text" placeholder="' + placeholder + '" class="pl-name">' +
+        '<input type="text" list="pl-datalist-rides" placeholder="e.g. Seven Dwarfs Mine Train" class="pl-name">' +
         '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
     }
     container.appendChild(row);
   }
 
-  // Start each section with one blank row so the form doesn't look empty.
+  function plMoveRow(btn, direction) {
+    const row = btn.closest('.pl-row');
+    const container = row.parentElement;
+    if (direction === -1 && row.previousElementSibling) {
+      container.insertBefore(row, row.previousElementSibling);
+    } else if (direction === 1 && row.nextElementSibling) {
+      container.insertBefore(row.nextElementSibling, row);
+    }
+  }
+
+  function plRefreshDatalists() {
+    const park = document.getElementById('pl-park').value;
+    const rides = (window.PLANNER_DATA.rides && window.PLANNER_DATA.rides[park]) || [];
+    const dining = (window.PLANNER_DATA.dining && window.PLANNER_DATA.dining[park]) || [];
+
+    document.getElementById('pl-datalist-rides').innerHTML = rides
+      .map((item) => '<option value="' + escapeHtml(item.name) + '">')
+      .join('');
+    document.getElementById('pl-datalist-dining').innerHTML = dining
+      .map((item) => '<option value="' + escapeHtml(item.name) + '">')
+      .join('');
+  }
+
+  document.getElementById('pl-park').addEventListener('change', plRefreshDatalists);
+
   plAddRow('dining');
   plAddRow('lightning');
   plAddRow('wishlist');
+  plRefreshDatalists();
 
   function escapeHtml(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -148,41 +227,48 @@
     return hour12 + ':' + String(m).padStart(2, '0') + ' ' + period;
   }
 
+  function plFindLand(list, name) {
+    const match = (list || []).find((item) => item.name.toLowerCase() === (name || '').toLowerCase());
+    return match ? match.land : null;
+  }
+
   function plGenerateSchedule() {
     const park = document.getElementById('pl-park').value;
     const date = document.getElementById('pl-date').value;
+    const arrival = document.getElementById('pl-arrival').value;
     const party = document.getElementById('pl-party').value;
 
-    const timedItems = [];
+    const rideList = (window.PLANNER_DATA.rides && window.PLANNER_DATA.rides[park]) || [];
+    const diningList = (window.PLANNER_DATA.dining && window.PLANNER_DATA.dining[park]) || [];
+    const theme = PL_PARK_THEME[park] || { color: '#0d3b3e', emoji: '🎢' };
 
-    document.querySelectorAll('#pl-dining-rows .pl-row').forEach((row) => {
-      const time = row.querySelector('.pl-time').value;
-      const name = row.querySelector('.pl-name').value;
-      if (time && name) timedItems.push({ time, name, type: 'dining' });
-    });
-
-    document.querySelectorAll('#pl-lightning-rows .pl-row').forEach((row) => {
-      const time = row.querySelector('.pl-time').value;
-      const name = row.querySelector('.pl-name').value;
-      if (time && name) timedItems.push({ time, name, type: 'lightning' });
-    });
-
-    timedItems.sort((a, b) => a.time.localeCompare(b.time));
-
-    const wishlistItems = [];
-    document.querySelectorAll('#pl-wishlist-rows .pl-row').forEach((row) => {
-      const name = row.querySelector('.pl-name').value;
-      if (name) wishlistItems.push(name);
-    });
-
+    // Banner
+    document.getElementById('pl-out-banner').style.background = theme.color;
+    document.getElementById('pl-out-emoji').textContent = theme.emoji;
     document.getElementById('pl-out-park').textContent = park;
     let metaParts = [];
     if (date) {
       const d = new Date(date + 'T00:00:00');
       metaParts.push(d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
     }
+    if (arrival) metaParts.push('Arrive by ' + formatTime(arrival));
     if (party) metaParts.push(party);
     document.getElementById('pl-out-meta').textContent = metaParts.join(' · ');
+
+    // Timed items: dining + Lightning Lane, sorted chronologically — exactly
+    // as entered, real times only.
+    const timedItems = [];
+    document.querySelectorAll('#pl-dining-rows .pl-row').forEach((row) => {
+      const time = row.querySelector('.pl-time').value;
+      const name = row.querySelector('.pl-name').value;
+      if (time && name) timedItems.push({ time, name, type: 'dining' });
+    });
+    document.querySelectorAll('#pl-lightning-rows .pl-row').forEach((row) => {
+      const time = row.querySelector('.pl-time').value;
+      const name = row.querySelector('.pl-name').value;
+      if (time && name) timedItems.push({ time, name, type: 'lightning' });
+    });
+    timedItems.sort((a, b) => a.time.localeCompare(b.time));
 
     const timedHtml = timedItems.map((item) => {
       const labelClass = item.type === 'dining' ? 'pl-label-dining' : 'pl-label-lightning';
@@ -192,14 +278,45 @@
         '<div><span class="pl-schedule-label ' + labelClass + '">' + labelText + '</span>' + escapeHtml(item.name) + '</div>' +
         '</div>';
     }).join('');
-    document.getElementById('pl-out-timed').innerHTML = timedHtml || '<p style="color:var(--ink-600); font-size:14px;">No timed reservations added yet.</p>';
+    const timedSection = document.getElementById('pl-out-timed-section');
+    if (timedItems.length) {
+      timedSection.style.display = 'block';
+      document.getElementById('pl-out-timed').innerHTML = timedHtml;
+    } else {
+      timedSection.style.display = 'none';
+    }
+
+    // Wishlist: preserves the priority order the person set with ↑ / ↓,
+    // grouped by land for a natural, walkable printout — no invented times.
+    const wishlistRows = Array.from(document.querySelectorAll('#pl-wishlist-rows .pl-row'))
+      .map((row) => row.querySelector('.pl-name').value)
+      .filter(Boolean);
+
+    const landOrder = []; // preserves first-seen order of each land, matching overall priority
+    const wishlistByLand = {};
+    wishlistRows.forEach((name) => {
+      const land = plFindLand(rideList, name) || 'Other';
+      if (!wishlistByLand[land]) {
+        wishlistByLand[land] = [];
+        landOrder.push(land);
+      }
+      wishlistByLand[land].push(name);
+    });
+
+    let rank = 1;
+    const wishlistHtml = landOrder.map((land) => {
+      const rides = wishlistByLand[land].map((name) => {
+        const html = '<div class="pl-ride-item"><span class="pl-rank">' + rank + '.</span>' + escapeHtml(name) + '</div>';
+        rank++;
+        return html;
+      }).join('');
+      return '<div class="pl-land-group"><div class="pl-land-name">' + escapeHtml(land) + '</div>' + rides + '</div>';
+    }).join('');
 
     const wishlistSection = document.getElementById('pl-out-wishlist-section');
-    if (wishlistItems.length) {
+    if (wishlistRows.length) {
       wishlistSection.style.display = 'block';
-      document.getElementById('pl-out-wishlist').innerHTML = wishlistItems
-        .map((name) => '<div class="pl-wishlist-item">• ' + escapeHtml(name) + '</div>')
-        .join('');
+      document.getElementById('pl-out-wishlist').innerHTML = wishlistHtml;
     } else {
       wishlistSection.style.display = 'none';
     }
