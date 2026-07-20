@@ -54,6 +54,8 @@
   .pl-section-title::after { content: ''; flex: 1; height: 2px; background: var(--sand-100); }
 
   .pl-ride-checkbox-item { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 15px; color: #333; border-bottom: 1px solid #f7f4ec; }
+  .pl-wishlist-columns { display: flex; gap: 28px; }
+  .pl-wishlist-column { flex: 1; min-width: 0; }
   .pl-ride-checkbox-item .pl-rank { color: var(--coral-600); font-weight: 700; width: 22px; flex-shrink: 0; }
   .pl-ride-checkbox-item input[type="checkbox"] {
     width: 20px; height: 20px; flex-shrink: 0;
@@ -100,8 +102,14 @@
        columns so more rows fit per page instead of running long lists onto
        a second page. break-inside:avoid keeps each checkbox+ride together
        as one unit rather than splitting it across the column break. */
-    #pl-out-wishlist { column-count: 2; column-gap: 28px; }
-    .pl-ride-checkbox-item { padding: 4px 0; font-size: 13px; break-inside: avoid; -webkit-column-break-inside: avoid; }
+    /* Two explicit side-by-side columns for the ride checklist, built in JS
+       (not CSS column-count) — Safari's print engine has a known bug where
+       it doesn't properly balance CSS multi-column layouts across a page,
+       often dumping everything into column 1 and overflowing to page 2
+       even with column 2 sitting empty. Two independent flex children
+       (defined as a general rule above) sidestep that entirely, since
+       there's no column-balancing algorithm involved at all. */
+    .pl-ride-checkbox-item { padding: 4px 0; font-size: 13px; }
 
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
@@ -422,17 +430,34 @@
     }
 
     // Flat priority-ordered checkbox list — no land grouping, just the
-    // person's own order, exactly as arranged with ↑ / ↓.
+    // person's own order, exactly as arranged with ↑ / ↓. Split into two
+    // explicit columns (rather than CSS column-count, which Safari doesn't
+    // reliably balance in print) once the list is long enough to benefit —
+    // read top-to-bottom in column 1, then continuing top-to-bottom in
+    // column 2, same convention as any numbered list split into columns.
     const wishlistNames = Array.from(document.querySelectorAll('#pl-wishlist-rows .pl-row'))
       .map((row) => plGetRowName(row))
       .filter(Boolean);
 
-    const wishlistHtml = wishlistNames.map((name, i) =>
-      '<div class="pl-ride-checkbox-item">' +
-        '<input type="checkbox" id="pl-check-' + i + '">' +
-        '<label for="pl-check-' + i + '"><span class="pl-rank">' + (i + 1) + '.</span>' + escapeHtml(name) + '</label>' +
-      '</div>'
-    ).join('');
+    function renderRideItem(name, rank) {
+      return '<div class="pl-ride-checkbox-item">' +
+        '<input type="checkbox" id="pl-check-' + rank + '">' +
+        '<label for="pl-check-' + rank + '"><span class="pl-rank">' + rank + '.</span>' + escapeHtml(name) + '</label>' +
+      '</div>';
+    }
+
+    let wishlistHtml;
+    if (wishlistNames.length > 6) {
+      const splitPoint = Math.ceil(wishlistNames.length / 2);
+      const col1 = wishlistNames.slice(0, splitPoint).map((name, i) => renderRideItem(name, i + 1)).join('');
+      const col2 = wishlistNames.slice(splitPoint).map((name, i) => renderRideItem(name, i + 1 + splitPoint)).join('');
+      wishlistHtml = '<div class="pl-wishlist-columns">' +
+        '<div class="pl-wishlist-column">' + col1 + '</div>' +
+        '<div class="pl-wishlist-column">' + col2 + '</div>' +
+      '</div>';
+    } else {
+      wishlistHtml = wishlistNames.map((name, i) => renderRideItem(name, i + 1)).join('');
+    }
 
     const wishlistSection = document.getElementById('pl-out-wishlist-section');
     if (wishlistNames.length) {
