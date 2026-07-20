@@ -6,12 +6,26 @@
   .pl-form-section { background: #fff; border: 1px solid var(--sand-100); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
   .pl-form-section h2 { font-family: var(--font-display); font-size: 18px; color: var(--teal-900); margin: 0 0 4px; }
   .pl-form-hint { font-size: 13px; color: var(--ink-600); margin-bottom: 14px; }
-  .pl-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
-  .pl-row input[type="time"] { width: 120px; flex-shrink: 0; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-  .pl-row input[type="text"] { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .pl-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* Real <select> dropdowns, styled to make it obvious they're dropdowns —
+     a visible arrow on the right, "Select..." as the default shown value. */
+  .pl-row select.pl-time { width: 150px; flex-shrink: 0; }
+  .pl-row select.pl-name { flex: 1; min-width: 200px; }
+  .pl-row select {
+    padding: 8px 34px 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%230d3b3e' d='M6 8L0 0h12z'/%3E%3C/svg%3E") no-repeat right 12px center;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .pl-row select.pl-name-other-active { border-color: var(--coral-600); }
+  .pl-row input.pl-name-other { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--coral-600); border-radius: 6px; font-size: 14px; }
   .pl-row button.pl-remove { background: none; border: none; color: #b3261e; font-size: 18px; cursor: pointer; padding: 4px 8px; flex-shrink: 0; }
   .pl-row button.pl-move { background: var(--sand-100); border: none; color: var(--teal-900); font-size: 13px; cursor: pointer; padding: 6px 9px; border-radius: 5px; flex-shrink: 0; }
-  .pl-row button.pl-move:disabled { opacity: 0.3; cursor: default; }
   .pl-add-btn { background: var(--sand-100); border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--teal-900); cursor: pointer; }
   .pl-top-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .pl-top-fields label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-600); margin-bottom: 4px; }
@@ -38,10 +52,19 @@
   .pl-section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--teal-900); margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
   .pl-section-title::after { content: ''; flex: 1; height: 2px; background: var(--sand-100); }
 
-  .pl-land-group { margin-bottom: 16px; }
-  .pl-land-name { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 12px; background: var(--sand-100); color: var(--teal-900); margin-bottom: 6px; }
-  .pl-ride-item { padding: 5px 0 5px 4px; font-size: 14px; color: #333; }
-  .pl-ride-item .pl-rank { display: inline-block; width: 20px; color: var(--coral-600); font-weight: 700; }
+  .pl-ride-checkbox-item { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 15px; color: #333; border-bottom: 1px solid #f7f4ec; }
+  .pl-ride-checkbox-item .pl-rank { color: var(--coral-600); font-weight: 700; width: 22px; flex-shrink: 0; }
+  .pl-ride-checkbox-item input[type="checkbox"] {
+    width: 20px; height: 20px; flex-shrink: 0;
+    appearance: none; -webkit-appearance: none;
+    border: 2px solid var(--teal-900); border-radius: 4px;
+    cursor: pointer;
+  }
+  .pl-ride-checkbox-item input[type="checkbox"]:checked {
+    background: var(--teal-900);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='11' viewBox='0 0 14 11'%3E%3Cpath fill='%23fff' d='M4.7 8.6L1.1 5l-1.1 1.1 4.7 4.7 8-8-1.1-1.1z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: center;
+  }
 
   .pl-print-btn { display: block; width: 100%; background: var(--teal-900); color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 24px; }
   .pl-print-hint { text-align: center; font-size: 12px; color: var(--ink-600); margin-top: 8px; }
@@ -61,8 +84,6 @@
     dining: <%- JSON.stringify(diningByPark) %>,
   };
 
-  // Original decorative theme per park — emoji + brand color, not Disney
-  // artwork/characters. Purely for a colorful, friendly-looking printout.
   var PL_PARK_THEME = {
     'Magic Kingdom': { color: '#c0554a', emoji: '🏰' },
     'EPCOT': { color: '#3d7a9e', emoji: '🌍' },
@@ -101,7 +122,7 @@
       </div>
       <div>
         <label for="pl-arrival">Arrival / Park Opens</label>
-        <input type="time" id="pl-arrival" value="08:00">
+        <select id="pl-arrival"></select>
       </div>
       <div>
         <label for="pl-party">Party Name (optional)</label>
@@ -114,14 +135,14 @@
 
   <div class="pl-form-section">
     <h2>🍽️ Dining Reservations</h2>
-    <p class="pl-form-hint">Add each reservation with its time.</p>
+    <p class="pl-form-hint">Pick a restaurant and a time for each reservation.</p>
     <div id="pl-dining-rows"></div>
     <button type="button" class="pl-add-btn" onclick="plAddRow('dining')">+ Add Reservation</button>
   </div>
 
   <div class="pl-form-section">
     <h2>⚡ Lightning Lane Selections</h2>
-    <p class="pl-form-hint">Add each ride with its return time window.</p>
+    <p class="pl-form-hint">Pick a ride and its return time window.</p>
     <div id="pl-lightning-rows"></div>
     <button type="button" class="pl-add-btn" onclick="plAddRow('lightning')">+ Add Lightning Lane</button>
   </div>
@@ -134,9 +155,6 @@
   </div>
 
   <button type="button" class="pl-generate-btn" onclick="plGenerateSchedule()">Build My Plan</button>
-
-  <datalist id="pl-datalist-dining"></datalist>
-  <datalist id="pl-datalist-rides"></datalist>
 
   <div id="pl-schedule">
     <div class="pl-schedule-box">
@@ -157,64 +175,11 @@
       </div>
     </div>
     <button type="button" class="pl-print-btn" onclick="window.print()">🖨️ Print or Save as PDF</button>
-    <p class="pl-print-hint">In the print dialog, choose "Save as PDF" instead of a printer if you want a file instead of paper.</p>
+    <p class="pl-print-hint">In the print dialog, choose "Save as PDF" instead of a printer if you want a file instead of paper. Checkboxes stay checkable even after printing to PDF.</p>
   </div>
 </main>
 
 <script>
-  function plAddRow(type) {
-    const container = document.getElementById('pl-' + type + '-rows');
-    const row = document.createElement('div');
-    row.className = 'pl-row';
-
-    if (type === 'wishlist') {
-      row.innerHTML =
-        '<button type="button" class="pl-move" onclick="plMoveRow(this, -1)">↑</button>' +
-        '<button type="button" class="pl-move" onclick="plMoveRow(this, 1)">↓</button>' +
-        '<input type="text" list="pl-datalist-rides" placeholder="e.g. Space Mountain" class="pl-name">' +
-        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
-    } else if (type === 'dining') {
-      row.innerHTML = '<input type="time" class="pl-time">' +
-        '<input type="text" list="pl-datalist-dining" placeholder="e.g. Be Our Guest Restaurant" class="pl-name">' +
-        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
-    } else {
-      row.innerHTML = '<input type="time" class="pl-time">' +
-        '<input type="text" list="pl-datalist-rides" placeholder="e.g. Seven Dwarfs Mine Train" class="pl-name">' +
-        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
-    }
-    container.appendChild(row);
-  }
-
-  function plMoveRow(btn, direction) {
-    const row = btn.closest('.pl-row');
-    const container = row.parentElement;
-    if (direction === -1 && row.previousElementSibling) {
-      container.insertBefore(row, row.previousElementSibling);
-    } else if (direction === 1 && row.nextElementSibling) {
-      container.insertBefore(row.nextElementSibling, row);
-    }
-  }
-
-  function plRefreshDatalists() {
-    const park = document.getElementById('pl-park').value;
-    const rides = (window.PLANNER_DATA.rides && window.PLANNER_DATA.rides[park]) || [];
-    const dining = (window.PLANNER_DATA.dining && window.PLANNER_DATA.dining[park]) || [];
-
-    document.getElementById('pl-datalist-rides').innerHTML = rides
-      .map((item) => '<option value="' + escapeHtml(item.name) + '">')
-      .join('');
-    document.getElementById('pl-datalist-dining').innerHTML = dining
-      .map((item) => '<option value="' + escapeHtml(item.name) + '">')
-      .join('');
-  }
-
-  document.getElementById('pl-park').addEventListener('change', plRefreshDatalists);
-
-  plAddRow('dining');
-  plAddRow('lightning');
-  plAddRow('wishlist');
-  plRefreshDatalists();
-
   function escapeHtml(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -227,22 +192,164 @@
     return hour12 + ':' + String(m).padStart(2, '0') + ' ' + period;
   }
 
-  function plFindLand(list, name) {
-    const match = (list || []).find((item) => item.name.toLowerCase() === (name || '').toLowerCase());
-    return match ? match.land : null;
+  // Builds <option> HTML for a time <select>, in 15-minute increments,
+  // starting from whatever the current Arrival Time is set to (times
+  // before arrival aren't useful to schedule) through the end of the day.
+  function plBuildTimeOptionsHtml() {
+    const arrival = document.getElementById('pl-arrival').value || '08:00';
+    const [startH, startM] = arrival.split(':').map(Number);
+    let totalMinutes = startH * 60 + startM;
+    const options = ['<option value="" selected disabled>Select time...</option>'];
+    while (totalMinutes < 24 * 60) {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      const value = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      options.push('<option value="' + value + '">' + formatTime(value) + '</option>');
+      totalMinutes += 15;
+    }
+    return options.join('');
   }
+
+  // The Arrival Time selector itself also runs in 15-minute increments,
+  // starting from a fixed 6:00 AM (parks don't open earlier than that).
+  function plBuildArrivalOptionsHtml() {
+    let totalMinutes = 6 * 60;
+    const options = [];
+    while (totalMinutes < 24 * 60) {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      const value = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      const selected = value === '08:00' ? ' selected' : '';
+      options.push('<option value="' + value + '"' + selected + '>' + formatTime(value) + '</option>');
+      totalMinutes += 15;
+    }
+    return options.join('');
+  }
+
+  function plRefreshAllTimeSelects() {
+    const html = plBuildTimeOptionsHtml();
+    document.querySelectorAll('select.pl-time').forEach((sel) => {
+      const current = sel.value;
+      sel.innerHTML = html;
+      // Keep the previously chosen time selected if it's still a valid,
+      // in-range option after the arrival time changed.
+      if (current && sel.querySelector('option[value="' + current + '"]')) {
+        sel.value = current;
+      }
+    });
+  }
+
+  document.getElementById('pl-arrival').innerHTML = plBuildArrivalOptionsHtml();
+  document.getElementById('pl-arrival').addEventListener('change', plRefreshAllTimeSelects);
+
+  // Builds <option> HTML for a ride/dining <select> — a clear "Select..."
+  // placeholder, the real current options for the selected park, and an
+  // "Other" choice for anything not in our data (e.g. Universal parks,
+  // which don't have dining directory data yet).
+  function plBuildNameOptionsHtml(items) {
+    const options = ['<option value="" selected disabled>Select...</option>'];
+    (items || []).forEach((item) => {
+      options.push('<option value="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</option>');
+    });
+    options.push('<option value="__other__">Other (type your own)...</option>');
+    return options.join('');
+  }
+
+  function plRefreshAllNameSelects() {
+    const park = document.getElementById('pl-park').value;
+    const rides = (window.PLANNER_DATA.rides && window.PLANNER_DATA.rides[park]) || [];
+    const dining = (window.PLANNER_DATA.dining && window.PLANNER_DATA.dining[park]) || [];
+    const rideOptionsHtml = plBuildNameOptionsHtml(rides);
+    const diningOptionsHtml = plBuildNameOptionsHtml(dining);
+
+    document.querySelectorAll('select.pl-name').forEach((sel) => {
+      sel.innerHTML = sel.dataset.kind === 'dining' ? diningOptionsHtml : rideOptionsHtml;
+    });
+  }
+
+  document.getElementById('pl-park').addEventListener('change', plRefreshAllNameSelects);
+
+  function plHandleNameChange(select) {
+    const row = select.closest('.pl-row');
+    const existingOther = row.querySelector('.pl-name-other');
+    if (select.value === '__other__') {
+      select.classList.add('pl-name-other-active');
+      if (!existingOther) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'pl-name-other';
+        input.placeholder = 'Type the name...';
+        select.insertAdjacentElement('afterend', input);
+      }
+    } else {
+      select.classList.remove('pl-name-other-active');
+      if (existingOther) existingOther.remove();
+    }
+  }
+
+  // Reads the effective name for a row — the select's value, unless "Other"
+  // was chosen, in which case it's whatever was typed in the adjacent field.
+  function plGetRowName(row) {
+    const select = row.querySelector('.pl-name');
+    if (select.value === '__other__') {
+      const other = row.querySelector('.pl-name-other');
+      return other ? other.value.trim() : '';
+    }
+    return select.value;
+  }
+
+  function plAddRow(type) {
+    const container = document.getElementById('pl-' + type + '-rows');
+    const row = document.createElement('div');
+    row.className = 'pl-row';
+
+    const nameKind = type === 'dining' ? 'dining' : 'rides';
+    const nameSelectHtml = '<select class="pl-name" data-kind="' + nameKind + '" onchange="plHandleNameChange(this)"></select>';
+
+    if (type === 'wishlist') {
+      row.innerHTML =
+        '<button type="button" class="pl-move" onclick="plMoveRow(this, -1)">↑</button>' +
+        '<button type="button" class="pl-move" onclick="plMoveRow(this, 1)">↓</button>' +
+        nameSelectHtml +
+        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
+    } else {
+      row.innerHTML = '<select class="pl-time"></select>' +
+        nameSelectHtml +
+        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
+    }
+    container.appendChild(row);
+
+    // Populate the newly created selects with current data right away.
+    const timeSelect = row.querySelector('select.pl-time');
+    if (timeSelect) timeSelect.innerHTML = plBuildTimeOptionsHtml();
+
+    const nameSelect = row.querySelector('select.pl-name');
+    const park = document.getElementById('pl-park').value;
+    const items = (window.PLANNER_DATA[nameKind === 'dining' ? 'dining' : 'rides'] && window.PLANNER_DATA[nameKind === 'dining' ? 'dining' : 'rides'][park]) || [];
+    nameSelect.innerHTML = plBuildNameOptionsHtml(items);
+  }
+
+  function plMoveRow(btn, direction) {
+    const row = btn.closest('.pl-row');
+    const container = row.parentElement;
+    if (direction === -1 && row.previousElementSibling) {
+      container.insertBefore(row, row.previousElementSibling);
+    } else if (direction === 1 && row.nextElementSibling) {
+      container.insertBefore(row.nextElementSibling, row);
+    }
+  }
+
+  plAddRow('dining');
+  plAddRow('lightning');
+  plAddRow('wishlist');
 
   function plGenerateSchedule() {
     const park = document.getElementById('pl-park').value;
     const date = document.getElementById('pl-date').value;
     const arrival = document.getElementById('pl-arrival').value;
     const party = document.getElementById('pl-party').value;
-
-    const rideList = (window.PLANNER_DATA.rides && window.PLANNER_DATA.rides[park]) || [];
-    const diningList = (window.PLANNER_DATA.dining && window.PLANNER_DATA.dining[park]) || [];
     const theme = PL_PARK_THEME[park] || { color: '#0d3b3e', emoji: '🎢' };
 
-    // Banner
     document.getElementById('pl-out-banner').style.background = theme.color;
     document.getElementById('pl-out-emoji').textContent = theme.emoji;
     document.getElementById('pl-out-park').textContent = park;
@@ -255,17 +362,15 @@
     if (party) metaParts.push(party);
     document.getElementById('pl-out-meta').textContent = metaParts.join(' · ');
 
-    // Timed items: dining + Lightning Lane, sorted chronologically — exactly
-    // as entered, real times only.
     const timedItems = [];
     document.querySelectorAll('#pl-dining-rows .pl-row').forEach((row) => {
       const time = row.querySelector('.pl-time').value;
-      const name = row.querySelector('.pl-name').value;
+      const name = plGetRowName(row);
       if (time && name) timedItems.push({ time, name, type: 'dining' });
     });
     document.querySelectorAll('#pl-lightning-rows .pl-row').forEach((row) => {
       const time = row.querySelector('.pl-time').value;
-      const name = row.querySelector('.pl-name').value;
+      const name = plGetRowName(row);
       if (time && name) timedItems.push({ time, name, type: 'lightning' });
     });
     timedItems.sort((a, b) => a.time.localeCompare(b.time));
@@ -286,35 +391,21 @@
       timedSection.style.display = 'none';
     }
 
-    // Wishlist: preserves the priority order the person set with ↑ / ↓,
-    // grouped by land for a natural, walkable printout — no invented times.
-    const wishlistRows = Array.from(document.querySelectorAll('#pl-wishlist-rows .pl-row'))
-      .map((row) => row.querySelector('.pl-name').value)
+    // Flat priority-ordered checkbox list — no land grouping, just the
+    // person's own order, exactly as arranged with ↑ / ↓.
+    const wishlistNames = Array.from(document.querySelectorAll('#pl-wishlist-rows .pl-row'))
+      .map((row) => plGetRowName(row))
       .filter(Boolean);
 
-    const landOrder = []; // preserves first-seen order of each land, matching overall priority
-    const wishlistByLand = {};
-    wishlistRows.forEach((name) => {
-      const land = plFindLand(rideList, name) || 'Other';
-      if (!wishlistByLand[land]) {
-        wishlistByLand[land] = [];
-        landOrder.push(land);
-      }
-      wishlistByLand[land].push(name);
-    });
-
-    let rank = 1;
-    const wishlistHtml = landOrder.map((land) => {
-      const rides = wishlistByLand[land].map((name) => {
-        const html = '<div class="pl-ride-item"><span class="pl-rank">' + rank + '.</span>' + escapeHtml(name) + '</div>';
-        rank++;
-        return html;
-      }).join('');
-      return '<div class="pl-land-group"><div class="pl-land-name">' + escapeHtml(land) + '</div>' + rides + '</div>';
-    }).join('');
+    const wishlistHtml = wishlistNames.map((name, i) =>
+      '<div class="pl-ride-checkbox-item">' +
+        '<input type="checkbox" id="pl-check-' + i + '">' +
+        '<label for="pl-check-' + i + '"><span class="pl-rank">' + (i + 1) + '.</span>' + escapeHtml(name) + '</label>' +
+      '</div>'
+    ).join('');
 
     const wishlistSection = document.getElementById('pl-out-wishlist-section');
-    if (wishlistRows.length) {
+    if (wishlistNames.length) {
       wishlistSection.style.display = 'block';
       document.getElementById('pl-out-wishlist').innerHTML = wishlistHtml;
     } else {
