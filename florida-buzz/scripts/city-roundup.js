@@ -191,6 +191,18 @@ async function run() {
     roundup.title = roundup.title.replace(datePattern, '').trim();
     roundup.meta_title = roundup.meta_title.replace(datePattern, '').trim();
 
+    // Defensive correction: the model is told the timeframe is "this week"
+    // or "this weekend" via the prompt, but can still write the other word
+    // in its own title text — especially likely when the actual events
+    // being summarized (concerts, weekend-flavored happenings) bias its own
+    // wording regardless of the instruction. Force the correct word based
+    // on the actual mode, the same way the date range itself is enforced in
+    // code rather than trusted to the model.
+    const correctWord = today.mode === 'week' ? 'This Week' : 'This Weekend';
+    const wrongWordPattern = today.mode === 'week' ? /\bThis Weekend\b/gi : /\bThis Week\b/gi;
+    roundup.title = roundup.title.replace(wrongWordPattern, correctWord);
+    roundup.meta_title = roundup.meta_title.replace(wrongWordPattern, correctWord);
+
     const dateRangeLabel = getDateRangeLabel(today.mode);
     roundup.title = `${roundup.title} (${dateRangeLabel})`;
     roundup.meta_title = `${roundup.meta_title} (${dateRangeLabel})`;
