@@ -40,6 +40,7 @@
   .pl-schedule-banner { padding: 28px 30px; color: #fff; text-align: center; }
   .pl-schedule-banner .pl-emoji { font-size: 40px; display: block; margin-bottom: 6px; }
   .pl-schedule-banner h2 { font-family: var(--font-display); font-size: 30px; margin: 0; }
+  .pl-brand-line { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.85; margin-top: 6px; }
   .pl-schedule-banner p { margin: 6px 0 0; opacity: 0.92; font-size: 14px; }
   .pl-schedule-body { padding: 26px 30px 30px; }
 
@@ -70,10 +71,31 @@
   .pl-print-hint { text-align: center; font-size: 12px; color: var(--ink-600); margin-top: 8px; }
 
   @media print {
-    header, .pl-form-section, .pl-generate-btn, .pl-print-btn, .pl-print-hint, footer, .newsletter, .eyebrow, .pl-note { display: none !important; }
+    @page { margin: 0.4in; size: auto; }
+
+    /* Hide EVERYTHING by default, rather than trying to enumerate every
+       element that shouldn't print (header, ticker, nav, newsletter signup,
+       footer, form, etc.) — that list is fragile and easy to miss something.
+       Then explicitly show only the schedule box and pull it out of normal
+       document flow so it starts at the very top of the page, instead of
+       leaving behind the blank space the hidden elements would have
+       otherwise occupied. */
+    body * { visibility: hidden !important; }
+    #pl-schedule, #pl-schedule * { visibility: visible !important; }
+    #pl-schedule {
+      display: block !important;
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      margin: 0;
+    }
+    .pl-print-btn, .pl-print-hint { display: none !important; }
+
     body { background: #fff; }
     .pl-schedule-box { box-shadow: none; }
-    #pl-schedule { display: block !important; margin-top: 0; }
+    .pl-schedule-banner { padding: 16px 24px; }
+    .pl-schedule-body { padding: 16px 24px 20px; }
+    .pl-schedule-item, .pl-ride-checkbox-item { padding: 5px 0; }
+    .pl-section-title { margin: 14px 0 6px; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
@@ -161,6 +183,7 @@
       <div class="pl-schedule-banner" id="pl-out-banner">
         <span class="pl-emoji" id="pl-out-emoji">🏰</span>
         <h2 id="pl-out-park">Magic Kingdom</h2>
+        <div class="pl-brand-line">Schedule presented by The Florida Buzz — TheFloridaBuzz.com</div>
         <p id="pl-out-meta"></p>
       </div>
       <div class="pl-schedule-body">
