@@ -454,6 +454,7 @@ router.get('/sitemap.xml', async (req, res) => {
   const staticUrls = [
     { loc: siteUrl, priority: '1.0' },
     { loc: `${siteUrl}/wait-times`, priority: '0.9' },
+    { loc: `${siteUrl}/planner`, priority: '0.9' },
     { loc: `${siteUrl}/dining`, priority: '0.8' },
     ...Object.keys(DINING_PARK_LABELS).map((park) => ({ loc: `${siteUrl}/dining/${park}`, priority: '0.8' })),
     ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
@@ -848,6 +849,16 @@ router.get('/dining/:park', async (req, res) => {
     restaurants,
     categoryLabels: CATEGORY_LABELS,
   });
+});
+
+// Printable/downloadable Disney day-planner — helps people organize a plan
+// (dining reservations, Lightning Lane times, must-do rides) into a clean
+// schedule BEFORE their trip, since Disney's own Genie itinerary tool only
+// works same-day with live wait times. Entirely client-side — nothing here
+// is saved server-side, it's just a form that renders a print-friendly
+// schedule in the browser.
+router.get('/planner', (req, res) => {
+  res.render('planner', { categoryLabels: CATEGORY_LABELS });
 });
 
 module.exports = router;
