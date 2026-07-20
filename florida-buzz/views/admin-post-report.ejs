@@ -101,7 +101,7 @@
     <% } %>
 
     <h2 style="font-size:16px; color:var(--teal-900); margin-top:32px;">Broken Links (404s)</h2>
-    <p style="color:var(--ink-600); font-size:13px; margin-top:2px;">Logged directly on the server whenever a request doesn't resolve — <%= total404sLast7d %> hit(s) in the last 7 days.</p>
+    <p style="color:var(--ink-600); font-size:13px; margin-top:2px;"><%= total404sLast7d %> total hit(s) in the last 7 days (includes routine bot scanning traffic every site gets). Table below filters that out to show genuine content-link issues only.</p>
 
     <% if (top404s.length) { %>
       <div style="margin-top:12px; overflow-x:auto;">
