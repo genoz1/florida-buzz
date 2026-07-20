@@ -93,8 +93,16 @@
     .pl-schedule-box { box-shadow: none; }
     .pl-schedule-banner { padding: 16px 24px; }
     .pl-schedule-body { padding: 16px 24px 20px; }
-    .pl-schedule-item, .pl-ride-checkbox-item { padding: 5px 0; }
+    .pl-schedule-item { padding: 5px 0; }
     .pl-section-title { margin: 14px 0 6px; }
+
+    /* The ride checklist is usually the longest section — flow it into two
+       columns so more rows fit per page instead of running long lists onto
+       a second page. break-inside:avoid keeps each checkbox+ride together
+       as one unit rather than splitting it across the column break. */
+    #pl-out-wishlist { column-count: 2; column-gap: 28px; }
+    .pl-ride-checkbox-item { padding: 4px 0; font-size: 13px; break-inside: avoid; -webkit-column-break-inside: avoid; }
+
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
