@@ -1,0 +1,212 @@
+<%- include('partials/header', { pageTitle: 'Disney Day Planner — Build a Printable Park Schedule — The Florida Buzz', pageDescription: 'Organize your dining reservations, Lightning Lane times, and must-do rides into one clean, printable schedule before your trip.', category: 'theme-parks', tickerItems: [], canonicalPath: '/planner' }) %>
+
+<style>
+  .pl-header { text-align: center; padding: 8px 0 20px; }
+  .pl-intro { color: var(--ink-600); max-width: 600px; margin: 10px auto 0; }
+  .pl-form-section { background: #fff; border: 1px solid var(--sand-100); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .pl-form-section h2 { font-family: var(--font-display); font-size: 18px; color: var(--teal-900); margin: 0 0 4px; }
+  .pl-form-hint { font-size: 13px; color: var(--ink-600); margin-bottom: 14px; }
+  .pl-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+  .pl-row input[type="time"] { width: 120px; flex-shrink: 0; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .pl-row input[type="text"] { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .pl-row button.pl-remove { background: none; border: none; color: #b3261e; font-size: 18px; cursor: pointer; padding: 4px 8px; flex-shrink: 0; }
+  .pl-add-btn { background: var(--sand-100); border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--teal-900); cursor: pointer; }
+  .pl-top-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .pl-top-fields label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-600); margin-bottom: 4px; }
+  .pl-top-fields input, .pl-top-fields select { width: 100%; padding: 9px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+  .pl-generate-btn { display: block; width: 100%; background: var(--coral-600); color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+
+  /* Printable schedule output */
+  #pl-schedule { display: none; margin-top: 30px; }
+  #pl-schedule.visible { display: block; }
+  .pl-schedule-box { background: #fff; border: 2px solid var(--teal-900); border-radius: 10px; padding: 30px; }
+  .pl-schedule-header { text-align: center; border-bottom: 2px solid var(--sand-100); padding-bottom: 16px; margin-bottom: 20px; }
+  .pl-schedule-header h2 { font-family: var(--font-display); font-size: 26px; color: var(--teal-900); margin: 0; }
+  .pl-schedule-header p { color: var(--ink-600); margin: 4px 0 0; }
+  .pl-schedule-item { display: flex; gap: 16px; padding: 10px 0; border-bottom: 1px solid #f0ece0; }
+  .pl-schedule-time { width: 90px; flex-shrink: 0; font-weight: 700; color: var(--teal-900); }
+  .pl-schedule-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 4px; margin-right: 8px; }
+  .pl-label-dining { background: #fff3e0; color: #b3620a; }
+  .pl-label-lightning { background: #e3f2fd; color: #1565c0; }
+  .pl-schedule-section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-600); margin: 24px 0 8px; }
+  .pl-wishlist-item { padding: 6px 0; }
+  .pl-print-btn { display: block; width: 100%; background: var(--teal-900); color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 24px; }
+  .pl-print-hint { text-align: center; font-size: 12px; color: var(--ink-600); margin-top: 8px; }
+
+  @media print {
+    header, .pl-form-section, .pl-generate-btn, .pl-print-btn, .pl-print-hint, footer, .newsletter, .eyebrow { display: none !important; }
+    body { background: #fff; }
+    .pl-schedule-box { border: none; padding: 0; }
+    #pl-schedule { display: block !important; margin-top: 0; }
+  }
+</style>
+
+<main class="wrap">
+  <div class="pl-header">
+    <span class="eyebrow">🗓️ Trip Planning</span>
+    <h1 style="font-family:var(--font-display); font-size:32px; color:var(--teal-900); margin:8px 0 0;">Disney Day Planner</h1>
+    <p class="pl-intro">Disney's own app only builds your itinerary the day you're there. Plan ahead instead — enter your dining reservations, Lightning Lane times, and must-do rides, and get a clean schedule you can print or save as a PDF before you go.</p>
+  </div>
+
+  <div class="pl-form-section">
+    <div class="pl-top-fields">
+      <div>
+        <label for="pl-park">Park</label>
+        <select id="pl-park">
+          <option value="Magic Kingdom">Magic Kingdom</option>
+          <option value="EPCOT">EPCOT</option>
+          <option value="Hollywood Studios">Hollywood Studios</option>
+          <option value="Animal Kingdom">Animal Kingdom</option>
+          <option value="Universal Studios Florida">Universal Studios Florida</option>
+          <option value="Islands of Adventure">Islands of Adventure</option>
+          <option value="Epic Universe">Epic Universe</option>
+        </select>
+      </div>
+      <div>
+        <label for="pl-date">Date</label>
+        <input type="date" id="pl-date">
+      </div>
+      <div>
+        <label for="pl-party">Party Name (optional)</label>
+        <input type="text" id="pl-party" placeholder="e.g. The Smith Family">
+      </div>
+    </div>
+  </div>
+
+  <div class="pl-form-section">
+    <h2>🍽️ Dining Reservations</h2>
+    <p class="pl-form-hint">Add each reservation with its time.</p>
+    <div id="pl-dining-rows"></div>
+    <button type="button" class="pl-add-btn" onclick="plAddRow('dining')">+ Add Reservation</button>
+  </div>
+
+  <div class="pl-form-section">
+    <h2>⚡ Lightning Lane Selections</h2>
+    <p class="pl-form-hint">Add each ride with its return time window.</p>
+    <div id="pl-lightning-rows"></div>
+    <button type="button" class="pl-add-btn" onclick="plAddRow('lightning')">+ Add Lightning Lane</button>
+  </div>
+
+  <div class="pl-form-section">
+    <h2>🎢 Rides & To-Do Wishlist</h2>
+    <p class="pl-form-hint">No specific time needed — just what you don't want to miss.</p>
+    <div id="pl-wishlist-rows"></div>
+    <button type="button" class="pl-add-btn" onclick="plAddRow('wishlist')">+ Add to Wishlist</button>
+  </div>
+
+  <button type="button" class="pl-generate-btn" onclick="plGenerateSchedule()">Build My Schedule</button>
+
+  <div id="pl-schedule">
+    <div class="pl-schedule-box">
+      <div class="pl-schedule-header">
+        <h2 id="pl-out-park">Magic Kingdom</h2>
+        <p id="pl-out-meta"></p>
+      </div>
+      <div id="pl-out-timed"></div>
+      <div id="pl-out-wishlist-section" style="display:none;">
+        <div class="pl-schedule-section-title">Also Want To Do</div>
+        <div id="pl-out-wishlist"></div>
+      </div>
+    </div>
+    <button type="button" class="pl-print-btn" onclick="window.print()">🖨️ Print or Save as PDF</button>
+    <p class="pl-print-hint">In the print dialog, choose "Save as PDF" instead of a printer if you want a file instead of paper.</p>
+  </div>
+</main>
+
+<script>
+  function plAddRow(type) {
+    const container = document.getElementById('pl-' + type + '-rows');
+    const row = document.createElement('div');
+    row.className = 'pl-row';
+
+    if (type === 'wishlist') {
+      row.innerHTML = '<input type="text" placeholder="e.g. Space Mountain" class="pl-name">' +
+        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
+    } else {
+      const placeholder = type === 'dining' ? 'e.g. Be Our Guest Restaurant' : 'e.g. Seven Dwarfs Mine Train';
+      row.innerHTML = '<input type="time" class="pl-time">' +
+        '<input type="text" placeholder="' + placeholder + '" class="pl-name">' +
+        '<button type="button" class="pl-remove" onclick="this.parentElement.remove()">&times;</button>';
+    }
+    container.appendChild(row);
+  }
+
+  // Start each section with one blank row so the form doesn't look empty.
+  plAddRow('dining');
+  plAddRow('lightning');
+  plAddRow('wishlist');
+
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatTime(t) {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    return hour12 + ':' + String(m).padStart(2, '0') + ' ' + period;
+  }
+
+  function plGenerateSchedule() {
+    const park = document.getElementById('pl-park').value;
+    const date = document.getElementById('pl-date').value;
+    const party = document.getElementById('pl-party').value;
+
+    const timedItems = [];
+
+    document.querySelectorAll('#pl-dining-rows .pl-row').forEach((row) => {
+      const time = row.querySelector('.pl-time').value;
+      const name = row.querySelector('.pl-name').value;
+      if (time && name) timedItems.push({ time, name, type: 'dining' });
+    });
+
+    document.querySelectorAll('#pl-lightning-rows .pl-row').forEach((row) => {
+      const time = row.querySelector('.pl-time').value;
+      const name = row.querySelector('.pl-name').value;
+      if (time && name) timedItems.push({ time, name, type: 'lightning' });
+    });
+
+    timedItems.sort((a, b) => a.time.localeCompare(b.time));
+
+    const wishlistItems = [];
+    document.querySelectorAll('#pl-wishlist-rows .pl-row').forEach((row) => {
+      const name = row.querySelector('.pl-name').value;
+      if (name) wishlistItems.push(name);
+    });
+
+    document.getElementById('pl-out-park').textContent = park;
+    let metaParts = [];
+    if (date) {
+      const d = new Date(date + 'T00:00:00');
+      metaParts.push(d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
+    }
+    if (party) metaParts.push(party);
+    document.getElementById('pl-out-meta').textContent = metaParts.join(' · ');
+
+    const timedHtml = timedItems.map((item) => {
+      const labelClass = item.type === 'dining' ? 'pl-label-dining' : 'pl-label-lightning';
+      const labelText = item.type === 'dining' ? 'Dining' : 'Lightning Lane';
+      return '<div class="pl-schedule-item">' +
+        '<div class="pl-schedule-time">' + formatTime(item.time) + '</div>' +
+        '<div><span class="pl-schedule-label ' + labelClass + '">' + labelText + '</span>' + escapeHtml(item.name) + '</div>' +
+        '</div>';
+    }).join('');
+    document.getElementById('pl-out-timed').innerHTML = timedHtml || '<p style="color:var(--ink-600); font-size:14px;">No timed reservations added yet.</p>';
+
+    const wishlistSection = document.getElementById('pl-out-wishlist-section');
+    if (wishlistItems.length) {
+      wishlistSection.style.display = 'block';
+      document.getElementById('pl-out-wishlist').innerHTML = wishlistItems
+        .map((name) => '<div class="pl-wishlist-item">• ' + escapeHtml(name) + '</div>')
+        .join('');
+    } else {
+      wishlistSection.style.display = 'none';
+    }
+
+    document.getElementById('pl-schedule').classList.add('visible');
+    document.getElementById('pl-schedule').scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
+
+<%- include('partials/footer') %>
