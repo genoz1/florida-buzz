@@ -31,6 +31,7 @@ const GENEZENTKO_PAGES = {
   '/career-journey': 'genezentko-career',
   '/why-i-build-businesses': 'genezentko-ventures',
   '/resume': 'genezentko-resume',
+  '/do-what-you-say': 'genezentko-philosophy',
 };
 app.use((req, res, next) => {
   if (GENEZENTKO_HOSTS.includes(req.hostname)) {
