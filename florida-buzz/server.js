@@ -32,6 +32,13 @@ const GENEZENTKO_PAGES = {
   '/why-i-build-businesses': 'genezentko-ventures',
   '/resume': 'genezentko-resume',
   '/do-what-you-say': 'genezentko-philosophy',
+  '/insights/building-relationships-healthcare-sales': 'genezentko-relationships',
+  '/insights/physician-sales-vs-veterinary-sales': 'genezentko-physician-vs-vet',
+  '/insights/territory-management-healthcare-sales': 'genezentko-territory',
+  '/insights/growing-laboratory-diagnostics-territory': 'genezentko-lab-growth',
+  '/insights/solving-problems-not-selling-products': 'genezentko-solving-problems',
+  '/insights/features-tell-benefits-sell': 'genezentko-features-benefits',
+  '/insights/people-buy-emotionally-justify-logically': 'genezentko-emotional-logical',
 };
 app.use((req, res, next) => {
   if (GENEZENTKO_HOSTS.includes(req.hostname)) {
