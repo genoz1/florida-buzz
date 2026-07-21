@@ -26,9 +26,16 @@ if (process.env.INDEXNOW_KEY) {
 // this same DigitalOcean app to avoid paying for separate hosting), serve
 // a standalone personal bio page instead of the normal Florida Buzz routes.
 const GENEZENTKO_HOSTS = ['genezentko.com', 'www.genezentko.com'];
+const GENEZENTKO_PAGES = {
+  '/': 'genezentko-standalone',
+  '/career-journey': 'genezentko-career',
+  '/why-i-build-businesses': 'genezentko-ventures',
+};
 app.use((req, res, next) => {
   if (GENEZENTKO_HOSTS.includes(req.hostname)) {
-    return res.render('genezentko-standalone');
+    const view = GENEZENTKO_PAGES[req.path];
+    if (view) return res.render(view);
+    return res.status(404).send('Not found');
   }
   next();
 });
