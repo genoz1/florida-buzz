@@ -380,9 +380,9 @@ async function isDuplicateOfRecent(title, category) {
 async function run() {
   console.log(`=== The Florida Buzz automation run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
-  if (!DRY_RUN) console.log(`Facebook posts will be spaced ${FB_POST_DELAY_MINUTES} minute(s) apart within this run.\n`);
+  if (!DRY_RUN) console.log(`Posts will be spaced ${FB_POST_DELAY_MINUTES} minute(s) apart across all platforms within this run.\n`);
 
-  let fbPostCount = 0;
+  let postCount = 0;
 
   for (const source of SOURCES) {
     console.log(`Checking ${source.name} (${source.category})...`);
@@ -518,15 +518,15 @@ async function run() {
         await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
       }
 
-      if (!DRY_RUN && fbPostCount > 0) {
-        console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before the next Facebook post...`);
+      if (!DRY_RUN && postCount > 0) {
+        console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before posting this article to all platforms...`);
         await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
       }
       await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
-      fbPostCount += 1;
       await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
       await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
       await postToThreads({ text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`), imageUrl: finalImage });
+      postCount += 1;
       await markSeen(guid);
     }
   }
