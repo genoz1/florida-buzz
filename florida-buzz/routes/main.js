@@ -893,13 +893,24 @@ router.get('/planner', async (req, res) => {
   });
 
   const diningByPark = {};
+  const resortDining = [];
   if (supabase) {
     const { data: restaurants } = await supabase.from('restaurants').select('park, name, land').order('name');
     (restaurants || []).forEach((r) => {
+      if (r.park === 'resorts') {
+        // Resort dining (breakfast/dinner reservations at a hotel table-service
+        // or signature restaurant) isn't tied to any single park — a guest
+        // visiting Magic Kingdom that day might still have an 8am breakfast
+        // reservation at a Grand Floridian restaurant beforehand. This is kept
+        // separate from diningByPark and made available regardless of which
+        // park is selected for that day, rather than filtered out entirely.
+        resortDining.push({ name: r.name, land: r.land });
+        return;
+      }
       const parkDisplayName = Object.keys(PARK_NAME_TO_DINING_SLUG).find(
         (name) => PARK_NAME_TO_DINING_SLUG[name] === r.park
       );
-      if (!parkDisplayName) return; // e.g. 'resorts' — not applicable to a single-park planner
+      if (!parkDisplayName) return;
       if (!diningByPark[parkDisplayName]) diningByPark[parkDisplayName] = [];
       diningByPark[parkDisplayName].push({ name: r.name, land: r.land });
     });
@@ -909,6 +920,7 @@ router.get('/planner', async (req, res) => {
     categoryLabels: CATEGORY_LABELS,
     ridesByPark,
     diningByPark,
+    resortDining,
   });
 });
 
