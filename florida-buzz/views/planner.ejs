@@ -119,6 +119,7 @@
   window.PLANNER_DATA = {
     rides: <%- JSON.stringify(ridesByPark) %>,
     dining: <%- JSON.stringify(diningByPark) %>,
+    resortDining: <%- JSON.stringify(resortDining) %>,
   };
 
   var PL_PARK_THEME = {
@@ -283,12 +284,24 @@
   // Builds <option> HTML for a ride/dining <select> — a clear "Select..."
   // placeholder, the real current options for the selected park, and an
   // "Other" choice for anything not in our data (e.g. Universal parks,
-  // which don't have dining directory data yet).
-  function plBuildNameOptionsHtml(items) {
+  // which don't have dining directory data yet). For dining selects only,
+  // resortItems adds a separate "Resort Dining" optgroup — a breakfast or
+  // dinner reservation at a resort hotel isn't tied to whichever park the
+  // guest is visiting that day, so these stay available no matter which
+  // park is currently selected.
+  function plBuildNameOptionsHtml(items, resortItems) {
     const options = ['<option value="" selected disabled>Select...</option>'];
     (items || []).forEach((item) => {
       options.push('<option value="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</option>');
     });
+    if (resortItems && resortItems.length) {
+      options.push('<optgroup label="Resort Dining (any resort, regardless of park)">');
+      resortItems.forEach((item) => {
+        const label = item.land ? item.name + ' — ' + item.land : item.name;
+        options.push('<option value="' + escapeHtml(item.name) + '">' + escapeHtml(label) + '</option>');
+      });
+      options.push('</optgroup>');
+    }
     options.push('<option value="__other__">Other (type your own)...</option>');
     return options.join('');
   }
@@ -297,8 +310,9 @@
     const park = document.getElementById('pl-park').value;
     const rides = (window.PLANNER_DATA.rides && window.PLANNER_DATA.rides[park]) || [];
     const dining = (window.PLANNER_DATA.dining && window.PLANNER_DATA.dining[park]) || [];
+    const resortDining = window.PLANNER_DATA.resortDining || [];
     const rideOptionsHtml = plBuildNameOptionsHtml(rides);
-    const diningOptionsHtml = plBuildNameOptionsHtml(dining);
+    const diningOptionsHtml = plBuildNameOptionsHtml(dining, resortDining);
 
     document.querySelectorAll('select.pl-name').forEach((sel) => {
       sel.innerHTML = sel.dataset.kind === 'dining' ? diningOptionsHtml : rideOptionsHtml;
@@ -364,7 +378,8 @@
     const nameSelect = row.querySelector('select.pl-name');
     const park = document.getElementById('pl-park').value;
     const items = (window.PLANNER_DATA[nameKind === 'dining' ? 'dining' : 'rides'] && window.PLANNER_DATA[nameKind === 'dining' ? 'dining' : 'rides'][park]) || [];
-    nameSelect.innerHTML = plBuildNameOptionsHtml(items);
+    const resortItems = nameKind === 'dining' ? (window.PLANNER_DATA.resortDining || []) : null;
+    nameSelect.innerHTML = plBuildNameOptionsHtml(items, resortItems);
   }
 
   function plMoveRow(btn, direction) {
