@@ -355,6 +355,14 @@ router.get('/about', (req, res) => {
   res.render('about');
 });
 
+router.get('/editorial-standards', (req, res) => {
+  res.render('editorial-standards');
+});
+
+router.get('/corrections-policy', (req, res) => {
+  res.render('corrections');
+});
+
 router.get('/gene-zentko', async (req, res) => {
   const recentArticles = await getArticles({ author: 'Gene Zentko', limit: 6 });
   res.render('gene-zentko', { recentArticles });
