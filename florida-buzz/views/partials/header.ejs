@@ -40,10 +40,13 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Organization",
+    "@type": "NewsMediaOrganization",
     "name": "Florida Buzz",
     "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>",
-    "logo": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/apple-touch-icon.png"
+    "logo": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/apple-touch-icon.png",
+    "masthead": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/about",
+    "ethicsPolicy": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/editorial-standards",
+    "correctionsPolicy": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/corrections-policy"
   }
   </script>
   <script type="application/ld+json">
