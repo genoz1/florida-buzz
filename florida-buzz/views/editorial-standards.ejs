@@ -1,0 +1,33 @@
+<%- include('partials/header', { pageTitle: 'Editorial Standards — The Florida Buzz', category: null, tickerItems: [], canonicalPath: '/editorial-standards' }) %>
+
+<main class="wrap">
+  <article class="article-page">
+    <h1>Editorial Standards</h1>
+    <p class="byline">Last updated: <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' }) %></p>
+
+    <div class="article-body">
+      <p>Florida Buzz is a Florida travel and lifestyle publication owned and operated by Cartzilla LLC. This page explains how we produce our content and the standards we hold it to.</p>
+
+      <h2>How our content is produced</h2>
+      <p>Florida Buzz's news coverage is written with AI assistance under the direct editorial oversight of founder Gene Zentko. Our writing process is built to only use facts present in official press releases, announcements, and other named source material — it does not invent quotes, dates, statistics, or details. Every news article credits its original source by name and links back to it.</p>
+      <p>Our evergreen guides (theme park tips, dining directories, travel planning content, and similar) are researched using current, verifiable information gathered from the web at the time of writing, and are bylined accordingly.</p>
+
+      <h2>Accuracy</h2>
+      <p>We only publish information we can trace back to a verifiable source. When source material doesn't name specific facts — for example, a "best of" or roundup-style story that doesn't actually list real, named places — we do not publish speculative or filler content to fill the gap.</p>
+
+      <h2>Tone and scope</h2>
+      <p>Florida Buzz covers the normal, upbeat local news and lifestyle content Florida residents and visitors care about — theme park updates, travel deals, wildlife and conservation news, weather, festivals, food, beaches, cruises, and space launches. We do not cover deaths, violent crime, active criminal cases, or other content involving serious harm to a named individual. When a story is genuinely ambiguous, we err on the side of not publishing it.</p>
+
+      <h2>Independence and affiliate disclosure</h2>
+      <p>Florida Buzz is an independently owned and operated publication. We are not affiliated with, endorsed by, or sponsored by The Walt Disney Company, Universal Destinations & Experiences, SeaWorld, LEGOLAND, or any other park, resort, or attraction we cover. Some of our articles and guides contain affiliate links (primarily through the Amazon Associates program and select travel-booking partners); we disclose this within any article that includes them, and it never influences the factual content of our reporting. See our <a href="/about">About page</a> for more.</p>
+
+      <h2>Corrections</h2>
+      <p>We take factual accuracy seriously. If you believe something we've published is incorrect, see our <a href="/corrections-policy">Corrections Policy</a> for how to report it and what happens next.</p>
+
+      <h2>Contact</h2>
+      <p>Questions about our editorial process can be sent to <a href="mailto:floridabuzzonline@gmail.com">floridabuzzonline@gmail.com</a>.</p>
+    </div>
+  </article>
+</main>
+
+<%- include('partials/footer') %>

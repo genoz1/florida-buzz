@@ -1,0 +1,23 @@
+<%- include('partials/header', { pageTitle: 'Corrections Policy — The Florida Buzz', category: null, tickerItems: [], canonicalPath: '/corrections-policy' }) %>
+
+<main class="wrap">
+  <article class="article-page">
+    <h1>Corrections Policy</h1>
+    <p class="byline">Last updated: <%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' }) %></p>
+
+    <div class="article-body">
+      <p>Florida Buzz is committed to accurate, factual reporting. We rely on official press releases, announcements, and other named source material for every story we publish — but mistakes can still happen, whether from an error in the original source, a misread detail, or something that changes after publication.</p>
+
+      <h2>How to report an error</h2>
+      <p>If you spot something in one of our articles or guides that's inaccurate, outdated, or unclear, please email <a href="mailto:floridabuzzonline@gmail.com">floridabuzzonline@gmail.com</a> with a link to the page and a short description of the issue. We review every report we receive.</p>
+
+      <h2>What happens next</h2>
+      <p>Once we've verified an error, we correct the article as soon as possible. For minor issues (typos, small factual slips that don't change the substance of the story), we simply fix the text. For more significant errors — ones that materially change the meaning or accuracy of a story — we note within the article that a correction was made, along with what changed.</p>
+
+      <h2>Our standard for corrections</h2>
+      <p>See our <a href="/editorial-standards">Editorial Standards</a> page for more on how our content is produced and reviewed.</p>
+    </div>
+  </article>
+</main>
+
+<%- include('partials/footer') %>

@@ -30,19 +30,17 @@
       "image": [<%- JSON.stringify(article.image_url || placeholderImg(article.category)) %>],
       "datePublished": <%- JSON.stringify(new Date(article.published_at).toISOString()) %>,
       "dateModified": <%- JSON.stringify(new Date(article.published_at).toISOString()) %>,
-      "author": {
-        "@type": "Organization",
-        "name": "Florida Buzz",
-        "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>"
-      },
+      "author": <%- article.is_evergreen ? JSON.stringify({ "@type": "Person", "name": article.source_name, ...(article.source_name === 'Gene Zentko' ? { "url": (process.env.SITE_URL || 'https://thefloridabuzz.com') + '/gene-zentko' } : {}) }) : JSON.stringify({ "@type": "Organization", "name": "Florida Buzz", "url": (process.env.SITE_URL || 'https://thefloridabuzz.com') }) %>,
       "publisher": {
-        "@type": "Organization",
+        "@type": "NewsMediaOrganization",
         "name": "Florida Buzz",
+        "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>",
         "logo": {
           "@type": "ImageObject",
           "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/apple-touch-icon.png"
         }
       },
+      "isAccessibleForFree": true,
       "mainEntityOfPage": {
         "@type": "WebPage",
         "@id": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') + '/article/' + article.slug %>"
