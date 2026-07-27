@@ -10,41 +10,52 @@ const { generateImage } = require('./openai');
 async function generateArticleImage({ title, category, slug }) {
   // Theme parks get a different treatment: attempts at a generic "big thrill ride"
   // scene kept drifting into unrelated territory (or risked looking too close to
-  // real, trademarked parks). A travel-planning flat-lay sidesteps both problems —
-  // it's about the trip, not the place, so there's no real scene to get wrong.
+  // real, trademarked parks). Rather than relying on a single flat-lay still-life
+  // composition for every guide (which reads as repetitive at volume — lots of
+  // "stuff arranged on a table" images back to back), this rotates between several
+  // different composition types, all of which stay clear of any real, recognizable
+  // landmark, logo, or character.
   if (category === 'theme-parks') {
-    const flatLaySystem = `You write concise, vivid prompts for an AI image generator,
-for a Florida travel site called The Florida Buzz. Write a prompt for a travel-planning
-still-life photo — NOT a photo of the actual park, ride, or attraction itself.
+    const themeParkImageSystem = `You write concise, vivid prompts for an AI image generator,
+for a Florida travel site called The Florida Buzz. The image accompanies a theme-park
+planning guide but must NOT depict the actual real park, ride, or attraction itself —
+no real, recognizable landmark, logo, character, or branded attraction of any kind.
 
-Pick 3-4 SPECIFIC objects that relate to what THIS headline is actually about, choosing
-freshly each time rather than defaulting to generic vacation items. Let the topic guide
-the choice — for example (these are illustrative, not a checklist to reuse every time):
-a photo package headline suggests a camera or a stack of printed photos; a dining
-headline suggests a reservation card, a folded napkin, cutlery; a ride-reservation or
-app-based system headline suggests a phone showing a blank/generic app screen and a
-wristband; an annual pass headline suggests a generic membership card and a wallet; a
-parking headline suggests a parking ticket stub and a car key fob; a resort/hotel
-headline suggests a room key card and a luggage tag; a packing/what-to-bring headline
-suggests sunscreen, a hat, a water bottle. Choose whatever set of objects a real person
-would actually be holding or using for THIS specific topic — invent beyond this list
-when a better fit exists.
+Pick ONE of these composition types for this image — vary which one you pick each time,
+don't default to the same one every time:
 
-Also vary the SETTING/composition each time — don't default to the same "overhead flat
-lay on a wooden table" every time. Rotate between options like: overhead flat lay on a
-wooden table, flat lay on a beach towel in the sand, items arranged on a hotel bed or
-nightstand, items held in someone's hands (no visible face), items on a car dashboard or
-passenger seat, items on a café table. Pick whichever setting best fits the topic.
+1. TRAVEL-PLANNING FLAT LAY: 3-4 specific objects relevant to this exact headline (not
+   generic vacation items), arranged in a setting that fits the topic — overhead on a
+   wooden table, on a beach towel, on a hotel bed/nightstand, held in someone's hands
+   (no visible face), on a car dashboard, on a café table.
 
-All objects must be generic/unbranded — no real logos, no readable brand names, no
-copyrighted characters, no recognizable real park architecture or attractions. Bright,
-warm, editorial travel-blog photography style.
+2. GOLDEN-HOUR SILHOUETTE: an INVENTED, generic silhouette scene — for example, an
+   imagined castle-like silhouette (with turret shapes/proportions clearly different
+   from any real park's actual castle), an imagined drop-tower or coaster silhouette,
+   string lights over a generic midway, or people walking toward a generic entrance
+   archway (seen from behind, no visible faces). The specific invented shape should fit
+   the headline's topic — e.g. a fairytale/classic-park topic suggests a castle-like
+   shape, a thrill-ride topic suggests a drop-tower or coaster-track shape. CRITICAL:
+   every shape must be your own invention, not a recognizable trace of any real
+   building — no specific real park's actual silhouette, proportions, or profile.
+
+3. POV / IN-MOTION SHOT: a first-person or over-the-shoulder view — hands holding a
+   phone showing a blank/generic app screen, or a folded paper map, while walking;
+   captures motion and life rather than static objects. No visible faces.
+
+4. WIDE ENVIRONMENTAL SCENE: a wide shot of a generic queue line, string-lit walkway,
+   or crowd of people from behind at golden hour — evokes the feeling of "being at a
+   theme park" through atmosphere and light rather than any specific real structure.
+
+All objects, structures, and scenes must be generic/unbranded — no real logos, no
+readable brand names, no copyrighted characters, no recognizable real park architecture.
+Bright, warm, editorial travel-blog photography style.
 
 Respond with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
 
     let imagePrompt;
     try {
-      imagePrompt = await askClaude(flatLaySystem, `Headline: ${title}`, 200);
+      imagePrompt = await askClaude(themeParkImageSystem, `Headline: ${title}`, 200);
     } catch (err) {
       console.error(`  [error] Could not write image prompt: ${err.message}`);
       return null;
