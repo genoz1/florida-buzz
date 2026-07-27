@@ -98,6 +98,11 @@ the angle, hook, and wording each time, don't just reword the same sentence:
 ${recentCaptions.length ? recentCaptions.map((c) => `- ${c}`).join('\n') : '(no recent posts yet)'}
 
 Keep it under 300 characters, warm and useful in tone, not salesy. No hashtags.
+Lead with the single most concrete, specific detail you can pull from the tool's own
+data — a real number, a specific park or restaurant name, a real feature — rather than
+a vague tease like "you won't believe this tool." A grounded, specific hook creates
+real curiosity; a vague one just reads as hype. Never imply the tool does something it
+doesn't actually do.
 
 Respond ONLY with valid JSON, no markdown fences, no preamble:
 {
