@@ -208,7 +208,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "category": "string, exactly one of: theme-parks, space, beaches, florida-living, wildlife, cruises, food, events — pick whichever ACTUALLY matches this specific story's real subject, regardless of which feed it came from (a ride closure is theme-parks even if it came through a food-focused feed; a restaurant opening is food even if it came through a general Disney feed)",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, 3-5 short paragraphs as <p> tags, original wording, ends with a sentence crediting the source by name",
-  "fb_caption": "string, Facebook post: 1-2 punchy sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags",
+  "fb_caption": "string, Facebook post: 1-2 sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags. Lead with the single most concrete, specific detail from the story — a price, a date, a named ride/restaurant/attraction, a number — rather than a vague tease. The goal is a real curiosity hook grounded in an actual fact from the story, not generic hype. When the story genuinely supports it, a contrarian or 'here's what most people don't know' framing works well, but only when it's actually true — never imply something the article doesn't really say just to make the hook stronger.",
   "pin_title": "string, under 100 characters, descriptive and keyword-rich (Pinterest is a search engine, not a feed — favor clarity over punchiness)",
   "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type (e.g. category, location, activity) without keyword-stuffing"
 }`;
