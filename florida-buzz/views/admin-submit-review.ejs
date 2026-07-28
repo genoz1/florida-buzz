@@ -1,0 +1,104 @@
+<%- include('partials/header', { pageTitle: 'Submit a Review — Florida Buzz Admin', category: null, tickerItems: [], canonicalPath: null }) %>
+
+<main class="wrap">
+  <section class="section" style="max-width:640px; margin:0 auto;">
+    <h1 style="font-family:var(--font-display); font-size:28px; color:var(--teal-900);">Submit a Review</h1>
+    <p style="color:var(--ink-600); margin-top:6px;">Fill in what you can — skip anything that doesn't apply. The more specific and personal the detail, the better the finished review reads. Nothing you don't write here gets added or invented. Takes a minute or two to publish after you submit.</p>
+
+    <% if (error) { %>
+      <div style="background:#fdecea; color:#b3261e; padding:12px 16px; border-radius:8px; margin-top:16px; font-size:14px;"><%= error %></div>
+    <% } %>
+    <% if (result) { %>
+      <div style="background:#e8f5e9; color:#1b5e20; padding:12px 16px; border-radius:8px; margin-top:16px; font-size:14px;"><%= result %></div>
+    <% } %>
+
+    <form method="POST" action="/admin/submit-review" enctype="multipart/form-data" style="margin-top:24px; display:flex; flex-direction:column; gap:16px;">
+      <input type="hidden" name="key" value="<%= adminKey %>">
+
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Review Type</label>
+        <select name="review_type" id="review_type" required style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+          <option value="" selected disabled>Select...</option>
+          <% Object.entries(reviewTypes).forEach(([slug, cfg]) => { %>
+            <option value="<%= slug %>"><%= cfg.label %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div style="border-top:1px solid #eee; padding-top:16px;">
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Your Name (byline)</label>
+        <input type="text" name="reviewer_name" required placeholder="e.g. Gene Zentko" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+      </div>
+
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Your Disney Background</label>
+        <textarea name="reviewer_background" rows="2" placeholder="How long you've been visiting, how often you go now, anything that establishes why readers should trust your take" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px; font-family:inherit;"></textarea>
+      </div>
+
+      <% Object.entries(reviewTypes).forEach(([slug, cfg]) => { %>
+        <div class="review-fieldset" data-type="<%= slug %>" style="display:none; border-top:1px solid #eee; padding-top:16px; display:flex; flex-direction:column; gap:16px;">
+          <% cfg.fields.forEach(f => { %>
+            <div>
+              <label style="display:block; font-weight:600; margin-bottom:6px;"><%= f.label %></label>
+              <% if (f.type === 'textarea') { %>
+                <textarea name="<%= f.name %>" rows="2" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px; font-family:inherit;"></textarea>
+              <% } else { %>
+                <input type="text" name="<%= f.name %>" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% }) %>
+
+      <div style="border-top:1px solid #eee; padding-top:16px;">
+        <label style="display:block; font-weight:600; margin-bottom:6px;">A Real Memory (optional, but great)</label>
+        <textarea name="memory" rows="2" placeholder="A specific story or moment — something that happened, something that's changed over the years" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px; font-family:inherit;"></textarea>
+      </div>
+
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Rating (out of 5, optional)</label>
+        <select name="rating" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+          <option value="">No rating</option>
+          <option value="5">5 — Excellent</option>
+          <option value="4">4 — Very good</option>
+          <option value="3">3 — Good</option>
+          <option value="2">2 — Fair</option>
+          <option value="1">1 — Poor</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Photo (optional)</label>
+        <input type="file" name="photo" accept="image/*" style="width:100%; padding:10px 0;">
+        <p style="color:var(--ink-600); font-size:13px; margin-top:4px;">If you skip this, an AI-generated image will be used instead.</p>
+      </div>
+
+      <button type="submit" class="btn" style="margin-top:8px;">Submit Review</button>
+    </form>
+  </section>
+</main>
+
+<script>
+  (function () {
+    var select = document.getElementById('review_type');
+    var fieldsets = document.querySelectorAll('.review-fieldset');
+
+    function updateVisibleFieldset() {
+      var chosen = select.value;
+      fieldsets.forEach(function (fs) {
+        var isMatch = fs.dataset.type === chosen;
+        fs.style.display = isMatch ? 'flex' : 'none';
+        // Fields in a hidden fieldset shouldn't be submitted or required —
+        // disabling them removes them from the form submission entirely.
+        fs.querySelectorAll('input, textarea').forEach(function (el) {
+          el.disabled = !isMatch;
+        });
+      });
+    }
+
+    select.addEventListener('change', updateVisibleFieldset);
+    updateVisibleFieldset();
+  })();
+</script>
+
+<%- include('partials/footer') %>
