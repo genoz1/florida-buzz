@@ -157,6 +157,7 @@ async function run() {
       body_html: review.body_html,
       category,
       source_name: reviewerName,
+      source_url: process.env.SITE_URL,
       image_url: finalImage,
       fb_caption: review.fb_caption,
       is_evergreen: true,
