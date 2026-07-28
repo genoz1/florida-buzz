@@ -82,13 +82,15 @@ async function normalizeAspectRatio(buffer) {
 }
 
 // Uploads generated image bytes to Supabase Storage for permanent hosting.
-// Returns the permanent public URL, or null if anything fails.
-async function storeGeneratedImage(imageBuffer, filename) {
+// Returns the permanent public URL, or null if anything fails. contentType
+// defaults to PNG (what every AI-generated image actually is) but can be
+// overridden — e.g. for a real uploaded photo, which is usually a JPEG.
+async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/png') {
   if (!supabase) return null;
   try {
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(filename, imageBuffer, { contentType: 'image/png', upsert: true });
+      .upload(filename, imageBuffer, { contentType, upsert: true });
 
     if (uploadError) throw uploadError;
 
