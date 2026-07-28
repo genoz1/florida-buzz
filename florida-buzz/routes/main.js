@@ -710,7 +710,10 @@ router.post('/admin/submit-review', reviewPhotoUpload.single('photo'), async (re
       PHOTO_URL: photoUrl || '',
     },
     detached: true,
-    stdio: 'ignore',
+    // 'inherit' (not 'ignore') so this script's console.log/console.error
+    // output shows up in DigitalOcean's Runtime Logs — without this, a
+    // failure in the background writer is completely invisible anywhere.
+    stdio: 'inherit',
   });
   child.unref();
 
