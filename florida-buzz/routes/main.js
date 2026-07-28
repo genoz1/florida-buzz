@@ -641,6 +641,15 @@ const REVIEW_TYPES = {
 // Web-form alternative to the docx templates — same questions, but with a
 // type dropdown (so the right fields show for restaurant/attraction/resort/
 // cruise) and a real photo upload instead of describing a photo in a doc.
+// Reviewer roster — each entry's background is pre-filled into the form
+// when that reviewer is selected, so it doesn't need retyping every time.
+// Add a new entry here whenever another reviewer (e.g. a niece) joins.
+const REVIEWERS = {
+  'Gene Zentko': {
+    background: 'I\u2019ve been going to Walt Disney World in Orlando every year for 50 years, since I was 18 months old. Since moving to Florida, I go up to a few times a week. I remember the openings of EPCOT, Hollywood Studios, and Animal Kingdom. I\u2019ve also been on several Disney cruises. My kids grew up going to Disney with me and are now 21 and 18.',
+  },
+};
+
 router.get('/admin/submit-review', (req, res) => {
   const { key } = req.query;
 
@@ -650,6 +659,7 @@ router.get('/admin/submit-review', (req, res) => {
 
   res.render('admin-submit-review', {
     reviewTypes: REVIEW_TYPES,
+    reviewers: REVIEWERS,
     result: null,
     error: null,
     adminKey: key,
@@ -669,6 +679,7 @@ router.post('/admin/submit-review', reviewPhotoUpload.single('photo'), async (re
   if (!typeConfig || !reviewer_name || !subjectName) {
     return res.render('admin-submit-review', {
       reviewTypes: REVIEW_TYPES,
+      reviewers: REVIEWERS,
       result: null,
       error: 'Please choose a review type and fill in at least the reviewer name and subject name.',
       adminKey: key,
@@ -719,6 +730,7 @@ router.post('/admin/submit-review', reviewPhotoUpload.single('photo'), async (re
 
   res.render('admin-submit-review', {
     reviewTypes: REVIEW_TYPES,
+    reviewers: REVIEWERS,
     result: `Started writing the ${typeConfig.label} review of "${subjectName}" in the background. This takes a minute or two — check the site or your Facebook Page shortly to confirm it published.`,
     error: null,
     adminKey: key,
