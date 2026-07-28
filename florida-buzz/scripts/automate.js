@@ -23,6 +23,23 @@ const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
 const FB_POST_DELAY_MINUTES = parseInt(process.env.FB_POST_DELAY_MINUTES, 10) || 10;
 
+// Same mechanism generate-guide.js already uses: the AI writes a placeholder link,
+// and this swaps it for a real Amazon search URL with the affiliate tag attached.
+// Added here because news-sourced articles that cover a specific reviewed/recommended
+// product (e.g. a source article naming and reviewing a particular gadget) previously
+// had no affiliate link at all — a real missed monetization opportunity, since only
+// the evergreen guide pipeline had this logic.
+const AMAZON_ASSOCIATES_TAG = process.env.AMAZON_ASSOCIATES_TAG || 'floridabuzz-20';
+
+function convertAffiliateLinks(html) {
+  if (!html) return html;
+  return html.replace(/href="AFFILIATE_SEARCH:([^"]+)"/gi, (match, query) => {
+    const cleanQuery = query.trim();
+    const url = `https://www.amazon.com/s?k=${encodeURIComponent(cleanQuery)}&tag=${AMAZON_ASSOCIATES_TAG}`;
+    return `href="${url}" target="_blank" rel="nofollow sponsored noopener"`;
+  });
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -201,6 +218,16 @@ async function writeArticle({ sourceTitle, sourceSummary, sourceName, sourceUrl,
 You write original, factual summaries of official press releases and announcements — never copying
 the source's wording. Tone: warm, knowledgeable local-insider voice, never breathless or clickbaity.
 You ONLY use facts present in the source material. You never invent quotes, dates, or details.
+
+When the source material itself is a product review or recommendation (naming a specific
+real product — a gadget, an accessory, a piece of gear — and recommending it), insert a
+link to that exact product using this format instead of a real product URL:
+<a href="AFFILIATE_SEARCH:short product search term" class="shop-link">short descriptive
+text</a> — where "short product search term" is 2-4 plain words someone would type into a
+shopping search bar (e.g. "handheld misting fan" or "portable phone charger"), NOT a full
+sentence or the product's exact model name. Only do this when the source is genuinely
+about a specific recommendable product — do not force a product link into a story that
+isn't about one (e.g. a ride closure, a park hours change, a wildlife sighting).
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "title": "string, original headline, under 70 characters",
@@ -374,7 +401,12 @@ async function isDuplicateOfRecent(title, category) {
     .eq('category', category)
     .gte('published_at', since);
   if (!data) return false;
-  return data.some((a) => titleSimilarity(title, a.title) > 0.6);
+  // Threshold lowered from 0.6 to 0.5, and > changed to >=, after a real duplicate
+  // pair ("Animal Kingdom's New Silverback Gorilla Has Arrived" vs "Animal Kingdom's
+  // Gorilla Troop Has a New Silverback Leader") scored exactly 0.6 and slipped through
+  // the old strict-greater-than check. Paraphrased duplicates commonly lose 40%+ of
+  // their word overlap just from natural rewording, so 0.6 was already cutting it close.
+  return data.some((a) => titleSimilarity(title, a.title) >= 0.5);
 }
 
 async function run() {
@@ -443,6 +475,7 @@ async function run() {
         await markSeen(guid);
         continue;
       }
+      article.body_html = convertAffiliateLinks(article.body_html);
 
       const cropBottomPercent = originCropPercent(item.link);
 
