@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../lib/supabase');
+const { supabase, storeGeneratedImage } = require('../lib/supabase');
 const { spawn } = require('child_process');
 const path = require('path');
+const multer = require('multer');
+const reviewPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 const { logNotFound } = require('../lib/notFoundLog');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
@@ -576,6 +578,145 @@ router.post('/admin/submit-topic', (req, res) => {
   res.render('admin-submit-topic', {
     categoryLabels: CATEGORY_LABELS,
     result: `Started generating "${title}" in the background. This takes a couple minutes — check the site or your Facebook Page shortly to confirm it published.`,
+    error: null,
+    adminKey: key,
+  });
+});
+
+// Config shared by the GET (renders the form) and POST (validates + spawns
+// the writer) routes below. Each review type maps to the site category it
+// publishes into (reviews aren't their own category — they're a content
+// *type*, like evergreen guides, that lives inside whichever category
+// actually fits the subject), plus the specific fields that type needs.
+const REVIEW_TYPES = {
+  restaurant: {
+    label: 'Restaurant',
+    category: 'food',
+    fields: [
+      { name: 'subject_name', label: 'Restaurant name & location', type: 'text' },
+      { name: 'visits', label: 'Times eaten here / over what span', type: 'text' },
+      { name: 'standout_dishes', label: 'Standout dishes — what to order', type: 'textarea' },
+      { name: 'skip', label: 'Anything to skip', type: 'textarea' },
+      { name: 'atmosphere', label: 'Atmosphere & service notes', type: 'textarea' },
+      { name: 'value', label: 'Value & who it\u2019s best for', type: 'textarea' },
+    ],
+  },
+  attraction: {
+    label: 'Attraction (New or Renovated)',
+    category: 'theme-parks',
+    fields: [
+      { name: 'subject_name', label: 'Attraction name & location (park/land)', type: 'text' },
+      { name: 'new_or_renovated', label: 'New, or renovated? If renovated, what changed?', type: 'textarea' },
+      { name: 'visits', label: 'Times ridden / since when', type: 'text' },
+      { name: 'standout', label: 'What stands out (theming, story, intensity)', type: 'textarea' },
+      { name: 'falls_flat', label: 'Anything that falls flat', type: 'textarea' },
+      { name: 'practical', label: 'Wait times, best time to ride, restrictions', type: 'textarea' },
+      { name: 'value', label: 'Who it\u2019s best for (thrill level, age range)', type: 'textarea' },
+    ],
+  },
+  resort: {
+    label: 'Resort / Hotel',
+    category: 'florida-living',
+    fields: [
+      { name: 'subject_name', label: 'Resort name & category (Value/Moderate/Deluxe)', type: 'text' },
+      { name: 'visits', label: 'Times stayed / over what span', type: 'text' },
+      { name: 'rooms', label: 'Rooms & theming — what stands out', type: 'textarea' },
+      { name: 'amenities', label: 'Amenities & location (pools, dining, transport)', type: 'textarea' },
+      { name: 'value', label: 'Value & who it\u2019s best for', type: 'textarea' },
+    ],
+  },
+  cruise: {
+    label: 'Disney Cruise',
+    category: 'cruises',
+    fields: [
+      { name: 'subject_name', label: 'Ship, itinerary & length of cruise', type: 'text' },
+      { name: 'visits', label: 'How many cruises / which ships', type: 'text' },
+      { name: 'highlights', label: 'Onboard highlights (dining, entertainment, rooms)', type: 'textarea' },
+      { name: 'castaway', label: 'Castaway Cay / Lookout Cay notes', type: 'textarea' },
+      { name: 'value', label: 'Value & who it\u2019s best for', type: 'textarea' },
+    ],
+  },
+};
+
+// Web-form alternative to the docx templates — same questions, but with a
+// type dropdown (so the right fields show for restaurant/attraction/resort/
+// cruise) and a real photo upload instead of describing a photo in a doc.
+router.get('/admin/submit-review', (req, res) => {
+  const { key } = req.query;
+
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+
+  res.render('admin-submit-review', {
+    reviewTypes: REVIEW_TYPES,
+    result: null,
+    error: null,
+    adminKey: key,
+  });
+});
+
+router.post('/admin/submit-review', reviewPhotoUpload.single('photo'), async (req, res) => {
+  const { key, review_type, reviewer_name, reviewer_background, memory, rating } = req.body;
+
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+
+  const typeConfig = REVIEW_TYPES[review_type];
+  const subjectName = req.body.subject_name;
+
+  if (!typeConfig || !reviewer_name || !subjectName) {
+    return res.render('admin-submit-review', {
+      reviewTypes: REVIEW_TYPES,
+      result: null,
+      error: 'Please choose a review type and fill in at least the reviewer name and subject name.',
+      adminKey: key,
+    });
+  }
+
+  // Only keep the fields that actually belong to this review type — anything
+  // else in req.body (from other hidden fieldsets in the form) is ignored.
+  const answers = {};
+  typeConfig.fields.forEach((f) => {
+    if (req.body[f.name]) answers[f.name] = req.body[f.name];
+  });
+
+  // The photo (if provided) has to be uploaded here, inside the request —
+  // it can't be handed to the background script as raw bytes via env vars.
+  // Same permanent storage used for every other article image.
+  let photoUrl = null;
+  if (req.file) {
+    photoUrl = await storeGeneratedImage(req.file.buffer, `review-${Date.now()}.jpg`, req.file.mimetype || 'image/jpeg');
+    if (!photoUrl) {
+      console.error('  [warn] Review photo upload failed — falling back to an AI-generated image instead.');
+    }
+  }
+
+  // Same reasoning as /admin/submit-topic: writing + posting to four
+  // platforms takes longer than an HTTP request should wait for.
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'submit-review.js');
+  const child = spawn('node', [scriptPath], {
+    env: {
+      ...process.env,
+      REVIEW_TYPE: review_type,
+      REVIEW_CATEGORY: typeConfig.category,
+      REVIEWER_NAME: reviewer_name,
+      REVIEWER_BACKGROUND: reviewer_background || '',
+      SUBJECT_NAME: subjectName,
+      MEMORY: memory || '',
+      RATING: rating || '',
+      ANSWERS_JSON: JSON.stringify(answers),
+      PHOTO_URL: photoUrl || '',
+    },
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+
+  res.render('admin-submit-review', {
+    reviewTypes: REVIEW_TYPES,
+    result: `Started writing the ${typeConfig.label} review of "${subjectName}" in the background. This takes a minute or two — check the site or your Facebook Page shortly to confirm it published.`,
     error: null,
     adminKey: key,
   });
