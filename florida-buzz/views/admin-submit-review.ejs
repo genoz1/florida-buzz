@@ -26,13 +26,19 @@
       </div>
 
       <div style="border-top:1px solid #eee; padding-top:16px;">
-        <label style="display:block; font-weight:600; margin-bottom:6px;">Your Name (byline)</label>
-        <input type="text" name="reviewer_name" required placeholder="e.g. Gene Zentko" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+        <label style="display:block; font-weight:600; margin-bottom:6px;">Reviewer</label>
+        <select name="reviewer_name" id="reviewer_name" required style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px;">
+          <option value="" selected disabled>Select...</option>
+          <% Object.keys(reviewers).forEach(name => { %>
+            <option value="<%= name %>"><%= name %></option>
+          <% }) %>
+        </select>
       </div>
 
       <div>
         <label style="display:block; font-weight:600; margin-bottom:6px;">Your Disney Background</label>
-        <textarea name="reviewer_background" rows="2" placeholder="How long you've been visiting, how often you go now, anything that establishes why readers should trust your take" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px; font-family:inherit;"></textarea>
+        <textarea name="reviewer_background" id="reviewer_background" rows="2" placeholder="How long you've been visiting, how often you go now, anything that establishes why readers should trust your take" style="width:100%; padding:10px 12px; border:1px solid #ccc; border-radius:6px; font-size:15px; font-family:inherit;"></textarea>
+        <p style="color:var(--ink-600); font-size:13px; margin-top:4px;">Auto-fills when you pick a reviewer above — feel free to edit it for this specific review.</p>
       </div>
 
       <% Object.entries(reviewTypes).forEach(([slug, cfg]) => { %>
@@ -80,6 +86,26 @@
 
 <script>
   (function () {
+    var REVIEWER_BACKGROUNDS = <%- JSON.stringify(Object.fromEntries(Object.entries(reviewers).map(([name, r]) => [name, r.background]))) %>;
+
+    var reviewerSelect = document.getElementById('reviewer_name');
+    var backgroundField = document.getElementById('reviewer_background');
+    var userHasEditedBackground = false;
+
+    backgroundField.addEventListener('input', function () {
+      userHasEditedBackground = true;
+    });
+
+    reviewerSelect.addEventListener('change', function () {
+      // Only auto-fill if the field is empty or still holds a previous
+      // reviewer's auto-filled text — don't overwrite something they
+      // already started typing for this specific review.
+      if (!userHasEditedBackground || !backgroundField.value.trim()) {
+        backgroundField.value = REVIEWER_BACKGROUNDS[reviewerSelect.value] || '';
+        userHasEditedBackground = false;
+      }
+    });
+
     var select = document.getElementById('review_type');
     var fieldsets = document.querySelectorAll('.review-fieldset');
 
