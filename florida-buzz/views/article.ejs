@@ -3,9 +3,20 @@
 <main class="wrap">
   <article class="article-page">
     <span class="eyebrow"><%= categoryLabels[article.category] %></span>
+    <% if (article.is_review) { %>
+      <% const REVIEW_TYPE_LABELS = { restaurant: 'Restaurant Review', attraction: 'Attraction Review', resort: 'Resort Review', cruise: 'Cruise Review' }; %>
+      <span class="eyebrow" style="background: var(--gold-500); color: var(--ink-900); margin-left: 8px;"><%= REVIEW_TYPE_LABELS[article.review_type] || 'Personal Review' %></span>
+    <% } %>
     <h1><%= article.title %></h1>
     <p class="dek"><%= article.dek %></p>
-    <p class="byline">By <%= article.is_evergreen ? article.source_name : 'The Florida Buzz staff' %> &middot; <%= timeAgo(article.published_at) %></p>
+    <p class="byline">
+      <% if (article.is_review) { %>
+        A Personal Review by <%= article.source_name %>
+      <% } else { %>
+        By <%= article.is_evergreen ? article.source_name : 'The Florida Buzz staff' %>
+      <% } %>
+      &middot; <%= timeAgo(article.published_at) %>
+    </p>
 
     <div class="hero-image" style="margin: 22px 0;">
       <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>" width="800" height="600" loading="eager" onerror="this.onerror=null;this.src='<%= placeholderImg(article.category) %>';">
@@ -48,13 +59,43 @@
     }
     </script>
 
-    <% if (article.is_evergreen) { %>
-    <p style="background: var(--sand-100); border-left: 3px solid var(--gold-500); padding: 12px 16px; font-size: 13px; color: var(--ink-600); margin-top: 24px;">
-      <strong>Heads up:</strong> this guide may contain affiliate links. If you book or buy through them, we may earn a small commission at no extra cost to you — it helps keep The Florida Buzz running.
-    </p>
+    <% if (article.is_review) { %>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": <%- JSON.stringify({ restaurant: 'Restaurant', attraction: 'TouristAttraction', resort: 'LodgingBusiness', cruise: 'Thing' }[article.review_type] || 'Thing') %>,
+        "name": <%- JSON.stringify(article.review_subject || article.title) %>
+      },
+      "author": {
+        "@type": "Person",
+        "name": <%- JSON.stringify(article.source_name) %>
+      },
+      <% if (article.review_rating) { %>
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": <%- JSON.stringify(article.review_rating) %>,
+        "bestRating": 5,
+        "worstRating": 1
+      },
+      <% } %>
+      "datePublished": <%- JSON.stringify(new Date(article.published_at).toISOString()) %>
+    }
+    </script>
     <% } %>
 
     <% if (article.is_evergreen) { %>
+    <p style="background: var(--sand-100); border-left: 3px solid var(--gold-500); padding: 12px 16px; font-size: 13px; color: var(--ink-600); margin-top: 24px;">
+      <strong>Heads up:</strong> this <%= article.is_review ? 'review' : 'guide' %> may contain affiliate links. If you book or buy through them, we may earn a small commission at no extra cost to you — it helps keep The Florida Buzz running.
+    </p>
+    <% } %>
+
+    <% if (article.is_review) { %>
+    <p class="source-note">
+      This is a personal review based on <%= article.source_name %>'s own firsthand visits and experience — not staff-reported news or AI-researched content.
+    </p>
+    <% } else if (article.is_evergreen) { %>
     <p class="source-note">
       Written and researched by <%= article.source_name %>.
     </p>
