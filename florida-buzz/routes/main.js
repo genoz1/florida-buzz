@@ -672,6 +672,34 @@ const REVIEWERS = {
   },
 };
 
+// One-off way to confirm the newsletter sending domain actually works,
+// without touching the real subscribers table or the daily digest logic.
+// Visit /admin/test-email?key=...&to=you@example.com to send a single,
+// real test email through whatever NEWSLETTER_FROM_EMAIL is currently set to.
+router.get('/admin/test-email', async (req, res) => {
+  const { key, to } = req.query;
+
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+
+  if (!to || !to.includes('@')) {
+    return res.send('Add ?to=you@example.com to the URL to choose where the test email goes.');
+  }
+
+  try {
+    const { sendEmail } = require('../lib/resend');
+    await sendEmail({
+      to,
+      subject: 'Florida Buzz — test email',
+      html: `<p>If you're reading this, your newsletter sending domain is fully wired up and working.</p><p>Sent from: ${process.env.NEWSLETTER_FROM_EMAIL || 'Florida Buzz <newsletter@thefloridabuzz.com> (default — NEWSLETTER_FROM_EMAIL not set yet)'}</p>`,
+    });
+    res.send(`Sent! Check ${to} (and its spam folder, just in case).`);
+  } catch (err) {
+    res.send(`Failed: ${err.message}`);
+  }
+});
+
 router.get('/admin/submit-review', (req, res) => {
   const { key } = req.query;
 
