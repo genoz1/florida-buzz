@@ -700,6 +700,52 @@ router.get('/admin/test-email', async (req, res) => {
   }
 });
 
+// Sends the REAL daily digest template with real recent articles — but only
+// to the one address you ask for, never to the actual subscribers table.
+// Use this to see what subscribers would actually receive before trusting
+// the live daily send.
+router.get('/admin/preview-newsletter', async (req, res) => {
+  const { key, to } = req.query;
+
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+
+  if (!to || !to.includes('@')) {
+    return res.send('Add ?to=you@example.com to the URL to choose where the preview goes.');
+  }
+
+  if (!supabase) {
+    return res.send('Supabase is not configured — cannot fetch articles for the preview.');
+  }
+
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: articles, error: articlesError } = await supabase
+    .from('articles')
+    .select('*')
+    .gte('published_at', oneDayAgo)
+    .order('published_at', { ascending: false })
+    .limit(10);
+
+  if (articlesError) {
+    return res.send(`Could not fetch articles: ${articlesError.message}`);
+  }
+  if (!articles || articles.length === 0) {
+    return res.send('No articles published in the last 24 hours — nothing to preview right now.');
+  }
+
+  try {
+    const { buildDigestHtml } = require('../scripts/newsletter');
+    const { sendEmail } = require('../lib/resend');
+    const unsubscribeUrl = `${process.env.SITE_URL}/unsubscribe?email=${encodeURIComponent(to)}`;
+    const html = buildDigestHtml(articles, unsubscribeUrl);
+    await sendEmail({ to, subject: `[PREVIEW] Florida Buzz: ${articles.length} stories from today`, html });
+    res.send(`Sent a preview of the real digest (${articles.length} articles) to ${to}.`);
+  } catch (err) {
+    res.send(`Failed: ${err.message}`);
+  }
+});
+
 router.get('/admin/submit-review', (req, res) => {
   const { key } = req.query;
 
