@@ -121,7 +121,15 @@ async function run() {
   console.log(`\n=== Done: ${sent} sent, ${failed} failed ===`);
 }
 
-run().catch((err) => {
-  console.error('Fatal error in newsletter run:', err);
-  process.exit(1);
-});
+// Only auto-runs when executed directly (node scripts/newsletter.js or the
+// cron job) — NOT when required as a module elsewhere (e.g. the admin
+// preview route below, which only wants buildDigestHtml, not a live send
+// to every real subscriber).
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in newsletter run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { buildDigestHtml };
