@@ -4,6 +4,10 @@
       <p>One email a day. The best of Florida — theme parks, beaches, space launches, and hidden gems.</p>
       <form class="newsletter-form" action="/subscribe" method="POST">
         <input type="email" name="email" placeholder="you@email.com" required>
+        <!-- Honeypot: invisible to real people, but bots that blindly fill every
+             field in a form will often fill this one in too. -->
+        <input type="text" name="website" style="position:absolute; left:-9999px;" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <input type="hidden" name="form_rendered_at" value="<%= Date.now() %>">
         <button type="submit" class="btn">Subscribe</button>
       </form>
     </div>
