@@ -397,10 +397,21 @@ router.get('/unsubscribe', async (req, res) => {
 });
 
 router.post('/subscribe', async (req, res) => {
-  const { email } = req.body;
+  const { email, website, form_rendered_at } = req.body;
   if (!email || !email.includes('@')) {
     return res.redirect('/?subscribed=error');
   }
+
+  // Anti-bot checks. Both fail silently with the normal "success" redirect —
+  // never a distinct error — so a bot can't tell its submission was caught
+  // and adjust. A real visitor never sees or triggers either of these.
+  const honeypotFilled = website && website.trim().length > 0;
+  const renderedAt = parseInt(form_rendered_at, 10) || 0;
+  const submittedTooFast = renderedAt > 0 && Date.now() - renderedAt < 3000;
+  if (honeypotFilled || submittedTooFast) {
+    return res.redirect('/?subscribed=1');
+  }
+
   if (supabase) {
     const { error } = await supabase.from('subscribers').upsert(
       { email: email.toLowerCase().trim(), active: true },
