@@ -16,7 +16,7 @@ const CATEGORY_LABELS = {
   events: '🎉 Events',
 };
 
-function buildDigestHtml(articles) {
+function buildDigestHtml(articles, unsubscribeUrl) {
   const rows = articles
     .map(
       (a) => `
@@ -48,6 +48,7 @@ function buildDigestHtml(articles) {
     </div>
     <p style="text-align: center; font-size: 11px; color: #4a5350; margin-top: 16px;">
       You're getting this because you signed up at thefloridabuzz.com.
+      <a href="${unsubscribeUrl}" style="color: #4a5350;">Unsubscribe</a>
     </p>
   </div>`;
 }
@@ -96,12 +97,13 @@ async function run() {
   }
 
   console.log(`Sending to ${subscribers.length} subscribers...`);
-  const html = buildDigestHtml(articles);
   const subject = `Florida Buzz: ${articles.length} stories from today`;
 
   let sent = 0;
   let failed = 0;
   for (const sub of subscribers) {
+    const unsubscribeUrl = `${SITE_URL}/unsubscribe?email=${encodeURIComponent(sub.email)}`;
+    const html = buildDigestHtml(articles, unsubscribeUrl);
     if (DRY_RUN) {
       console.log(`  [dry-run] Would send to: ${sub.email}`);
       sent++;
