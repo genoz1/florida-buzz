@@ -374,6 +374,28 @@ router.get('/terms', (req, res) => {
   res.render('terms');
 });
 
+// Simple one-click unsubscribe — matches the promise already made in the
+// Privacy Policy ("unsubscribe using the link in any newsletter email"),
+// which wasn't actually wired up to anything until now. No confirmation
+// step on purpose: a second "are you sure" page is exactly the kind of
+// friction CAN-SPAM's one-click requirement is meant to prevent.
+router.get('/unsubscribe', async (req, res) => {
+  const { email } = req.query;
+  let message = 'Please provide a valid email address to unsubscribe.';
+
+  if (email && email.includes('@') && supabase) {
+    const { error } = await supabase
+      .from('subscribers')
+      .update({ active: false })
+      .eq('email', email.toLowerCase().trim());
+    message = error
+      ? 'Something went wrong — please try again, or just ignore future emails.'
+      : `${email} has been unsubscribed and won't receive any more emails from us.`;
+  }
+
+  res.render('unsubscribe', { message });
+});
+
 router.post('/subscribe', async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
