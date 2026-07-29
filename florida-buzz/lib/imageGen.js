@@ -91,6 +91,13 @@ Use the specific headline to pick a specific, relevant scene — not just the ca
 A springs guide should show a natural spring (clear blue-green water, limestone, tubers
 or swimmers), not a generic beach.
 
+Never depict anything genuinely disgusting, off-putting, or appetite-killing — no pests,
+insects, mold, filth, or spoiled food — even when the story itself is literally about a
+health code violation, pest sighting, or inspection failure. For topics like that, depict
+something adjacent and tasteful instead: a health inspector's clipboard, a "temporarily
+closed" sign on a restaurant door, an empty dining room, a generic restaurant exterior —
+never the literal violation itself.
+
 Write a prompt for a generic, warm, photorealistic scene that captures the general mood
 and setting of the article while staying geographically accurate to Florida. Respond
 with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
