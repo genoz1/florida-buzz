@@ -87,31 +87,58 @@ async function createPost({ text, imageUrl }) {
     // Step 2: wait for Threads to finish processing (only really matters for images).
     if (imageUrl) {
       await waitForContainerReady(containerId, accessToken);
+      // Meta's own "FINISHED" status has a documented quirk: it can report
+      // ready a beat before the container is genuinely available to publish,
+      // causing an immediate "Media Not Found" on the very next call. A short
+      // grace pause here costs nothing and avoids hitting that window.
+      await sleep(3000);
     }
 
-    // Step 3: publish the container.
-    const publishRes = await fetch(`${GRAPH_BASE}/${userId}/threads_publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        creation_id: containerId,
-        access_token: accessToken,
-      }),
-    });
-    const publishData = await publishRes.json();
+    // Step 3: publish the container. If this fails with the specific
+    // "container not found" timing quirk, retry a couple of times with a
+    // short pause first — this is usually a beat too early, not a real
+    // failure, and often succeeds on the very next attempt.
+    const MAX_PUBLISH_ATTEMPTS = 3;
+    let publishData;
+    let lastPublishError;
+    for (let attempt = 1; attempt <= MAX_PUBLISH_ATTEMPTS; attempt++) {
+      const publishRes = await fetch(`${GRAPH_BASE}/${userId}/threads_publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creation_id: containerId,
+          access_token: accessToken,
+        }),
+      });
+      publishData = await publishRes.json();
 
-    if (!publishRes.ok) {
-      // Meta said this failed — but that response can be wrong under
-      // rate-limiting/transient conditions. Check Threads' actual recent
-      // posts before believing it.
-      console.log('  Threads reported an error on publish — double-checking whether it actually posted anyway...');
+      if (publishRes.ok) {
+        lastPublishError = null;
+        break;
+      }
+
+      lastPublishError = publishData;
+      const isNotFoundTimingIssue = publishData?.error?.code === 24;
+      if (isNotFoundTimingIssue && attempt < MAX_PUBLISH_ATTEMPTS) {
+        console.log(`  Threads publish attempt ${attempt} hit the "not found" timing issue — retrying in a few seconds...`);
+        await sleep(4000);
+        continue;
+      }
+      break;
+    }
+
+    if (lastPublishError) {
+      // Still failing after retries — but that response can still be wrong
+      // under rate-limiting/transient conditions. Check Threads' actual
+      // recent posts before believing it.
+      console.log('  Threads reported an error on publish after retries — double-checking whether it actually posted anyway...');
       const actuallyPosted = await verifyRecentPublish(userId, accessToken, text);
       if (actuallyPosted) {
         console.log('  Confirmed: it posted successfully despite the error response. Logging as success.');
         await logPost({ platform: 'threads', status: 'success', detail: `${(text || '').slice(0, 100)} (recovered after false-error response)` });
         return { recovered: true };
       }
-      throw new Error(`Threads publish failed: ${JSON.stringify(publishData)}`);
+      throw new Error(`Threads publish failed: ${JSON.stringify(lastPublishError)}`);
     }
 
     await logPost({ platform: 'threads', status: 'success', detail: text ? text.slice(0, 100) : null });
