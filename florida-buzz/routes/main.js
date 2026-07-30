@@ -24,6 +24,7 @@ const CATEGORY_LABELS = {
   cruises: '🚢 Cruises',
   food: '🍔 Food',
   events: '🎉 Events',
+  'travel-deals': '🏷️ Travel Deals',
 };
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS);
 
@@ -98,6 +99,11 @@ const CATEGORY_SEO = {
     title: 'Florida Events & Festivals',
     description: 'Festivals, fireworks, holiday events, and things to do across Florida.',
     intro: 'Festivals, fireworks, holiday events, and things to do across Florida.',
+  },
+  'travel-deals': {
+    title: 'Florida Travel Deals',
+    description: 'Ticket discounts, hotel deals, and money-saving finds for Disney, Universal, and Florida travel.',
+    intro: 'Ticket discounts, hotel deals, and money-saving finds for Disney, Universal, and Florida travel.',
   },
 };
 
