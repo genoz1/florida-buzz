@@ -20,12 +20,13 @@ const FORCE_TOPIC = process.env.FORCE_TOPIC || null;
 const FORCE_TITLE = process.env.FORCE_TITLE || null;
 
 const CATEGORY_WEIGHTS = {
-  'theme-parks': 45,
+  'theme-parks': 38,
   beaches: 18,
   events: 12,
   wildlife: 12,
+  'travel-deals': 10,
   food: 6,
-  'florida-living': 4,
+  'florida-living': 3,
   cruises: 2,
   space: 1,
 };
@@ -46,6 +47,7 @@ const CATEGORY_AFFINITY = {
   'florida-living': ['events', 'food', 'beaches'],
   cruises: ['beaches', 'food', 'events'],
   space: ['theme-parks', 'events', 'florida-living'],
+  'travel-deals': ['theme-parks', 'cruises', 'florida-living'],
 };
 
 const RELATED_GUIDES_COUNT = 3;
