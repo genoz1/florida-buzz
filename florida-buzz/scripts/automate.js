@@ -232,7 +232,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "title": "string, original headline, under 70 characters",
   "meta_title": "string, under 60 characters, written the way a person would phrase a Google search for this topic — lead with the specific place, attraction, or subject name, plus what changed (e.g. 'Magic Kingdom Lightning Lane Prices July 2026' not a clever headline). This is for the browser tab and Google search result, not the on-page headline — it should read naturally, not keyword-stuffed.",
-  "category": "string, exactly one of: theme-parks, space, beaches, florida-living, wildlife, cruises, food, events — pick whichever ACTUALLY matches this specific story's real subject, regardless of which feed it came from (a ride closure is theme-parks even if it came through a food-focused feed; a restaurant opening is food even if it came through a general Disney feed)",
+  "category": "string, exactly one of: theme-parks, space, beaches, florida-living, wildlife, cruises, food, events, travel-deals — pick whichever ACTUALLY matches this specific story's real subject, regardless of which feed it came from (a ride closure is theme-parks even if it came through a food-focused feed; a restaurant opening is food even if it came through a general Disney feed; a hotel discount, ticket sale, or airline fare deal is travel-deals even if the property itself is a theme-park resort)",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, 3-5 short paragraphs as <p> tags, original wording, ends with a sentence crediting the source by name",
   "fb_caption": "string, Facebook post: 1-2 sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags. Lead with the single most concrete, specific detail from the story — a price, a date, a named ride/restaurant/attraction, a number — rather than a vague tease. The goal is a real curiosity hook grounded in an actual fact from the story, not generic hype. When the story genuinely supports it, a contrarian or 'here's what most people don't know' framing works well, but only when it's actually true — never imply something the article doesn't really say just to make the hook stronger.",
@@ -479,7 +479,7 @@ async function run() {
 
       const cropBottomPercent = originCropPercent(item.link);
 
-      const VALID_CATEGORIES = ['theme-parks', 'space', 'beaches', 'florida-living', 'wildlife', 'cruises', 'food', 'events'];
+      const VALID_CATEGORIES = ['theme-parks', 'space', 'beaches', 'florida-living', 'wildlife', 'cruises', 'food', 'events', 'travel-deals'];
       const realCategory = VALID_CATEGORIES.includes(article.category) ? article.category : source.category;
       if (realCategory !== source.category) {
         console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
