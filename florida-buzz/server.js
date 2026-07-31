@@ -39,6 +39,7 @@ const GENEZENTKO_PAGES = {
   '/insights/solving-problems-not-selling-products': 'genezentko-solving-problems',
   '/insights/features-tell-benefits-sell': 'genezentko-features-benefits',
   '/insights/people-buy-emotionally-justify-logically': 'genezentko-emotional-logical',
+  '/profiles': 'genezentko-profiles',
 };
 app.use((req, res, next) => {
   if (GENEZENTKO_HOSTS.includes(req.hostname)) {
