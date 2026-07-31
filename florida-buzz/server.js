@@ -43,6 +43,15 @@ const GENEZENTKO_PAGES = {
 };
 app.use((req, res, next) => {
   if (GENEZENTKO_HOSTS.includes(req.hostname)) {
+    if (req.path === '/sitemap.xml') {
+      // Auto-generated from GENEZENTKO_PAGES above — every page added there
+      // automatically appears here too, so this can never drift out of sync.
+      const urls = Object.keys(GENEZENTKO_PAGES)
+        .map((path) => `  <url><loc>https://genezentko.com${path === '/' ? '' : path}</loc></url>`)
+        .join('\n');
+      res.set('Content-Type', 'application/xml');
+      return res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
+    }
     const view = GENEZENTKO_PAGES[req.path];
     if (view) return res.render(view);
     return res.status(404).send('Not found');
