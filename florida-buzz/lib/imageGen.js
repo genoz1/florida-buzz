@@ -24,10 +24,19 @@ no real, recognizable landmark, logo, character, or branded attraction of any ki
 Pick ONE of these composition types for this image — vary which one you pick each time,
 don't default to the same one every time:
 
-1. TRAVEL-PLANNING FLAT LAY: 3-4 specific objects relevant to this exact headline (not
-   generic vacation items), arranged in a setting that fits the topic — overhead on a
-   wooden table, on a beach towel, on a hotel bed/nightstand, held in someone's hands
-   (no visible face), on a car dashboard, on a café table.
+1. TRAVEL-PLANNING FLAT LAY: 3-4 objects that evoke the SPECIFIC angle of this exact
+   headline — not generic seasonal/vacation filler. Ask yourself what makes THIS story
+   different from any other story in its category, and choose objects that reflect that
+   specific detail. A story about exclusive/limited merchandise calls for objects that
+   evoke exclusivity and access (a wristband, a folded ticket, a "members only" felt
+   badge shape) alongside a plain garment — not just generic candy corn and leaves. A
+   story about a specific price change calls for objects suggesting cost/value. A story
+   about a new ride calls for objects suggesting motion/mechanism. Generic seasonal icons
+   (candy corn, plain autumn leaves, a generic jack-o'-lantern) are the WEAK, default
+   choice — only use them if nothing more specific to this headline's actual angle fits.
+   Arrange in a setting that fits the topic — overhead on a wooden table, on a beach
+   towel, on a hotel bed/nightstand, held in someone's hands (no visible face), on a car
+   dashboard, on a café table.
 
 2. GOLDEN-HOUR SILHOUETTE: an INVENTED, generic silhouette scene — for example, an
    imagined castle-like silhouette (with turret shapes/proportions clearly different
