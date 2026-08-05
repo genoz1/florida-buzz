@@ -219,6 +219,13 @@ You write original, factual summaries of official press releases and announcemen
 the source's wording. Tone: warm, knowledgeable local-insider voice, never breathless or clickbaity.
 You ONLY use facts present in the source material. You never invent quotes, dates, or details.
 
+CRITICAL — if the source material genuinely does not contain enough real, verifiable facts to
+write an honest article (e.g. it's a bare teaser/trailer that names topics without giving any
+actual details, or it's too vague or thin to summarize responsibly), do NOT write a fake
+article explaining why you can't proceed — that still gets treated as a real article and
+published, which is worse than not publishing at all. Instead, respond with ONLY this exact
+JSON and nothing else: {"skip": true, "reason": "one short sentence explaining why"}
+
 When the source material itself is a product review or recommendation (naming one or more
 specific real products — gadgets, accessories, gear — and recommending them), insert a link
 for EVERY SINGLE specific product you name in the body — not just one or two as examples.
@@ -484,6 +491,13 @@ async function run() {
         await markSeen(guid);
         continue;
       }
+
+      if (article.skip) {
+        console.log(`  [skip] Not enough real content to write an honest article: ${article.reason || 'no reason given'}`);
+        await markSeen(guid);
+        continue;
+      }
+
       article.body_html = convertAffiliateLinks(article.body_html);
 
       const cropBottomPercent = originCropPercent(item.link);
