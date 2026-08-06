@@ -206,6 +206,42 @@ function convertUndercoverTouristLinks(html) {
   });
 }
 
+// Rather than relying on the AI writer to organically mention ticket-buying (which
+// guides about dining, ride strategy, hotels, etc. often never do), every theme-parks
+// category guide gets this box appended automatically — guaranteed placement instead
+// of AI discretion.
+const UNDERCOVER_TOURIST_PARK_LABELS = {
+  'disney-world': 'Walt Disney World',
+  'universal-orlando': 'Universal Orlando',
+  'epic-universe': 'Universal Epic Universe',
+  'seaworld': 'SeaWorld Orlando',
+  'legoland': 'LEGOLAND Florida',
+  'theme-parks': 'Orlando theme park',
+};
+
+function detectParkKey(text) {
+  const t = (text || '').toLowerCase();
+  if (/epic universe/.test(t)) return 'epic-universe';
+  if (/universal|islands of adventure|volcano bay|wizarding world/.test(t)) return 'universal-orlando';
+  if (/seaworld|aquatica|discovery cove/.test(t)) return 'seaworld';
+  if (/legoland/.test(t)) return 'legoland';
+  if (/disney|magic kingdom|epcot|hollywood studios|animal kingdom|cinderella|space mountain|disney springs/.test(t)) return 'disney-world';
+  return 'theme-parks';
+}
+
+function buildUndercoverTouristBox(key) {
+  const destination = UNDERCOVER_TOURIST_DESTINATIONS[key] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
+  const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
+  const label = UNDERCOVER_TOURIST_PARK_LABELS[key] || UNDERCOVER_TOURIST_PARK_LABELS['theme-parks'];
+  return `\n<div class="shop-box">\n  <p class="shop-box-eyebrow">Planning Your Trip</p>\n  <p>Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.</p>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">Compare ${label} Ticket Prices</a>\n</div>\n`;
+}
+
+function appendUndercoverTouristBox(html, category, contextText) {
+  if (!html || category !== 'theme-parks') return html;
+  const key = detectParkKey(contextText);
+  return html + buildUndercoverTouristBox(key);
+}
+
 async function pickTopic(category, existingGuides) {
   const sameCategory = existingGuides.filter((g) => g.category === category).map((g) => g.title);
   const otherTitles = existingGuides.filter((g) => g.category !== category).map((g) => g.title);
@@ -308,6 +344,7 @@ Working title idea: ${workingTitle}`;
   guide.body_html = stripCitationTags(guide.body_html);
   guide.body_html = convertAffiliateLinks(guide.body_html);
   guide.body_html = convertUndercoverTouristLinks(guide.body_html);
+  guide.body_html = appendUndercoverTouristBox(guide.body_html, category, `${topic} ${workingTitle} ${guide.title}`);
   return guide;
 }
 
