@@ -344,6 +344,38 @@ img { max-width: 100%; display: block; }
   font-weight: 700;
   text-decoration: underline;
 }
+.shop-box {
+  background: var(--sand-100);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--coral-600);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 28px 0;
+}
+.shop-box .shop-box-eyebrow {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+  margin: 0 0 6px;
+}
+.shop-box p {
+  margin: 0 0 12px;
+  color: var(--ink-900);
+}
+.shop-box p:last-child { margin-bottom: 0; }
+.shop-box a.shop-box-cta {
+  display: inline-block;
+  background: var(--coral-600);
+  color: var(--sand-50);
+  font-weight: 700;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+}
+.shop-box a.shop-box-cta:hover { background: var(--coral-500); }
 .source-note {
   margin-top: 32px;
   padding-top: 20px;
