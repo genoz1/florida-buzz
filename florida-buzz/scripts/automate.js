@@ -68,6 +68,72 @@ function convertUndercoverTouristLinks(html) {
   });
 }
 
+const UNDERCOVER_TOURIST_PARK_LABELS = {
+  'disney-world': 'Walt Disney World',
+  'universal-orlando': 'Universal Orlando',
+  'epic-universe': 'Universal Epic Universe',
+  'seaworld': 'SeaWorld Orlando',
+  'legoland': 'LEGOLAND Florida',
+  'theme-parks': 'Orlando theme park',
+};
+const UNDERCOVER_TOURIST_HOTEL_DESTINATIONS = {
+  'disney-world': 'https://www.undercovertourist.com/disney-vacation-packages',
+  'universal-orlando': 'https://www.undercovertourist.com/universal-vacation-packages/',
+  'epic-universe': 'https://www.undercovertourist.com/universal-vacation-packages/',
+};
+const UNDERCOVER_TOURIST_CAR_RENTAL_URL = 'https://www.undercovertourist.com/car-rental/';
+
+function detectParkKey(text) {
+  const t = (text || '').toLowerCase();
+  if (/epic universe/.test(t)) return 'epic-universe';
+  if (/universal|islands of adventure|volcano bay|wizarding world/.test(t)) return 'universal-orlando';
+  if (/seaworld|aquatica|discovery cove/.test(t)) return 'seaworld';
+  if (/legoland/.test(t)) return 'legoland';
+  if (/disney|magic kingdom|epcot|hollywood studios|animal kingdom|cinderella|space mountain|disney springs/.test(t)) return 'disney-world';
+  return 'theme-parks';
+}
+
+function detectBoxVariant(text) {
+  const t = (text || '').toLowerCase();
+  if (/car rental|rental car/.test(t)) return 'car-rentals';
+  if (/\bresort\b|\bhotel\b|where to stay|resort review/.test(t)) return 'hotel';
+  return 'tickets';
+}
+
+function buildUndercoverTouristBox(key, variant) {
+  const label = UNDERCOVER_TOURIST_PARK_LABELS[key] || UNDERCOVER_TOURIST_PARK_LABELS['theme-parks'];
+  let destination;
+  let ctaText;
+  let bodyText;
+  if (variant === 'car-rentals') {
+    destination = UNDERCOVER_TOURIST_CAR_RENTAL_URL;
+    ctaText = 'Compare Car Rental Rates';
+    bodyText = 'Undercover Tourist partners with Alamo, Avis, Budget, Enterprise, and National for discounted rates when bundled with tickets or a hotel stay.';
+  } else if (variant === 'hotel' && UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key]) {
+    destination = UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key];
+    ctaText = `Find ${label} Hotel + Ticket Deals`;
+    bodyText = `Undercover Tourist is an authorized seller of ${label} hotel and ticket packages, often with savings over booking direct.`;
+  } else {
+    destination = UNDERCOVER_TOURIST_DESTINATIONS[key] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
+    ctaText = `Compare ${label} Ticket Prices`;
+    bodyText = `Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.`;
+  }
+  const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
+  return `\n<div class="shop-box">\n  <p class="shop-box-eyebrow">Planning Your Trip</p>\n  <p>${bodyText}</p>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">${ctaText}</a>\n</div>\n`;
+}
+
+// Spot-news articles are more varied than evergreen guides (a road closure or a
+// wildlife rescue shouldn't get a ticket pitch), so this only fires for the
+// theme-parks category or when a specific park is actually named in the piece.
+function appendUndercoverTouristBox(html, category, contextText) {
+  if (!html) return html;
+  const key = detectParkKey(contextText);
+  const isRelevant = category === 'theme-parks' || key !== 'theme-parks';
+  if (!isRelevant) return html;
+  const variant = detectBoxVariant(contextText);
+  return html + buildUndercoverTouristBox(key, variant);
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -545,6 +611,7 @@ async function run() {
       if (realCategory !== source.category) {
         console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
       }
+      article.body_html = appendUndercoverTouristBox(article.body_html, realCategory, article.title);
 
       if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
         console.log(`  [skip] This looks like the same story as something published in the last 3 days (likely picked up from a different feed) — skipping to avoid a duplicate.`);

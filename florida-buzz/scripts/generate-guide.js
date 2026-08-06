@@ -219,6 +219,16 @@ const UNDERCOVER_TOURIST_PARK_LABELS = {
   'theme-parks': 'Orlando theme park',
 };
 
+// Hotel/vacation-package destinations — only Disney and Universal currently sell
+// bundled hotel+ticket packages through Undercover Tourist; SeaWorld/LEGOLAND fall
+// back to the ticket page since no dedicated package page was found.
+const UNDERCOVER_TOURIST_HOTEL_DESTINATIONS = {
+  'disney-world': 'https://www.undercovertourist.com/disney-vacation-packages',
+  'universal-orlando': 'https://www.undercovertourist.com/universal-vacation-packages/',
+  'epic-universe': 'https://www.undercovertourist.com/universal-vacation-packages/',
+};
+const UNDERCOVER_TOURIST_CAR_RENTAL_URL = 'https://www.undercovertourist.com/car-rental/';
+
 function detectParkKey(text) {
   const t = (text || '').toLowerCase();
   if (/epic universe/.test(t)) return 'epic-universe';
@@ -229,17 +239,51 @@ function detectParkKey(text) {
   return 'theme-parks';
 }
 
-function buildUndercoverTouristBox(key) {
-  const destination = UNDERCOVER_TOURIST_DESTINATIONS[key] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
-  const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
-  const label = UNDERCOVER_TOURIST_PARK_LABELS[key] || UNDERCOVER_TOURIST_PARK_LABELS['theme-parks'];
-  return `\n<div class="shop-box">\n  <p class="shop-box-eyebrow">Planning Your Trip</p>\n  <p>Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.</p>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">Compare ${label} Ticket Prices</a>\n</div>\n`;
+// Which flavor of box to show — a dining/attraction guide should pitch tickets,
+// a resort/hotel review should pitch the hotel package, a road-trip/rental guide
+// should pitch the car rental page. Checked in this order since a guide can
+// mention more than one.
+function detectBoxVariant(text) {
+  const t = (text || '').toLowerCase();
+  if (/car rental|rental car/.test(t)) return 'car-rentals';
+  if (/\bresort\b|\bhotel\b|where to stay|resort review/.test(t)) return 'hotel';
+  return 'tickets';
 }
 
+function buildUndercoverTouristBox(key, variant) {
+  const label = UNDERCOVER_TOURIST_PARK_LABELS[key] || UNDERCOVER_TOURIST_PARK_LABELS['theme-parks'];
+  let destination;
+  let ctaText;
+  let bodyText;
+  if (variant === 'car-rentals') {
+    destination = UNDERCOVER_TOURIST_CAR_RENTAL_URL;
+    ctaText = 'Compare Car Rental Rates';
+    bodyText = 'Undercover Tourist partners with Alamo, Avis, Budget, Enterprise, and National for discounted rates when bundled with tickets or a hotel stay.';
+  } else if (variant === 'hotel' && UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key]) {
+    destination = UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key];
+    ctaText = `Find ${label} Hotel + Ticket Deals`;
+    bodyText = `Undercover Tourist is an authorized seller of ${label} hotel and ticket packages, often with savings over booking direct.`;
+  } else {
+    destination = UNDERCOVER_TOURIST_DESTINATIONS[key] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
+    ctaText = `Compare ${label} Ticket Prices`;
+    bodyText = `Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.`;
+  }
+  const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
+  return `\n<div class="shop-box">\n  <p class="shop-box-eyebrow">Planning Your Trip</p>\n  <p>${bodyText}</p>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">${ctaText}</a>\n</div>\n`;
+}
+
+// Guaranteed placement isn't limited to the theme-parks category anymore — a
+// Disney resort review filed under florida-living, or a park-restaurant review
+// filed under food, is just as relevant. The trigger is content (a specific park
+// actually detected), not the category tag; category === 'theme-parks' still
+// always gets a box even if detectParkKey falls back to the generic label.
 function appendUndercoverTouristBox(html, category, contextText) {
-  if (!html || category !== 'theme-parks') return html;
+  if (!html) return html;
   const key = detectParkKey(contextText);
-  return html + buildUndercoverTouristBox(key);
+  const isRelevant = category === 'theme-parks' || key !== 'theme-parks';
+  if (!isRelevant) return html;
+  const variant = detectBoxVariant(contextText);
+  return html + buildUndercoverTouristBox(key, variant);
 }
 
 async function pickTopic(category, existingGuides) {
