@@ -178,6 +178,34 @@ function convertAffiliateLinks(html) {
   });
 }
 
+// Same placeholder mechanism as AFFILIATE_SEARCH above, for Undercover Tourist
+// (theme park ticket affiliate, approved via CJ Affiliate ~Aug 2026). Uses CJ's
+// Evergreen deep-link (link ID 15733832), which wraps a real Undercover Tourist
+// destination URL via the standard CJ "?url=" deep-link parameter rather than
+// pointing at one of CJ's hundreds of dated/expired promo-specific links.
+const UNDERCOVER_TOURIST_BASE = process.env.UNDERCOVER_TOURIST_LINK || 'https://www.jdoqocy.com/click-101851476-15733832';
+const UNDERCOVER_TOURIST_DESTINATIONS = {
+  'disney': 'https://www.undercovertourist.com/disney/',
+  'disney-world': 'https://www.undercovertourist.com/orlando/walt-disney-world-resort/',
+  'universal': 'https://www.undercovertourist.com/universal/',
+  'universal-orlando': 'https://www.undercovertourist.com/orlando/universal-orlando-resort/',
+  'epic-universe': 'https://www.undercovertourist.com/epic-universe/',
+  'seaworld': 'https://www.undercovertourist.com/orlando/seaworld-orlando-resort/',
+  'legoland': 'https://www.undercovertourist.com/orlando/legoland-florida-resort/',
+  'theme-parks': 'https://www.undercovertourist.com/theme-parks/',
+  'orlando': 'https://www.undercovertourist.com/orlando/',
+};
+
+function convertUndercoverTouristLinks(html) {
+  if (!html) return html;
+  return html.replace(/href="AFFILIATE_UT:([^"]+)"/gi, (match, key) => {
+    const cleanKey = key.trim().toLowerCase();
+    const destination = UNDERCOVER_TOURIST_DESTINATIONS[cleanKey] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
+    const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
+    return `href="${url}" target="_blank" rel="nofollow sponsored noopener"`;
+  });
+}
+
 async function pickTopic(category, existingGuides) {
   const sameCategory = existingGuides.filter((g) => g.category === category).map((g) => g.title);
   const otherTitles = existingGuides.filter((g) => g.category !== category).map((g) => g.title);
@@ -246,6 +274,15 @@ someone would type into a shopping search bar (e.g. "polarized sunglasses" or
 "water resistant phone pouch"), NOT a full sentence. Use at most 2-3 of these, only
 where genuinely natural — don't force it.
 
+Separately, whenever the guide naturally mentions buying, saving on, or planning theme
+park tickets (Walt Disney World, Universal Orlando, SeaWorld Orlando, or LEGOLAND Florida),
+link that mention using this format: <a href="AFFILIATE_UT:key" class="shop-link">short
+descriptive text</a> — where "key" is exactly one of: disney, disney-world, universal,
+universal-orlando, epic-universe, seaworld, legoland, theme-parks, orlando (pick the most
+specific one that matches what's being discussed). Use at most 1-2 of these per guide,
+only where a ticket/planning mention already exists naturally — never invent a ticket
+recommendation just to place a link.
+
 CRITICAL: body_html is published directly on the site as-is. Never include 
 tags, citation indices, footnote markers, or any other research/citation annotation
 syntax — write plain narrative HTML only. Facts from your research should read as
@@ -270,6 +307,7 @@ Working title idea: ${workingTitle}`;
   const guide = await parseJsonResponse(text, 'guide');
   guide.body_html = stripCitationTags(guide.body_html);
   guide.body_html = convertAffiliateLinks(guide.body_html);
+  guide.body_html = convertUndercoverTouristLinks(guide.body_html);
   return guide;
 }
 

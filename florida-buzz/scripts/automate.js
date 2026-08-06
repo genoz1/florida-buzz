@@ -40,6 +40,34 @@ function convertAffiliateLinks(html) {
   });
 }
 
+// Same placeholder mechanism as AFFILIATE_SEARCH above, for Undercover Tourist
+// (theme park ticket affiliate, approved via CJ Affiliate ~Aug 2026). Uses CJ's
+// Evergreen deep-link (link ID 15733832), which wraps a real Undercover Tourist
+// destination URL via the standard CJ "?url=" deep-link parameter rather than
+// pointing at one of CJ's hundreds of dated/expired promo-specific links.
+const UNDERCOVER_TOURIST_BASE = process.env.UNDERCOVER_TOURIST_LINK || 'https://www.jdoqocy.com/click-101851476-15733832';
+const UNDERCOVER_TOURIST_DESTINATIONS = {
+  'disney': 'https://www.undercovertourist.com/disney/',
+  'disney-world': 'https://www.undercovertourist.com/orlando/walt-disney-world-resort/',
+  'universal': 'https://www.undercovertourist.com/universal/',
+  'universal-orlando': 'https://www.undercovertourist.com/orlando/universal-orlando-resort/',
+  'epic-universe': 'https://www.undercovertourist.com/epic-universe/',
+  'seaworld': 'https://www.undercovertourist.com/orlando/seaworld-orlando-resort/',
+  'legoland': 'https://www.undercovertourist.com/orlando/legoland-florida-resort/',
+  'theme-parks': 'https://www.undercovertourist.com/theme-parks/',
+  'orlando': 'https://www.undercovertourist.com/orlando/',
+};
+
+function convertUndercoverTouristLinks(html) {
+  if (!html) return html;
+  return html.replace(/href="AFFILIATE_UT:([^"]+)"/gi, (match, key) => {
+    const cleanKey = key.trim().toLowerCase();
+    const destination = UNDERCOVER_TOURIST_DESTINATIONS[cleanKey] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
+    const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
+    return `href="${url}" target="_blank" rel="nofollow sponsored noopener"`;
+  });
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -237,6 +265,15 @@ shopping search bar (e.g. "handheld misting fan" or "portable phone charger"), N
 sentence or the product's exact model name. Only do this when the source is genuinely
 about specific recommendable products — do not force a product link into a story that
 isn't about one (e.g. a ride closure, a park hours change, a wildlife sighting).
+
+Separately, whenever the article naturally mentions buying, saving on, or planning theme
+park tickets (Walt Disney World, Universal Orlando, SeaWorld Orlando, or LEGOLAND Florida),
+link that mention using this format: <a href="AFFILIATE_UT:key" class="shop-link">short
+descriptive text</a> — where "key" is exactly one of: disney, disney-world, universal,
+universal-orlando, epic-universe, seaworld, legoland, theme-parks, orlando (pick the most
+specific one that matches what's being discussed). Use at most 1-2 of these per article,
+only where a ticket/planning mention already exists naturally — never invent a ticket
+recommendation just to place a link.
 
 CRITICAL — never describe the links themselves as coming from the source, and never imply
 the source provided or is affiliated with any link in this article. These are The Florida
@@ -499,6 +536,7 @@ async function run() {
       }
 
       article.body_html = convertAffiliateLinks(article.body_html);
+      article.body_html = convertUndercoverTouristLinks(article.body_html);
 
       const cropBottomPercent = originCropPercent(item.link);
 
