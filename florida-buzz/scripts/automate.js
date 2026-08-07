@@ -119,7 +119,22 @@ function buildUndercoverTouristBox(key, variant) {
     bodyText = `Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.`;
   }
   const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
-  return `\n<div class="shop-box">\n  <p class="shop-box-eyebrow">Planning Your Trip</p>\n  <p>${bodyText}</p>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">${ctaText}</a>\n</div>\n`;
+  return `\n<div class="shop-box">\n  <div class="shop-box-text">\n    <p class="shop-box-eyebrow">Planning Your Trip</p>\n    <p>${bodyText}</p>\n  </div>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">${ctaText}</a>\n</div>\n`;
+}
+
+// Splits the article's HTML on paragraph/list boundaries and drops the box in
+// around the midpoint, rather than always at the very end — so it reads as
+// part of the piece instead of a tacked-on footer. Falls back to appending at
+// the end if the content is too short to have a clean midpoint.
+function insertBoxMidContent(html, boxHtml) {
+  const parts = html.split(/(<\/p>|<\/ul>|<\/ol>)/i);
+  const chunks = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    chunks.push((parts[i] || '') + (parts[i + 1] || ''));
+  }
+  if (chunks.length < 4) return html + boxHtml;
+  const insertAfter = Math.floor(chunks.length / 2);
+  return chunks.slice(0, insertAfter + 1).join('') + boxHtml + chunks.slice(insertAfter + 1).join('');
 }
 
 // Spot-news articles are more varied than evergreen guides (a road closure or a
@@ -131,7 +146,7 @@ function appendUndercoverTouristBox(html, category, contextText) {
   const isRelevant = category === 'theme-parks' || key !== 'theme-parks';
   if (!isRelevant) return html;
   const variant = detectBoxVariant(contextText);
-  return html + buildUndercoverTouristBox(key, variant);
+  return insertBoxMidContent(html, buildUndercoverTouristBox(key, variant));
 }
 
 function sleep(ms) {
