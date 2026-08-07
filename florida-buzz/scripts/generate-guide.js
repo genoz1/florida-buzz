@@ -257,15 +257,15 @@ function buildUndercoverTouristBox(key, variant) {
   let bodyText;
   if (variant === 'car-rentals') {
     destination = UNDERCOVER_TOURIST_CAR_RENTAL_URL;
-    ctaText = 'Compare Car Rental Rates';
+    ctaText = 'Compare Rental Rates';
     bodyText = 'Undercover Tourist partners with Alamo, Avis, Budget, Enterprise, and National for discounted rates when bundled with tickets or a hotel stay.';
   } else if (variant === 'hotel' && UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key]) {
     destination = UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key];
-    ctaText = `Find ${label} Hotel + Ticket Deals`;
+    ctaText = 'See Hotel + Ticket Deals';
     bodyText = `Undercover Tourist is an authorized seller of ${label} hotel and ticket packages, often with savings over booking direct.`;
   } else {
     destination = UNDERCOVER_TOURIST_DESTINATIONS[key] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
-    ctaText = `Compare ${label} Ticket Prices`;
+    ctaText = 'Compare Ticket Prices';
     bodyText = `Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.`;
   }
   const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
