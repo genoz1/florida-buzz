@@ -582,6 +582,80 @@ router.get('/admin/submit-topic', (req, res) => {
   });
 });
 
+// Pinterest access tokens expire (~30 days) and the quick "Generate Access
+// Tokens" button on Pinterest's own developer dashboard only grants read
+// scopes, not the pins:write scope actually needed to post. These two routes
+// do the full OAuth flow so getting a fresh working token is "click a link,
+// copy what it shows you" instead of a manual API exchange.
+// One-time setup: add PINTEREST_APP_ID and PINTEREST_APP_SECRET (from the
+// Pinterest developer app page) as env vars, and register
+// {SITE_URL}/admin/pinterest-callback as a Redirect URI on that same page.
+router.get('/admin/pinterest-auth', (req, res) => {
+  const { key } = req.query;
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+  if (!process.env.PINTEREST_APP_ID) {
+    return res.send('PINTEREST_APP_ID env var is not set — add it first, then reload this page.');
+  }
+  const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
+  const redirectUri = `${siteUrl}/admin/pinterest-callback`;
+  const scope = 'pins:read,pins:write,boards:read,boards:write';
+  const authUrl = `https://www.pinterest.com/oauth/?client_id=${encodeURIComponent(process.env.PINTEREST_APP_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${key}`;
+  res.redirect(authUrl);
+});
+
+router.get('/admin/pinterest-callback', async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+  if (!process.env.ADMIN_PASSWORD || state !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+  if (error) {
+    return res.send(`Pinterest returned an error: ${error} — ${error_description || ''}`);
+  }
+  if (!code) {
+    return res.send('No authorization code came back from Pinterest. Try the auth link again.');
+  }
+  if (!process.env.PINTEREST_APP_ID || !process.env.PINTEREST_APP_SECRET) {
+    return res.send('PINTEREST_APP_ID / PINTEREST_APP_SECRET env vars are not set.');
+  }
+  try {
+    const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
+    const redirectUri = `${siteUrl}/admin/pinterest-callback`;
+    const basicAuth = Buffer.from(`${process.env.PINTEREST_APP_ID}:${process.env.PINTEREST_APP_SECRET}`).toString('base64');
+    const tokenRes = await fetch('https://api.pinterest.com/v5/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+    const data = await tokenRes.json();
+    if (!tokenRes.ok) {
+      return res.send(`<pre>Pinterest token exchange failed:\n${JSON.stringify(data, null, 2)}</pre>`);
+    }
+    res.send(`
+      <pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">
+Success! Update these two env vars in DigitalOcean, then redeploy:
+
+PINTEREST_ACCESS_TOKEN=${data.access_token}
+PINTEREST_REFRESH_TOKEN=${data.refresh_token}
+
+(access_token expires in ~${Math.round((data.expires_in || 0) / 86400)} days, but once
+PINTEREST_REFRESH_TOKEN is set, the app will auto-renew the access token on
+its own going forward — you shouldn't need to do this again.)
+      </pre>
+    `);
+  } catch (err) {
+    res.send(`Token exchange request failed: ${err.message}`);
+  }
+});
+
 router.post('/admin/submit-topic', (req, res) => {
   const { key, category, topic, title } = req.body;
 
