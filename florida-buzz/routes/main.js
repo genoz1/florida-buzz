@@ -6,6 +6,7 @@ const path = require('path');
 const multer = require('multer');
 const reviewPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 const { logNotFound } = require('../lib/notFoundLog');
+const { createPin } = require('../lib/pinterest');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
@@ -653,6 +654,31 @@ its own going forward — you shouldn't need to do this again.)
     `);
   } catch (err) {
     res.send(`Token exchange request failed: ${err.message}`);
+  }
+});
+
+// Browser-friendly version of scripts/test-pinterest.js — creates one real
+// test pin on your Florida Buzz board and shows the result on screen, no
+// terminal/console needed. Safe to run any time; delete the test pin from
+// Pinterest afterward if you don't want it cluttering the board.
+router.get('/admin/test-pinterest', async (req, res) => {
+  const { key } = req.query;
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+  if (!process.env.PINTEREST_BOARD_ID) {
+    return res.send('PINTEREST_BOARD_ID env var is not set — nothing to test.');
+  }
+  try {
+    const result = await createPin({
+      imageUrl: 'https://thefloridabuzz.com/apple-touch-icon.png',
+      title: 'Florida Buzz — Test Pin',
+      description: 'This is a one-time test pin to confirm the Pinterest integration is working correctly. Safe to delete.',
+      link: 'https://thefloridabuzz.com',
+    });
+    res.send(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">Success! Pin created — check your "Florida Buzz" board on Pinterest.\n\n${JSON.stringify(result, null, 2)}</pre>`);
+  } catch (err) {
+    res.send(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">Failed: ${err.message}</pre>`);
   }
 });
 
