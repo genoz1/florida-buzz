@@ -90,7 +90,18 @@ async function doRun() {
     if (page.length < PAGE_SIZE) break; // last page was partial — nothing more to fetch
   }
 
-  const candidates = articles.filter((a) => isOwnStorageUrl(a.image_url));
+  // This specific article's image has crashed the whole process on every single
+  // attempt so far, even past the dimension-bomb and NaN-dimension checks —
+  // meaning whatever's actually wrong with this file isn't something those
+  // generic guards catch. Rather than keep guessing at the root cause while it
+  // blocks the entire run every time, skip it by name and move on. Worth
+  // looking at manually later (delete and let it regenerate, or replace by hand)
+  // but it should never be allowed to take down the whole job again.
+  const KNOWN_PROBLEM_SLUGS = new Set([
+    'legoland-florida-coastersaurus-reopening-august-16-2026',
+  ]);
+
+  const candidates = articles.filter((a) => isOwnStorageUrl(a.image_url) && !KNOWN_PROBLEM_SLUGS.has(a.slug));
   console.log(`Found ${articles.length} articles total, ${candidates.length} with an image in our own storage to check.\n`);
 
   let succeeded = 0;
