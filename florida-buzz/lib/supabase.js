@@ -85,16 +85,46 @@ async function normalizeAspectRatio(buffer) {
 // Returns the permanent public URL, or null if anything fails. contentType
 // defaults to PNG (what every AI-generated image actually is) but can be
 // overridden — e.g. for a real uploaded photo, which is usually a JPEG.
+//
+// AI-generated images (gpt-image-1) come back as full-size 1536x1024 PNGs —
+// PNG is lossless, so these run several MB each with zero compression. Serving
+// them as-is is what drove the site's page weight to 12MB+ and LCP past 11s
+// (confirmed via PageSpeed Insights, Aug 2026), which is a serious enough
+// slowdown to plausibly affect Google's indexing decisions. Every PNG upload
+// through this function is resized to a sane display width and re-encoded as
+// compressed JPEG before it ever reaches storage — cuts file size by roughly
+// 90%+ with no visible quality loss for a photo-style image. Already-JPEG
+// uploads (e.g. real photos, user-submitted review photos) are left as-is,
+// since they're not the source of the problem this fixes.
+const GENERATED_IMAGE_MAX_WIDTH = 1200; // plenty for hero/thumbnail display at any real screen size
+const GENERATED_IMAGE_JPEG_QUALITY = 78; // strong visual quality, small file size
+
 async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/png') {
   if (!supabase) return null;
   try {
+    let finalBuffer = imageBuffer;
+    let finalContentType = contentType;
+    let finalFilename = filename;
+
+    if (contentType === 'image/png') {
+      const img = await Jimp.read(imageBuffer);
+      if (img.width > GENERATED_IMAGE_MAX_WIDTH) {
+        img.resize({ w: GENERATED_IMAGE_MAX_WIDTH });
+      }
+      const originalSize = imageBuffer.length;
+      finalBuffer = await img.getBuffer('image/jpeg', { quality: GENERATED_IMAGE_JPEG_QUALITY });
+      finalContentType = 'image/jpeg';
+      finalFilename = filename.replace(/\.png$/i, '.jpg');
+      console.log(`  Compressed generated image: ${(originalSize / 1024).toFixed(0)}KB PNG -> ${(finalBuffer.length / 1024).toFixed(0)}KB JPEG`);
+    }
+
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(filename, imageBuffer, { contentType, upsert: true });
+      .upload(finalFilename, finalBuffer, { contentType: finalContentType, upsert: true });
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from('article-images').getPublicUrl(filename);
+    const { data } = supabase.storage.from('article-images').getPublicUrl(finalFilename);
     return data.publicUrl;
   } catch (err) {
     console.error(`  [error] Could not store generated image: ${err.message}`);
