@@ -41,6 +41,26 @@ function looksLikeAd(width, height) {
 const INSTAGRAM_MIN_RATIO = 4 / 5;   // 0.8 — tallest allowed (portrait)
 const INSTAGRAM_MAX_RATIO = 1.91;    // widest allowed (landscape)
 
+// Shared by every path that stores an image for the website (AI-generated
+// and real downloaded photos alike). Resizes to a sane max display width and
+// re-encodes as compressed JPEG. This is what actually controls page weight —
+// normalizeAspectRatio below only handles Instagram's shape requirements and
+// was never resizing or compressing anything, which is why real downloaded
+// photos (often several MB straight from the source publisher, full
+// resolution) were a major unaddressed contributor to the site's ~12MB page
+// weight and 11.6s mobile LCP (confirmed via PageSpeed Insights, Aug 2026)
+// even after AI-generated images were fixed.
+const WEB_IMAGE_MAX_WIDTH = 1200;
+const WEB_IMAGE_JPEG_QUALITY = 78;
+
+async function compressForWeb(buffer) {
+  const img = await Jimp.read(buffer);
+  if (img.width > WEB_IMAGE_MAX_WIDTH) {
+    img.resize({ w: WEB_IMAGE_MAX_WIDTH });
+  }
+  return img.getBuffer('image/jpeg', { quality: WEB_IMAGE_JPEG_QUALITY });
+}
+
 async function normalizeAspectRatio(buffer) {
   let dims;
   try {
@@ -187,7 +207,15 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
     // later at posting time — cheaper to fix once here than to fail silently
     // on every future post attempt using this image.
     buffer = await normalizeAspectRatio(buffer);
+
+    // Real source photos come straight from the publisher's own CDN, often
+    // several MB at full resolution with no compression at all — this is
+    // what actually controls page weight, independent of the aspect-ratio
+    // step above.
+    const originalSize = buffer.length;
+    buffer = await compressForWeb(buffer);
     contentType = 'image/jpeg';
+    console.log(`  Compressed source image: ${(originalSize / 1024).toFixed(0)}KB -> ${(buffer.length / 1024).toFixed(0)}KB`);
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')
