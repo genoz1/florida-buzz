@@ -682,6 +682,44 @@ router.get('/admin/test-pinterest', async (req, res) => {
   }
 });
 
+// One-time (well, re-runnable) job to shrink every existing AI-generated
+// image that's still an uncompressed PNG down to a resized, compressed JPEG —
+// fixes the page-weight/LCP problem for already-published content, not just
+// new content going forward. Runs in the background since 800+ images will
+// take well past any HTTP timeout; check the DigitalOcean runtime logs to
+// watch progress, or just re-visit this URL later — it's safe to re-run,
+// since already-reprocessed images are no longer PNGs and get skipped.
+router.get('/admin/reprocess-images', (req, res) => {
+  const { key, dryRun } = req.query;
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'reprocess-images.js');
+  const child = spawn('node', [scriptPath], {
+    env: {
+      ...process.env,
+      DRY_RUN: dryRun === 'true' ? 'true' : 'false',
+    },
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+
+  res.send(`
+    <pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">
+Started reprocessing images in the background${dryRun === 'true' ? ' (DRY RUN — nothing will actually change)' : ''}.
+
+This could take a while with 800+ images (roughly 300ms between each, so
+maybe 5-10 minutes total). Check your DigitalOcean app's runtime logs to
+watch progress, or just check back on the site later.
+
+Safe to leave running and safe to re-run later — already-reprocessed images
+are no longer PNGs, so they get automatically skipped on any future run.
+    </pre>
+  `);
+});
+
 router.post('/admin/submit-topic', (req, res) => {
   const { key, category, topic, title } = req.body;
 
