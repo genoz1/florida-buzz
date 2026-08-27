@@ -69,14 +69,25 @@ async function doRun() {
     return;
   }
 
-  const { data: articles, error } = await supabase
-    .from('articles')
-    .select('id, slug, image_url')
-    .order('published_at', { ascending: false });
+  // Supabase caps results at 1000 rows per request by default — a plain
+  // query here would silently miss everything past the first 1000 articles,
+  // with no error to signal it happened. Paginating with .range() in a loop
+  // fetches everything regardless of how many articles there are.
+  const articles = [];
+  const PAGE_SIZE = 1000;
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data: page, error } = await supabase
+      .from('articles')
+      .select('id, slug, image_url')
+      .order('published_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (error) {
-    console.error('Could not load articles:', error.message);
-    return;
+    if (error) {
+      console.error('Could not load articles:', error.message);
+      return;
+    }
+    articles.push(...page);
+    if (page.length < PAGE_SIZE) break; // last page was partial — nothing more to fetch
   }
 
   const candidates = articles.filter((a) => isOwnStorageUrl(a.image_url));
@@ -118,6 +129,12 @@ async function doRun() {
         continue;
       }
       const megapixels = (dims.width * dims.height) / 1_000_000;
+      if (!Number.isFinite(megapixels) || megapixels <= 0) {
+        console.log(`  [skipped] Could not determine valid dimensions (got ${dims.width}x${dims.height}) — treating as unsafe rather than risking a crash on an unusual file.`);
+        skipped += 1;
+        await sleep(50);
+        continue;
+      }
       if (megapixels > MAX_MEGAPIXELS) {
         console.log(`  [skipped] ${dims.width}x${dims.height} (${megapixels.toFixed(0)}MP) — unusually large dimensions for a modest file size, likely to crash on decode. Flagging for manual review instead of risking it.`);
         skipped += 1;
