@@ -702,7 +702,7 @@ router.get('/admin/reprocess-images', (req, res) => {
       DRY_RUN: dryRun === 'true' ? 'true' : 'false',
     },
     detached: true,
-    stdio: 'ignore',
+    stdio: 'inherit',
   });
   child.unref();
 
