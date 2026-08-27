@@ -1,10 +1,20 @@
 require('dotenv').config();
+const fs = require('fs');
 const { supabase } = require('../lib/supabase');
 const { Jimp } = require('jimp');
+const { imageSize } = require('image-size');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_WIDTH = 1200;
 const JPEG_QUALITY = 78;
+
+// A file's byte size doesn't tell you its decoded memory footprint — a
+// modest-looking few-MB file can have huge pixel dimensions (a "dimension
+// bomb") that balloons to a massive raw buffer once actually decoded,
+// crashing the whole container via OOM. image-size reads just the file
+// header, not the full image, so this check is cheap and safe to do before
+// ever calling the heavy Jimp.read()/resize()/encode() pipeline.
+const MAX_MEGAPIXELS = 25; // ~5000x5000 — comfortably above any real photo/hero image this site uses
 
 // Small pause between images so this doesn't hammer Supabase/DigitalOcean's
 // outbound bandwidth all at once across 800+ files in a tight loop.
@@ -27,7 +37,30 @@ function isOwnStorageUrl(url) {
   return !!url && url.includes('/storage/v1/object/public/article-images/');
 }
 
-async function run() {
+// Prevents exactly what happened before: hitting the trigger URL again while
+// a previous run is still going (e.g. right after a crash-restart) spawns a
+// second, third, fourth... instance all fighting over the same CPU/memory,
+// which makes an already-marginal OOM situation worse, not better. This
+// lockfile makes a second run refuse to start instead of stacking up.
+const LOCK_FILE = '/tmp/reprocess-images.lock';
+
+function acquireLock() {
+  if (fs.existsSync(LOCK_FILE)) return false;
+  fs.writeFileSync(LOCK_FILE, String(process.pid));
+  return true;
+}
+
+function releaseLock() {
+  try {
+    if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
+  } catch {
+    // best-effort — a leftover lockfile after a hard crash is expected and
+    // clears itself on the next container restart anyway, since /tmp doesn't
+    // persist across restarts
+  }
+}
+
+async function doRun() {
   console.log(`=== Image reprocessing run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: no images will be downloaded, converted, or saved, no rows updated.\n');
 
@@ -74,6 +107,23 @@ async function run() {
       }
 
       console.log(`Processing: ${article.slug} (${(originalBuffer.length / 1024).toFixed(0)}KB — over threshold)`);
+
+      let dims;
+      try {
+        dims = imageSize(originalBuffer);
+      } catch {
+        console.log(`  [skipped] Could not read image dimensions — leaving as-is rather than risk a crash on an unreadable file.`);
+        skipped += 1;
+        await sleep(50);
+        continue;
+      }
+      const megapixels = (dims.width * dims.height) / 1_000_000;
+      if (megapixels > MAX_MEGAPIXELS) {
+        console.log(`  [skipped] ${dims.width}x${dims.height} (${megapixels.toFixed(0)}MP) — unusually large dimensions for a modest file size, likely to crash on decode. Flagging for manual review instead of risking it.`);
+        skipped += 1;
+        await sleep(50);
+        continue;
+      }
 
       const img = await Jimp.read(originalBuffer);
       if (img.width > MAX_WIDTH) img.resize({ w: MAX_WIDTH });
@@ -137,5 +187,19 @@ async function run() {
 
 run().catch((err) => {
   console.error('Fatal error in reprocessing run:', err);
+  releaseLock();
   process.exit(1);
 });
+
+async function run() {
+  if (!acquireLock()) {
+    console.log('=== Image reprocessing: already running (lockfile present) — refusing to start a second instance. ===');
+    console.log('If you\'re sure nothing is actually running (e.g. the container restarted and left a stale lock), delete /tmp/reprocess-images.lock and try again.');
+    return;
+  }
+  try {
+    await doRun();
+  } finally {
+    releaseLock();
+  }
+}
