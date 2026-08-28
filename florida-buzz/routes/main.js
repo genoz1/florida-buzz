@@ -198,16 +198,38 @@ async function hasAnyRealArticles() {
 
 async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen, slug, author } = {}) {
   if (supabase) {
-    let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
-    if (category) query = query.eq('category', category);
-    if (city) query = query.eq('city', city);
-    if (evergreenOnly) query = query.eq('is_evergreen', true);
-    if (excludeEvergreen) query = query.eq('is_evergreen', false);
-    if (slug) query = query.eq('slug', slug); // exact match — not subject to `limit`, so old articles are always findable
-    if (author) query = query.eq('source_name', author);
-    if (limit) query = query.limit(limit);
-    const { data, error } = await query;
+    const runQuery = async () => {
+      let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
+      if (category) query = query.eq('category', category);
+      if (city) query = query.eq('city', city);
+      if (evergreenOnly) query = query.eq('is_evergreen', true);
+      if (excludeEvergreen) query = query.eq('is_evergreen', false);
+      if (slug) query = query.eq('slug', slug); // exact match — not subject to `limit`, so old articles are always findable
+      if (author) query = query.eq('source_name', author);
+      if (limit) query = query.limit(limit);
+      return query;
+    };
+
+    let { data, error } = await runQuery();
+    if (error) {
+      // A real query error (e.g. the ongoing Supabase JWT-rejection platform
+      // incident) is NOT the same thing as "no matching rows" — treating it
+      // as such was silently rendering real, valid article links as 404s to
+      // real visitors. These errors are documented as often resolving within
+      // under a second, so one short retry recovers the real data instead of
+      // falsely reporting the article doesn't exist. Logged now too, since
+      // this was previously invisible even when it was happening.
+      console.error(`  [warning] Supabase query failed (retrying once): ${error.message}`);
+      await new Promise((r) => setTimeout(r, 800));
+      ({ data, error } = await runQuery());
+      if (error) {
+        console.error(`  [error] Supabase query failed again after retry: ${error.message}`);
+      }
+    }
     if (!error && data && data.length) return data;
+    // Only fall through to sample/demo data below when Supabase genuinely
+    // has no matching rows (no error) — not when the query itself failed.
+    if (error) return [];
   }
 
   const hasReal = await hasAnyRealArticles();
