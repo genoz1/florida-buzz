@@ -186,7 +186,7 @@ async function doRun() {
     }
 
     try {
-      const res = await fetch(article.image_url);
+      const res = await fetch(article.image_url, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
       const originalBuffer = Buffer.from(await res.arrayBuffer());
 
