@@ -68,7 +68,33 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`The Florida Buzz running on port ${PORT}`);
+  checkAndResumeImageReprocessing();
 });
+
+// Checks on every boot whether the image reprocessing job still has real work
+// left, and if so, launches it automatically. Combined with the fact that
+// DigitalOcean already auto-restarts this app within seconds of any crash,
+// this turns "the job crashed on an unknown bad file" into a fully
+// self-healing loop: crash -> platform auto-restart -> this check fires ->
+// job resumes automatically -> repeat as needed -> no one has to be awake
+// watching it or re-clicking anything. The job itself remembers (via a state
+// file in Supabase Storage, not local disk, so it survives a restart) which
+// specific file it was working on when a crash happened, and permanently
+// skips that one on the next attempt.
+async function checkAndResumeImageReprocessing() {
+  if (process.env.AUTO_RESUME_IMAGE_REPROCESSING !== 'true') return;
+  try {
+    console.log('Startup check: AUTO_RESUME_IMAGE_REPROCESSING is on — launching the reprocessing job to check for and continue any remaining work.');
+    const { spawn } = require('child_process');
+    const child = spawn('node', [path.join(__dirname, 'scripts', 'reprocess-images.js')], {
+      detached: true,
+      stdio: 'inherit',
+    });
+    child.unref();
+  } catch (err) {
+    console.error('Startup image-reprocessing check failed (non-fatal, site continues normally):', err.message);
+  }
+}
 
 // Runs the RSS -> AI -> publish -> post pipeline automatically, 4x/day.
 // Adjust the cron schedule once you've confirmed costs/volume feel right.
