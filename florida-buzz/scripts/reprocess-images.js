@@ -185,15 +185,67 @@ async function doRun() {
       continue;
     }
 
+    // The whole per-article attempt — download, decode, upload, DB update —
+    // gets a hard overall time limit. Individual steps already have their
+    // own timeouts (the download, the isolated worker), but there are other
+    // network calls in here (uploading the result, updating the database,
+    // saving state) that don't, and any one of them hanging instead of
+    // failing outright would freeze the whole job with nothing to rescue it —
+    // which is what happened overnight. This is the backstop: no matter
+    // which specific thing is slow, 90 seconds and it's treated as a failure
+    // and the loop moves on regardless.
+    try {
+      await Promise.race([
+        processOneArticle(article, persisted),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out after 90s (hung on some step — see which log line came before this one to narrow it down)')), 90000)),
+      ]).then((result) => {
+        if (result.status === 'success') {
+          succeeded += 1;
+          totalOriginalBytes += result.originalSize;
+          totalNewBytes += result.compressedSize;
+        } else if (result.status === 'skipped') {
+          skipped += 1;
+        }
+      });
+    } catch (err) {
+      console.log(`  [failed] ${err.message}`);
+      failed.push(article.slug);
+      // Reaching this line at all proves the container survived — clear the
+      // marker here too, not just on the success path, so a normal handled
+      // failure never gets mistaken for a crash on the next run.
+      await savePersistedState({ inProgressSlug: null, confirmedProblems: persisted.confirmedProblems });
+    }
+
+    await sleep(300);
+  }
+
+  console.log('\n=== Reprocessing complete ===');
+  if (!DRY_RUN) {
+    console.log(`Already fine, skipped: ${skipped}`);
+    console.log(`Reprocessed successfully: ${succeeded}`);
+    console.log(`Failed: ${failed.length}`);
+    if (succeeded > 0) {
+      const totalSavedMB = (totalOriginalBytes - totalNewBytes) / 1024 / 1024;
+      const pctSaved = (100 - (totalNewBytes / totalOriginalBytes) * 100).toFixed(0);
+      console.log(`Total size reduction: ${totalSavedMB.toFixed(1)}MB (${pctSaved}% smaller across all reprocessed images)`);
+    }
+    if (failed.length) {
+      console.log('\nThese articles could not be reprocessed (left with their original image, untouched):');
+      failed.forEach((slug) => console.log(`  - ${slug}`));
+      console.log('\nYou can re-run this script later to retry these.');
+    }
+  }
+}
+
+async function processOneArticle(article, persisted) {
     try {
       const res = await fetch(article.image_url, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
       const originalBuffer = Buffer.from(await res.arrayBuffer());
 
       if (originalBuffer.length <= SIZE_THRESHOLD_BYTES) {
-        skipped += 1;
         await sleep(50); // still a real request even when skipping — don't hammer the CDN
-        continue;
+        return { status: 'skipped' };
       }
 
       console.log(`Processing: ${article.slug} (${(originalBuffer.length / 1024).toFixed(0)}KB — over threshold)`);
@@ -201,9 +253,7 @@ async function doRun() {
       const unsupportedFormat = getKnownUnsupportedFormat(originalBuffer);
       if (unsupportedFormat) {
         console.log(`  [failed] Mime type ${unsupportedFormat} does not support decoding`);
-        failed.push(article.slug);
-        await sleep(50);
-        continue;
+        throw new Error(`Mime type ${unsupportedFormat} does not support decoding`);
       }
 
       let dims;
@@ -211,22 +261,19 @@ async function doRun() {
         dims = imageSize(originalBuffer);
       } catch {
         console.log(`  [skipped] Could not read image dimensions — leaving as-is rather than risk a crash on an unreadable file.`);
-        skipped += 1;
         await sleep(50);
-        continue;
+        return { status: 'skipped' };
       }
       const megapixels = (dims.width * dims.height) / 1_000_000;
       if (!Number.isFinite(megapixels) || megapixels <= 0) {
         console.log(`  [skipped] Could not determine valid dimensions (got ${dims.width}x${dims.height}) — treating as unsafe rather than risking a crash on an unusual file.`);
-        skipped += 1;
         await sleep(50);
-        continue;
+        return { status: 'skipped' };
       }
       if (megapixels > MAX_MEGAPIXELS) {
         console.log(`  [skipped] ${dims.width}x${dims.height} (${megapixels.toFixed(0)}MP) — unusually large dimensions for a modest file size, likely to crash on decode. Flagging for manual review instead of risking it.`);
-        skipped += 1;
         await sleep(50);
-        continue;
+        return { status: 'skipped' };
       }
 
       const tempIn = `/tmp/reprocess-in-${article.id}.tmp`;
@@ -284,38 +331,13 @@ async function doRun() {
       }
 
       const savedKB = (originalBuffer.length - compressedBuffer.length) / 1024;
-      totalOriginalBytes += originalBuffer.length;
-      totalNewBytes += compressedBuffer.length;
       console.log(`  [success] ${(originalBuffer.length / 1024).toFixed(0)}KB -> ${(compressedBuffer.length / 1024).toFixed(0)}KB (saved ${savedKB.toFixed(0)}KB)`);
-      succeeded += 1;
+      return { status: 'success', originalSize: originalBuffer.length, compressedSize: compressedBuffer.length };
     } catch (err) {
-      console.log(`  [failed] ${err.message}`);
-      failed.push(article.slug);
-      // Reaching this line at all proves the container survived — clear the
-      // marker here too, not just on the success path, so a normal handled
-      // failure never gets mistaken for a crash on the next run.
-      await savePersistedState({ inProgressSlug: null, confirmedProblems: persisted.confirmedProblems });
+      // Re-throw so the caller's Promise.race/catch handles logging, the
+      // failed list, and clearing the persisted marker in one place.
+      throw err;
     }
-
-    await sleep(300);
-  }
-
-  console.log('\n=== Reprocessing complete ===');
-  if (!DRY_RUN) {
-    console.log(`Already fine, skipped: ${skipped}`);
-    console.log(`Reprocessed successfully: ${succeeded}`);
-    console.log(`Failed: ${failed.length}`);
-    if (succeeded > 0) {
-      const totalSavedMB = (totalOriginalBytes - totalNewBytes) / 1024 / 1024;
-      const pctSaved = (100 - (totalNewBytes / totalOriginalBytes) * 100).toFixed(0);
-      console.log(`Total size reduction: ${totalSavedMB.toFixed(1)}MB (${pctSaved}% smaller across all reprocessed images)`);
-    }
-    if (failed.length) {
-      console.log('\nThese articles could not be reprocessed (left with their original image, untouched):');
-      failed.forEach((slug) => console.log(`  - ${slug}`));
-      console.log('\nYou can re-run this script later to retry these.');
-    }
-  }
 }
 
 run().catch((err) => {
