@@ -78,6 +78,41 @@ function releaseLock() {
   }
 }
 
+// Durable crash memory. If the whole container gets killed mid-decode (the
+// exact failure mode hit repeatedly tonight), a hardcoded in-code skip list
+// requires someone to read the crash log and manually add the slug, redeploy,
+// and try again. This does the same thing automatically: right before the
+// risky decode step for a given article, its slug is recorded here (in
+// Supabase Storage — NOT local /tmp, which gets wiped on every restart, so
+// this actually survives a crash). If the process dies before clearing that
+// marker, the next run (even one auto-triggered by a platform restart, with
+// no human involved at all) sees the leftover marker, knows that specific
+// file killed the last attempt, and permanently skips it going forward.
+const STATE_FILE = '_reprocess-state.json';
+
+async function loadPersistedState() {
+  try {
+    const { data, error } = await supabase.storage.from('article-images').download(STATE_FILE);
+    if (error || !data) return { inProgressSlug: null, confirmedProblems: [] };
+    const text = await data.text();
+    return JSON.parse(text);
+  } catch {
+    return { inProgressSlug: null, confirmedProblems: [] };
+  }
+}
+
+async function savePersistedState(state) {
+  try {
+    await supabase.storage.from('article-images').upload(
+      STATE_FILE,
+      Buffer.from(JSON.stringify(state)),
+      { contentType: 'application/json', upsert: true }
+    );
+  } catch (err) {
+    console.error(`  [warning] Could not persist crash-recovery state: ${err.message}`);
+  }
+}
+
 async function doRun() {
   console.log(`=== Image reprocessing run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: no images will be downloaded, converted, or saved, no rows updated.\n');
@@ -85,6 +120,19 @@ async function doRun() {
   if (!supabase) {
     console.error('Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_KEY missing) — nothing to do.');
     return;
+  }
+
+  const persisted = await loadPersistedState();
+  if (persisted.inProgressSlug) {
+    console.log(`Previous run's state shows it was mid-attempt on "${persisted.inProgressSlug}" when it stopped — that's almost certainly what caused the crash. Adding it to the permanent skip list automatically.`);
+    if (!persisted.confirmedProblems.includes(persisted.inProgressSlug)) {
+      persisted.confirmedProblems.push(persisted.inProgressSlug);
+    }
+    persisted.inProgressSlug = null;
+    await savePersistedState(persisted);
+  }
+  if (persisted.confirmedProblems.length) {
+    console.log(`Auto-discovered problem files being skipped this run: ${persisted.confirmedProblems.join(', ')}`);
   }
 
   // Supabase caps results at 1000 rows per request by default — a plain
@@ -120,7 +168,8 @@ async function doRun() {
     'visit-orlando-magical-dining-2026-restaurants-and-details',
   ]);
 
-  const candidates = articles.filter((a) => isOwnStorageUrl(a.image_url) && !KNOWN_PROBLEM_SLUGS.has(a.slug));
+  const allProblemSlugs = new Set([...KNOWN_PROBLEM_SLUGS, ...persisted.confirmedProblems]);
+  const candidates = articles.filter((a) => isOwnStorageUrl(a.image_url) && !allProblemSlugs.has(a.slug));
   console.log(`Found ${articles.length} articles total, ${candidates.length} with an image in our own storage to check.\n`);
 
   let succeeded = 0;
@@ -183,6 +232,10 @@ async function doRun() {
       const tempIn = `/tmp/reprocess-in-${article.id}.tmp`;
       const tempOut = `/tmp/reprocess-out-${article.id}.jpg`;
       fs.writeFileSync(tempIn, originalBuffer);
+
+      // Persisted BEFORE the risky call, and awaited, so it's durably saved
+      // even if the very next line kills the whole container.
+      await savePersistedState({ inProgressSlug: article.slug, confirmedProblems: persisted.confirmedProblems });
       try {
         execFileSync(
           'node',
@@ -199,6 +252,9 @@ async function doRun() {
       } finally {
         if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
       }
+      // Made it past the risky call without the container dying — safe to
+      // clear the marker now.
+      await savePersistedState({ inProgressSlug: null, confirmedProblems: persisted.confirmedProblems });
       const compressedBuffer = fs.readFileSync(tempOut);
       fs.unlinkSync(tempOut);
 
@@ -235,6 +291,10 @@ async function doRun() {
     } catch (err) {
       console.log(`  [failed] ${err.message}`);
       failed.push(article.slug);
+      // Reaching this line at all proves the container survived — clear the
+      // marker here too, not just on the success path, so a normal handled
+      // failure never gets mistaken for a crash on the next run.
+      await savePersistedState({ inProgressSlug: null, confirmedProblems: persisted.confirmedProblems });
     }
 
     await sleep(300);
