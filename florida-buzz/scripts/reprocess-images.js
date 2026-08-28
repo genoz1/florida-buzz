@@ -1,9 +1,11 @@
 require('dotenv').config();
 const fs = require('fs');
+const path = require('path');
+const { execFileSync } = require('child_process');
 const { supabase } = require('../lib/supabase');
-const { Jimp } = require('jimp');
 const { imageSize } = require('image-size');
 
+const WORKER_PATH = path.join(__dirname, 'compress-worker.js');
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_WIDTH = 1200;
 const JPEG_QUALITY = 78;
@@ -153,9 +155,27 @@ async function doRun() {
         continue;
       }
 
-      const img = await Jimp.read(originalBuffer);
-      if (img.width > MAX_WIDTH) img.resize({ w: MAX_WIDTH });
-      const compressedBuffer = await img.getBuffer('image/jpeg', { quality: JPEG_QUALITY });
+      const tempIn = `/tmp/reprocess-in-${article.id}.tmp`;
+      const tempOut = `/tmp/reprocess-out-${article.id}.jpg`;
+      fs.writeFileSync(tempIn, originalBuffer);
+      try {
+        execFileSync(
+          'node',
+          ['--max-old-space-size=300', WORKER_PATH, tempIn, tempOut, String(MAX_WIDTH), String(JPEG_QUALITY)],
+          { timeout: 20000, stdio: ['ignore', 'ignore', 'pipe'] }
+        );
+      } catch (workerErr) {
+        // The worker process crashed or got killed for using too much memory
+        // — since it ran in its own isolated process, that's all that
+        // happened. The main server (and this loop) are completely fine and
+        // simply move on to the next image, instead of the whole process
+        // dying the way it did before this isolation was added.
+        throw new Error(`Isolated compression worker failed (this image is likely corrupt or malformed): ${workerErr.stderr ? workerErr.stderr.toString().trim() : workerErr.message}`);
+      } finally {
+        if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+      }
+      const compressedBuffer = fs.readFileSync(tempOut);
+      fs.unlinkSync(tempOut);
 
       const oldFilename = article.image_url.split('/article-images/')[1].split('?')[0];
       const newFilename = oldFilename.replace(/\.(png|jpe?g|webp)$/i, '.jpg');
