@@ -39,6 +39,22 @@ function isOwnStorageUrl(url) {
   return !!url && url.includes('/storage/v1/object/public/article-images/');
 }
 
+// Jimp genuinely cannot decode these two formats at all (confirmed earlier —
+// it only bundles JPEG/PNG/GIF/BMP/TIFF support). Checking for them here,
+// from just the first few bytes, means they're skipped instantly rather than
+// being handed to the isolated worker at all — no process spawn, no timeout
+// to wait out, nothing that can hang. This is the fast path for the large
+// majority of "unsupported format" failures seen in every run so far.
+function getKnownUnsupportedFormat(buffer) {
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return 'image/webp';
+  }
+  if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp' && buffer.toString('ascii', 8, 12).startsWith('avif')) {
+    return 'image/avif';
+  }
+  return null;
+}
+
 // Prevents exactly what happened before: hitting the trigger URL again while
 // a previous run is still going (e.g. right after a crash-restart) spawns a
 // second, third, fourth... instance all fighting over the same CPU/memory,
@@ -132,6 +148,14 @@ async function doRun() {
 
       console.log(`Processing: ${article.slug} (${(originalBuffer.length / 1024).toFixed(0)}KB — over threshold)`);
 
+      const unsupportedFormat = getKnownUnsupportedFormat(originalBuffer);
+      if (unsupportedFormat) {
+        console.log(`  [failed] Mime type ${unsupportedFormat} does not support decoding`);
+        failed.push(article.slug);
+        await sleep(50);
+        continue;
+      }
+
       let dims;
       try {
         dims = imageSize(originalBuffer);
@@ -162,7 +186,7 @@ async function doRun() {
         execFileSync(
           'node',
           ['--max-old-space-size=300', WORKER_PATH, tempIn, tempOut, String(MAX_WIDTH), String(JPEG_QUALITY)],
-          { timeout: 20000, stdio: ['ignore', 'ignore', 'pipe'] }
+          { timeout: 20000, killSignal: 'SIGKILL', stdio: ['ignore', 'ignore', 'pipe'] }
         );
       } catch (workerErr) {
         // The worker process crashed or got killed for using too much memory
