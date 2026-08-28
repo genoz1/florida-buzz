@@ -227,9 +227,12 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
       }
     }
     if (!error && data && data.length) return data;
-    // Only fall through to sample/demo data below when Supabase genuinely
-    // has no matching rows (no error) — not when the query itself failed.
-    if (error) return [];
+    // A persistent error (still failing after the retry above) falls
+    // through to the fallback logic below, same as before this change —
+    // that's a real safety net (showing something rather than nothing) and
+    // shouldn't have been bypassed. The retry above already handles the
+    // common transient case (the false-404 bug); this just stops a
+    // sustained outage from producing a completely empty homepage.
   }
 
   const hasReal = await hasAnyRealArticles();
