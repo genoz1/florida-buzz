@@ -16,7 +16,7 @@ const JPEG_QUALITY = 78;
 // crashing the whole container via OOM. image-size reads just the file
 // header, not the full image, so this check is cheap and safe to do before
 // ever calling the heavy Jimp.read()/resize()/encode() pipeline.
-const MAX_MEGAPIXELS = 25; // ~5000x5000 — comfortably above any real photo/hero image this site uses
+const MAX_MEGAPIXELS = 12; // ~3500x3500 — two confirmed crashes tonight were both on large real-world photos (2.2MB, 5.7MB); a lower, more conservative ceiling trades a few more manual-review skips for meaningfully less risk of hitting the same container-memory wall on an unknown third file
 
 // Small pause between images so this doesn't hammer Supabase/DigitalOcean's
 // outbound bandwidth all at once across 800+ files in a tight loop.
@@ -117,6 +117,7 @@ async function doRun() {
   // but it should never be allowed to take down the whole job again.
   const KNOWN_PROBLEM_SLUGS = new Set([
     'legoland-florida-coastersaurus-reopening-august-16-2026',
+    'visit-orlando-magical-dining-2026-restaurants-and-details',
   ]);
 
   const candidates = articles.filter((a) => isOwnStorageUrl(a.image_url) && !KNOWN_PROBLEM_SLUGS.has(a.slug));
