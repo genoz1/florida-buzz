@@ -140,7 +140,16 @@ async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/p
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(finalFilename, finalBuffer, { contentType: finalContentType, upsert: true });
+      .upload(finalFilename, finalBuffer, {
+        contentType: finalContentType,
+        upsert: true,
+        // 30 days — these images never change once created, so Supabase's
+        // short default cache lifetime was forcing needless repeat
+        // downloads. Flagged directly by PageSpeed Insights as one of the
+        // two biggest remaining opportunities (1,053 KiB) after the actual
+        // image-weight fix.
+        cacheControl: '2592000',
+      });
 
     if (uploadError) throw uploadError;
 
@@ -219,7 +228,7 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(filename, buffer, { contentType, upsert: true });
+      .upload(filename, buffer, { contentType, upsert: true, cacheControl: '2592000' });
 
     if (uploadError) throw uploadError;
 
