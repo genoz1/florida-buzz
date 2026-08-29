@@ -310,7 +310,7 @@ async function processOneArticle(article, persisted) {
 
       const { error: uploadError } = await supabase.storage
         .from('article-images')
-        .upload(newFilename, compressedBuffer, { contentType: 'image/jpeg', upsert: true });
+        .upload(newFilename, compressedBuffer, { contentType: 'image/jpeg', upsert: true, cacheControl: '2592000' });
       if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
       const { data: urlData } = supabase.storage.from('article-images').getPublicUrl(newFilename);
