@@ -174,6 +174,7 @@ async function doRun() {
 
   let succeeded = 0;
   let skipped = 0;
+  let cacheRefreshed = 0;
   let totalOriginalBytes = 0;
   let totalNewBytes = 0;
   const failed = [];
@@ -203,6 +204,8 @@ async function doRun() {
           succeeded += 1;
           totalOriginalBytes += result.originalSize;
           totalNewBytes += result.compressedSize;
+        } else if (result.status === 'cache_refreshed') {
+          cacheRefreshed += 1;
         } else if (result.status === 'skipped') {
           skipped += 1;
         }
@@ -222,6 +225,7 @@ async function doRun() {
   console.log('\n=== Reprocessing complete ===');
   if (!DRY_RUN) {
     console.log(`Already fine, skipped: ${skipped}`);
+    console.log(`Cache header refreshed (no resize needed): ${cacheRefreshed}`);
     console.log(`Reprocessed successfully: ${succeeded}`);
     console.log(`Failed: ${failed.length}`);
     if (succeeded > 0) {
@@ -244,8 +248,38 @@ async function processOneArticle(article, persisted) {
       const originalBuffer = Buffer.from(await res.arrayBuffer());
 
       if (originalBuffer.length <= SIZE_THRESHOLD_BYTES) {
-        await sleep(50); // still a real request even when skipping — don't hammer the CDN
-        return { status: 'skipped' };
+        // Already a properly sized/compressed image — no decoding needed at
+        // all, just re-upload the exact same bytes so the new 30-day
+        // cacheControl setting actually takes effect (uploads only pick up
+        // cacheControl at upload time; it doesn't apply retroactively to
+        // files already sitting in storage). This is the safe way to force
+        // that across the whole catalog quickly: it skips the
+        // decode/resize/isolated-worker pipeline entirely for the vast
+        // majority of images that don't need it, so this carries none of
+        // the crash risk that pipeline had — it's just a re-upload of bytes
+        // already in hand.
+        const filename = article.image_url.split('/article-images/')[1]?.split('?')[0];
+        if (!filename) {
+          await sleep(50);
+          return { status: 'skipped' };
+        }
+        const { error: refreshError } = await supabase.storage
+          .from('article-images')
+          .upload(filename, originalBuffer, {
+            upsert: true,
+            cacheControl: '2592000',
+            // Preserve whatever content-type Supabase is already serving
+            // this file as — omitting this risks Supabase defaulting to
+            // something generic on re-upload, which could break how the
+            // image renders even though the bytes themselves are unchanged.
+            contentType: res.headers.get('content-type') || 'image/jpeg',
+          });
+        if (refreshError) {
+          throw new Error(`Cache-header refresh upload failed: ${refreshError.message}`);
+        }
+        console.log(`Refreshed cache header only (already properly sized): ${article.slug}`);
+        await sleep(50);
+        return { status: 'cache_refreshed' };
       }
 
       console.log(`Processing: ${article.slug} (${(originalBuffer.length / 1024).toFixed(0)}KB — over threshold)`);
