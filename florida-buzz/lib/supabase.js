@@ -61,6 +61,50 @@ async function compressForWeb(buffer) {
   return img.getBuffer('image/jpeg', { quality: WEB_IMAGE_JPEG_QUALITY });
 }
 
+// A second, smaller version specifically for the small "related articles"
+// cards shown on nearly every page (article, category, city, guides, home,
+// pillar) — those cards render at roughly 480-640px wide depending on
+// screen size, so serving the same 1200px hero-sized image there wastes
+// real bandwidth on every card, on every page view, site-wide. 640px
+// matches what PageSpeed Insights measured as the actual rendered width on
+// mobile. Stored as a genuine second file (not Supabase's paid Image
+// Transformation API — that's the exact feature that already blew through
+// the Storage Image Transformations quota once) so serving it is a normal,
+// free file download, not a billed per-view transformation.
+const THUMBNAIL_MAX_WIDTH = 640;
+const THUMBNAIL_JPEG_QUALITY = 72;
+
+async function generateThumbnail(buffer) {
+  const img = await Jimp.read(buffer);
+  if (img.width > THUMBNAIL_MAX_WIDTH) {
+    img.resize({ w: THUMBNAIL_MAX_WIDTH });
+  }
+  return img.getBuffer('image/jpeg', { quality: THUMBNAIL_JPEG_QUALITY });
+}
+
+// Derives the thumbnail's filename from the main image's filename by simple
+// convention (insert "-thumb" before the extension) rather than adding a
+// database column — the two files live side by side in the same bucket,
+// and the relationship is always computable from the one URL already
+// stored on the article.
+function thumbFilename(filename) {
+  return filename.replace(/\.([a-z0-9]+)$/i, '-thumb.$1');
+}
+
+// Template-facing version: takes a full image URL (as stored on an article)
+// and returns the thumbnail's URL, or the original URL unchanged if it's not
+// one of our own Supabase-hosted images (e.g. the picsum.photos placeholders
+// used when no real image exists — those have no separate thumbnail and
+// were already small to begin with).
+function thumbUrl(imageUrl) {
+  if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
+  if (!imageUrl.includes('/storage/v1/object/public/article-images/')) return imageUrl;
+  const [base, query] = imageUrl.split('?');
+  const parts = base.split('/article-images/');
+  const thumbBase = `${parts[0]}/article-images/${thumbFilename(parts[1])}`;
+  return query ? `${thumbBase}?${query}` : thumbBase;
+}
+
 async function normalizeAspectRatio(buffer) {
   let dims;
   try {
@@ -153,6 +197,20 @@ async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/p
 
     if (uploadError) throw uploadError;
 
+    // Non-fatal: the main image already succeeded, which is what matters
+    // most. If thumbnail generation has a problem, templates fall back to
+    // the full-size image for cards rather than the article failing outright.
+    try {
+      const thumbBuffer = await generateThumbnail(finalBuffer);
+      await supabase.storage.from('article-images').upload(thumbFilename(finalFilename), thumbBuffer, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        cacheControl: '2592000',
+      });
+    } catch (thumbErr) {
+      console.error(`  [warning] Could not generate thumbnail (article's main image is unaffected): ${thumbErr.message}`);
+    }
+
     const { data } = supabase.storage.from('article-images').getPublicUrl(finalFilename);
     return data.publicUrl;
   } catch (err) {
@@ -232,6 +290,17 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
 
     if (uploadError) throw uploadError;
 
+    try {
+      const thumbBuffer = await generateThumbnail(buffer);
+      await supabase.storage.from('article-images').upload(thumbFilename(filename), thumbBuffer, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        cacheControl: '2592000',
+      });
+    } catch (thumbErr) {
+      console.error(`  [warning] Could not generate thumbnail (article's main image is unaffected): ${thumbErr.message}`);
+    }
+
     const { data } = supabase.storage.from('article-images').getPublicUrl(filename);
     return data.publicUrl;
   } catch (err) {
@@ -240,4 +309,4 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
   }
 }
 
-module.exports = { supabase, storeGeneratedImage, storeImageFromUrl };
+module.exports = { supabase, storeGeneratedImage, storeImageFromUrl, thumbUrl };
