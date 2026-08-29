@@ -80,7 +80,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "meta_title": "string, under 60 characters, natural search phrasing (e.g. 'Coral Reef Restaurant Review — Epcot')",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, 4-7 short paragraphs as <p> tags, first-person, original wording, based only on the facts given",
-  "fb_caption": "string, Facebook post: 1-2 sentences plus a relevant emoji, ends with 'Full review \\u2193' — no hashtags. Lead with a specific, concrete detail from the review, not generic hype.",
+  "fb_caption": "string, Facebook post: 1-2 sentences plus a relevant emoji, ends with 'Full review \\u2193' — no hashtags. Name the specific place being reviewed clearly, and make clear the reviewer has a real, specific verdict or standout detail — but hold that detail back rather than stating it, so there's a genuine reason to click through and read it.",
   "pin_title": "string, under 100 characters, descriptive and keyword-rich",
   "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms"
 }`;
