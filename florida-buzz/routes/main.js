@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { supabase, storeGeneratedImage } = require('../lib/supabase');
+const { supabase, storeGeneratedImage, thumbUrl } = require('../lib/supabase');
 const { spawn } = require('child_process');
 const path = require('path');
 const multer = require('multer');
@@ -268,6 +268,7 @@ router.get('/', async (req, res) => {
     ticker: all.slice(0, 8),
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    thumbUrl,
     resizeImg,
     timeAgo,
   });
@@ -291,6 +292,7 @@ router.get('/category/:cat', async (req, res) => {
     seoIntro: seo.intro,
     cityLabels: cat === 'events' ? CITY_LABELS : null,
     placeholderImg,
+    thumbUrl,
     resizeImg,
     timeAgo,
   });
@@ -314,6 +316,7 @@ router.get('/city/:city', async (req, res) => {
     seoDescription: seo.description,
     seoIntro: seo.intro,
     placeholderImg,
+    thumbUrl,
     resizeImg,
     timeAgo,
   });
@@ -340,6 +343,7 @@ router.get('/article/:slug', async (req, res) => {
     ticker,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    thumbUrl,
     resizeImg,
     timeAgo,
   });
@@ -354,6 +358,7 @@ router.get('/guides', async (req, res) => {
     ticker,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    thumbUrl,
     resizeImg,
     timeAgo,
   });
@@ -376,6 +381,7 @@ router.get('/guide/:pillarSlug', async (req, res) => {
     ticker,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
+    thumbUrl,
     resizeImg,
     timeAgo,
   });
