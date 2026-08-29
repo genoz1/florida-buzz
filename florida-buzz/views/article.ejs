@@ -19,7 +19,7 @@
     </p>
 
     <div class="hero-image" style="margin: 22px 0;">
-      <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>" width="800" height="600" loading="eager" onerror="this.onerror=null;this.src='<%= placeholderImg(article.category) %>';">
+      <img src="<%= article.image_url || placeholderImg(article.category) %>" alt="<%= article.title %>" width="800" height="600" loading="eager" fetchpriority="high" onerror="this.onerror=null;this.src='<%= placeholderImg(article.category) %>';">
     </div>
 
     <div class="article-body"><%- article.body_html %></div>
