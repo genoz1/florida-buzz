@@ -34,7 +34,15 @@
   <% } %>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Loaded asynchronously (preload, then swap to stylesheet on load) instead
+       of a plain blocking <link rel="stylesheet">, which was forcing the
+       browser to wait on an external domain before it could render anything
+       — flagged directly by PageSpeed Insights as the single biggest
+       remaining "render-blocking requests" issue (2,240ms). The noscript
+       fallback keeps fonts working correctly with JS disabled. -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap"></noscript>
   <link rel="stylesheet" href="/css/style.css">
 
   <script type="application/ld+json">
