@@ -309,4 +309,4 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
   }
 }
 
-module.exports = { supabase, storeGeneratedImage, storeImageFromUrl, thumbUrl };
+module.exports = { supabase, storeGeneratedImage, storeImageFromUrl, thumbUrl, thumbFilename, generateThumbnail };
