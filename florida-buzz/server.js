@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 8080;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
 // IndexNow key verification file — must be served at the site root with a
 // filename matching the key itself, containing just the key as plain text.
