@@ -2,7 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { supabase } = require('../lib/supabase');
+const { supabase, thumbFilename, generateThumbnail } = require('../lib/supabase');
 const { imageSize } = require('image-size');
 
 const WORKER_PATH = path.join(__dirname, 'compress-worker.js');
@@ -241,6 +241,39 @@ async function doRun() {
   }
 }
 
+// Checks whether this article's thumbnail already exists and generates one
+// if not, using a buffer that's already been safely decoded once by this
+// point in the caller (either confirmed small enough to trust directly, or
+// already run through the isolated worker) — so this doesn't need its own
+// isolation the way the original raw-decode step did. Non-fatal: a missing
+// thumbnail template-side just falls back to the full-size image, so a
+// failure here shouldn't count against the article's main image work.
+async function ensureThumbnailExists(article, safeBuffer) {
+  const filename = article.image_url.split('/article-images/')[1]?.split('?')[0];
+  if (!filename) return false;
+  const thumbName = thumbFilename(filename);
+  try {
+    const { data } = supabase.storage.from('article-images').getPublicUrl(thumbName);
+    const headRes = await fetch(data.publicUrl, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+    if (headRes.ok) return false; // already exists, nothing to do
+  } catch {
+    // Treat a failed check the same as "missing" and just try to create it —
+    // worst case this attempts a redundant upload, which is harmless.
+  }
+  try {
+    const thumbBuffer = await generateThumbnail(safeBuffer);
+    await supabase.storage.from('article-images').upload(thumbName, thumbBuffer, {
+      contentType: 'image/jpeg',
+      upsert: true,
+      cacheControl: '2592000',
+    });
+    return true;
+  } catch (err) {
+    console.log(`  [warning] Could not backfill thumbnail for ${article.slug}: ${err.message}`);
+    return false;
+  }
+}
+
 async function processOneArticle(article, persisted) {
     try {
       const res = await fetch(article.image_url, { signal: AbortSignal.timeout(15000) });
@@ -278,6 +311,8 @@ async function processOneArticle(article, persisted) {
           throw new Error(`Cache-header refresh upload failed: ${refreshError.message}`);
         }
         console.log(`Refreshed cache header only (already properly sized): ${article.slug}`);
+        const thumbCreated = await ensureThumbnailExists(article, originalBuffer);
+        if (thumbCreated) console.log(`  Also created missing thumbnail.`);
         await sleep(50);
         return { status: 'cache_refreshed' };
       }
@@ -366,6 +401,12 @@ async function processOneArticle(article, persisted) {
 
       const savedKB = (originalBuffer.length - compressedBuffer.length) / 1024;
       console.log(`  [success] ${(originalBuffer.length / 1024).toFixed(0)}KB -> ${(compressedBuffer.length / 1024).toFixed(0)}KB (saved ${savedKB.toFixed(0)}KB)`);
+      // Use the NEW filename (urlData.publicUrl) here, not the stale
+      // article.image_url still held in memory — the DB update above already
+      // moved this article to the new file, and the old one may already be
+      // deleted by the block just above.
+      const thumbCreated = await ensureThumbnailExists({ ...article, image_url: urlData.publicUrl }, compressedBuffer);
+      if (thumbCreated) console.log(`  Also created missing thumbnail.`);
       return { status: 'success', originalSize: originalBuffer.length, compressedSize: compressedBuffer.length };
     } catch (err) {
       // Re-throw so the caller's Promise.race/catch handles logging, the
