@@ -1,6 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
 const { imageSize } = require('image-size');
 const { Jimp } = require('jimp');
+const {
+  MAX_SOURCE_IMAGE_BYTES,
+  inspectSourceImage,
+  processSourceImageInWorker,
+} = require('./sourceImageProcessor');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   console.warn('[supabase] SUPABASE_URL / SUPABASE_SERVICE_KEY not set yet — site will run with sample data only.');
@@ -238,27 +243,32 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
         Referer: new URL(sourceUrl).origin + '/',
         Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
       },
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error(`Source image fetch failed: HTTP ${res.status}`);
 
-    let contentType = res.headers.get('content-type') || 'image/jpeg';
-    let buffer = Buffer.from(await res.arrayBuffer());
-
-    // For sources known to bake a branding banner across the bottom of every
-    // image (e.g. WDW Magic's video-roundup thumbnails), crop that strip off
-    // before doing anything else, rather than discarding the whole real photo
-    // for an AI-generated one. The percentage here is a first-pass estimate —
-    // easy to adjust if it turns out to cut too much or too little.
-    if (cropBottomPercent) {
-      const img = await Jimp.read(buffer);
-      const keepHeight = Math.round(img.height * (1 - cropBottomPercent));
-      img.crop({ x: 0, y: 0, w: img.width, h: keepHeight });
-      buffer = await img.getBuffer('image/jpeg');
-      contentType = 'image/jpeg';
+    const declaredLength = Number(res.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_SOURCE_IMAGE_BYTES) {
+      throw new Error(`Source image exceeds the ${MAX_SOURCE_IMAGE_BYTES / 1024 / 1024}MB download limit.`);
     }
 
+    const reader = res.body.getReader();
+    const chunks = [];
+    let downloadedBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      downloadedBytes += value.byteLength;
+      if (downloadedBytes > MAX_SOURCE_IMAGE_BYTES) {
+        await reader.cancel();
+        throw new Error(`Source image exceeds the ${MAX_SOURCE_IMAGE_BYTES / 1024 / 1024}MB download limit.`);
+      }
+      chunks.push(Buffer.from(value));
+    }
+    const buffer = Buffer.concat(chunks, downloadedBytes);
+
     try {
-      const dims = imageSize(buffer);
+      const dims = inspectSourceImage(buffer);
       if (looksLikeAd(dims.width, dims.height)) {
         console.log(`  [reject] Downloaded image is ${dims.width}x${dims.height} — matches a known ad size or is too small to be a real hero photo. Skipping.`);
         return null;
@@ -266,33 +276,22 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
     } catch (dimErr) {
       // If we can't even read the dimensions, treat it the same as a rejected
       // ad image rather than risk storing something broken or unreadable.
-      console.log(`  [reject] Could not read image dimensions (${dimErr.message}) — skipping rather than risk a bad file.`);
+      console.log(`  [reject] Source image is not safe to decode (${dimErr.message}) — skipping rather than risk a bad file.`);
       return null;
     }
 
-    // Fix the aspect ratio if needed so Instagram doesn't reject this image
-    // later at posting time — cheaper to fix once here than to fail silently
-    // on every future post attempt using this image.
-    buffer = await normalizeAspectRatio(buffer);
-
-    // Real source photos come straight from the publisher's own CDN, often
-    // several MB at full resolution with no compression at all — this is
-    // what actually controls page weight, independent of the aspect-ratio
-    // step above.
     const originalSize = buffer.length;
-    buffer = await compressForWeb(buffer);
-    contentType = 'image/jpeg';
-    console.log(`  Compressed source image: ${(originalSize / 1024).toFixed(0)}KB -> ${(buffer.length / 1024).toFixed(0)}KB`);
+    const { mainBuffer, thumbnailBuffer } = await processSourceImageInWorker(buffer, { cropBottomPercent });
+    console.log(`  Compressed source image: ${(originalSize / 1024).toFixed(0)}KB -> ${(mainBuffer.length / 1024).toFixed(0)}KB`);
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')
-      .upload(filename, buffer, { contentType, upsert: true, cacheControl: '2592000' });
+      .upload(filename, mainBuffer, { contentType: 'image/jpeg', upsert: true, cacheControl: '2592000' });
 
     if (uploadError) throw uploadError;
 
     try {
-      const thumbBuffer = await generateThumbnail(buffer);
-      await supabase.storage.from('article-images').upload(thumbFilename(filename), thumbBuffer, {
+      await supabase.storage.from('article-images').upload(thumbFilename(filename), thumbnailBuffer, {
         contentType: 'image/jpeg',
         upsert: true,
         cacheControl: '2592000',
