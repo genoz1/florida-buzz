@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { askClaudeWithSearch } = require('../lib/anthropic');
+const { generateTextWithResearch } = require('../lib/aiText');
+const { validateGuide, validateTopic } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { postToFacebookPage } = require('../lib/facebook');
@@ -337,8 +338,8 @@ ${sameCategory.length ? sameCategory.map((t) => `- ${t}`).join('\n') : '(none ye
 Already-covered guides in other categories (for awareness, avoid near-duplicates):
 ${otherTitles.length ? otherTitles.map((t) => `- ${t}`).join('\n') : '(none yet)'}`;
 
-  const { text } = await askClaudeWithSearch(system, user, 500, 3);
-  return parseJsonResponse(text, 'topic');
+  const { text } = await generateTextWithResearch(system, user, 500, 3);
+  return validateTopic(await parseJsonResponse(text, 'topic'));
 }
 
 async function researchAndWriteGuide({ category, topic, workingTitle }) {
@@ -397,9 +398,9 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 Topic: ${topic}
 Working title idea: ${workingTitle}`;
 
-  const { text, searchesUsed } = await askClaudeWithSearch(system, user, 6000, 12);
+  const { text, searchesUsed } = await generateTextWithResearch(system, user, 6000, 12);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
-  const guide = await parseJsonResponse(text, 'guide');
+  const guide = validateGuide(await parseJsonResponse(text, 'guide'));
   guide.body_html = stripCitationTags(guide.body_html);
   guide.body_html = convertAffiliateLinks(guide.body_html);
   guide.body_html = convertUndercoverTouristLinks(guide.body_html);
@@ -545,7 +546,11 @@ async function run() {
   console.log('\n=== Run complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in guide generation run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in guide generation run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, pickTopic, researchAndWriteGuide, parseJsonResponse };

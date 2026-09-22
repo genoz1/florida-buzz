@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { askClaude } = require('../lib/anthropic');
+const { generateText } = require('../lib/aiText');
+const { validateRoundup } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { postToFacebookPage } = require('../lib/facebook');
 const { notifyIndexNow } = require('../lib/indexnow');
@@ -131,16 +132,16 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
     .map((a, i) => `${i + 1}. ${a.title} — ${a.dek} (${SITE_URL}/article/${a.slug})`)
     .join('\n');
 
-  const raw = await askClaude(system, user, 1200);
+  const raw = await generateText(system, user, 1200);
   const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
 
   try {
-    return JSON.parse(cleaned);
+    return validateRoundup(JSON.parse(cleaned));
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        return JSON.parse(match[0]);
+        return validateRoundup(JSON.parse(match[0]));
       } catch {
         // fall through
       }
@@ -261,7 +262,11 @@ async function run() {
   console.log('\n=== Run complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in city roundup run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in city roundup run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, composeRoundup };

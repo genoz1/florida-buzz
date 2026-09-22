@@ -1,7 +1,9 @@
 require('dotenv').config();
 const Parser = require('rss-parser');
 const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/supabase');
-const { askClaude } = require('../lib/anthropic');
+const { generateText } = require('../lib/aiText');
+const { validateNewsArticle } = require('../lib/contentValidation');
+const { createArticleRetryQueue } = require('../lib/articleRetryQueue');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
@@ -313,13 +315,8 @@ publish something insensitive or off-topic.`;
 
   const user = `Headline: ${title}\nSummary: ${summary}`;
 
-  try {
-    const raw = await askClaude(system, user, 10);
-    return raw.trim().toUpperCase().startsWith('YES');
-  } catch (err) {
-    console.error(`  [error] Safety check failed, skipping item to be safe: ${err.message}`);
-    return false;
-  }
+  const raw = await generateText(system, user, 10);
+  return raw.trim().toUpperCase().startsWith('YES');
 }
 
 async function writeArticle({ sourceTitle, sourceSummary, sourceName, sourceUrl, category }) {
@@ -380,16 +377,16 @@ Source summary/content: ${sourceSummary}
 This feed is generally about: ${category} (but classify based on this specific story's actual subject, not this hint, if they differ)
 Source link (for context only, do not include in body_html): ${sourceUrl}`;
 
-  const raw = await askClaude(system, user, 1200);
+  const raw = await generateText(system, user, 1200);
   const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
 
   try {
-    return JSON.parse(cleaned);
+    return validateNewsArticle(JSON.parse(cleaned));
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        return JSON.parse(match[0]);
+        return validateNewsArticle(JSON.parse(match[0]));
       } catch {
         // fall through to the error below
       }
@@ -502,9 +499,28 @@ async function alreadySeen(guid) {
   return !!data;
 }
 
+async function alreadyPublishedSource(sourceUrl, client = supabase) {
+  if (!client || !sourceUrl) return false;
+  const { data, error } = await client
+    .from('articles')
+    .select('id')
+    .eq('source_url', sourceUrl)
+    .limit(1);
+  if (error) {
+    console.error(`  [warning] Could not check source publication status: ${error.message}`);
+    return false;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
 async function markSeen(guid) {
-  if (!supabase || DRY_RUN) return;
-  await supabase.from('seen_feed_items').insert({ guid });
+  if (!supabase || DRY_RUN) return true;
+  const { error } = await supabase.from('seen_feed_items').upsert({ guid }, { onConflict: 'guid' });
+  if (error) {
+    console.error(`  [warning] Could not mark feed item complete: ${error.message}`);
+    return false;
+  }
+  return true;
 }
 
 // Catches cross-feed duplicates: the same real-world story picked up
@@ -549,6 +565,181 @@ async function run() {
   if (!DRY_RUN) console.log(`Posts will be spaced ${FB_POST_DELAY_MINUTES} minute(s) apart across all platforms within this run.\n`);
 
   let postCount = 0;
+  const retryQueue = createArticleRetryQueue(supabase, { dryRun: DRY_RUN });
+  const handledGuids = new Set();
+
+  async function completeItem(guid) {
+    if (await markSeen(guid)) await retryQueue.clear(guid);
+  }
+
+  async function processItem(source, item, { queued = false } = {}) {
+    const guid = item.guid || item.link;
+    if (!guid || handledGuids.has(guid)) return;
+    handledGuids.add(guid);
+
+    if (await alreadySeen(guid)) {
+      console.log(`  Already covered: "${item.title}"`);
+      await retryQueue.clear(guid);
+      return;
+    }
+
+    if (await alreadyPublishedSource(item.link)) {
+      console.log(`  Already published from this source URL — repairing seen status without republishing.`);
+      await completeItem(guid);
+      return;
+    }
+
+    if (!queued) await retryQueue.recordPending(source, item);
+
+    console.log(`  ${queued ? 'Retrying' : 'New item'}: "${item.title}" — checking content...`);
+    const summary = item.contentSnippet || item.content || item.title;
+    let ok;
+    try {
+      ok = await isAppropriate(item.title, summary);
+    } catch (err) {
+      console.error(`  [error] Safety check could not run: ${err.message}. Item remains queued for retry.`);
+      await retryQueue.recordFailure(source, item, err);
+      return;
+    }
+    if (!ok) {
+      console.log(`  [skip] Flagged as not a fit for the site's tone — skipping.`);
+      await completeItem(guid);
+      return;
+    }
+
+    console.log(`  Writing article...`);
+    const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
+    const realImage = extractImage(item);
+
+    const fullSourceText = await fetchFullSourceText(item.link);
+    const summaryForWriter = fullSourceText || summary;
+    if (fullSourceText) {
+      console.log(`  Fetched full source article (${fullSourceText.length} chars) instead of relying on the short RSS summary.`);
+    } else {
+      console.log(`  Could not fetch the full source page — using the RSS feed's summary instead.`);
+    }
+
+    let article;
+    try {
+      article = await writeArticle({
+        sourceTitle: item.title,
+        sourceSummary: summaryForWriter,
+        sourceName: actualSourceName,
+        sourceUrl: item.link,
+        category: source.category,
+      });
+    } catch (err) {
+      console.error(`  [error] AI writing failed: ${err.message}. Item remains queued for retry.`);
+      await retryQueue.recordFailure(source, item, err);
+      return;
+    }
+
+    if (article.skip) {
+      console.log(`  [skip] Not enough real content to write an honest article: ${article.reason || 'no reason given'}`);
+      await completeItem(guid);
+      return;
+    }
+
+    article.body_html = convertAffiliateLinks(article.body_html);
+    article.body_html = convertUndercoverTouristLinks(article.body_html);
+
+    const cropBottomPercent = originCropPercent(item.link);
+    const VALID_CATEGORIES = ['theme-parks', 'space', 'beaches', 'florida-living', 'wildlife', 'cruises', 'food', 'events', 'travel-deals'];
+    const realCategory = VALID_CATEGORIES.includes(article.category) ? article.category : source.category;
+    if (realCategory !== source.category) {
+      console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
+    }
+    article.body_html = appendUndercoverTouristBox(article.body_html, realCategory, article.title);
+
+    if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
+      console.log(`  [skip] This looks like the same story as something published in the last 3 days (likely picked up from a different feed) — skipping to avoid a duplicate.`);
+      await completeItem(guid);
+      return;
+    }
+
+    const slug = await generateUniqueSlug(article.meta_title || article.title);
+    let finalImage;
+    if (source.preferAI) {
+      console.log(`  This source is set to always use AI images — generating...`);
+      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
+    } else if (realImage) {
+      if (DRY_RUN) {
+        console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
+        finalImage = null;
+      } else {
+        console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
+        if (cropBottomPercent) console.log(`  This origin site bakes a branding banner into its images — cropping bottom ${Math.round(cropBottomPercent * 100)}%...`);
+        const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`, { cropBottomPercent });
+        if (storedUrl) {
+          console.log(`  Stored real photo permanently.`);
+          finalImage = storedUrl;
+        } else {
+          console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
+          finalImage = await generateArticleImage({ title: article.title, category: realCategory, slug });
+        }
+      }
+    } else {
+      console.log(`  No real photo found — generating one...`);
+      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
+    }
+
+    if (DRY_RUN) {
+      console.log(`  [dry-run] Title: ${article.title}`);
+      console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
+      console.log(`  [dry-run] Category: ${realCategory}`);
+      console.log(`  [dry-run] Dek: ${article.dek}`);
+      console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
+      console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
+      console.log(`  [dry-run] Pin title: ${article.pin_title}`);
+      console.log(`  [dry-run] Pin description: ${article.pin_description}`);
+      return;
+    }
+
+    if (!supabase) {
+      const error = new Error('Supabase is not configured — article was not published.');
+      console.error(`  [error] ${error.message}`);
+      await retryQueue.recordFailure(source, item, error);
+      return;
+    }
+
+    const { error } = await supabase.from('articles').insert({
+      slug,
+      title: article.title,
+      meta_title: article.meta_title,
+      dek: article.dek,
+      body_html: article.body_html,
+      category: realCategory,
+      city: source.city || null,
+      source_name: actualSourceName,
+      source_url: item.link,
+      image_url: finalImage,
+      fb_caption: article.fb_caption,
+    });
+    if (error) {
+      console.error(`  [error] Could not save article: ${error.message}`);
+      await retryQueue.recordFailure(source, item, error);
+      return;
+    }
+    console.log(`  Saved article: /article/${slug}`);
+    await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
+
+    if (postCount > 0) {
+      console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before posting this article to all platforms...`);
+      await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
+    }
+    await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
+    await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
+    await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
+    await postToThreads({ text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`), imageUrl: finalImage });
+    postCount += 1;
+    await completeItem(guid);
+  }
+
+  const pending = await retryQueue.loadPending();
+  if (pending.length) console.log(`Retrying ${pending.length} queued article item(s) before checking new feed entries.\n`);
+  for (const row of pending) {
+    await processItem(row.payload.source, row.payload.item, { queued: true });
+  }
 
   for (const source of SOURCES) {
     console.log(`Checking ${source.name} (${source.category})...`);
@@ -567,150 +758,25 @@ async function run() {
 
     const itemsToCheck = feed.items.slice(0, MAX_ITEMS_PER_SOURCE);
     for (const item of itemsToCheck) {
-      const guid = item.guid || item.link;
-
-      if (await alreadySeen(guid)) {
-        console.log(`  Already covered: "${item.title}"`);
-        continue;
-      }
-
-      console.log(`  New item: "${item.title}" — checking content...`);
-      const summary = item.contentSnippet || item.content || item.title;
-      const ok = await isAppropriate(item.title, summary);
-      if (!ok) {
-        console.log(`  [skip] Flagged as not a fit for the site's tone — skipping.`);
-        await markSeen(guid);
-        continue;
-      }
-
-      console.log(`  Writing article...`);
-      const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
-      const realImage = extractImage(item);
-
-      const fullSourceText = await fetchFullSourceText(item.link);
-      const summaryForWriter = fullSourceText || summary;
-      if (fullSourceText) {
-        console.log(`  Fetched full source article (${fullSourceText.length} chars) instead of relying on the short RSS summary.`);
-      } else {
-        console.log(`  Could not fetch the full source page — using the RSS feed's summary instead.`);
-      }
-
-      let article;
-      try {
-        article = await writeArticle({
-          sourceTitle: item.title,
-          sourceSummary: summaryForWriter,
-          sourceName: actualSourceName,
-          sourceUrl: item.link,
-          category: source.category,
-        });
-      } catch (err) {
-        console.error(`  [error] AI writing failed: ${err.message}`);
-        await markSeen(guid);
-        continue;
-      }
-
-      if (article.skip) {
-        console.log(`  [skip] Not enough real content to write an honest article: ${article.reason || 'no reason given'}`);
-        await markSeen(guid);
-        continue;
-      }
-
-      article.body_html = convertAffiliateLinks(article.body_html);
-      article.body_html = convertUndercoverTouristLinks(article.body_html);
-
-      const cropBottomPercent = originCropPercent(item.link);
-
-      const VALID_CATEGORIES = ['theme-parks', 'space', 'beaches', 'florida-living', 'wildlife', 'cruises', 'food', 'events', 'travel-deals'];
-      const realCategory = VALID_CATEGORIES.includes(article.category) ? article.category : source.category;
-      if (realCategory !== source.category) {
-        console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
-      }
-      article.body_html = appendUndercoverTouristBox(article.body_html, realCategory, article.title);
-
-      if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
-        console.log(`  [skip] This looks like the same story as something published in the last 3 days (likely picked up from a different feed) — skipping to avoid a duplicate.`);
-        await markSeen(guid);
-        continue;
-      }
-
-      const slug = await generateUniqueSlug(article.meta_title || article.title);
-
-      let finalImage;
-      if (source.preferAI) {
-        console.log(`  This source is set to always use AI images — generating...`);
-        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
-      } else if (realImage) {
-        if (DRY_RUN) {
-          console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
-          finalImage = null;
-        } else {
-          console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
-          if (cropBottomPercent) {
-            console.log(`  This origin site bakes a branding banner into its images — cropping bottom ${Math.round(cropBottomPercent * 100)}%...`);
-          }
-          const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`, { cropBottomPercent });
-          if (storedUrl) {
-            console.log(`  Stored real photo permanently.`);
-            finalImage = storedUrl;
-          } else {
-            console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
-            finalImage = await generateArticleImage({ title: article.title, category: realCategory, slug });
-          }
-        }
-      } else {
-        console.log(`  No real photo found — generating one...`);
-        finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
-      }
-
-      if (DRY_RUN) {
-        console.log(`  [dry-run] Title: ${article.title}`);
-        console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
-        console.log(`  [dry-run] Category: ${realCategory}`);
-        console.log(`  [dry-run] Dek: ${article.dek}`);
-        console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
-        console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
-        console.log(`  [dry-run] Pin title: ${article.pin_title}`);
-        console.log(`  [dry-run] Pin description: ${article.pin_description}`);
-      } else if (supabase) {
-        const { error } = await supabase.from('articles').insert({
-          slug,
-          title: article.title,
-          meta_title: article.meta_title,
-          dek: article.dek,
-          body_html: article.body_html,
-          category: realCategory,
-          city: source.city || null,
-          source_name: actualSourceName,
-          source_url: item.link,
-          image_url: finalImage,
-          fb_caption: article.fb_caption,
-        });
-        if (error) {
-          console.error(`  [error] Could not save article: ${error.message}`);
-          continue;
-        }
-        console.log(`  Saved article: /article/${slug}`);
-        await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
-      }
-
-      if (!DRY_RUN && postCount > 0) {
-        console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before posting this article to all platforms...`);
-        await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
-      }
-      await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
-      await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
-      await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
-      await postToThreads({ text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`), imageUrl: finalImage });
-      postCount += 1;
-      await markSeen(guid);
+      await processItem(source, item);
     }
   }
 
   console.log('\n=== Run complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in automation run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in automation run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  run,
+  isAppropriate,
+  writeArticle,
+  alreadyPublishedSource,
+  titleSimilarity,
+  createArticleRetryQueue,
+};

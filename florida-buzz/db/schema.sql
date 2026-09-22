@@ -28,6 +28,28 @@ create table if not exists seen_feed_items (
   created_at timestamptz default now()
 );
 
+-- Durable retry queue for RSS items. A provider/database failure never writes
+-- the item to seen_feed_items; it stays here until it is intentionally skipped,
+-- deduplicated against an existing article, or successfully published.
+create table if not exists article_generation_queue (
+  guid text primary key,
+  source_url text,
+  payload jsonb not null,
+  status text not null default 'pending' check (status in ('pending', 'failed')),
+  attempts integer not null default 0,
+  last_error text,
+  last_attempt_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists article_generation_queue_status_idx
+  on article_generation_queue (status, created_at);
+
+-- Internal automation state only. The server uses the service-role client,
+-- which bypasses RLS; no browser/anonymous access should be allowed.
+alter table article_generation_queue enable row level security;
+
 -- Newsletter subscribers
 create table if not exists subscribers (
   id uuid primary key default gen_random_uuid(),

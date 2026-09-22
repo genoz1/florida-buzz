@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { askClaude } = require('../lib/anthropic');
+const { generateText } = require('../lib/aiText');
+const { validateEngagementPost } = require('../lib/contentValidation');
 const { postToFacebookPage } = require('../lib/facebook');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -59,15 +60,15 @@ Respond ONLY with valid JSON, no markdown fences, no preamble:
   const user = `Recently used topics (avoid repeating or closely overlapping with these):
 ${recentTopics.length ? recentTopics.map((t) => `- ${t}`).join('\n') : '(none yet)'}`;
 
-  const text = await askClaude(system, user, 400);
+  const text = await generateText(system, user, 400);
   const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
   try {
-    return JSON.parse(cleaned);
+    return validateEngagementPost(JSON.parse(cleaned));
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        return JSON.parse(match[0]);
+        return validateEngagementPost(JSON.parse(match[0]));
       } catch {
         // fall through
       }
@@ -108,7 +109,11 @@ async function run() {
   console.log('\n=== Run complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in engagement-post run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in engagement-post run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, generateThisOrThat };

@@ -6,7 +6,7 @@ connect it to a new DigitalOcean App, set environment variables, deploy. No loca
 ## What's built and working right now
 - The full website (homepage, 8 category pages, article pages) — renders with sample articles
   even before any setup, so you can see the design immediately.
-- The automation pipeline (`scripts/automate.js`) — pulls RSS, writes articles with Claude,
+- The automation pipeline (`scripts/automate.js`) — pulls RSS, writes articles through the provider-neutral AI text service,
   saves to Supabase, posts to Facebook. Tested for logic, but the RSS feeds themselves need
   verification on your end (see Step 4) since my sandbox can't reach external news sites.
 
@@ -33,12 +33,14 @@ Don't reuse the villagesgolfcarttrader Supabase project — keep these separate.
 3. Go to Project Settings → API → copy the **Project URL** and the **service_role key**
    (not the anon key — the automation needs write access).
 
-## Step 3: Get an Anthropic API key
-This is separate from your claude.ai subscription — it's pay-per-use.
-1. console.anthropic.com → API Keys → Create Key.
-2. Add a small starting credit balance ($10–20 to start; each article costs a fraction of a cent
-   to a few cents depending on length, so even daily posting stays well under $20–30/month
-   matching the original budget estimate).
+## Step 3: Configure the OpenAI API
+API usage is separate from a ChatGPT subscription and is billed through the OpenAI API account.
+Set `OPENAI_API_KEY` in the deployment environment. Florida Buzz uses the Responses API for
+text and live web research, and the existing Images API integration for featured images.
+`AI_TEXT_PROVIDER` defaults to `openai`; `AI_TEXT_MODEL` and `AI_RESEARCH_MODEL` both default
+to `gpt-5.6-terra` and can be changed independently without changing the publishing pipeline.
+AI content schedules are disabled by default. Set `AI_CONTENT_SCHEDULES_ENABLED=true` only
+after controlled validation; `OPENAI_API_KEY` by itself does not activate any AI schedule.
 
 ## Step 4: Verify the RSS feeds (do this before turning on live posting)
 Some of the feed URLs in `scripts/sources.js` are marked unverified — I wrote them from the
@@ -68,8 +70,9 @@ most likely official path but couldn't confirm they resolve from my end. Once de
 2. Build command: `npm install`. Run command: `npm start`.
 3. Add all the environment variables from `.env.example` (filled in with your real values)
    in the App's Settings → Environment Variables.
-4. Deploy. The site goes live; automation runs on its own schedule (6am/11am/3pm/7pm) once
-   `ANTHROPIC_API_KEY` is set — adjust the schedule in `server.js` if you want a different cadence.
+4. Deploy. The site goes live; AI automation remains paused unless both `OPENAI_API_KEY` is
+   set and `AI_CONTENT_SCHEDULES_ENABLED` is explicitly `true`. Adjust the schedule in
+   `server.js` if you want a different cadence.
 
 ## Step 7: Point your domain
 1. Register thefloridabuzz.com (or your final choice) — Namecheap or Cloudflare Registrar
@@ -82,7 +85,7 @@ most likely official path but couldn't confirm they resolve from my end. Once de
 - Domain: ~$15/year
 - DigitalOcean App: ~$5–12/month (similar tier to your existing apps)
 - Supabase: free tier covers this easily at the start
-- Anthropic API: likely $10–30/month at 4 articles/day
+- OpenAI API: usage-based text, web-search, and image charges; monitor the API usage dashboard after a controlled production test
 - **No Make.com needed** — the automation is built directly into this app, so that's one
   fewer subscription than the original plan.
 
