@@ -5,7 +5,8 @@
 // facts the reviewer actually provided get used — nothing is invented.
 require('dotenv').config();
 const { supabase, storeGeneratedImage } = require('../lib/supabase');
-const { askClaude } = require('../lib/anthropic');
+const { generateText } = require('../lib/aiText');
+const { validateReview } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
@@ -95,16 +96,16 @@ ${answerLines || '(no additional details provided)'}
 ${memory ? `A specific memory the reviewer shared: ${memory}` : ''}
 ${rating ? `Reviewer's rating: ${rating}/5` : ''}`;
 
-  const raw = await askClaude(system, user, 1400);
+  const raw = await generateText(system, user, 1400);
   const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
 
   try {
-    return JSON.parse(cleaned);
+    return validateReview(JSON.parse(cleaned));
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        return JSON.parse(match[0]);
+        return validateReview(JSON.parse(match[0]));
       } catch {
         // fall through
       }
@@ -207,7 +208,11 @@ async function run() {
   console.log('=== Review submission complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in submit-review run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in submit-review run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, writeReview };

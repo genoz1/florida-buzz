@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { askClaudeWithSearch } = require('../lib/anthropic');
+const { generateTextWithResearch } = require('../lib/aiText');
+const { validateDiningDirectory } = require('../lib/contentValidation');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
@@ -96,12 +97,12 @@ location at ${parkLabel}. Use enough web searches to be confident the list is ac
 and current as of today. Remember: respond with ONLY the final JSON array, no narration
 or commentary before or after it.`;
 
-  const { text, searchesUsed, stopReason } = await askClaudeWithSearch(system, user, 16000, 15);
+  const { text, searchesUsed, stopReason } = await generateTextWithResearch(system, user, 16000, 15);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   if (stopReason === 'max_tokens') {
     throw new Error('Response was cut off before finishing (hit the token limit) — the model was likely still narrating its research when it ran out of room. Try again; if it keeps happening, this prompt may need an even higher token budget.');
   }
-  return parseJsonResponse(text);
+  return validateDiningDirectory(parseJsonResponse(text));
 }
 
 // Resort dining is a fundamentally bigger, differently-shaped research task
@@ -151,12 +152,12 @@ current spread of Value, Moderate, and Deluxe resorts. Use enough web searches t
 confident the list is accurate as of today. Remember: respond with ONLY the final JSON
 array, no narration or commentary before or after it.`;
 
-  const { text, searchesUsed, stopReason } = await askClaudeWithSearch(system, user, 24000, 25);
+  const { text, searchesUsed, stopReason } = await generateTextWithResearch(system, user, 24000, 25);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   if (stopReason === 'max_tokens') {
     throw new Error('Response was cut off before finishing (hit the token limit) — the model was likely still narrating its research or listing restaurants when it ran out of room. Try again; if it keeps happening, this prompt may need an even higher token budget or a narrower scope.');
   }
-  return parseJsonResponse(text);
+  return validateDiningDirectory(parseJsonResponse(text));
 }
 
 async function researchDiningDirectory(park, parkLabel) {
@@ -234,7 +235,11 @@ async function run() {
   console.log('\n=== Run complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in generate-dining-directory run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in generate-dining-directory run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, researchParkDining, researchResortDining, parseJsonResponse };

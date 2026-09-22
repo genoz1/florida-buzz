@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase, storeGeneratedImage } = require('../lib/supabase');
-const { askClaude } = require('../lib/anthropic');
+const { generateText } = require('../lib/aiText');
+const { validateFeaturePromo } = require('../lib/contentValidation');
 const { generateImage } = require('../lib/openai');
 const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
@@ -111,15 +112,15 @@ Respond ONLY with valid JSON, no markdown fences, no preamble:
   "pin_description": "1-2 sentences, under 500 characters, naturally keyword-rich"
 }`;
 
-  const text = await askClaude(system, 'Generate today\'s promotional post.', 500);
+  const text = await generateText(system, 'Generate today\'s promotional post.', 500);
   const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
   try {
-    return JSON.parse(cleaned);
+    return validateFeaturePromo(JSON.parse(cleaned));
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
-        return JSON.parse(match[0]);
+        return validateFeaturePromo(JSON.parse(match[0]));
       } catch {
         // fall through
       }
@@ -205,7 +206,11 @@ async function run() {
   console.log('\n=== Run complete ===');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in promo-feature-post run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in promo-feature-post run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, generateCaption };

@@ -4,6 +4,7 @@
   "description": "The Florida Buzz - automated Florida lifestyle & travel news site",
   "main": "server.js",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "start": "node server.js",
     "automate": "node scripts/automate.js",
     "automate:dry": "DRY_RUN=true node scripts/automate.js",
