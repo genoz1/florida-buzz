@@ -9,6 +9,7 @@ const DEFAULT_PROVIDER = 'openai';
 const DEFAULT_MODEL = 'gpt-5.6-terra';
 const DEFAULT_TIMEOUT_MS = 120000;
 const DEFAULT_MAX_ATTEMPTS = 3;
+const MIN_OUTPUT_TOKENS = 16;
 
 class AIProviderError extends Error {
   constructor(message, { code = 'provider_error', status = null, retryable = false, cause = null } = {}) {
@@ -127,7 +128,9 @@ async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch
     model: modelName(withResearch),
     instructions: `${systemPrompt}${researchInstruction}`,
     input: userPrompt,
-    max_output_tokens: maxTokens,
+    // The Responses API rejects values below 16. Clamp at the provider
+    // boundary as a final guard even when a caller accidentally asks for less.
+    max_output_tokens: Math.max(MIN_OUTPUT_TOKENS, maxTokens),
     reasoning: { effort: withResearch ? 'medium' : 'none' },
   };
 

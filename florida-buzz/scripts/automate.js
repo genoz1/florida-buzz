@@ -315,7 +315,7 @@ publish something insensitive or off-topic.`;
 
   const user = `Headline: ${title}\nSummary: ${summary}`;
 
-  const raw = await generateText(system, user, 10);
+  const raw = await generateText(system, user, 16);
   return raw.trim().toUpperCase().startsWith('YES');
 }
 

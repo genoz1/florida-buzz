@@ -37,13 +37,24 @@ test('generateText preserves prompts and normalizes a Responses API result', asy
       output: [{ type: 'message', content: [{ type: 'output_text', text: ' YES ' }] }],
     });
   };
-  assert.equal(await generateText('system prompt', 'user prompt', 10), 'YES');
+  assert.equal(await generateText('system prompt', 'user prompt', 16), 'YES');
   assert.equal(request.url, 'https://api.openai.com/v1/responses');
   assert.equal(request.body.instructions, 'system prompt');
   assert.equal(request.body.input, 'user prompt');
   assert.equal(request.body.model, 'gpt-5.6-terra');
-  assert.equal(request.body.max_output_tokens, 10);
+  assert.equal(request.body.max_output_tokens, 16);
   assert.equal(request.body.tools, undefined);
+});
+
+test('Responses API output limit is clamped to 16 for the production suitability failure', async () => {
+  let requestBody;
+  global.fetch = async (url, options) => {
+    requestBody = JSON.parse(options.body);
+    return response(200, { status: 'completed', output_text: 'YES' });
+  };
+
+  assert.equal(await generateText('suitability instructions', 'headline and summary', 10), 'YES');
+  assert.equal(requestBody.max_output_tokens, 16);
 });
 
 test('research requires live web search and reports normalized metadata', async () => {
