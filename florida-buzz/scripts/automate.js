@@ -1,7 +1,8 @@
 require('dotenv').config();
 const Parser = require('rss-parser');
 const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/supabase');
-const { generateText } = require('../lib/aiText');
+const { generateText, generateStructuredText } = require('../lib/aiText');
+const { newsArticle: newsArticleSchema } = require('../lib/aiSchemas');
 const { validateNewsArticle } = require('../lib/contentValidation');
 const { createArticleRetryQueue } = require('../lib/articleRetryQueue');
 const { generateArticleImage } = require('../lib/imageGen');
@@ -329,8 +330,9 @@ CRITICAL — if the source material genuinely does not contain enough real, veri
 write an honest article (e.g. it's a bare teaser/trailer that names topics without giving any
 actual details, or it's too vague or thin to summarize responsibly), do NOT write a fake
 article explaining why you can't proceed — that still gets treated as a real article and
-published, which is worse than not publishing at all. Instead, respond with ONLY this exact
-JSON and nothing else: {"skip": true, "reason": "one short sentence explaining why"}
+published, which is worse than not publishing at all. Instead, set "skip" to true, give a
+one-sentence "reason", and set every article-content field to null. For a normal article,
+set "skip" to false and "reason" to null.
 
 When the source material itself is a product review or recommendation (naming one or more
 specific real products — gadgets, accessories, gear — and recommending them), insert a link
@@ -361,6 +363,8 @@ like "the links come from [source]" or "Amazon links from [source]" — if you m
 at all, describe them only as this article's own, or simply don't reference their origin.
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
+  "skip": "boolean",
+  "reason": "string when skipped, otherwise null",
   "title": "string, original headline, under 70 characters",
   "meta_title": "string, under 60 characters, written the way a person would phrase a Google search for this topic — lead with the specific place, attraction, or subject name, plus what changed (e.g. 'Magic Kingdom Lightning Lane Prices July 2026' not a clever headline). This is for the browser tab and Google search result, not the on-page headline — it should read naturally, not keyword-stuffed.",
   "category": "string, exactly one of: theme-parks, space, beaches, florida-living, wildlife, cruises, food, events, travel-deals — pick whichever ACTUALLY matches this specific story's real subject, regardless of which feed it came from (a ride closure is theme-parks even if it came through a food-focused feed; a restaurant opening is food even if it came through a general Disney feed; a hotel discount, ticket sale, or airline fare deal is travel-deals even if the property itself is a theme-park resort)",
@@ -377,23 +381,8 @@ Source summary/content: ${sourceSummary}
 This feed is generally about: ${category} (but classify based on this specific story's actual subject, not this hint, if they differ)
 Source link (for context only, do not include in body_html): ${sourceUrl}`;
 
-  const raw = await generateText(system, user, 1200);
-  const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
-
-  try {
-    return validateNewsArticle(JSON.parse(cleaned));
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return validateNewsArticle(JSON.parse(match[0]));
-      } catch {
-        // fall through to the error below
-      }
-    }
-    console.error(`  [debug] Raw response was not valid JSON: "${cleaned.slice(0, 150)}..."`);
-    throw new Error('Could not parse a valid article from the AI response');
-  }
+  const article = await generateStructuredText(system, user, newsArticleSchema, 1200);
+  return validateNewsArticle(article);
 }
 
 async function postToFacebook({ title, fb_caption, source_url, slug, imageUrl }) {

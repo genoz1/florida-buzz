@@ -5,7 +5,8 @@
 // facts the reviewer actually provided get used — nothing is invented.
 require('dotenv').config();
 const { supabase, storeGeneratedImage } = require('../lib/supabase');
-const { generateText } = require('../lib/aiText');
+const { generateStructuredText } = require('../lib/aiText');
+const { review: reviewSchema } = require('../lib/aiSchemas');
 const { validateReview } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
@@ -96,22 +97,7 @@ ${answerLines || '(no additional details provided)'}
 ${memory ? `A specific memory the reviewer shared: ${memory}` : ''}
 ${rating ? `Reviewer's rating: ${rating}/5` : ''}`;
 
-  const raw = await generateText(system, user, 1400);
-  const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
-
-  try {
-    return validateReview(JSON.parse(cleaned));
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return validateReview(JSON.parse(match[0]));
-      } catch {
-        // fall through
-      }
-    }
-    throw new Error('Could not parse a valid review from the AI response');
-  }
+  return validateReview(await generateStructuredText(system, user, reviewSchema, 1400));
 }
 
 async function run() {

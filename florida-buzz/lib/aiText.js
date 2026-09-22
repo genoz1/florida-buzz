@@ -111,7 +111,7 @@ function classifyHttpError(status, body) {
   });
 }
 
-async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch, maxSearches }) {
+async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch, maxSearches, outputSchema = null }) {
   if (!process.env.OPENAI_API_KEY) {
     throw new AIProviderError('OPENAI_API_KEY is not configured.', {
       code: 'authentication_error', retryable: false,
@@ -144,6 +144,17 @@ async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch
     requestBody.tool_choice = 'required';
   }
 
+  if (outputSchema) {
+    requestBody.text = {
+      format: {
+        type: 'json_schema',
+        name: outputSchema.name,
+        schema: outputSchema.schema,
+        strict: true,
+      },
+    };
+  }
+
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -167,8 +178,20 @@ async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch
       });
     }
 
+    let value = null;
+    if (outputSchema) {
+      try {
+        value = JSON.parse(text);
+      } catch (err) {
+        throw new AIProviderError('OpenAI returned malformed structured output.', {
+          code: 'malformed_response', retryable: true, cause: err,
+        });
+      }
+    }
+
     return {
       text,
+      value,
       searchesUsed: countSearches(data),
       stopReason: stopReason(data),
       provider: 'openai',
@@ -211,12 +234,31 @@ async function requestWithRetry(options) {
 }
 
 async function generateText(systemPrompt, userPrompt, maxTokens = 1500) {
-  const result = await requestWithRetry({ systemPrompt, userPrompt, maxTokens, withResearch: false, maxSearches: 0 });
+  const result = await requestWithRetry({ systemPrompt, userPrompt, maxTokens, withResearch: false, maxSearches: 0, outputSchema: null });
   return result.text;
 }
 
 async function generateTextWithResearch(systemPrompt, userPrompt, maxTokens = 3000, maxSearches = 10) {
-  const result = await requestWithRetry({ systemPrompt, userPrompt, maxTokens, withResearch: true, maxSearches });
+  const result = await requestWithRetry({ systemPrompt, userPrompt, maxTokens, withResearch: true, maxSearches, outputSchema: null });
+  if (result.searchesUsed < 1) {
+    throw new AIProviderError('Research response completed without using live web search.', {
+      code: 'research_not_performed', retryable: true,
+    });
+  }
+  return result;
+}
+
+async function generateStructuredText(systemPrompt, userPrompt, outputSchema, maxTokens = 1500) {
+  const result = await requestWithRetry({
+    systemPrompt, userPrompt, maxTokens, withResearch: false, maxSearches: 0, outputSchema,
+  });
+  return result.value;
+}
+
+async function generateStructuredTextWithResearch(systemPrompt, userPrompt, outputSchema, maxTokens = 3000, maxSearches = 10) {
+  const result = await requestWithRetry({
+    systemPrompt, userPrompt, maxTokens, withResearch: true, maxSearches, outputSchema,
+  });
   if (result.searchesUsed < 1) {
     throw new AIProviderError('Research response completed without using live web search.', {
       code: 'research_not_performed', retryable: true,
@@ -229,5 +271,7 @@ module.exports = {
   AIProviderError,
   generateText,
   generateTextWithResearch,
+  generateStructuredText,
+  generateStructuredTextWithResearch,
   _test: { extractResponseText, countSearches, stopReason, classifyHttpError, requestWithRetry },
 };

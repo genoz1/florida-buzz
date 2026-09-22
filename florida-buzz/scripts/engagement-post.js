@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { generateText } = require('../lib/aiText');
+const { generateStructuredText } = require('../lib/aiText');
+const { engagementPost: engagementPostSchema } = require('../lib/aiSchemas');
 const { validateEngagementPost } = require('../lib/contentValidation');
 const { postToFacebookPage } = require('../lib/facebook');
 
@@ -60,21 +61,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble:
   const user = `Recently used topics (avoid repeating or closely overlapping with these):
 ${recentTopics.length ? recentTopics.map((t) => `- ${t}`).join('\n') : '(none yet)'}`;
 
-  const text = await generateText(system, user, 400);
-  const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
-  try {
-    return validateEngagementPost(JSON.parse(cleaned));
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return validateEngagementPost(JSON.parse(match[0]));
-      } catch {
-        // fall through
-      }
-    }
-    throw new Error(`Could not parse engagement post JSON: "${cleaned.slice(0, 200)}..."`);
-  }
+  return validateEngagementPost(await generateStructuredText(system, user, engagementPostSchema, 400));
 }
 
 async function run() {
