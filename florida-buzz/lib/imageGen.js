@@ -1,5 +1,5 @@
 const { storeGeneratedImage } = require('./supabase');
-const { askClaude } = require('./anthropic');
+const { generateText } = require('./aiText');
 const { generateImage } = require('./openai');
 
 // Writes an image prompt for the article, and generates + permanently stores the image.
@@ -64,7 +64,7 @@ Respond with ONLY the image prompt text, nothing else — no preamble, no quotes
 
     let imagePrompt;
     try {
-      imagePrompt = await askClaude(themeParkImageSystem, `Headline: ${title}`, 200);
+      imagePrompt = await generateText(themeParkImageSystem, `Headline: ${title}`, 200);
     } catch (err) {
       console.error(`  [error] Could not write image prompt: ${err.message}`);
       return null;
@@ -115,7 +115,7 @@ with ONLY the image prompt text, nothing else — no preamble, no quotes.`;
 
   let imagePrompt;
   try {
-    imagePrompt = await askClaude(promptSystem, promptUser, 150);
+    imagePrompt = await generateText(promptSystem, promptUser, 150);
   } catch (err) {
     console.error(`  [error] Could not write image prompt: ${err.message}`);
     return null;
