@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { generateText } = require('../lib/aiText');
+const { generateStructuredText } = require('../lib/aiText');
+const { roundup: roundupSchema } = require('../lib/aiSchemas');
 const { validateRoundup } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { postToFacebookPage } = require('../lib/facebook');
@@ -132,22 +133,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
     .map((a, i) => `${i + 1}. ${a.title} — ${a.dek} (${SITE_URL}/article/${a.slug})`)
     .join('\n');
 
-  const raw = await generateText(system, user, 1200);
-  const cleaned = raw.replace(/^```json\s*|```$/g, '').trim();
-
-  try {
-    return validateRoundup(JSON.parse(cleaned));
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return validateRoundup(JSON.parse(match[0]));
-      } catch {
-        // fall through
-      }
-    }
-    throw new Error('Could not parse a valid roundup article from the AI response');
-  }
+  return validateRoundup(await generateStructuredText(system, user, roundupSchema, 1200));
 }
 
 async function run() {

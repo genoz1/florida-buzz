@@ -43,7 +43,7 @@ test('all Florida Buzz text workflows retain their existing structured contracts
   const originalFetch = global.fetch;
   const requests = [];
   const payloads = [
-    { value: { title: 'Florida Attraction Announces a Helpful Update', meta_title: 'Florida Attraction Update 2026', category: 'theme-parks', dek: 'A concise explanation of what visitors should know.', body_html: body, ...social } },
+    { value: { skip: false, reason: null, title: 'Florida Attraction Announces a Helpful Update', meta_title: 'Florida Attraction Update 2026', category: 'theme-parks', dek: 'A concise explanation of what visitors should know.', body_html: body, ...social } },
     { research: true, value: { topic: 'Current Florida park entry procedures', working_title: 'Florida Park Entry Procedures Guide' } },
     { research: true, value: { title: 'Florida Park Entry Procedures Guide', dek: 'What to know before arriving at the gate.', body_html: body, ...social, fb_caption: 'Plan your next Florida park day with current details. Full guide ↓' } },
     { research: true, value: { title: 'Manual Florida Springs Planning Guide', dek: 'Current planning details for a Florida springs visit.', body_html: body, ...social, fb_caption: 'Plan a Florida springs day with current information. Full guide ↓' } },
@@ -51,7 +51,7 @@ test('all Florida Buzz text workflows retain their existing structured contracts
     { value: { title: 'What to Do This Weekend in Orlando', meta_title: 'Orlando Events This Weekend', dek: 'A useful selection of current Orlando events.', body_html: body, fb_caption: 'Orlando has a busy weekend ahead. 🎉' } },
     { value: { topic: 'beach-vs-springs', message: '❤️ for Florida beaches or 👍 for natural springs? React with your pick!' } },
     { value: { message: 'See current Florida attraction waits before choosing your next stop.', pin_title: 'Florida Theme Park Wait Times', pin_description: 'Check current Florida theme park wait times while planning a park day.' } },
-    { research: true, value: [{ name: 'Sample Restaurant', land: 'Sample Land', service_type: 'table-service', reservations: 'recommended', dining_plan: null, character_dining: false, characters: null, meal_periods: ['dinner'], description: 'A current table-service option with a practical menu and comfortable setting.' }] },
+    { research: true, value: { restaurants: [{ name: 'Sample Restaurant', land: 'Sample Land', service_type: 'table-service', reservations: 'recommended', dining_plan: null, character_dining: false, characters: null, meal_periods: ['dinner'], description: 'A current table-service option with a practical menu and comfortable setting.' }] } },
   ];
   global.fetch = queueFetch(payloads, requests);
   t.after(() => { global.fetch = originalFetch; });
@@ -67,6 +67,10 @@ test('all Florida Buzz text workflows retain their existing structured contracts
   assert.equal((await researchParkDining('Sample Florida Park'))[0].name, 'Sample Restaurant');
   assert.equal(payloads.length, 0);
   assert.equal(requests.filter((request) => request.body?.tool_choice === 'required').length, 4);
+  assert.equal(requests.filter((request) => request.body?.text?.format?.type === 'json_schema').length, 9);
+  assert.ok(requests.filter((request) => request.body?.text?.format?.type === 'json_schema').every(
+    (request) => request.body.text.format.strict === true
+  ));
 });
 
 test('the image path still uses a text prompt followed by gpt-image-1 and fails closed', async (t) => {

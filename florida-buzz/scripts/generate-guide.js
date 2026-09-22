@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { generateTextWithResearch } = require('../lib/aiText');
+const { generateStructuredTextWithResearch } = require('../lib/aiText');
+const { guide: guideSchema, topic: topicSchema } = require('../lib/aiSchemas');
 const { validateGuide, validateTopic } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
@@ -143,24 +144,6 @@ function buildRelatedGuidesHtml(relatedGuides) {
     )
     .join('\n');
   return `\n<div class="related-guides">\n  <h3>You Might Also Like</h3>\n  <ul>\n${items}\n  </ul>\n</div>`;
-}
-
-async function parseJsonResponse(text, label) {
-  const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch {
-        // fall through to the error below
-      }
-    }
-    console.error(`  [debug] Raw ${label} response was not valid JSON: "${cleaned.slice(0, 200)}..."`);
-    throw new Error(`Could not parse a valid ${label} from the AI response`);
-  }
 }
 
 function stripCitationTags(html) {
@@ -338,8 +321,8 @@ ${sameCategory.length ? sameCategory.map((t) => `- ${t}`).join('\n') : '(none ye
 Already-covered guides in other categories (for awareness, avoid near-duplicates):
 ${otherTitles.length ? otherTitles.map((t) => `- ${t}`).join('\n') : '(none yet)'}`;
 
-  const { text } = await generateTextWithResearch(system, user, 500, 3);
-  return validateTopic(await parseJsonResponse(text, 'topic'));
+  const { value } = await generateStructuredTextWithResearch(system, user, topicSchema, 500, 3);
+  return validateTopic(value);
 }
 
 async function researchAndWriteGuide({ category, topic, workingTitle }) {
@@ -398,9 +381,9 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 Topic: ${topic}
 Working title idea: ${workingTitle}`;
 
-  const { text, searchesUsed } = await generateTextWithResearch(system, user, 6000, 12);
+  const { value, searchesUsed } = await generateStructuredTextWithResearch(system, user, guideSchema, 6000, 12);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
-  const guide = validateGuide(await parseJsonResponse(text, 'guide'));
+  const guide = validateGuide(value);
   guide.body_html = stripCitationTags(guide.body_html);
   guide.body_html = convertAffiliateLinks(guide.body_html);
   guide.body_html = convertUndercoverTouristLinks(guide.body_html);
@@ -553,4 +536,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, pickTopic, researchAndWriteGuide, parseJsonResponse };
+module.exports = { run, pickTopic, researchAndWriteGuide };

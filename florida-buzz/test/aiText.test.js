@@ -1,6 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { generateText, generateTextWithResearch, AIProviderError } = require('../lib/aiText');
+const {
+  generateText,
+  generateTextWithResearch,
+  generateStructuredText,
+  generateStructuredTextWithResearch,
+  AIProviderError,
+} = require('../lib/aiText');
+
+const testSchema = {
+  name: 'test_response',
+  schema: {
+    type: 'object',
+    properties: { answer: { type: 'string' } },
+    required: ['answer'],
+    additionalProperties: false,
+  },
+};
 
 const originalFetch = global.fetch;
 const originalEnv = { ...process.env };
@@ -76,6 +92,62 @@ test('research requires live web search and reports normalized metadata', async 
   assert.equal(requestBody.tools[0].type, 'web_search');
   assert.equal(requestBody.tools[0].external_web_access, true);
   assert.equal(requestBody.tool_choice, 'required');
+});
+
+test('structured text uses strict Responses API JSON Schema output', async () => {
+  let requestBody;
+  global.fetch = async (url, options) => {
+    requestBody = JSON.parse(options.body);
+    return response(200, { status: 'completed', output_text: '{"answer":"ready"}' });
+  };
+
+  assert.deepEqual(
+    await generateStructuredText('structured instructions', 'topic', testSchema, 100),
+    { answer: 'ready' }
+  );
+  assert.deepEqual(requestBody.text.format, {
+    type: 'json_schema',
+    name: 'test_response',
+    schema: testSchema.schema,
+    strict: true,
+  });
+});
+
+test('malformed structured output is rejected after bounded retries', async () => {
+  process.env.AI_MAX_ATTEMPTS = '2';
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    return response(200, { status: 'completed', output_text: 'not valid JSON' });
+  };
+
+  await assert.rejects(
+    () => generateStructuredText('structured instructions', 'topic', testSchema, 100),
+    (err) => err.code === 'malformed_response' && err.retryable === true
+  );
+  assert.equal(calls, 2);
+});
+
+test('structured research preserves search enforcement and parsed value', async () => {
+  let requestBody;
+  global.fetch = async (url, options) => {
+    requestBody = JSON.parse(options.body);
+    return response(200, {
+      status: 'completed',
+      output: [
+        { type: 'web_search_call', action: { type: 'search', query: 'current information' } },
+        { type: 'message', content: [{ type: 'output_text', text: '{"answer":"grounded"}' }] },
+      ],
+    });
+  };
+
+  const result = await generateStructuredTextWithResearch(
+    'research instructions', 'topic', testSchema, 500, 3
+  );
+  assert.deepEqual(result.value, { answer: 'grounded' });
+  assert.equal(result.searchesUsed, 1);
+  assert.equal(requestBody.tool_choice, 'required');
+  assert.equal(requestBody.text.format.type, 'json_schema');
 });
 
 test('authentication failure is classified and not immediately retried', async () => {

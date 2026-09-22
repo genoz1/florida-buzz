@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase, storeGeneratedImage } = require('../lib/supabase');
-const { generateText } = require('../lib/aiText');
+const { generateStructuredText } = require('../lib/aiText');
+const { featurePromo: featurePromoSchema } = require('../lib/aiSchemas');
 const { validateFeaturePromo } = require('../lib/contentValidation');
 const { generateImage } = require('../lib/openai');
 const { createPin } = require('../lib/pinterest');
@@ -112,21 +113,9 @@ Respond ONLY with valid JSON, no markdown fences, no preamble:
   "pin_description": "1-2 sentences, under 500 characters, naturally keyword-rich"
 }`;
 
-  const text = await generateText(system, 'Generate today\'s promotional post.', 500);
-  const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
-  try {
-    return validateFeaturePromo(JSON.parse(cleaned));
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return validateFeaturePromo(JSON.parse(match[0]));
-      } catch {
-        // fall through
-      }
-    }
-    throw new Error(`Could not parse a valid caption from the AI response: "${cleaned.slice(0, 200)}..."`);
-  }
+  return validateFeaturePromo(await generateStructuredText(
+    system, 'Generate today\'s promotional post.', featurePromoSchema, 500
+  ));
 }
 
 async function run() {

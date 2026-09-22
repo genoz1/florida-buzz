@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { generateTextWithResearch } = require('../lib/aiText');
+const { generateStructuredTextWithResearch } = require('../lib/aiText');
+const { diningDirectory: diningDirectorySchema } = require('../lib/aiSchemas');
 const { validateDiningDirectory } = require('../lib/contentValidation');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -21,29 +22,12 @@ const PARK_LABELS = {
   resorts: 'Walt Disney World Resort Hotels',
 };
 
-function parseJsonResponse(text) {
-  const cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const match = cleaned.match(/\[[\s\S]*\]/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch {
-        // fall through
-      }
-    }
-    console.error(`  [debug] Raw response was not valid JSON: "${cleaned.slice(0, 300)}..."`);
-    throw new Error('Could not parse a valid restaurant list from the AI response');
-  }
-}
-
 // Shared JSON schema instructions used by both the per-park and resorts
 // prompts below — kept in one place so the two stay in sync.
-const SCHEMA_INSTRUCTIONS = `Respond ONLY with a valid JSON array, no markdown fences, no preamble:
-[
-  {
+const SCHEMA_INSTRUCTIONS = `Respond ONLY with valid JSON matching this object shape, no markdown fences, no preamble:
+{
+  "restaurants": [
+    {
     "name": "string",
     "land": "string",
     "service_type": "quick-service" | "table-service",
@@ -53,8 +37,9 @@ const SCHEMA_INSTRUCTIONS = `Respond ONLY with a valid JSON array, no markdown f
     "characters": "string or null",
     "meal_periods": ["breakfast", "lunch", "dinner", "snacks"],
     "description": "string"
-  }
-]`;
+    }
+  ]
+}`;
 
 async function researchParkDining(parkLabel) {
   const system = `You are a meticulous Disney dining researcher compiling a complete,
@@ -70,7 +55,7 @@ genuinely unsure whether a restaurant is still open, leave it out rather than gu
 CRITICAL: do all of your searching and reasoning silently. Do not narrate your research
 process, do not describe your search plan, do not write things like "let me search for
 more specifics" or "good data so far" anywhere in your response. Your entire text
-response must be ONLY the final JSON array below — nothing before it, nothing after it.
+response must be ONLY the final JSON object below — nothing before it, nothing after it.
 
 For EVERY currently-operating restaurant, quick-service window, and dedicated snack
 location in the park, provide:
@@ -94,15 +79,17 @@ ${SCHEMA_INSTRUCTIONS}`;
 
   const user = `Research and list every current restaurant, quick-service spot, and snack
 location at ${parkLabel}. Use enough web searches to be confident the list is accurate
-and current as of today. Remember: respond with ONLY the final JSON array, no narration
+and current as of today. Remember: respond with ONLY the final JSON object, no narration
 or commentary before or after it.`;
 
-  const { text, searchesUsed, stopReason } = await generateTextWithResearch(system, user, 16000, 15);
+  const { value, searchesUsed, stopReason } = await generateStructuredTextWithResearch(
+    system, user, diningDirectorySchema, 16000, 15
+  );
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   if (stopReason === 'max_tokens') {
     throw new Error('Response was cut off before finishing (hit the token limit) — the model was likely still narrating its research when it ran out of room. Try again; if it keeps happening, this prompt may need an even higher token budget.');
   }
-  return validateDiningDirectory(parseJsonResponse(text));
+  return validateDiningDirectory(value.restaurants);
 }
 
 // Resort dining is a fundamentally bigger, differently-shaped research task
@@ -130,7 +117,7 @@ every logistics detail.
 CRITICAL: do all of your searching and reasoning silently. Do not narrate your research
 process, do not describe your search plan, do not write things like "let me search for
 more specifics" or "good data so far" anywhere in your response. Your entire text
-response must be ONLY the final JSON array below — nothing before it, nothing after it.
+response must be ONLY the final JSON object below — nothing before it, nothing after it.
 
 For each entry, provide:
 - name: the restaurant's actual current name
@@ -152,12 +139,14 @@ current spread of Value, Moderate, and Deluxe resorts. Use enough web searches t
 confident the list is accurate as of today. Remember: respond with ONLY the final JSON
 array, no narration or commentary before or after it.`;
 
-  const { text, searchesUsed, stopReason } = await generateTextWithResearch(system, user, 24000, 25);
+  const { value, searchesUsed, stopReason } = await generateStructuredTextWithResearch(
+    system, user, diningDirectorySchema, 24000, 25
+  );
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   if (stopReason === 'max_tokens') {
     throw new Error('Response was cut off before finishing (hit the token limit) — the model was likely still narrating its research or listing restaurants when it ran out of room. Try again; if it keeps happening, this prompt may need an even higher token budget or a narrower scope.');
   }
-  return validateDiningDirectory(parseJsonResponse(text));
+  return validateDiningDirectory(value.restaurants);
 }
 
 async function researchDiningDirectory(park, parkLabel) {
@@ -242,4 +231,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, researchParkDining, researchResortDining, parseJsonResponse };
+module.exports = { run, researchParkDining, researchResortDining };
