@@ -655,6 +655,7 @@ async function run() {
     if (realCategory !== source.category) {
       console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
     }
+    const imageDetails = { dek: article.dek, bodyHtml: article.body_html, location: source.city };
     article.body_html = appendUndercoverTouristBox(article.body_html, realCategory, article.title);
 
     if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
@@ -667,7 +668,7 @@ async function run() {
     let finalImage;
     if (source.preferAI) {
       console.log(`  This source is set to always use AI images — generating...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
+      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug, ...imageDetails });
     } else if (realImage) {
       if (DRY_RUN) {
         console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
@@ -681,12 +682,12 @@ async function run() {
           finalImage = storedUrl;
         } else {
           console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
-          finalImage = await generateArticleImage({ title: article.title, category: realCategory, slug });
+          finalImage = await generateArticleImage({ title: article.title, category: realCategory, slug, ...imageDetails });
         }
       }
     } else {
       console.log(`  No real photo found — generating one...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug });
+      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug, ...imageDetails });
     }
 
     if (DRY_RUN) {
