@@ -119,20 +119,16 @@ if (scheduleFlags.articleAutomation) {
 }
 
 // Generates new evergreen guides (web-search-grounded research, then writes,
-// images, and posts them), 2x/day, so the daily newsletter and /guides page
+// images, and posts them), 4x/day, so the daily newsletter and /guides page
 // keep getting fresh reference content alongside the news items. Spaced away
 // from the article automation and promo post times above. Disabled until
 // OPENAI_API_KEY is set.
 if (scheduleFlags.evergreenGuides) {
-  cron.schedule('45 7,18 * * *', () => {
+  cron.schedule('45 7,12,17,22 * * *', () => {
     console.log('Running scheduled evergreen guide generation...');
     runScheduledCommand('evergreen guide generation', 'node scripts/generate-guide.js');
   }, { timezone: 'America/New_York' });
-  cron.schedule('15 13 * * *', () => {
-    console.log('Running scheduled evergreen guide generation...');
-    runScheduledCommand('evergreen guide generation', 'node scripts/generate-guide.js');
-  }, { timezone: 'America/New_York' });
-  console.log('Evergreen guide generation scheduled: 7:45am, 1:15pm, and 6:45pm daily (Eastern time).');
+  console.log('Evergreen guide generation scheduled: 7:45am, 12:45pm, 5:45pm, and 10:45pm daily (Eastern time).');
 } else {
   console.log('Evergreen guide generation NOT scheduled — AI_CONTENT_SCHEDULES_ENABLED must be true and OPENAI_API_KEY must be set.');
 }
