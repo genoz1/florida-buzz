@@ -479,7 +479,7 @@ async function run() {
   const slug = `${slugify(guide.title)}-${Date.now().toString(36)}`;
 
   console.log('Generating image...');
-  const imageUrl = DRY_RUN ? null : await generateArticleImage({ title: guide.title, category, slug });
+  const imageUrl = DRY_RUN ? null : await generateArticleImage({ title: guide.title, category, slug, dek: guide.dek, bodyHtml: guide.body_html });
 
   if (DRY_RUN) {
     console.log(`\n[dry-run] Title: ${guide.title}`);
