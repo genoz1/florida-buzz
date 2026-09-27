@@ -666,10 +666,7 @@ async function run() {
 
     const slug = await generateUniqueSlug(article.meta_title || article.title);
     let finalImage;
-    if (source.preferAI) {
-      console.log(`  This source is set to always use AI images — generating...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug, ...imageDetails });
-    } else if (realImage) {
+    if (realImage) {
       if (DRY_RUN) {
         console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
         finalImage = null;
@@ -695,7 +692,7 @@ async function run() {
       console.log(`  [dry-run] Meta title (for Google): ${article.meta_title}`);
       console.log(`  [dry-run] Category: ${realCategory}`);
       console.log(`  [dry-run] Dek: ${article.dek}`);
-      console.log(`  [dry-run] Image: ${source.preferAI ? '(would generate — preferAI is set)' : realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
+      console.log(`  [dry-run] Image: ${realImage ? '(would download and permanently store the real photo)' : '(would generate — no real photo found)'}`);
       console.log(`  [dry-run] FB caption: ${article.fb_caption}`);
       console.log(`  [dry-run] Pin title: ${article.pin_title}`);
       console.log(`  [dry-run] Pin description: ${article.pin_description}`);

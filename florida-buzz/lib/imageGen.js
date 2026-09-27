@@ -2,7 +2,21 @@ const { storeGeneratedImage } = require('./supabase');
 const { generateText } = require('./aiText');
 const { generateImage } = require('./openai');
 
-// Use existing article details to illustrate the subject, not fabricate event photography.
+const PHOTO_REQUIREMENTS = `Create a highly photorealistic editorial travel/news photograph
+that appears captured with a professional camera at the actual real location. Use realistic
+Florida lighting, natural colors, believable architecture and landscaping, realistic materials
+and textures, natural photographic perspective, realistic depth and editorial composition.
+Match the photographic appearance of genuine photographs beside it on Florida Buzz.
+No illustrations, cartoons, animation, children's-book artwork, paintings, watercolor,
+digital paintings, drawings, sketches, vector art, clip art, posters, graphic-design
+compositions, fantasy artwork, stylized travel posters, collages, scrapbook pages or infographics.
+No readable text, fake signs, nonsense words, invented logos or attraction names, captions,
+watermarks or text overlays. Do not add branded characters or unnecessary trademarks.
+People, if present, must have realistic anatomy and proportions.
+Retain the actual subject and location; do not invent rides, landmarks, buildings or environments.
+Prefer a modest, accurate photographic view of the existing setting when details are uncertain.`;
+
+// Use article details for a photographic fallback of the actual subject and setting.
 async function generateArticleImage({ title, category, slug, dek = '', bodyHtml = '', location = '' }) {
   const articleText = String(bodyHtml)
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
@@ -31,15 +45,17 @@ relevant. Brands are not a reason to erase a place. Use recognizable, destinatio
 architecture or setting cues; never substitute another park's castle, globe or attraction.
 Do not invent precise architecture if uncertain; retain the destination name in the prompt.
 
-Create a clearly illustrative editorial composition, not a documentary photograph. Show the
-subject through a stylized scene or conceptual inset, not a fabricated view of a reported
-installation, construction project, product launch or event. Use only supplied details for
-new objects or changes; do not invent their exact design. Preserve distinctions such as
-historic/discontinued versus currently offered, and assistance versus priority access.
-Do not invent official cards, app interfaces, readable signage, named people or endorsements.
-Choose a composition suited to this story, not a mandatory flat lay or generic park skyline.
-No captions, labels, watermarks or text overlays. Return ONLY the image prompt, including
-the destination, specific subject and the instruction to illustrate rather than document.`;
+Create a photographic view of the actual destination relevant to the story. Choose the most
+specific location supported by the article, not merely its category or the feed's city.
+Blizzard Beach should retain its Florida snow/ski-resort theming; Typhoon Lagoon its tropical,
+storm-themed environment. For Epic Universe, use the actual relevant area identified in the
+article; for Disney Springs, its recognizable real environment. Never mix different parks.
+Use only established features; do not invent the design of new or proposed rides, construction,
+installations or products. Preserve historic versus current and proposed versus completed status.
+If a reported change cannot be depicted accurately, show a modest view of the existing location.
+Do not fabricate a news event, endorsement, official card, app interface or named person.
+${PHOTO_REQUIREMENTS}
+Return ONLY the photographic image prompt, including the actual destination and specific subject.`;
 
     let imagePrompt;
     try {
@@ -51,7 +67,7 @@ the destination, specific subject and the instruction to illustrate rather than 
 
     let imageBuffer;
     try {
-      imageBuffer = await generateImage(`${imagePrompt}. Editorial illustration with warm light and visibly drawn or painted details, not documentary photography. No text overlays.`);
+      imageBuffer = await generateImage(`${imagePrompt}\n\n${PHOTO_REQUIREMENTS}`);
     } catch (err) {
       console.error(`  [error] Image generation failed: ${err.message}`);
       return null;
@@ -68,16 +84,18 @@ Universal or other named places with generic scenery merely because they are bra
 Use recognizable setting cues appropriate to the actual place, not another destination.
 If uncertain about a precise design, keep the place name without inventing architectural details.
 
-Use a clearly illustrative editorial composition, not a documentary photograph of the
-reported event, construction, installation, product or person. A conceptual inset can explain
-a reported change without placing an invented object at an exact real site. Use only supplied
-facts for new features; preserve historical versus current and proposed versus completed status.
-Never invent official signage, readable app/card designs, endorsements or identifiable people.
+Create a photographic view of the most specific actual location and subject supported by the
+article, not merely its category or the feed's city. Use established environmental features;
+do not invent new buildings, landmarks, rides or the design of reported products or installations.
+Preserve historical versus current and proposed versus completed status. When details are
+uncertain, choose a modest view of the existing setting. Do not fabricate a reported event,
+violation, closure, endorsement, official signage, app/card design or identifiable person.
 Keep Florida geography appropriate to the location: flat terrain, sandy beaches, springs,
 wetlands or urban streets as relevant, not mountains or a beach for every story.
-For unpleasant subjects such as inspection failures, use a tasteful conceptual treatment;
-do not fabricate a violation or closure at a named business. No captions, labels, watermarks
-or text overlays. Return ONLY the image prompt with the place, subject and illustrative intent.`;
+For unpleasant subjects such as inspection failures, choose a neutral, tasteful photographic
+view of the setting without depicting an unverified violation or closure.
+${PHOTO_REQUIREMENTS}
+Return ONLY the photographic image prompt with the actual place and specific subject.`;
 
   let imagePrompt;
   try {
@@ -89,7 +107,7 @@ or text overlays. Return ONLY the image prompt with the place, subject and illus
 
   let imageBuffer;
   try {
-    imageBuffer = await generateImage(`${imagePrompt}. Editorial illustration with warm light and visibly drawn or painted details, not documentary photography. No text overlays.`);
+    imageBuffer = await generateImage(`${imagePrompt}\n\n${PHOTO_REQUIREMENTS}`);
   } catch (err) {
     console.error(`  [error] Image generation failed: ${err.message}`);
     return null;
