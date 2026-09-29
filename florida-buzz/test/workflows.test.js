@@ -35,6 +35,9 @@ function queueFetch(payloads, requests) {
     if (next.image) {
       return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('mock-image').toString('base64') }] }), { status: 200 });
     }
+    if (next.review) {
+      return new Response(JSON.stringify(responsePayload(JSON.stringify(next.review))), { status: 200 });
+    }
     return new Response(JSON.stringify(responsePayload(JSON.stringify(next.value), { research: next.research })), { status: 200 });
   };
 }
@@ -73,16 +76,18 @@ test('all Florida Buzz text workflows retain their existing structured contracts
   ));
 });
 
-test('the image path still uses a text prompt followed by gpt-image-1 and fails closed', async (t) => {
+test('the image path uses a text prompt, gpt-image-1, and a visual review before storage', async (t) => {
   const originalFetch = global.fetch;
   t.after(() => { global.fetch = originalFetch; });
 
   const requests = [];
-  global.fetch = queueFetch([{ value: 'A warm, generic Florida springs scene without logos.' }, { image: true }], requests);
+  global.fetch = queueFetch([{ value: 'A warm, generic Florida springs scene without logos.' }, { image: true }, { review: { acceptable: true, issues: [], correction: '' } }], requests);
   assert.equal(await generateArticleImage({ title: 'Florida Springs Planning Update', category: 'florida-living', slug: 'springs-update' }), null);
   assert.equal(requests[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(requests[1].url, 'https://api.openai.com/v1/images/generations');
   assert.equal(requests[1].body.model, 'gpt-image-1');
+  assert.equal(requests[2].url, 'https://api.openai.com/v1/responses');
+  assert.equal(requests[2].body.input[0].content[1].type, 'input_image');
 
   const failedRequests = [];
   global.fetch = async (url, options = {}) => {

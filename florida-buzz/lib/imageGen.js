@@ -1,6 +1,9 @@
 const { storeGeneratedImage } = require('./supabase');
 const { generateText } = require('./aiText');
 const { generateImage } = require('./openai');
+const { validateGeneratedImage } = require('./imageValidation');
+
+const MAX_IMAGE_ATTEMPTS = 2;
 
 const PHOTO_REQUIREMENTS = `Create a highly photorealistic editorial travel/news photograph
 that appears captured with a professional camera at the actual real location. Use realistic
@@ -13,11 +16,48 @@ compositions, fantasy artwork, stylized travel posters, collages, scrapbook page
 No readable text, fake signs, nonsense words, invented logos or attraction names, captions,
 watermarks or text overlays. Do not add branded characters or unnecessary trademarks.
 People, if present, must have realistic anatomy and proportions.
+Prefer a wide establishing photograph of the actual location or attraction without prominent
+foreground people. Small background crowds are acceptable only if they look natural.
+If people appear, heads, faces, hands, arms and legs must be anatomically correct; heads must
+face naturally relative to torsos and bodies must be oriented correctly. People must interact
+realistically with objects. Adults must push strollers from behind, not pull them from the front;
+children must be seated naturally and face a physically plausible direction. Stroller handles,
+wheels, seats and frames must have correct geometry. No duplicated, merged, floating, malformed
+or partially generated people, including distorted people in background crowds.
 Retain the actual subject and location; do not invent rides, landmarks, buildings or environments.
 Prefer a modest, accurate photographic view of the existing setting when details are uncertain.`;
 
+async function generateValidatedImage(imagePrompt, context, { generate = generateImage, validate = validateGeneratedImage, store = storeGeneratedImage } = {}) {
+  let correction = '';
+  for (let attempt = 1; attempt <= MAX_IMAGE_ATTEMPTS; attempt += 1) {
+    const prompt = `${imagePrompt}\n\n${PHOTO_REQUIREMENTS}${correction ? `\n\nPrevious image was rejected: ${correction}. Correct these defects. If people or strollers are not essential, exclude them and show a wide establishing view instead.` : ''}`;
+    let imageBuffer;
+    try {
+      imageBuffer = await generate(prompt);
+    } catch (err) {
+      console.error(`  [error] Image generation failed: ${err.message}`);
+      return null;
+    }
+
+    let review;
+    try {
+      review = await validate(imageBuffer, { ...context, imagePrompt: prompt });
+    } catch (err) {
+      console.error(`  [error] Image review unavailable (${err.message}) — leaving article without an AI image.`);
+      return null;
+    }
+    if (review?.acceptable === true && Array.isArray(review.issues) && review.issues.length === 0) {
+      return store(imageBuffer, `${context.slug}.png`);
+    }
+    correction = String(review?.correction || review?.issues?.join('; ') || 'visible quality defects').slice(0, 500);
+    console.warn(`  [reject] Generated image failed visual review (${attempt}/${MAX_IMAGE_ATTEMPTS}): ${correction}`);
+  }
+  console.warn('  [review] No acceptable AI image after two attempts — leaving article without a generated hero image.');
+  return null;
+}
+
 // Use article details for a photographic fallback of the actual subject and setting.
-async function generateArticleImage({ title, category, slug, dek = '', bodyHtml = '', location = '' }) {
+async function generateArticleImage({ title, category, slug, dek = '', bodyHtml = '', location = '' }, dependencies) {
   const articleText = String(bodyHtml)
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
@@ -65,15 +105,7 @@ Return ONLY the photographic image prompt, including the actual destination and 
       return null;
     }
 
-    let imageBuffer;
-    try {
-      imageBuffer = await generateImage(`${imagePrompt}\n\n${PHOTO_REQUIREMENTS}`);
-    } catch (err) {
-      console.error(`  [error] Image generation failed: ${err.message}`);
-      return null;
-    }
-
-    return storeGeneratedImage(imageBuffer, `${slug}.png`);
+    return generateValidatedImage(imagePrompt, { title, location, slug }, dependencies);
   }
 
   const promptSystem = `Write a concise image prompt for The Florida Buzz using the
@@ -105,15 +137,7 @@ Return ONLY the photographic image prompt with the actual place and specific sub
     return null;
   }
 
-  let imageBuffer;
-  try {
-    imageBuffer = await generateImage(`${imagePrompt}\n\n${PHOTO_REQUIREMENTS}`);
-  } catch (err) {
-    console.error(`  [error] Image generation failed: ${err.message}`);
-    return null;
-  }
-
-  return storeGeneratedImage(imageBuffer, `${slug}.png`);
+  return generateValidatedImage(imagePrompt, { title, location, slug }, dependencies);
 }
 
-module.exports = { generateArticleImage };
+module.exports = { generateArticleImage, generateValidatedImage };
