@@ -78,7 +78,7 @@ when rejected; leave correction empty when accepted.`,
           { type: 'input_image', image_url: `data:${imageMimeType(imageBuffer)};base64,${imageBuffer.toString('base64')}`, detail: 'high' },
         ],
       }],
-      max_output_tokens: 350,
+      max_output_tokens: 2000,
       reasoning: { effort: 'low' },
       text: { format: { type: 'json_schema', name: 'article_image_review', schema: reviewSchema, strict: true } },
     }),
@@ -86,7 +86,13 @@ when rejected; leave correction empty when accepted.`,
 
   if (!response.ok) throw new Error(`Image review API returned HTTP ${response.status}.`);
   const data = await response.json();
-  if (data.status !== 'completed') throw new Error('Image review did not complete.');
+  if (data.status !== 'completed') {
+    const status = ['incomplete', 'failed', 'cancelled', 'queued', 'in_progress'].includes(data.status)
+      ? data.status : 'unknown';
+    const reason = ['max_output_tokens', 'content_filter'].includes(data.incomplete_details?.reason)
+      ? data.incomplete_details.reason : 'unknown';
+    throw new Error(`Image review did not complete (status=${status}, incomplete_reason=${reason}).`);
+  }
   const output = data.output_text || (data.output || []).flatMap((item) =>
     item.type === 'message' ? (item.content || []).filter((part) => part.type === 'output_text').map((part) => part.text) : []
   ).join('');
