@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">Florida Buzz article placeholder</title>
+  <desc id="description">A branded abstract Florida sunrise used when no relevant story photograph is available.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e3b43"/>
+      <stop offset="0.64" stop-color="#176b73"/>
+      <stop offset="1" stop-color="#f07c5f"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd59b"/>
+      <stop offset="1" stop-color="#ff9b74"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <circle cx="1260" cy="225" r="118" fill="url(#sun)" opacity=".96"/>
+  <path d="M0 570C225 510 360 630 590 573s382-38 550 21 307 29 460-4v310H0Z" fill="#f7ecd6" opacity=".96"/>
+  <path d="M0 650c238-56 416 46 638 8 237-40 420-9 576 39 135 42 250 25 386-10v213H0Z" fill="#9ed0c8" opacity=".72"/>
+  <path d="M134 742c172-43 308-42 485 0m357 34c181-55 324-58 480-10" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" opacity=".62"/>
+  <g fill="#fff" text-anchor="middle">
+    <text x="800" y="300" font-family="Georgia, serif" font-size="104" font-weight="700">Florida <tspan font-style="italic" fill="#ff9b74">Buzz</tspan></text>
+    <text x="800" y="374" font-family="Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="7" opacity=".82">STORY IMAGE COMING SOON</text>
+  </g>
+</svg>

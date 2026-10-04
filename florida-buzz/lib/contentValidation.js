@@ -33,6 +33,13 @@ function requireHtml(value, field = 'body_html') {
   }
 }
 
+function requireStringArray(value, field, { maxItems = 12 } = {}) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > maxItems
+    || !value.every((item) => typeof item === 'string' && item.trim().length > 0)) {
+    throw new ContentValidationError(`${field} must contain 1-${maxItems} strings.`);
+  }
+}
+
 function validateNewsArticle(article) {
   requireObject(article, 'article');
   if (article.skip === true) {
@@ -50,6 +57,9 @@ function validateNewsArticle(article) {
   requireString(article.fb_caption, 'fb_caption');
   requireString(article.pin_title, 'pin_title', { max: 140 });
   requireString(article.pin_description, 'pin_description', { max: 600 });
+  requireString(article.image_subject, 'image_subject', { max: 180 });
+  if (article.image_location !== null) requireString(article.image_location, 'image_location', { max: 120 });
+  requireStringArray(article.image_entities, 'image_entities');
   return article;
 }
 

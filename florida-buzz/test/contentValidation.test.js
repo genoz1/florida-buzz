@@ -17,6 +17,8 @@ test('article-producing workflows accept complete representative output', () => 
   assert.doesNotThrow(() => validateNewsArticle({
     title: 'Florida Attraction Announces an Update', meta_title: 'Florida Attraction Update 2026',
     category: 'theme-parks', dek: 'A concise explanation of what changed.', body_html: body, ...social,
+    image_subject: 'The named Florida attraction in its real setting', image_location: 'Orlando, Florida',
+    image_entities: ['Florida attraction', 'Orlando'],
   }));
   assert.doesNotThrow(() => validateGuide({
     title: 'A Practical Florida Planning Guide', dek: 'What to know before visiting.', body_html: body,

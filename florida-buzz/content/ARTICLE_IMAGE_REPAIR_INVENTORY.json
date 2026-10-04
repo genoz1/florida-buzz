@@ -1,0 +1,128 @@
+[
+  {
+    "slug": "universal-orlando-refillable-cups-2026-are-they-worth-it-musx811n",
+    "title": "Universal Orlando Refillable Cups 2026: Are They Worth It?",
+    "category": "theme-parks",
+    "imageSubject": "Universal Orlando refillable beverage cups in a credible in-park Coca-Cola Freestyle setting",
+    "location": "Universal Orlando Resort, Orlando, Florida",
+    "imageEntities": ["Universal Orlando Resort", "Coca-Cola Freestyle", "refillable cups"],
+    "observedIssue": "Missing stored image renders the fixed theme-parks beach placeholder."
+  },
+  {
+    "slug": "disney-world-park-hopper-2026-is-it-worth-the-add-on-murhsegc",
+    "title": "Disney World Park Hopper 2026: Is It Worth the Add-On?",
+    "category": "theme-parks",
+    "imageSubject": "Walt Disney World park-to-park transportation or a neutral multi-park planning scene",
+    "location": "Walt Disney World Resort, Lake Buena Vista, Florida",
+    "imageEntities": ["Walt Disney World", "Park Hopper"],
+    "observedIssue": "Missing stored image renders the fixed theme-parks beach placeholder."
+  },
+  {
+    "slug": "seaworld-orlando-quick-queue-2026-which-pass-is-worth-it-mur72hf8",
+    "title": "SeaWorld Orlando Quick Queue 2026: Which Pass Is Worth It?",
+    "category": "theme-parks",
+    "imageSubject": "A credible SeaWorld Orlando attraction entrance and guest queue setting",
+    "location": "SeaWorld Orlando, Orlando, Florida",
+    "imageEntities": ["SeaWorld Orlando", "Quick Queue"],
+    "observedIssue": "Missing stored image renders the fixed theme-parks beach placeholder."
+  },
+  {
+    "slug": "st-augustine-nights-of-lights-2026-27-parking-shuttles-murshx1k",
+    "title": "St. Augustine Nights of Lights 2026–27: Parking & Shuttles",
+    "category": "events",
+    "imageSubject": "Historic downtown St. Augustine streets illuminated during Nights of Lights",
+    "location": "St. Augustine, Florida",
+    "imageEntities": ["St. Augustine", "Nights of Lights"],
+    "observedIssue": "Missing stored image renders the fixed events mountain placeholder."
+  },
+  {
+    "slug": "seaworld-2-day-vs-14-day-ticket-which-is-better-musbsjgo",
+    "title": "SeaWorld 2-Day vs. 14-Day Ticket: Which Is Better?",
+    "category": "travel-deals",
+    "imageSubject": "SeaWorld Orlando entrance or attractions in a neutral ticket-planning context",
+    "location": "SeaWorld Orlando, Orlando, Florida",
+    "imageEntities": ["SeaWorld Orlando", "park tickets"],
+    "observedIssue": "Missing stored image renders the generic Florida sunset placeholder."
+  },
+  {
+    "slug": "disney-monstropolis-construction-update-october-2026",
+    "title": "Trees and Brickwork Appear at Disney’s Monstropolis Site",
+    "category": "theme-parks",
+    "imageSubject": "The existing Monstropolis construction site at Disney's Hollywood Studios without invented finished structures",
+    "location": "Disney's Hollywood Studios, Walt Disney World",
+    "imageEntities": ["Monstropolis", "Disney's Hollywood Studios"],
+    "observedIssue": "Recent theme-park listing uses the fixed theme-parks placeholder."
+  },
+  {
+    "slug": "disney-world-halloween-party-2026-sold-out",
+    "title": "Disney World’s 2026 Halloween Party Is Sold Out",
+    "category": "theme-parks",
+    "imageSubject": "Magic Kingdom decorated for Mickey's Not-So-Scary Halloween Party",
+    "location": "Magic Kingdom, Walt Disney World",
+    "imageEntities": ["Magic Kingdom", "Mickey's Not-So-Scary Halloween Party"],
+    "observedIssue": "Recent theme-park listing uses the fixed theme-parks placeholder."
+  },
+  {
+    "slug": "disney-animal-kingdom-timu-eastern-black-rhino",
+    "title": "Timu the Eastern Black Rhino Joins Animal Kingdom Savanna",
+    "category": "wildlife",
+    "imageSubject": "An eastern black rhinoceros in a credible Disney's Animal Kingdom savanna habitat",
+    "location": "Disney's Animal Kingdom, Walt Disney World",
+    "imageEntities": ["Timu", "eastern black rhinoceros", "Disney's Animal Kingdom"],
+    "observedIssue": "Current home-page card has no stored image and uses a generic category placeholder."
+  },
+  {
+    "slug": "wekiwa-springs-state-park-glamping-tents",
+    "title": "Wekiwa Springs State Park Adds Four Glamping Tents",
+    "category": "florida-living",
+    "imageSubject": "Glamping tents in the flat wooded setting of Wekiwa Springs State Park",
+    "location": "Wekiwa Springs State Park, Florida",
+    "imageEntities": ["Wekiwa Springs State Park", "glamping tents"],
+    "observedIssue": "Current home-page card has no stored image and uses a generic category placeholder."
+  },
+  {
+    "slug": "cape-canaveral-starship-launch-proposal-faa-review",
+    "title": "FAA Review Begins for Proposed Starship Launches at Cape Canaveral",
+    "category": "space",
+    "imageSubject": "Existing Space Launch Complex 37 or a neutral Cape Canaveral launch facility view without depicting an unbuilt Starship installation",
+    "location": "Cape Canaveral Space Force Station, Florida",
+    "imageEntities": ["FAA", "Starship", "Cape Canaveral", "SLC-37"],
+    "observedIssue": "Current home-page card has no stored image and shares the fixed space placeholder."
+  },
+  {
+    "slug": "nasa-spacex-crew-12-space-station-mission-ends",
+    "title": "NASA’s SpaceX Crew-12 Wraps Up Space Station Research",
+    "category": "space",
+    "imageSubject": "A credible Crew Dragon or International Space Station mission scene tied to Crew-12",
+    "location": "International Space Station mission",
+    "imageEntities": ["NASA", "SpaceX", "Crew-12", "International Space Station"],
+    "observedIssue": "Current home-page card has no stored image and shares the fixed space placeholder."
+  },
+  {
+    "slug": "crew-13-reaches-iss-after-cape-canaveral-launch",
+    "title": "Crew-13 Reaches ISS After Cape Canaveral Launch",
+    "category": "space",
+    "imageSubject": "A credible Crew Dragon launch or International Space Station arrival scene tied to Crew-13",
+    "location": "Cape Canaveral, Florida and the International Space Station",
+    "imageEntities": ["Crew-13", "Cape Canaveral", "International Space Station"],
+    "observedIssue": "Current home-page card has no stored image and shares the fixed space placeholder."
+  },
+  {
+    "slug": "parkvolusia-guide-daytona-beach-driving-parking-passes-muq2cbd7",
+    "title": "ParkVolusia Guide: Daytona Beach Driving, Parking & Passes",
+    "category": "beaches",
+    "imageSubject": "A marked vehicle access ramp or beach-driving scene in Volusia County",
+    "location": "Daytona Beach, Volusia County, Florida",
+    "imageEntities": ["ParkVolusia", "Daytona Beach", "Volusia County"],
+    "observedIssue": "Current home-page card has no stored image and uses a generic beach placeholder."
+  },
+  {
+    "slug": "orlando-halloween-events-october-2026",
+    "title": "Central Florida’s October 2026 Halloween Event Guide",
+    "category": "events",
+    "imageSubject": "A neutral Central Florida Halloween event setting with credible seasonal decorations",
+    "location": "Central Florida",
+    "imageEntities": ["Central Florida", "Halloween events"],
+    "observedIssue": "Current home-page card has no stored image and uses the events mountain placeholder."
+  }
+]

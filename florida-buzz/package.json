@@ -19,6 +19,7 @@
     "backfill-images:dry": "DRY_RUN=true node scripts/backfill-images.js",
     "fix-images": "node scripts/fix-specific-images.js",
     "fix-images:dry": "DRY_RUN=true node scripts/fix-specific-images.js",
+    "repair-article-images": "node scripts/repair-article-images.js",
     "crop-image": "node scripts/crop-existing-image.js",
     "city-roundup": "node scripts/city-roundup.js",
     "city-roundup:dry": "DRY_RUN=true node scripts/city-roundup.js"

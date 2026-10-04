@@ -7,6 +7,7 @@ const multer = require('multer');
 const reviewPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 const { logNotFound } = require('../lib/notFoundLog');
 const { createPin } = require('../lib/pinterest');
+const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
@@ -126,17 +127,7 @@ const PILLARS = {
 };
 
 function placeholderImg(category) {
-  const seedMap = {
-    'theme-parks': 'fc-theme-parks',
-    space: 'fc-space',
-    beaches: 'fc-beaches',
-    'florida-living': 'fc-florida-living',
-    wildlife: 'fc-wildlife',
-    cruises: 'fc-cruises',
-    food: 'fc-food',
-    events: 'fc-events',
-  };
-  return `https://picsum.photos/seed/${seedMap[category] || 'florida'}/1600/900`;
+  return ARTICLE_PLACEHOLDER_PATH;
 }
 
 // Rewrites a Supabase Storage URL to request a resized/compressed version via
@@ -144,7 +135,7 @@ function placeholderImg(category) {
 // full-size original (AI-generated images are 1536x1024; real downloaded
 // photos can be several MB) on every single page view. This is what was
 // driving Supabase bandwidth usage well over the free tier's monthly limit.
-// Non-Supabase URLs (e.g. the picsum.photos placeholders) pass through
+// Non-Supabase URLs (including the local designed placeholder) pass through
 // untouched — they're already small and hosted elsewhere.
 function resizeImg(url, width) {
   if (!url || typeof url !== 'string') return url;

@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('node:crypto');
 const { imageSize } = require('image-size');
 const { Jimp } = require('jimp');
 const {
@@ -6,6 +7,7 @@ const {
   inspectSourceImage,
   processSourceImageInWorker,
 } = require('./sourceImageProcessor');
+const { contentAddressedName } = require('./articleImages');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   console.warn('[supabase] SUPABASE_URL / SUPABASE_SERVICE_KEY not set yet — site will run with sample data only.');
@@ -98,7 +100,7 @@ function thumbFilename(filename) {
 
 // Template-facing version: takes a full image URL (as stored on an article)
 // and returns the thumbnail's URL, or the original URL unchanged if it's not
-// one of our own Supabase-hosted images (e.g. the picsum.photos placeholders
+// one of our own Supabase-hosted images (e.g. the local designed placeholder
 // used when no real image exists — those have no separate thumbnail and
 // were already small to begin with).
 function thumbUrl(imageUrl) {
@@ -168,7 +170,7 @@ async function normalizeAspectRatio(buffer) {
 const GENERATED_IMAGE_MAX_WIDTH = 1200; // plenty for hero/thumbnail display at any real screen size
 const GENERATED_IMAGE_JPEG_QUALITY = 78; // strong visual quality, small file size
 
-async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/png') {
+async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/png', { contentAddressed = false } = {}) {
   if (!supabase) return null;
   try {
     let finalBuffer = imageBuffer;
@@ -185,6 +187,11 @@ async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/p
       finalContentType = 'image/jpeg';
       finalFilename = filename.replace(/\.png$/i, '.jpg');
       console.log(`  Compressed generated image: ${(originalSize / 1024).toFixed(0)}KB PNG -> ${(finalBuffer.length / 1024).toFixed(0)}KB JPEG`);
+    }
+
+    if (contentAddressed) {
+      const fingerprint = crypto.createHash('sha256').update(finalBuffer).digest('hex');
+      finalFilename = contentAddressedName(finalFilename, fingerprint);
     }
 
     const { error: uploadError } = await supabase.storage
@@ -231,7 +238,7 @@ async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/p
 // that server ever removes the image, changes its URL, or blocks hotlinking.
 // Returns the permanent public URL, or null if the download/store fails for
 // any reason (caller should fall back to AI generation in that case).
-async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}) {
+async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent, contentAddressed = false } = {}) {
   if (!supabase) return null;
   try {
     // Some publisher CDNs (Dotdash Meredith properties like Travel + Leisure
@@ -283,6 +290,11 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent } = {}
     const originalSize = buffer.length;
     const { mainBuffer, thumbnailBuffer } = await processSourceImageInWorker(buffer, { cropBottomPercent });
     console.log(`  Compressed source image: ${(originalSize / 1024).toFixed(0)}KB -> ${(mainBuffer.length / 1024).toFixed(0)}KB`);
+
+    if (contentAddressed) {
+      const fingerprint = crypto.createHash('sha256').update(mainBuffer).digest('hex');
+      filename = contentAddressedName(filename, fingerprint);
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('article-images')

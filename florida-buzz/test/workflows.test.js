@@ -46,7 +46,7 @@ test('all Florida Buzz text workflows retain their existing structured contracts
   const originalFetch = global.fetch;
   const requests = [];
   const payloads = [
-    { value: { skip: false, reason: null, title: 'Florida Attraction Announces a Helpful Update', meta_title: 'Florida Attraction Update 2026', category: 'theme-parks', dek: 'A concise explanation of what visitors should know.', body_html: body, ...social } },
+    { value: { skip: false, reason: null, title: 'Florida Attraction Announces a Helpful Update', meta_title: 'Florida Attraction Update 2026', category: 'theme-parks', dek: 'A concise explanation of what visitors should know.', body_html: body, ...social, image_subject: 'The named Florida attraction in its real park setting', image_location: 'Orlando, Florida', image_entities: ['Florida attraction', 'Orlando'] } },
     { research: true, value: { topic: 'Current Florida park entry procedures', working_title: 'Florida Park Entry Procedures Guide' } },
     { research: true, value: { title: 'Florida Park Entry Procedures Guide', dek: 'What to know before arriving at the gate.', body_html: body, ...social, fb_caption: 'Plan your next Florida park day with current details. Full guide ↓' } },
     { research: true, value: { title: 'Manual Florida Springs Planning Guide', dek: 'Current planning details for a Florida springs visit.', body_html: body, ...social, fb_caption: 'Plan a Florida springs day with current information. Full guide ↓' } },
@@ -81,7 +81,7 @@ test('the image path uses a text prompt, gpt-image-1, and a visual review before
   t.after(() => { global.fetch = originalFetch; });
 
   const requests = [];
-  global.fetch = queueFetch([{ value: 'A warm, generic Florida springs scene without logos.' }, { image: true }, { review: { acceptable: true, issues: [], correction: '' } }], requests);
+  global.fetch = queueFetch([{ value: 'A warm, relevant Florida springs scene without logos.' }, { image: true }, { review: { acceptable: true, relevance_acceptable: true, issues: [], correction: '' } }], requests);
   assert.equal(await generateArticleImage({ title: 'Florida Springs Planning Update', category: 'florida-living', slug: 'springs-update' }), null);
   assert.equal(requests[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(requests[1].url, 'https://api.openai.com/v1/images/generations');

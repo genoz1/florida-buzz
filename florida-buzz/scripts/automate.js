@@ -11,6 +11,10 @@ const { createPost: createInstagramPost } = require('../lib/instagram');
 const { createPost: createThreadsPost } = require('../lib/threads');
 const { postToFacebookPage } = require('../lib/facebook');
 const { notifyIndexNow } = require('../lib/indexnow');
+const {
+  findDuplicateImage,
+  isLikelyGenericSourceImage,
+} = require('../lib/articleImages');
 const SOURCES = require('./sources');
 
 const parser = new Parser({
@@ -378,6 +382,14 @@ Buzz's own independent links, generated separately — the source only gets cred
 underlying information/recommendation, not for any specific link. Do not write anything
 like "the links come from [source]" or "Amazon links from [source]" — if you mention links
 at all, describe them only as this article's own, or simply don't reference their origin.
+Also provide compact image-relevance metadata in this same response. image_subject must name
+the concrete visual subject that honestly represents this exact story, not merely its category.
+image_location must preserve the specific real destination or Florida city when the source
+supports one, otherwise null. image_entities must list the central named parks, attractions,
+businesses, events, ships, cities, beaches, hotels or destinations that an image must not
+silently substitute. These fields are evidence for the existing image pipeline, not permission
+to invent what a new product, attraction or construction project looks like. When skip is true,
+set all three image fields to null.
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "skip": "boolean",
@@ -389,7 +401,10 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "body_html": "string, useful factual article as <p> tags, length appropriate to the available facts, with supported context woven in naturally; headings only when helpful",
   "fb_caption": "string, Facebook post: 1-2 sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags. Name the real place, attraction, or subject clearly so readers know what this is about, and make clear that a specific concrete detail exists (a price, a date, a name, a number) — but hold that detail back rather than stating it outright, so there's a genuine reason to click through and see it. For example, write toward 'Disney just changed something about Lightning Lane pricing this week' rather than stating the new price directly in the caption. This is a real curiosity gap, not vague hype — it must point at something specific and true from the story, just without giving away the payoff itself. Never imply something the article doesn't actually say just to make the hook stronger.",
   "pin_title": "string, under 100 characters, descriptive and keyword-rich (Pinterest is a search engine, not a feed — favor clarity over punchiness)",
-  "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type (e.g. category, location, activity) without keyword-stuffing"
+  "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type (e.g. category, location, activity) without keyword-stuffing",
+  "image_subject": "specific concrete visual subject for this exact article, or null when skipped",
+  "image_location": "specific supported destination/city/venue, or null when no location is supported or when skipped",
+  "image_entities": "array of 1-10 central named entities that the image must preserve, or null when skipped"
 }`;
 
   const user = `Source: ${sourceName}
@@ -615,7 +630,11 @@ async function run() {
 
     console.log(`  Writing article...`);
     const actualSourceName = source.mixedSource ? nameFromUrl(item.link) : source.name;
-    const realImage = extractImage(item);
+    const extractedImage = extractImage(item);
+    const realImage = isLikelyGenericSourceImage(extractedImage) ? null : extractedImage;
+    if (extractedImage && !realImage) {
+      console.log('  [reject] RSS image URL looks like a generic placeholder/logo — using the relevant-image path instead.');
+    }
 
     const fullSourceText = await fetchFullSourceText(item.link);
     const summaryForWriter = fullSourceText || summary;
@@ -655,7 +674,13 @@ async function run() {
     if (realCategory !== source.category) {
       console.log(`  Reclassified: this story is actually "${realCategory}", not "${source.category}" (the feed's usual category).`);
     }
-    const imageDetails = { dek: article.dek, bodyHtml: article.body_html, location: source.city };
+    const imageDetails = {
+      dek: article.dek,
+      bodyHtml: article.body_html,
+      location: article.image_location || source.city,
+      imageSubject: article.image_subject,
+      imageEntities: article.image_entities,
+    };
     article.body_html = appendUndercoverTouristBox(article.body_html, realCategory, article.title);
 
     if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
@@ -673,18 +698,45 @@ async function run() {
       } else {
         console.log(`  Found real photo — downloading and storing it permanently (not hotlinking)...`);
         if (cropBottomPercent) console.log(`  This origin site bakes a branding banner into its images — cropping bottom ${Math.round(cropBottomPercent * 100)}%...`);
-        const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`, { cropBottomPercent });
+        const storedUrl = await storeImageFromUrl(realImage, `${slug}.jpg`, {
+          cropBottomPercent,
+          contentAddressed: true,
+        });
         if (storedUrl) {
           console.log(`  Stored real photo permanently.`);
           finalImage = storedUrl;
         } else {
           console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
-          finalImage = await generateArticleImage({ title: article.title, category: realCategory, slug, ...imageDetails });
+          finalImage = await generateArticleImage(
+            { title: article.title, category: realCategory, slug, ...imageDetails },
+            { store: (buffer, filename) => storeGeneratedImage(buffer, filename, 'image/png', { contentAddressed: true }) }
+          );
         }
       }
     } else {
       console.log(`  No real photo found — generating one...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage({ title: article.title, category: realCategory, slug, ...imageDetails });
+      finalImage = DRY_RUN ? null : await generateArticleImage(
+        { title: article.title, category: realCategory, slug, ...imageDetails },
+        { store: (buffer, filename) => storeGeneratedImage(buffer, filename, 'image/png', { contentAddressed: true }) }
+      );
+    }
+
+    if (!DRY_RUN && finalImage && supabase) {
+      const { data: recentWithImage, error: duplicateError } = await supabase.from('articles')
+        .select('slug, title, image_url')
+        .eq('image_url', finalImage)
+        .order('published_at', { ascending: false })
+        .limit(25);
+      if (duplicateError) {
+        console.error(`  [warning] Could not verify image uniqueness: ${duplicateError.message}. Leaving the article without an image rather than risk unrelated reuse.`);
+        finalImage = null;
+      } else {
+        const duplicate = findDuplicateImage(finalImage, recentWithImage || [], slug);
+        if (duplicate) {
+          console.warn(`  [reject] Exact image already belongs to "${duplicate.title}" — leaving this article on the designed fallback.`);
+          finalImage = null;
+        }
+      }
     }
 
     if (DRY_RUN) {
