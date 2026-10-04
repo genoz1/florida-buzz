@@ -129,7 +129,10 @@ async function processImageRepairJob(client, queue, job, {
       imageEntities: context.imageEntities || [],
     }, {
       maxAttempts: 2,
-      priorCorrection: job.correction || '',
+      // A persisted correction may have been written by an older reviewer contract and can
+      // reintroduce obsolete, over-prescriptive composition demands. Corrections produced by
+      // the current reviewer still guide the immediate second attempt inside imageGen.
+      priorCorrection: '',
       store,
       validate,
     });
