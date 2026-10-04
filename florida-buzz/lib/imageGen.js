@@ -1,7 +1,7 @@
 const { storeGeneratedImage } = require('./supabase');
 const { generateText } = require('./aiText');
 const { generateImage } = require('./openai');
-const { validateGeneratedImage } = require('./imageValidation');
+const { validateGeneratedImage, assertCompletedReview } = require('./imageValidation');
 const { buildImageBrief } = require('./articleImages');
 
 const MAX_IMAGE_ATTEMPTS = 2;
@@ -57,7 +57,7 @@ async function generateValidatedImageResult(imagePrompt, context, {
 
     let review;
     try {
-      review = await validate(imageBuffer, { ...context, imagePrompt: prompt });
+      review = assertCompletedReview(await validate(imageBuffer, { ...context, imagePrompt: prompt }));
     } catch (err) {
       console.error(`  [error] Image review unavailable (${err.message}) — preserving the generated candidate for review retry.`);
       return {

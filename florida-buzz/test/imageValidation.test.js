@@ -151,3 +151,17 @@ test('technical review failure preserves the generated candidate for retry witho
   assert.equal(result.candidateUrl, 'https://storage.example/candidate.jpg');
   assert.equal(generations, 1);
 });
+
+ test('malformed review decisions preserve candidate without corrective generation', async () => {
+  for (const verdict of [undefined, {}, { acceptable: false }, { acceptable: false, issues: [], correction: null }]) {
+    let generations = 0;
+    const result = await generateValidatedImageResult('Photo', context, {
+      generate: async () => { generations++; return bytes; },
+      store: async () => 'https://storage.example/same.jpg',
+      validate: async () => verdict,
+    });
+    assert.equal(result.status, 'review_failed');
+    assert.equal(result.candidateUrl, 'https://storage.example/same.jpg');
+    assert.equal(generations, 1);
+  }
+});

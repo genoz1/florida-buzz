@@ -1,13 +1,27 @@
+const { imageSize } = require('image-size');
 const { findDuplicateImage } = require('./articleImages');
 const { generateArticleImageResult } = require('./imageGen');
-const { validateGeneratedImage } = require('./imageValidation');
+const { validateGeneratedImage, assertCompletedReview } = require('./imageValidation');
 const { createImageRepairQueue, MAX_GENERATION_ATTEMPTS } = require('./imageRepairQueue');
 const { storeGeneratedImage } = require('./supabase');
 
 async function fetchCandidate(url, fetchImpl = fetch) {
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(30000) });
-  if (!response.ok) throw new Error(`Stored candidate fetch returned HTTP ${response.status}.`);
-  return Buffer.from(await response.arrayBuffer());
+  if (!response.ok) {
+    const error = new Error(`Stored candidate fetch returned HTTP ${response.status}.`);
+    error.candidateInvalid = response.status === 404 || response.status === 410;
+    throw error;
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  try {
+    const dimensions = imageSize(buffer);
+    if (!dimensions.width || !dimensions.height) throw new Error('Missing dimensions');
+  } catch {
+    const error = new Error('Stored candidate is corrupt or not an image.');
+    error.candidateInvalid = true;
+    throw error;
+  }
+  return buffer;
 }
 
 function validationContext(job) {
@@ -65,13 +79,14 @@ async function reviewStoredCandidate(client, queue, job, {
   try {
     buffer = await fetchCandidate(job.candidate_image_url, fetchImpl);
   } catch (error) {
-    await queue.markReviewFailure(job, error);
+    if (error.candidateInvalid) await queue.markRejected(job, error.message);
+    else await queue.markReviewFailure(job, error);
     return { status: 'candidate_fetch_failed', slug: job.article_slug, error: error.message };
   }
 
   let review;
   try {
-    review = await validate(buffer, validationContext(job));
+    review = assertCompletedReview(await validate(buffer, validationContext(job)));
   } catch (error) {
     await queue.markReviewFailure(job, error);
     return { status: 'review_failed', slug: job.article_slug, reusedCandidate: true, error: error.message };

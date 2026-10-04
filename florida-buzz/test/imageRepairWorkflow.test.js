@@ -158,7 +158,7 @@ test('technical review failure retries the same stored asset without generation'
   const job = { ...baseJob, status: 'review_pending', candidate_image_url: 'https://storage.example/candidate.jpg' };
   const result = await processImageRepairJob({}, queue, job, {
     generate: async () => { generations += 1; throw new Error('must not generate'); },
-    fetchImpl: async () => new Response(Buffer.from('candidate-bytes'), { status: 200 }),
+    fetchImpl: async () => new Response(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5WQAAAAASUVORK5CYII=', 'base64'), { status: 200 }),
     validate: async () => { throw new Error('review service unavailable'); },
   });
   assert.equal(result.status, 'review_failed');
@@ -172,7 +172,7 @@ test('a preserved candidate can later pass review and transition to accepted', a
   const { article, client } = articleClient();
   const job = { ...baseJob, status: 'review_pending', candidate_image_url: 'https://storage.example/candidate.jpg' };
   const result = await reviewStoredCandidate(client, queue, job, {
-    fetchImpl: async () => new Response(Buffer.from('candidate-bytes'), { status: 200 }),
+    fetchImpl: async () => new Response(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5WQAAAAASUVORK5CYII=', 'base64'), { status: 200 }),
     validate: async () => ({ acceptable: true, issues: [], correction: '' }),
   });
   assert.equal(result.status, 'accepted');

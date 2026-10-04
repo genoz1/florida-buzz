@@ -44,8 +44,11 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
     if (!client || !article?.id || !article?.slug) return false;
     const existing = await get(article.id);
     const candidateUrl = result?.candidateUrl
-      || (existing?.status === 'review_pending' ? existing.candidate_image_url : null);
-    const status = candidateUrl && result?.status === 'review_failed' ? 'review_pending' : 'pending';
+      || (['review_pending', 'needs_manual'].includes(existing?.status) ? existing.candidate_image_url : null);
+    const preserveReviewPending = !result && existing?.status === 'review_pending' && Boolean(candidateUrl);
+    const preserveRetry = !result && (preserveReviewPending || existing?.status === 'needs_manual');
+    const status = preserveRetry ? existing.status
+      : candidateUrl && result?.status === 'review_failed' ? 'review_pending' : 'pending';
     const generationAttempts = Math.max(existing?.generation_attempts || 0, result?.generationAttempts || 0);
     const reviewAttempts = Math.max(existing?.review_attempts || 0, result?.reviewAttempts || 0);
     const row = {
@@ -61,7 +64,9 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
       review_attempts: reviewAttempts,
       last_error: safeText(result?.error || existing?.last_error),
       correction: safeText(result?.correction || existing?.correction),
-      next_attempt_at: immediate ? now().toISOString() : nextAttempt(reviewAttempts, now()),
+      next_attempt_at: preserveRetry && existing?.next_attempt_at
+        ? existing.next_attempt_at
+        : immediate ? now().toISOString() : nextAttempt(reviewAttempts, now()),
       updated_at: now().toISOString(),
     };
     const { error } = await client.from('article_image_repairs').upsert(row, { onConflict: 'article_id' });
