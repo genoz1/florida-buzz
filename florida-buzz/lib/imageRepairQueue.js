@@ -42,12 +42,43 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
     immediate = true,
   } = {}) {
     if (!client || !article?.id || !article?.slug) return false;
+
     const existing = await get(article.id);
+
     const candidateUrl = result?.candidateUrl
-      || (existing?.status === 'review_pending' ? existing.candidate_image_url : null);
-    const status = candidateUrl && result?.status === 'review_failed' ? 'review_pending' : 'pending';
-    const generationAttempts = Math.max(existing?.generation_attempts || 0, result?.generationAttempts || 0);
-    const reviewAttempts = Math.max(existing?.review_attempts || 0, result?.reviewAttempts || 0);
+      || (existing?.status === 'review_pending'
+        ? existing.candidate_image_url
+        : null);
+
+    /*
+     * An audit/queue refresh must not convert an existing review_pending
+     * repair back to pending while it still has a stored candidate.
+     *
+     * Technical review failures deliberately preserve the generated
+     * candidate so the next retry reviews that same image instead of
+     * paying to generate another one.
+     */
+    const preserveReviewPending = existing?.status === 'review_pending'
+      && Boolean(existing?.candidate_image_url)
+      && !result;
+
+    const status = (
+      (candidateUrl && result?.status === 'review_failed')
+      || preserveReviewPending
+    )
+      ? 'review_pending'
+      : 'pending';
+
+    const generationAttempts = Math.max(
+      existing?.generation_attempts || 0,
+      result?.generationAttempts || 0
+    );
+
+    const reviewAttempts = Math.max(
+      existing?.review_attempts || 0,
+      result?.reviewAttempts || 0
+    );
+
     const row = {
       article_id: article.id,
       article_slug: article.slug,
@@ -61,25 +92,42 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
       review_attempts: reviewAttempts,
       last_error: safeText(result?.error || existing?.last_error),
       correction: safeText(result?.correction || existing?.correction),
-      next_attempt_at: immediate ? now().toISOString() : nextAttempt(reviewAttempts, now()),
+
+      /*
+       * Preserve the existing retry time for review_pending jobs.
+       * A routine audit must not erase review backoff and immediately
+       * retry the review service.
+       */
+      next_attempt_at: preserveReviewPending && existing?.next_attempt_at
+        ? existing.next_attempt_at
+        : (immediate
+          ? now().toISOString()
+          : nextAttempt(reviewAttempts, now())),
+
       updated_at: now().toISOString(),
     };
-    const { error } = await client.from('article_image_repairs').upsert(row, { onConflict: 'article_id' });
+
+    const { error } = await client.from('article_image_repairs')
+      .upsert(row, { onConflict: 'article_id' });
+
     if (error) {
       logger.error(`  [warning] Could not queue image repair for ${article.slug}: ${error.message}`);
       return false;
     }
+
     return true;
   }
 
   async function loadDue(limit = 3) {
     if (!client) return [];
+
     const { data, error } = await client.from('article_image_repairs')
       .select('*')
       .in('status', ['pending', 'review_pending'])
       .lte('next_attempt_at', now().toISOString())
       .order('next_attempt_at', { ascending: true })
       .limit(Math.max(1, Math.min(Number(limit) || 3, 20)));
+
     if (error) throw new Error(`Could not load due image repairs: ${error.message}`);
     return data || [];
   }
@@ -89,12 +137,14 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
       ...patch,
       updated_at: now().toISOString(),
     }).eq('article_id', articleId);
+
     if (error) throw new Error(`Could not update image repair state: ${error.message}`);
   }
 
   async function markProviderFailure(job, error) {
     const failures = (job.provider_failures || 0) + 1;
     const exhausted = failures >= MAX_PROVIDER_FAILURES;
+
     await update(job.article_id, {
       status: exhausted ? 'needs_manual' : 'pending',
       generation_attempts: job.generation_attempts || 0,
@@ -109,6 +159,7 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
   async function markReviewFailure(job, error) {
     const attempts = (job.review_attempts || 0) + 1;
     const exhausted = attempts >= MAX_REVIEW_ATTEMPTS;
+
     await update(job.article_id, {
       status: exhausted ? 'needs_manual' : 'review_pending',
       review_attempts: attempts,
@@ -133,13 +184,18 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
   async function markRejected(job, correction) {
     const attempts = job.generation_attempts || 0;
     const exhausted = attempts >= MAX_GENERATION_ATTEMPTS;
+
     await update(job.article_id, {
       status: exhausted ? 'needs_manual' : 'pending',
       candidate_image_url: null,
       review_attempts: job.review_attempts || 0,
       correction: safeText(correction),
-      last_error: exhausted ? 'Maximum automatic generation attempts reached.' : 'Generated image rejected by quality review.',
-      next_attempt_at: exhausted ? nextAttempt(24, now()) : nextAttempt(attempts, now()),
+      last_error: exhausted
+        ? 'Maximum automatic generation attempts reached.'
+        : 'Generated image rejected by quality review.',
+      next_attempt_at: exhausted
+        ? nextAttempt(24, now())
+        : nextAttempt(attempts, now()),
     });
   }
 
