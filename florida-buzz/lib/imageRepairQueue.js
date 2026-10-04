@@ -119,11 +119,11 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
     });
   }
 
-  async function markCandidate(job, candidateUrl) {
+  async function markCandidate(job, candidateUrl, generationAttempts = 1) {
     await update(job.article_id, {
       status: 'review_pending',
       candidate_image_url: candidateUrl,
-      generation_attempts: (job.generation_attempts || 0) + 1,
+      generation_attempts: (job.generation_attempts || 0) + generationAttempts,
       review_attempts: 0,
       last_error: null,
       next_attempt_at: now().toISOString(),
@@ -136,6 +136,7 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
     await update(job.article_id, {
       status: exhausted ? 'needs_manual' : 'pending',
       candidate_image_url: null,
+      review_attempts: job.review_attempts || 0,
       correction: safeText(correction),
       last_error: exhausted ? 'Maximum automatic generation attempts reached.' : 'Generated image rejected by quality review.',
       next_attempt_at: exhausted ? nextAttempt(24, now()) : nextAttempt(attempts, now()),

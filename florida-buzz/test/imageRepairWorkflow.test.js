@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { processImageRepairJob, reviewStoredCandidate } = require('../lib/imageRepairWorkflow');
+const { generateValidatedImageResult } = require('../lib/imageGen');
 const {
   MAX_GENERATION_ATTEMPTS,
   MAX_PROVIDER_FAILURES,
@@ -37,6 +38,69 @@ function queueRecorder() {
   };
 }
 
+function articleClient() {
+  const article = { id: baseJob.article_id, slug: baseJob.article_slug, image_url: null };
+  return {
+    article,
+    client: {
+      from(table) {
+        assert.equal(table, 'articles');
+        return {
+          select() {
+            return {
+              eq(field, value) {
+                if (field === 'image_url') return { limit: async () => ({ data: [], error: null }) };
+                assert.equal(value, baseJob.article_id);
+                return { maybeSingle: async () => ({ data: article, error: null }) };
+              },
+            };
+          },
+          update(values) {
+            const chain = {
+              eq() { return chain; },
+              is() { return chain; },
+              select() { return chain; },
+              async maybeSingle() { Object.assign(article, values); return { data: article, error: null }; },
+            };
+            return chain;
+          },
+        };
+      },
+    },
+  };
+}
+
+test('repair cycle passes the first rejection correction to a second generation and accepts it', async () => {
+  const queue = queueRecorder();
+  const { article, client } = articleClient();
+  const prompts = [];
+  const verdicts = [
+    { acceptable: false, issues: ['Wrong entrance'], correction: 'Show the real Florida entrance' },
+    { acceptable: true, issues: [], correction: '' },
+  ];
+  let configuredAttempts;
+  const result = await processImageRepairJob(client, queue, baseJob, {
+    generate: async (_article, options) => {
+      configuredAttempts = options.maxAttempts;
+      return generateValidatedImageResult('Specific Florida event entrance', { slug: baseJob.article_slug }, {
+        ...options,
+        generate: async (prompt) => { prompts.push(prompt); return Buffer.from(`image-${prompts.length}`); },
+        validate: async () => verdicts.shift(),
+      });
+    },
+    store: async (_buffer, filename) => `https://storage.example/${prompts.length}-${filename}`,
+  });
+
+  assert.equal(configuredAttempts, 2);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[1], /Show the real Florida entrance/);
+  assert.equal(result.status, 'accepted');
+  assert.equal(article.image_url, 'https://storage.example/2-sample-article.png');
+  const accepted = queue.calls.find((call) => call[0] === 'accepted');
+  assert.equal(accepted[1].generation_attempts, 2);
+  assert.equal(accepted[1].review_attempts, 2);
+});
+
 test('provider failure and timeout remain isolated repair states', async () => {
   for (const message of ['provider unavailable', 'generation timeout']) {
     const queue = queueRecorder();
@@ -63,6 +127,31 @@ test('quality rejection advances generation state but never marks the image acce
   assert.equal(queue.calls.some((call) => call[0] === 'accepted'), false);
 });
 
+test('two genuine quality failures use exactly two generations and attach no image', async () => {
+  const queue = queueRecorder();
+  let generations = 0;
+  const result = await processImageRepairJob({ from: () => { throw new Error('must not attach'); } }, queue, baseJob, {
+    generate: async (_article, options) => generateValidatedImageResult('Specific Florida event', { slug: baseJob.article_slug }, {
+      ...options,
+      generate: async () => { generations += 1; return Buffer.from(`bad-image-${generations}`); },
+      validate: async () => ({
+        acceptable: false,
+        issues: ['Wrong location'],
+        correction: 'Use the named Florida location rather than generic scenery',
+      }),
+    }),
+    store: async (_buffer, filename) => `https://storage.example/${generations}-${filename}`,
+  });
+
+  assert.equal(result.status, 'rejected');
+  assert.equal(generations, 2);
+  assert.equal(queue.calls.some((call) => call[0] === 'accepted'), false);
+  assert.equal(queue.calls.find((call) => call[0] === 'candidate')[3], 2);
+  const rejected = queue.calls.find((call) => call[0] === 'rejected');
+  assert.equal(rejected[1].generation_attempts, 2);
+  assert.equal(rejected[1].review_attempts, 2);
+});
+
 test('technical review failure retries the same stored asset without generation', async () => {
   const queue = queueRecorder();
   let generations = 0;
@@ -80,32 +169,7 @@ test('technical review failure retries the same stored asset without generation'
 
 test('a preserved candidate can later pass review and transition to accepted', async () => {
   const queue = queueRecorder();
-  const article = { id: baseJob.article_id, slug: baseJob.article_slug, image_url: null };
-  const client = {
-    from(table) {
-      assert.equal(table, 'articles');
-      return {
-        select() {
-          return {
-            eq(field, value) {
-              if (field === 'image_url') return { limit: async () => ({ data: [], error: null }) };
-              assert.equal(value, baseJob.article_id);
-              return { maybeSingle: async () => ({ data: article, error: null }) };
-            },
-          };
-        },
-        update(values) {
-          const chain = {
-            eq() { return chain; },
-            is() { return chain; },
-            select() { return chain; },
-            async maybeSingle() { Object.assign(article, values); return { data: article, error: null }; },
-          };
-          return chain;
-        },
-      };
-    },
-  };
+  const { article, client } = articleClient();
   const job = { ...baseJob, status: 'review_pending', candidate_image_url: 'https://storage.example/candidate.jpg' };
   const result = await reviewStoredCandidate(client, queue, job, {
     fetchImpl: async () => new Response(Buffer.from('candidate-bytes'), { status: 200 }),

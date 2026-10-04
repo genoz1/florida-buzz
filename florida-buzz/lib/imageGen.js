@@ -65,7 +65,7 @@ async function generateValidatedImageResult(imagePrompt, context, {
         candidateUrl: lastCandidateUrl,
         error: err.message,
         generationAttempts: attempt,
-        reviewAttempts: 1,
+        reviewAttempts: attempt,
         prompt,
         correction,
       };
@@ -76,7 +76,7 @@ async function generateValidatedImageResult(imagePrompt, context, {
         url: lastCandidateUrl,
         candidateUrl: lastCandidateUrl,
         generationAttempts: attempt,
-        reviewAttempts: 1,
+        reviewAttempts: attempt,
         prompt,
         correction: '',
       };

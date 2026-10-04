@@ -50,7 +50,9 @@ from behind using plausible handles, children sit and face naturally, and wheels
 have physically correct geometry. Check vehicles, buildings, perspective and lighting for obvious
 AI artifacts. Reject cartoon, illustration or synthetic-looking imagery when a real photograph was
 requested. Reject major inaccuracies in recognizable locations, especially landmarks belonging to
-another destination. If uncertain about a visible defect or the claimed setting, reject for review.
+another destination. Reject clear visible defects or material inaccuracies. Do not reject solely
+because a minor background detail cannot be verified. Judge whether the image is credible and
+suitable as an editorial hero image overall.
 Separately judge semantic relevance. The visible image must credibly represent the specific story
 subject and preserve the supplied named entity and location cues. A generic beach, mountain, sunset,
 forest or generic attraction scene is not relevant merely because it is attractive or broadly travel
