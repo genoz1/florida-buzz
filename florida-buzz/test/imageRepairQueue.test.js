@@ -85,7 +85,7 @@ test('completed rejection permits corrective generation', async () => {
   await processImageRepairJob({}, f.queue, f.row(), { generate: async (_article, options) => {
     generated++;
     assert.equal(options.maxAttempts, 2);
-    assert.equal(options.priorCorrection, 'Show Universal Orlando');
+    assert.equal(options.priorCorrection, '');
     return { status: 'generation_failed' };
   } });
   assert.equal(generated, 1);
@@ -105,5 +105,31 @@ test('exhausted review and generation safeguards survive audit refresh', async (
     generate: async () => { calls++; },
   });
   assert.equal(calls, 0);
+  assert.equal(f.row().status, 'needs_manual');
+});
+
+ test('legacy generation exhaustion receives only one bounded recovery without losing history', async () => {
+  const f = fixture();
+  await f.queue.update(article.id, { status: 'needs_manual', generation_attempts: 6,
+    candidate_image_url: null, last_error: 'Maximum automatic generation attempts reached.' });
+  const recovered = await f.queue.recoverLegacy(f.row());
+  const { generationLimit } = require('../lib/imageRepairQueue');
+  assert.equal(recovered.generation_attempts, 6);
+  assert.equal(generationLimit(recovered), 8);
+  await f.queue.enqueue(article);
+  assert.equal(generationLimit(f.row()), 8);
+  await f.queue.markRejected({ ...f.row(), generation_attempts: 8 }, 'Wrong place');
+  await f.queue.recoverLegacy(f.row());
+  assert.equal(f.row().status, 'needs_manual');
+  assert.equal(generationLimit(f.row()), 8);
+});
+ test('provider exhaustion cannot use legacy quality recovery; refresh preserves backoff', async () => {
+  const f = fixture();
+  await f.queue.markProviderFailure(f.row(), new Error('moderation_stage: output'));
+  const before = f.row();
+  await f.queue.enqueue(article);
+  assert.equal(f.row().next_attempt_at, before.next_attempt_at);
+  await f.queue.update(article.id, { status: 'needs_manual', last_error: 'Maximum automatic provider retries reached' });
+  await f.queue.recoverLegacy(f.row());
   assert.equal(f.row().status, 'needs_manual');
 });

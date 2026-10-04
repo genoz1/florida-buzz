@@ -30,13 +30,8 @@ test('review sends the actual image at high detail and accepts a clean completed
   assert.equal(body.text.format.strict, true);
   assert.equal(body.max_output_tokens, 2000);
   assert.match(body.instructions, /semantic relevance/i);
-  assert.match(body.instructions, /Reject clear visible defects or material inaccuracies/);
-  assert.match(body.instructions, /Do not reject solely\s+because a minor background detail cannot be verified/);
-  assert.match(body.instructions, /generic beach, mountain, sunset,\s*forest or generic attraction scene is not\s*relevant/i);
-  assert.match(body.instructions, /landmarks belonging to\s*another destination/i);
-  assert.match(body.instructions, /Do not require every article detail, every named\s*entity/i);
-  assert.match(body.instructions, /not debatable expert-level morphology/i);
-  assert.match(body.instructions, /minimum\s*change needed to fix the visible material defect/i);
+  assert.match(body.instructions, /impossible anatomy/);
+  assert.doesNotMatch(body.input[0].content[0].text, /Image request:|Supporting entities/);
 });
 
 test('non-person planning prompt evidence excludes incidental people and article prose', () => {
@@ -65,14 +60,13 @@ test('image prompt normalization keeps destination specificity without requestin
   assert.doesNotMatch(prompt, /\bWalt\b/i);
 });
 
-test('review standard accepts relevant editorial latitude but preserves material rejection grounds', () => {
-  assert.match(REVIEW_INSTRUCTIONS, /Accept a strong photorealistic image when it clearly illustrates\s*the main story subject/i);
-  assert.match(REVIEW_INSTRUCTIONS, /different but\s*credible composition/i);
-  assert.match(REVIEW_INSTRUCTIONS, /a particular camera viewpoint, branded signage/i);
-  assert.match(REVIEW_INSTRUCTIONS, /clearly wrong subject or materially important location/i);
-  assert.match(REVIEW_INSTRUCTIONS, /obvious AI artifact/i);
-  assert.match(REVIEW_INSTRUCTIONS, /impossible anatomy or orientation/i);
-  assert.match(REVIEW_INSTRUCTIONS, /materially false depiction/i);
+test('production EPCOT and Magic Kingdom rejection patterns are explicitly excluded', () => {
+  assert.match(REVIEW_INSTRUCTIONS, /EPCOT promenade with Spaceship Earth can pass/);
+  assert.match(REVIEW_INSTRUCTIONS, /imperfect triangular\s+panels or distance/);
+  assert.match(REVIEW_INSTRUCTIONS, /Disney World arrival scene can pass without exact Magic Kingdom/);
+  assert.match(REVIEW_INSTRUCTIONS, /TTC, monorail, ferry, train station, Main Street or castle placement/);
+  assert.match(REVIEW_INSTRUCTIONS, /clearly depicts the wrong place/);
+  assert.match(REVIEW_INSTRUCTIONS, /obviously impossible physical geometry/);
 });
 
 test('production token exhaustion stays a technical failure with safe diagnostic details', async (t) => {

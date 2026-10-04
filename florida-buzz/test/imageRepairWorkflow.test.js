@@ -210,3 +210,31 @@ test('automatic generation, provider, and review retry budgets are finite', () =
   assert.ok(MAX_PROVIDER_FAILURES > 0 && MAX_PROVIDER_FAILURES <= 20);
   assert.ok(MAX_REVIEW_ATTEMPTS > 0 && MAX_REVIEW_ATTEMPTS <= 20);
 });
+
+test('output moderation failure stops the current item without another generation or review', async () => {
+  let requests = 0;
+  const result = await generateValidatedImageResult('Ordinary editorial scene', { slug: 'moderation-test' }, {
+    generate: async () => { requests++; throw new Error('moderation_blocked moderation_stage: output'); },
+    validate: async () => { throw new Error('must not review'); },
+    store: async () => { throw new Error('must not store'); },
+    maxAttempts: 2,
+  });
+  assert.equal(requests, 1);
+  assert.equal(result.status, 'generation_failed');
+});
+
+test('strict batch cap reserves generation calls and targets only selected slugs', async () => {
+  const { runImageRepairBatch } = require('../lib/imageRepairWorkflow');
+  const jobs = [{ ...baseJob, next_attempt_at: '2026-01-01' }, { ...baseJob, next_attempt_at: '2026-01-01', article_id: 'other-id', article_slug: 'other-slug' }];
+  let selections;
+  const client = { from: () => ({
+    select: () => ({ in: async (_field, slugs) => { selections = slugs; return { data: jobs }; } }),
+    update: () => ({ eq: async () => ({}) }),
+  }) };
+  let allowed = 0;
+  await runImageRepairBatch(client, { limit: 1, slugs: ['sample-article', 'other-slug'], logger: { log() {}, error() {} },
+    generate: async (_article, options) => { allowed += options.maxAttempts; return { status: 'generation_failed' }; },
+  });
+  assert.deepEqual(selections, ['sample-article', 'other-slug']);
+  assert.equal(allowed, 1);
+});
