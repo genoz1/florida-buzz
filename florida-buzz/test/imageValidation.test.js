@@ -23,11 +23,42 @@ test('review sends the actual image at high detail and accepts a clean completed
   assert.equal(body.input[0].content[1].image_url, `data:image/png;base64,${bytes.toString('base64')}`);
   assert.equal(body.input[0].content[1].detail, 'high');
   assert.equal(body.text.format.strict, true);
+  assert.equal(body.max_output_tokens, 2000);
   assert.match(body.instructions, /semantic relevance/i);
   assert.match(body.instructions, /Reject clear visible defects or material inaccuracies/);
   assert.match(body.instructions, /Do not reject solely\s+because a minor background detail cannot be verified/);
   assert.match(body.instructions, /generic beach, mountain, sunset,\s*forest or generic attraction scene is not relevant/i);
   assert.match(body.instructions, /landmarks belonging to\s*another destination/i);
+});
+
+test('production token exhaustion stays a technical failure with safe diagnostic details', async (t) => {
+  const prior = global.fetch;
+  t.after(() => { global.fetch = prior; });
+  global.fetch = async () => new Response(JSON.stringify({
+    status: 'incomplete',
+    incomplete_details: { reason: 'max_output_tokens' },
+    usage: { output_tokens: 350, output_tokens_details: { reasoning_tokens: 203 } },
+    output: [],
+    secret: 'must-not-log',
+  }));
+  await assert.rejects(validateGeneratedImage(bytes, context), (error) => {
+    assert.equal(error.message, 'Image review did not complete (status=incomplete, incomplete_reason=max_output_tokens).');
+    assert.doesNotMatch(error.message, /must-not-log/);
+    return true;
+  });
+  global.fetch = async () => new Response(JSON.stringify({
+    status: 'untrusted-status-secret', incomplete_details: { reason: 'untrusted-reason-secret' },
+  }));
+  await assert.rejects(validateGeneratedImage(bytes, context), /status=unknown, incomplete_reason=unknown/);
+});
+
+test('completed empty and malformed API review output is never accepted', async (t) => {
+  const prior = global.fetch;
+  t.after(() => { global.fetch = prior; });
+  for (const output_text of ['', '{broken', '{}', 'null']) {
+    global.fetch = async () => new Response(JSON.stringify({ status: 'completed', output_text }));
+    await assert.rejects(validateGeneratedImage(bytes, context));
+  }
 });
 
 test('wrong-location and generic imagery remain strict relevance failures', async (t) => {
