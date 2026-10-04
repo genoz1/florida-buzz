@@ -2,44 +2,27 @@
 // An unavailable, incomplete, or ambiguous review must never approve an image.
 const VALIDATION_MODEL = process.env.AI_IMAGE_VALIDATION_MODEL || process.env.AI_TEXT_MODEL || 'gpt-5.6-terra';
 
-const REVIEW_INSTRUCTIONS = `You are the final visual quality reviewer for an editorial travel photograph.
-Use a practical editorial standard. Accept a strong photorealistic image when it clearly illustrates
-the main story subject and has no clearly visible, material defect. Reject only a defect you can see
-with high confidence: a clearly wrong subject or materially important location, an obvious AI artifact,
-impossible anatomy or orientation, a materially false depiction, or an otherwise visibly unusable image.
-Do not turn supporting article context into a shot list. Do not require every article detail, every named
-entity, a particular camera viewpoint, branded signage, destination-management cues, or an exact
-recreation of a described scene. Do not reject a relevant image merely because it uses a different but
-credible composition. For animals, accept a credible photorealistic portrayal of the correct animal;
-reject only clearly wrong species or obvious impossible anatomy, not debatable expert-level morphology,
-precise horn proportions, lip shape, pose, or subspecies markers.
-
-Inspect the actual image closely, including small background figures. Reject malformed anatomy,
-reversed or unnaturally rotated heads, impossible body positions, incorrect limb number or placement,
-malformed faces or hands, duplicated, merged, floating or partially generated people, and distorted
-background people. Reject impossible interactions with objects. For strollers, check that adults push
-from behind using plausible handles, children sit and face naturally, and wheels, seats and frame
-have physically correct geometry. Check vehicles, buildings, perspective and lighting for obvious
-AI artifacts. Reject cartoon, illustration or synthetic-looking imagery when a real photograph was
-requested. Reject major inaccuracies in recognizable locations, especially landmarks belonging to
-another destination. Reject clear visible defects or material inaccuracies. Do not reject solely
-because a minor background detail cannot be verified. Judge whether the image is credible and
-suitable as an editorial hero image overall.
-
-Separately judge semantic relevance. The visible image must credibly represent the main story subject.
-The named location is mandatory only when it materially changes what the image claims or the image
-contains recognizable location cues; never demand signage or a landmark merely to prove the location.
-A correct subject in a plausible setting may be sufficient when exact destination identity is not
-visually verifiable. A generic beach, mountain, sunset, forest or generic attraction scene is not
-relevant merely because it is attractive or broadly travel related. Reject a category-level image when
-the story names a specific park, city, event, attraction, ship, hotel or product and the visible scene has
-no credible connection to the main subject. Reject geographically incompatible scenery. Set
-relevance_acceptable independently; acceptable cannot be true when relevance is false.
-
-Treat the title, location, entities and requested prompt as context, not separate visual requirements.
-Do not infer an image is sound solely because its prompt asks for realism. List only rejection-worthy
-issues. When accepting, return no issues and no correction. When rejecting, request only the minimum
-change needed to fix the visible material defect; do not add new composition requirements.`;
+const REVIEW_INSTRUCTIONS = `Review this AI-generated editorial image using a practical photographic standard.
+PASS a photorealistic, visually believable image clearly relevant to the main article subject,
+without obvious AI artifacts, impossible anatomy/orientation, or material deception about the central subject.
+This is an editorial illustration, not documentary evidence or a forensic recreation.
+Architectural geometry, exact attraction layout, camera position, branding, background placement,
+and secondary article details are NOT rejection grounds. Do not demand authentic panel geometry,
+precise landmark distances, or exact spatial placement of park entrances, transit infrastructure,
+Main Street, castles, stations, ferries or other background features.
+Location accuracy is a rejection ground ONLY when the image clearly depicts the wrong place or
+materially misrepresents the central subject. A recognizable, plausible setting is sufficient.
+For example, a believable EPCOT promenade with Spaceship Earth can pass despite imperfect triangular
+panels or distance. A believable Disney World arrival scene can pass without exact Magic Kingdom,
+TTC, monorail, ferry, train station, Main Street or castle placement. These exceptions do not permit
+obviously impossible physical geometry, another destination, or a false central subject.
+Reject clearly visible malformed people, reversed heads, impossible body positions, merged or floating
+objects, impossible interactions, clearly wrong animal species, geographically incompatible scenery,
+cartoon or visibly synthetic imagery, or a subject with no credible connection to the article.
+Do not demand expert-level morphology, signage, every named entity or a particular composition.
+Evaluate semantic relevance independently. Context describes the topic; it is not a shot checklist.
+List only visible material defects with high confidence. On acceptance return no issues or correction.
+On rejection describe the actual visible defect and only the minimum correction needed.`;
 
 const reviewSchema = {
   type: 'object',
@@ -92,7 +75,7 @@ async function validateGeneratedImage(imageBuffer, {
       input: [{
         role: 'user',
         content: [
-          { type: 'input_text', text: `Article title: ${String(title).slice(0, 250)}\nMain visual subject: ${String(subject).slice(0, 180)}\nSupporting entities (context only): ${(Array.isArray(entities) ? entities : []).join(', ').slice(0, 600)}\nLocation: ${String(location || '').slice(0, 120)}\nCategory: ${String(category || '').slice(0, 40)}\nImage request: ${String(imagePrompt).slice(0, 2500)}\nIs this image both relevant to this exact story and acceptable as a realistic editorial hero photograph?` },
+          { type: 'input_text', text: `Article title: ${String(title).slice(0, 250)}\nMain visual subject: ${String(subject).slice(0, 180)}\nLocation: ${String(location || '').slice(0, 120)}\nCategory: ${String(category || '').slice(0, 40)}\nIs this image both relevant to the main article topic and acceptable as a realistic editorial hero photograph?` },
           { type: 'input_image', image_url: `data:${imageMimeType(imageBuffer)};base64,${imageBuffer.toString('base64')}`, detail: 'high' },
         ],
       }],

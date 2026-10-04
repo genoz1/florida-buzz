@@ -216,7 +216,7 @@ async function run() {
   }
   const queued = await seedRepairs(supabase, audit);
   console.log(`Queued or refreshed ${queued} durable image repair item(s).`);
-  const results = await runImageRepairBatch(supabase);
+  const results = await runImageRepairBatch(supabase, { slugs: [...requested], recoverLegacy: process.env.RECOVER_LEGACY_IMAGE_REPAIRS === 'true' });
   const remaining = await reportQueue(supabase);
   console.log(JSON.stringify({ repaired_this_run: results.filter((row) => row.status === 'accepted').length, remaining: remaining.length }));
   for (const row of remaining) console.log(`[remaining] ${row.article_slug}: ${row.status} — ${row.last_error || row.reason}`);

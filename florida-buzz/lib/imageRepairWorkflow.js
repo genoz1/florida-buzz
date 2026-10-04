@@ -2,7 +2,7 @@ const { imageSize } = require('image-size');
 const { findDuplicateImage } = require('./articleImages');
 const { generateArticleImageResult } = require('./imageGen');
 const { validateGeneratedImage, assertCompletedReview } = require('./imageValidation');
-const { createImageRepairQueue, MAX_GENERATION_ATTEMPTS } = require('./imageRepairQueue');
+const { createImageRepairQueue, generationLimit } = require('./imageRepairQueue');
 const { storeGeneratedImage } = require('./supabase');
 
 async function fetchCandidate(url, fetchImpl = fetch) {
@@ -99,6 +99,7 @@ async function reviewStoredCandidate(client, queue, job, {
 }
 
 async function processImageRepairJob(client, queue, job, {
+  maxGenerations = 2,
   generate = generateArticleImageResult,
   validate = validateGeneratedImage,
   fetchImpl = fetch,
@@ -107,7 +108,7 @@ async function processImageRepairJob(client, queue, job, {
   if (job.status === 'review_pending' && job.candidate_image_url) {
     return reviewStoredCandidate(client, queue, job, { validate, fetchImpl });
   }
-  if ((job.generation_attempts || 0) >= MAX_GENERATION_ATTEMPTS) {
+  if ((job.generation_attempts || 0) >= generationLimit(job)) {
     await queue.update(job.article_id, {
       status: 'needs_manual',
       last_error: 'Maximum automatic generation attempts reached.',
@@ -128,7 +129,7 @@ async function processImageRepairJob(client, queue, job, {
       imageSubject: context.imageSubject || context.title || job.article_slug,
       imageEntities: context.imageEntities || [],
     }, {
-      maxAttempts: 2,
+      maxAttempts: Math.min(2, maxGenerations, generationLimit(job) - (job.generation_attempts || 0)),
       // A persisted correction may have been written by an older reviewer contract and can
       // reintroduce obsolete, over-prescriptive composition demands. Corrections produced by
       // the current reviewer still guide the immediate second attempt inside imageGen.
@@ -170,7 +171,7 @@ async function processImageRepairJob(client, queue, job, {
     ...job,
     generation_attempts: (job.generation_attempts || 0) + (result?.generationAttempts || 0),
   };
-  if (attemptedJob.generation_attempts >= MAX_GENERATION_ATTEMPTS) {
+  if (attemptedJob.generation_attempts >= generationLimit(job)) {
     await queue.update(job.article_id, {
       status: 'needs_manual',
       generation_attempts: attemptedJob.generation_attempts,
@@ -185,15 +186,31 @@ async function processImageRepairJob(client, queue, job, {
 async function runImageRepairBatch(client, {
   limit = Number(process.env.IMAGE_REPAIR_GENERATION_LIMIT || 3),
   logger = console,
+  slugs = [],
+  recoverLegacy = false,
   ...dependencies
 } = {}) {
   if (!client) throw new Error('Supabase is required for article image repair.');
   const queue = createImageRepairQueue(client, { logger });
-  const jobs = await queue.loadDue(limit);
+  let jobs;
+  if (slugs.length) {
+    const { data, error } = await client.from('article_image_repairs').select('*').in('article_slug', slugs);
+    if (error) throw error;
+    jobs = [];
+    for (let job of data || []) {
+      if (recoverLegacy) job = await queue.recoverLegacy(job);
+      if (['pending', 'review_pending'].includes(job.status) && job.next_attempt_at <= new Date().toISOString()) jobs.push(job);
+    }
+  } else jobs = await queue.loadDue(limit);
+  let remainingGenerations = Math.max(0, Math.floor(Number(limit) || 0));
   const results = [];
   for (const job of jobs) {
+    if (remainingGenerations <= 0 && !(job.status === 'review_pending' && job.candidate_image_url)) continue;
+    const allowance = job.status === 'review_pending' && job.candidate_image_url ? 0 : Math.min(2, remainingGenerations, generationLimit(job) - (job.generation_attempts || 0));
+    remainingGenerations -= Math.max(0, allowance); // Reserve API calls, including blocked/failed requests.
     try {
-      const result = await processImageRepairJob(client, queue, job, dependencies);
+      const result = await processImageRepairJob(client, queue, job, { ...dependencies, maxGenerations: allowance });
+      
       results.push(result);
       logger.log(`[image-repair] ${job.article_slug}: ${result.status}`);
     } catch (error) {

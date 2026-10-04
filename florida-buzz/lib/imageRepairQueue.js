@@ -2,6 +2,21 @@ const MAX_GENERATION_ATTEMPTS = Number(process.env.IMAGE_REPAIR_MAX_GENERATIONS 
 const MAX_PROVIDER_FAILURES = Number(process.env.IMAGE_REPAIR_MAX_PROVIDER_FAILURES || 8);
 const MAX_REVIEW_ATTEMPTS = Number(process.env.IMAGE_REPAIR_MAX_REVIEWS || 6);
 const MAX_BACKOFF_HOURS = 24;
+// Fixed, one-time recovery epoch; do not advance automatically with deployments.
+const RECOVERY_EPOCH = 'practical-review-2026-10-04';
+function generationLimit(job) {
+  const recovery = job.image_context?.repairRecovery;
+  return recovery?.epoch === RECOVERY_EPOCH
+    ? Math.max(MAX_GENERATION_ATTEMPTS, recovery.generationBaseline + 2)
+    : MAX_GENERATION_ATTEMPTS;
+}
+function legacyRecovery(job) {
+  return job?.status === 'needs_manual'
+    && job.last_error === 'Maximum automatic generation attempts reached.'
+    && !job.image_context?.repairRecovery
+    && job.image_context?.reviewContract !== RECOVERY_EPOCH
+    && (job.provider_failures || 0) < MAX_PROVIDER_FAILURES;
+}
 
 function safeText(value, max = 500) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -46,7 +61,7 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
     const candidateUrl = result?.candidateUrl
       || (['review_pending', 'needs_manual'].includes(existing?.status) ? existing.candidate_image_url : null);
     const preserveReviewPending = !result && existing?.status === 'review_pending' && Boolean(candidateUrl);
-    const preserveRetry = !result && (preserveReviewPending || existing?.status === 'needs_manual');
+    const preserveRetry = !result && (preserveReviewPending || existing?.status === 'needs_manual' || existing?.status === 'pending');
     const status = preserveRetry ? existing.status
       : candidateUrl && result?.status === 'review_failed' ? 'review_pending' : 'pending';
     const generationAttempts = Math.max(existing?.generation_attempts || 0, result?.generationAttempts || 0);
@@ -56,7 +71,7 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
       article_slug: article.slug,
       status,
       reason: safeText(reason, 120) || 'missing_image',
-      image_context: imageContext(article, context),
+      image_context: { ...imageContext(article, context), ...(!existing ? { reviewContract: RECOVERY_EPOCH } : existing.image_context?.reviewContract ? { reviewContract: existing.image_context.reviewContract } : {}), ...(existing?.image_context?.repairRecovery ? { repairRecovery: existing.image_context.repairRecovery } : {}) },
       original_image_url: existing?.original_image_url || article.image_url || null,
       candidate_image_url: candidateUrl,
       generation_attempts: generationAttempts,
@@ -75,6 +90,20 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
       return false;
     }
     return true;
+  }
+
+  async function recoverLegacy(job) {
+    if (!legacyRecovery(job)) return job;
+    const patch = {
+      status: job.candidate_image_url ? 'review_pending' : 'pending',
+      image_context: { ...job.image_context, repairRecovery: {
+        epoch: RECOVERY_EPOCH, generationBaseline: job.generation_attempts || 0,
+        recoveredAt: now().toISOString(), previousError: job.last_error,
+      } },
+      correction: null, last_error: null, next_attempt_at: now().toISOString(),
+    };
+    await update(job.article_id, patch);
+    return { ...job, ...patch };
   }
 
   async function loadDue(limit = 3) {
@@ -127,6 +156,7 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
   async function markCandidate(job, candidateUrl, generationAttempts = 1) {
     await update(job.article_id, {
       status: 'review_pending',
+      image_context: { ...job.image_context, reviewContract: RECOVERY_EPOCH },
       candidate_image_url: candidateUrl,
       generation_attempts: (job.generation_attempts || 0) + generationAttempts,
       review_attempts: 0,
@@ -137,9 +167,10 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
 
   async function markRejected(job, correction) {
     const attempts = job.generation_attempts || 0;
-    const exhausted = attempts >= MAX_GENERATION_ATTEMPTS;
+    const exhausted = attempts >= generationLimit(job);
     await update(job.article_id, {
       status: exhausted ? 'needs_manual' : 'pending',
+      image_context: { ...job.image_context, reviewContract: RECOVERY_EPOCH },
       candidate_image_url: null,
       review_attempts: job.review_attempts || 0,
       correction: safeText(correction),
@@ -163,6 +194,7 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
 
   return {
     enqueue,
+    recoverLegacy,
     get,
     loadDue,
     markAccepted,
@@ -175,6 +207,9 @@ function createImageRepairQueue(client, { logger = console, now = () => new Date
 }
 
 module.exports = {
+  generationLimit,
+  legacyRecovery,
+  RECOVERY_EPOCH,
   MAX_GENERATION_ATTEMPTS,
   MAX_PROVIDER_FAILURES,
   MAX_REVIEW_ATTEMPTS,
