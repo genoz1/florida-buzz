@@ -9,6 +9,8 @@ const { logNotFound } = require('../lib/notFoundLog');
 const { createPin } = require('../lib/pinterest');
 const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
+const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
+const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
@@ -30,6 +32,73 @@ const CATEGORY_LABELS = {
   'travel-deals': '🏷️ Travel Deals',
 };
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS);
+
+const buzzSocialImageCache = new Map();
+
+router.get('/integrations/meta/facebook/webhook', (req, res) => {
+  const expected = process.env.META_WEBHOOK_VERIFY_TOKEN;
+  if (!expected || req.query['hub.mode'] !== 'subscribe' || req.query['hub.verify_token'] !== expected) {
+    return res.sendStatus(403);
+  }
+  return res.status(200).type('text/plain').send(String(req.query['hub.challenge'] || ''));
+});
+
+router.post('/integrations/meta/facebook/webhook', express.raw({ type: 'application/json', limit: '100kb' }), (req, res) => {
+  const secret = process.env.META_APP_SECRET;
+  const signature = req.get('X-Hub-Signature-256') || '';
+  if (!supabase || !verifyFacebookSignature(req.body, signature, secret)) return res.sendStatus(403);
+  let payload;
+  try {
+    payload = JSON.parse(req.body.toString('utf8'));
+  } catch {
+    return res.sendStatus(400);
+  }
+  res.sendStatus(200);
+  setImmediate(() => {
+    processFacebookWebhook(supabase, payload)
+      .catch((error) => console.error(`Facebook Buzz webhook processing failed: ${error.message}`));
+  });
+});
+
+router.get('/go/buzz/:slug', (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return render404(req, res);
+  const destination = new URL(`/buzz/${slug}`, process.env.SITE_URL || 'https://thefloridabuzz.com');
+  destination.searchParams.set('utm_source', 'facebook');
+  destination.searchParams.set('utm_medium', 'organic_social');
+  destination.searchParams.set('utm_campaign', 'buzz_board_launch');
+  destination.searchParams.set('utm_content', slug);
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, `${destination.pathname}${destination.search}`);
+});
+
+router.get('/images/buzz-board-social/:slug.png', async (req, res) => {
+  if (!supabase) return render404(req, res);
+  const slug = String(req.params.slug || '').toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return render404(req, res);
+
+  try {
+    let buffer = buzzSocialImageCache.get(slug);
+    if (!buffer) {
+      const { data: discussion, error } = await supabase.from('discussions')
+        .select('question, category')
+        .eq('slug', slug)
+        .eq('status', 'published')
+        .eq('moderation_status', 'published')
+        .maybeSingle();
+      if (error || !discussion) return render404(req, res);
+      buffer = await renderBuzzSocialImage(discussion);
+      if (buzzSocialImageCache.size >= 100) buzzSocialImageCache.delete(buzzSocialImageCache.keys().next().value);
+      buzzSocialImageCache.set(slug, buffer);
+    }
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    return res.send(buffer);
+  } catch (error) {
+    console.error(`Could not render Buzz Board social image for ${slug}: ${error.message}`);
+    return res.status(500).send('Could not render social image.');
+  }
+});
 
 const CITY_LABELS = {
   jacksonville: 'Jacksonville Area',
