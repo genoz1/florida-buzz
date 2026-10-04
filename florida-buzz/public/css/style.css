@@ -921,9 +921,9 @@ footer a:hover { opacity: 1; }
       "question question"
       "context context"
       "stats stats";
-    gap: 6px 12px;
+    gap: 4px 10px;
     min-height: 0;
-    padding: 14px 14px 13px 19px;
+    padding: 11px 12px 10px 16px;
     overflow: visible;
     background: transparent;
     border: 0;
@@ -938,30 +938,30 @@ footer a:hover { opacity: 1; }
     grid-area: category;
     align-self: center;
     justify-self: start;
-    min-height: 23px;
-    padding: 4px 8px;
-    font-size: 9.5px;
+    min-height: 21px;
+    padding: 3px 7px;
+    font-size: 9px;
   }
   .buzz-time {
     grid-area: time;
     align-self: center;
     justify-self: end;
-    font-size: 9.5px;
+    font-size: 9px;
     line-height: 1.3;
     text-align: right;
   }
   .buzz-card > .buzz-question-link { grid-area: question; min-width: 0; }
-  .buzz-card h3 { margin: 1px 0 0; font-size: 1.27rem; line-height: 1.14; }
+  .buzz-card h3 { margin: 1px 0 0; font-size: 1.15rem; line-height: 1.12; }
   .buzz-card-context {
     grid-area: context;
     display: -webkit-box;
     margin: 0;
     overflow: hidden;
     color: var(--ink-600);
-    font-size: 12.5px;
-    line-height: 1.32;
+    font-size: 11.5px;
+    line-height: 1.25;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
   }
   .buzz-card-footer {
     grid-area: stats;
@@ -971,18 +971,18 @@ footer a:hover { opacity: 1; }
     margin: 1px 0 0;
     padding: 0;
     color: var(--ink-600);
-    font-size: 11.5px;
+    font-size: 10.5px;
   }
   .buzz-card-footer strong { color: var(--teal-900); }
   .buzz-card-footer a {
     width: auto;
     margin: 0 0 0 auto;
-    padding: 4px 9px;
+    padding: 3px 8px;
     color: var(--coral-600);
     background: #fff0e8;
     border-radius: 99px;
   }
-  .buzz-first-voice { font-size: 11.5px; }
+  .buzz-first-voice { font-size: 10.5px; }
   .buzz-conversation-head { align-items: flex-start; flex-direction: column; }
   .buzz-field-row { grid-template-columns: 1fr; }
 }
