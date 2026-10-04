@@ -20,6 +20,14 @@ function imageMimeType(buffer) {
   return 'image/png';
 }
 
+function assertCompletedReview(review) {
+  if (typeof review?.acceptable !== 'boolean' || !Array.isArray(review.issues)
+    || !review.issues.every((issue) => typeof issue === 'string') || typeof review.correction !== 'string') {
+    throw new Error('Image review returned an invalid decision.');
+  }
+  return review;
+}
+
 async function validateGeneratedImage(imageBuffer, {
   title,
   subject = '',
@@ -98,4 +106,4 @@ when rejected; leave correction empty when accepted.`,
   };
 }
 
-module.exports = { imageMimeType, validateGeneratedImage };
+module.exports = { assertCompletedReview, imageMimeType, validateGeneratedImage };
