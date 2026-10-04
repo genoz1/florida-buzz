@@ -31,7 +31,7 @@ function normalizeFacebookPublishResult(result) {
 async function saveFacebookPostMapping(client, { discussionId, publishResult, publishedAt = new Date() }) {
   const normalized = normalizeFacebookPublishResult(publishResult);
   if (!normalized) throw new Error('Facebook did not return a usable post ID.');
-  const { data, error } = await client.from('facebook_buzz_posts').upsert({
+  const { data, error } = await client.from('facebook_buzz_posts').insert({
     discussion_id: discussionId,
     facebook_post_id: normalized.postId,
     facebook_photo_id: normalized.photoId,
@@ -39,7 +39,7 @@ async function saveFacebookPostMapping(client, { discussionId, publishResult, pu
     status: 'active',
     published_at: publishedAt.toISOString(),
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'discussion_id' }).select('discussion_id, facebook_post_id').single();
+  }).select('discussion_id, facebook_post_id').single();
   if (error) throw new Error(`Could not retain Facebook post mapping: ${error.message}`);
   return data;
 }

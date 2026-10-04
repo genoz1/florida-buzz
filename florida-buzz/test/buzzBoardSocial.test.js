@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   buildCopy,
@@ -8,9 +10,13 @@ const {
   buildInstagramShortTrackingUrl,
   buildShortTrackingUrl,
   buildTrackingUrl,
+  categoryForSlot,
+  FACEBOOK_COOLDOWN_DAYS,
+  INSTAGRAM_COOLDOWN_DAYS,
   logMarker,
   run,
   selectDailyDiscussion,
+  selectSocialDiscussion,
 } = require('../scripts/buzz-board-social');
 const { getScheduleFlags } = require('../lib/scheduleConfig');
 
@@ -62,6 +68,33 @@ test('daily selection is deterministic and rotates approved discussions', () => 
     selectDailyDiscussion(discussions, new Date('2026-10-03T16:00:00Z')),
     selectDailyDiscussion(discussions, new Date('2026-10-04T16:00:00Z'))
   );
+});
+
+test('social rotation weights Disney and Universal while retaining Cruises and Florida Life', () => {
+  const categories = Array.from({ length: 9 }, (_, offset) => {
+    const now = new Date(Date.UTC(2026, 9, 1 + offset, 12));
+    return categoryForSlot('instagram', 'daily', now);
+  });
+  assert.equal(categories.filter((value) => value === 'disney').length, 4);
+  assert.equal(categories.filter((value) => value === 'universal').length, 3);
+  assert.equal(categories.filter((value) => value === 'cruises').length, 1);
+  assert.equal(categories.filter((value) => value === 'florida-life').length, 1);
+  assert.equal(FACEBOOK_COOLDOWN_DAYS, 10);
+  assert.equal(INSTAGRAM_COOLDOWN_DAYS, 21);
+});
+
+test('selection excludes discussions inside the platform cooldown and falls back across categories', () => {
+  const now = new Date('2026-10-04T16:00:00Z');
+  const discussions = [
+    { slug: 'disney-a', category: 'disney' },
+    { slug: 'universal-a', category: 'universal' },
+    { slug: 'cruise-a', category: 'cruises' },
+  ];
+  const history = [
+    { slug: 'disney-a', created_at: '2026-10-03T16:00:00Z' },
+    { slug: 'universal-a', created_at: '2026-10-03T16:00:00Z' },
+  ];
+  assert.equal(selectSocialDiscussion(discussions, history, { platform: 'facebook', slot: 'morning', now }).slug, 'cruise-a');
 });
 
 test('platform copy stays conversation-first and sends readers to the selected discussion', () => {
@@ -125,4 +158,13 @@ test('dry run exercises both publishers without writing post-log state', async (
   assert.equal(facebookCalls[0].message, 'Answer here or join the conversation on Buzz Board 👇');
   assert.equal(facebookCalls[0].link, 'https://thefloridabuzz.com/go/buzz/sample-question');
   assert.equal(facebookCalls[0].imageUrl, 'https://thefloridabuzz.com/images/buzz-board-social/sample-question.png');
+});
+
+test('production scheduler spaces three Facebook posts and one Instagram post in Eastern time', () => {
+  const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  assert.match(server, /'30 8 \* \* \*'.*slot: 'morning'/);
+  assert.match(server, /'15 14 \* \* \*'.*slot: 'afternoon'/);
+  assert.match(server, /'30 21 \* \* \*'.*slot: 'evening'/);
+  assert.match(server, /SOCIAL_PLATFORM=instagram BUZZ_SOCIAL_SLOT=daily/);
+  assert.match(server, /timezone: 'America\/New_York'/);
 });

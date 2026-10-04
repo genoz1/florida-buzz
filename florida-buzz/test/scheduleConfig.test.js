@@ -72,6 +72,7 @@ test('server schedule map disables every AI group by default while preserving no
     engagementPosts: flags.engagementPosts,
     diningDirectoryResearch: flags.diningDirectoryResearch,
     featurePromoCaptions: flags.featurePromoCaptions,
+    imageRepair: flags.imageRepair,
   }, {
     articleAutomation: false,
     evergreenGuides: false,
@@ -79,6 +80,7 @@ test('server schedule map disables every AI group by default while preserving no
     engagementPosts: false,
     diningDirectoryResearch: false,
     featurePromoCaptions: false,
+    imageRepair: false,
   });
   assert.equal(flags.newsletter, true);
   assert.equal(flags.standardPromo, true);
@@ -91,6 +93,8 @@ test('server schedule map enables every configured AI group only with an explici
     OPENAI_API_KEY: 'configured',
     FB_PAGE_ID: 'configured',
     FB_PAGE_ACCESS_TOKEN: 'configured',
+    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_SERVICE_KEY: 'configured',
   });
   assert.equal(flags.articleAutomation, true);
   assert.equal(flags.evergreenGuides, true);
@@ -98,4 +102,5 @@ test('server schedule map enables every configured AI group only with an explici
   assert.equal(flags.engagementPosts, true);
   assert.equal(flags.diningDirectoryResearch, true);
   assert.equal(flags.featurePromoCaptions, true);
+  assert.equal(flags.imageRepair, true);
 });

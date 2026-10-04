@@ -28,37 +28,80 @@ or partially generated people, including distorted people in background crowds.
 Retain the actual subject and location; do not invent rides, landmarks, buildings or environments.
 Prefer a modest, accurate photographic view of the existing setting when details are uncertain.`;
 
-async function generateValidatedImage(imagePrompt, context, { generate = generateImage, validate = validateGeneratedImage, store = storeGeneratedImage } = {}) {
-  let correction = '';
-  for (let attempt = 1; attempt <= MAX_IMAGE_ATTEMPTS; attempt += 1) {
+async function generateValidatedImageResult(imagePrompt, context, {
+  generate = generateImage,
+  validate = validateGeneratedImage,
+  store = storeGeneratedImage,
+  maxAttempts = MAX_IMAGE_ATTEMPTS,
+  priorCorrection = '',
+} = {}) {
+  let correction = String(priorCorrection || '').slice(0, 500);
+  let lastCandidateUrl = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const prompt = `${imagePrompt}\n\n${PHOTO_REQUIREMENTS}${correction ? `\n\nPrevious image was rejected: ${correction}. Correct these defects. If people or strollers are not essential, exclude them and show a wide establishing view instead.` : ''}`;
     let imageBuffer;
     try {
       imageBuffer = await generate(prompt);
     } catch (err) {
       console.error(`  [error] Image generation failed: ${err.message}`);
-      return null;
+      return { status: 'generation_failed', error: err.message, generationAttempts: attempt - 1, reviewAttempts: 0, prompt, correction };
+    }
+
+    try {
+      lastCandidateUrl = await store(imageBuffer, `${context.slug}.png`);
+      if (!lastCandidateUrl) throw new Error('Generated image storage returned no URL.');
+    } catch (err) {
+      console.error(`  [error] Generated image could not be stored: ${err.message}`);
+      return { status: 'storage_failed', error: err.message, generationAttempts: attempt, reviewAttempts: 0, prompt, correction };
     }
 
     let review;
     try {
       review = await validate(imageBuffer, { ...context, imagePrompt: prompt });
     } catch (err) {
-      console.error(`  [error] Image review unavailable (${err.message}) — leaving article without an AI image.`);
-      return null;
+      console.error(`  [error] Image review unavailable (${err.message}) — preserving the generated candidate for review retry.`);
+      return {
+        status: 'review_failed',
+        candidateUrl: lastCandidateUrl,
+        error: err.message,
+        generationAttempts: attempt,
+        reviewAttempts: 1,
+        prompt,
+        correction,
+      };
     }
     if (review?.acceptable === true && Array.isArray(review.issues) && review.issues.length === 0) {
-      return store(imageBuffer, `${context.slug}.png`);
+      return {
+        status: 'accepted',
+        url: lastCandidateUrl,
+        candidateUrl: lastCandidateUrl,
+        generationAttempts: attempt,
+        reviewAttempts: 1,
+        prompt,
+        correction: '',
+      };
     }
     correction = String(review?.correction || review?.issues?.join('; ') || 'visible quality defects').slice(0, 500);
-    console.warn(`  [reject] Generated image failed visual review (${attempt}/${MAX_IMAGE_ATTEMPTS}): ${correction}`);
+    console.warn(`  [reject] Generated image failed visual review (${attempt}/${maxAttempts}): ${correction}`);
   }
-  console.warn('  [review] No acceptable AI image after two attempts — leaving article without a generated hero image.');
-  return null;
+  console.warn(`  [review] No acceptable AI image after ${maxAttempts} attempt(s) — deferring image repair.`);
+  return {
+    status: 'rejected',
+    candidateUrl: lastCandidateUrl,
+    generationAttempts: maxAttempts,
+    reviewAttempts: maxAttempts,
+    correction,
+    prompt: imagePrompt,
+  };
+}
+
+async function generateValidatedImage(imagePrompt, context, dependencies = {}) {
+  const result = await generateValidatedImageResult(imagePrompt, context, dependencies);
+  return result.status === 'accepted' ? result.url : null;
 }
 
 // Use article details for a photographic fallback of the actual subject and setting.
-async function generateArticleImage({
+async function generateArticleImageResult({
   title,
   category,
   slug,
@@ -121,10 +164,10 @@ Return ONLY the photographic image prompt, including the actual destination and 
       imagePrompt = await generateText(themeParkImageSystem, promptUser, 200);
     } catch (err) {
       console.error(`  [error] Could not write image prompt: ${err.message}`);
-      return null;
+      return { status: 'prompt_failed', error: err.message, generationAttempts: 0, reviewAttempts: 0 };
     }
 
-    return generateValidatedImage(imagePrompt, { title, slug, ...imageBrief }, dependencies);
+    return generateValidatedImageResult(imagePrompt, { title, slug, ...imageBrief }, dependencies);
   }
 
   const promptSystem = `Write a concise image prompt for The Florida Buzz using the
@@ -153,10 +196,21 @@ Return ONLY the photographic image prompt with the actual place and specific sub
     imagePrompt = await generateText(promptSystem, promptUser, 150);
   } catch (err) {
     console.error(`  [error] Could not write image prompt: ${err.message}`);
-    return null;
+    return { status: 'prompt_failed', error: err.message, generationAttempts: 0, reviewAttempts: 0 };
   }
 
-  return generateValidatedImage(imagePrompt, { title, slug, ...imageBrief }, dependencies);
+  return generateValidatedImageResult(imagePrompt, { title, slug, ...imageBrief }, dependencies);
 }
 
-module.exports = { generateArticleImage, generateValidatedImage };
+async function generateArticleImage(article, dependencies) {
+  const result = await generateArticleImageResult(article, dependencies);
+  return result?.status === 'accepted' ? result.url : null;
+}
+
+module.exports = {
+  MAX_IMAGE_ATTEMPTS,
+  generateArticleImage,
+  generateArticleImageResult,
+  generateValidatedImage,
+  generateValidatedImageResult,
+};

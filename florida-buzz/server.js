@@ -210,17 +210,52 @@ if (scheduleFlags.engagementPosts) {
   console.log('Engagement post NOT scheduled — AI_CONTENT_SCHEDULES_ENABLED must be true and the OpenAI/Facebook variables must be set.');
 }
 
-// Publishes one approved Buzz Board starter per day through the existing
-// Facebook and Instagram integrations. The job is deterministic, makes no AI
-// calls, and uses post_log to avoid reposting the same discussion per platform.
+// Facebook receives three spaced conversation posts. Instagram remains at one
+// daily Buzz Board post so it complements, rather than floods, the existing
+// article feed. Selection is deterministic, category-weighted and protected by
+// platform-specific cooldowns in scripts/buzz-board-social.js.
 if (scheduleFlags.buzzBoardSocial) {
+  const facebookBuzzSlots = [
+    { cron: '30 8 * * *', slot: 'morning', label: '8:30am' },
+    { cron: '15 14 * * *', slot: 'afternoon', label: '2:15pm' },
+    { cron: '30 21 * * *', slot: 'evening', label: '9:30pm' },
+  ];
+  for (const entry of facebookBuzzSlots) {
+    cron.schedule(entry.cron, () => {
+      console.log(`Running scheduled Facebook Buzz Board post (${entry.slot})...`);
+      runScheduledCommand(
+        `Facebook Buzz Board post: ${entry.slot}`,
+        `SOCIAL_PLATFORM=facebook BUZZ_SOCIAL_SLOT=${entry.slot} node scripts/buzz-board-social.js`
+      );
+    }, { timezone: 'America/New_York' });
+  }
   cron.schedule('30 21 * * *', () => {
-    console.log('Running scheduled Buzz Board social post...');
-    runScheduledCommand('Buzz Board social post', 'node scripts/buzz-board-social.js');
+    console.log('Running scheduled Instagram Buzz Board post...');
+    runScheduledCommand(
+      'Instagram Buzz Board post',
+      'SOCIAL_PLATFORM=instagram BUZZ_SOCIAL_SLOT=daily node scripts/buzz-board-social.js'
+    );
   }, { timezone: 'America/New_York' });
-  console.log('Buzz Board social distribution scheduled: 9:30pm daily (Eastern time).');
+  console.log('Facebook Buzz Board distribution scheduled: 8:30am, 2:15pm, and 9:30pm daily (Eastern time).');
+  console.log('Instagram Buzz Board distribution scheduled: 9:30pm daily (Eastern time).');
 } else {
   console.log('Buzz Board social distribution NOT scheduled — enable both Buzz Board flags and configure Facebook/Instagram credentials.');
+}
+
+// Repairs a small bounded number of image jobs each night. Technical review
+// failures keep and re-review the same stored candidate; they do not purchase
+// another generation. The queue survives deploys and provider outages.
+if (scheduleFlags.imageRepair) {
+  cron.schedule('30 2 * * *', () => {
+    console.log('Running bounded article image repair batch...');
+    runScheduledCommand(
+      'article image repair',
+      'APPLY_IMAGE_REPAIR=true PRODUCTION_IMAGE_REPAIR_APPROVED=true VERIFY_IMAGE_BYTES=false node scripts/repair-article-images.js'
+    );
+  }, { timezone: 'America/New_York' });
+  console.log('Article image repair scheduled: 2:30am daily (Eastern time), bounded by IMAGE_REPAIR_GENERATION_LIMIT.');
+} else {
+  console.log('Article image repair NOT scheduled — enable AI schedules and configure OpenAI/Supabase.');
 }
 
 // Low-frequency reconciliation complements the signed Meta Page webhook and
