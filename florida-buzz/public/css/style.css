@@ -1434,6 +1434,7 @@ footer a:hover { opacity: 1; }
 /* Keep forum topics visually distinct without returning to editorial cards. */
 .buzz-card-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 7px;
   overflow: visible;
   background: transparent;
@@ -1452,4 +1453,15 @@ footer a:hover { opacity: 1; }
 @media (max-width: 760px) {
   .buzz-card-grid { gap: 6px; }
   .buzz-card { border-radius: 5px; }
+}
+
+/* Lighter forum-index subjects for faster scanning. */
+.buzz-card h3 {
+  font-size: .94rem;
+  font-weight: 500;
+  line-height: 1.28;
+}
+
+@media (max-width: 760px) {
+  .buzz-card h3 { font-size: .9rem; line-height: 1.26; }
 }
