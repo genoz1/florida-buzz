@@ -1465,3 +1465,33 @@ footer a:hover { opacity: 1; }
 @media (max-width: 760px) {
   .buzz-card h3 { font-size: .9rem; line-height: 1.26; }
 }
+
+/* Facebook-originated discussion remains visibly separate from member posts. */
+.buzz-facebook-conversation {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 2px solid rgba(14,59,67,.16);
+}
+.buzz-facebook-head { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 11px; }
+.buzz-facebook-head h2 { margin: 0; color: var(--teal-900); font: 700 1.35rem var(--font-body); }
+.buzz-facebook-head > a, .buzz-facebook-source { color: #315e9e; font-size: 12px; font-weight: 700; }
+.buzz-facebook-empty { margin: 0; padding: 15px 16px; color: var(--ink-600); background: rgba(255,253,248,.7); border: 1px solid rgba(14,59,67,.12); border-radius: 5px; }
+.buzz-facebook-list, .buzz-facebook-replies { list-style: none; margin: 0; padding: 0; }
+.buzz-facebook-comment { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 11px; margin-bottom: 9px; padding: 15px 16px; background: #fffdf8; border: 1px solid rgba(14,59,67,.13); border-radius: 5px; }
+.buzz-facebook-avatar { display: grid; width: 32px; height: 32px; place-items: center; color: #fff; background: #315e9e; border-radius: 50%; font: 700 19px Arial,sans-serif; }
+.buzz-facebook-byline { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; color: var(--ink-600); font-size: 10px; }
+.buzz-facebook-byline strong { color: var(--teal-900); font-size: 13px; }
+.buzz-facebook-byline span { color: #315e9e; font: 700 9px var(--font-mono); text-transform: uppercase; }
+.buzz-facebook-byline time { font-family: var(--font-mono); }
+.buzz-facebook-comment p, .buzz-facebook-replies p { margin: 6px 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.5; }
+.buzz-facebook-replies { margin-top: 12px; padding-left: 13px; border-left: 3px solid rgba(49,94,158,.18); }
+.buzz-facebook-replies li { padding: 10px 0 2px; border-top: 1px solid rgba(14,59,67,.1); }
+
+@media (max-width: 760px) {
+  .buzz-facebook-conversation { margin-top: 19px; padding-top: 15px; }
+  .buzz-facebook-head { align-items: start; }
+  .buzz-facebook-head h2 { font-size: 1.14rem; }
+  .buzz-facebook-comment { grid-template-columns: 28px minmax(0,1fr); gap: 8px; padding: 12px 11px; }
+  .buzz-facebook-avatar { width: 27px; height: 27px; font-size: 16px; }
+  .buzz-facebook-comment p, .buzz-facebook-replies p { font-size: 13px; }
+}
