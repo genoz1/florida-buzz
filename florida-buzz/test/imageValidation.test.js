@@ -24,6 +24,40 @@ test('review sends the actual image at high detail and accepts a clean completed
   assert.equal(body.input[0].content[1].detail, 'high');
   assert.equal(body.text.format.strict, true);
   assert.match(body.instructions, /semantic relevance/i);
+  assert.match(body.instructions, /Reject clear visible defects or material inaccuracies/);
+  assert.match(body.instructions, /Do not reject solely\s+because a minor background detail cannot be verified/);
+  assert.match(body.instructions, /generic beach, mountain, sunset,\s*forest or generic attraction scene is not relevant/i);
+  assert.match(body.instructions, /landmarks belonging to\s*another destination/i);
+});
+
+test('wrong-location and generic imagery remain strict relevance failures', async (t) => {
+  const prior = global.fetch;
+  t.after(() => { global.fetch = prior; });
+  const failures = [
+    { issues: ['Generic beach does not depict the named park'], correction: 'Show the named park' },
+    { issues: ['Recognizable landmark belongs to another destination'], correction: 'Use the correct Florida location' },
+  ];
+  global.fetch = async () => new Response(JSON.stringify({
+    status: 'completed',
+    output_text: JSON.stringify({
+      acceptable: false,
+      relevance_acceptable: false,
+      ...failures.shift(),
+    }),
+  }), { status: 200 });
+
+  for (const imagePrompt of ['Generic attractive beach', 'Landmark from the wrong park']) {
+    const review = await validateGeneratedImage(bytes, {
+      title: 'Named Florida park update',
+      subject: 'Named Florida park',
+      location: 'Orlando, Florida',
+      entities: ['Named Florida park'],
+      category: 'theme-parks',
+      imagePrompt,
+    });
+    assert.equal(review.acceptable, false);
+    assert.equal(review.relevanceAcceptable, false);
+  }
 });
 
 test('bad anatomy triggers one corrected generation; only the approved replacement is stored', async () => {
