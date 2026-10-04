@@ -113,7 +113,7 @@ async function processImageRepairJob(client, queue, job, {
       imageSubject: context.imageSubject || context.title || job.article_slug,
       imageEntities: context.imageEntities || [],
     }, {
-      maxAttempts: 1,
+      maxAttempts: 2,
       priorCorrection: job.correction || '',
       store,
       validate,
@@ -124,14 +124,25 @@ async function processImageRepairJob(client, queue, job, {
   }
 
   if (result?.status === 'accepted' && result.url) {
-    const current = { ...job, generation_attempts: (job.generation_attempts || 0) + (result.generationAttempts || 1) };
+    const current = {
+      ...job,
+      generation_attempts: (job.generation_attempts || 0) + (result.generationAttempts || 1),
+      review_attempts: (job.review_attempts || 0) + (result.reviewAttempts || 1),
+    };
     return attachCandidate(client, queue, current, result.url);
   }
   if (result?.candidateUrl) {
-    await queue.markCandidate(job, result.candidateUrl);
-    const current = { ...job, candidate_image_url: result.candidateUrl, generation_attempts: (job.generation_attempts || 0) + 1 };
+    const generationAttempts = result.generationAttempts || 1;
+    const reviewAttempts = result.reviewAttempts || 1;
+    await queue.markCandidate(job, result.candidateUrl, generationAttempts);
+    const current = {
+      ...job,
+      candidate_image_url: result.candidateUrl,
+      generation_attempts: (job.generation_attempts || 0) + generationAttempts,
+      review_attempts: (job.review_attempts || 0) + reviewAttempts,
+    };
     if (result.status === 'review_failed') {
-      await queue.markReviewFailure({ ...current, review_attempts: 0 }, new Error(result.error || 'Image review failed technically.'));
+      await queue.markReviewFailure({ ...current, review_attempts: current.review_attempts - 1 }, new Error(result.error || 'Image review failed technically.'));
       return { status: 'review_failed', slug: job.article_slug, reusedCandidate: true };
     }
     await queue.markRejected(current, result.correction || 'Image did not pass review.');
