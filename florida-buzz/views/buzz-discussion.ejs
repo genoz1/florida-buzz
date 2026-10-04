@@ -11,20 +11,26 @@
   <div class="wrap buzz-discussion-wrap">
     <a class="buzz-back" href="/buzz"><span aria-hidden="true">←</span> Back to The Buzz Board</a>
 
-    <article class="buzz-starter buzz-starter--<%= discussion.category %>">
-      <div class="buzz-starter-brand">
-        <span class="buzz-starter-logo" aria-hidden="true">FB</span>
-        <div><strong>Florida Buzz asks</strong><span>Starter question</span></div>
-      </div>
-      <span class="buzz-category buzz-category--<%= discussion.category %>"><%= categoryLabels[discussion.category] %></span>
+    <header class="buzz-thread-header">
       <h1><%= discussion.question %></h1>
-      <% if (discussion.context) { %><p class="buzz-starter-context"><%= discussion.context %></p><% } %>
-      <div class="buzz-starter-meta">
+      <div class="buzz-thread-meta">
+        <span class="buzz-category buzz-category--<%= discussion.category %>"><%= categoryLabels[discussion.category] %></span>
         <span><strong><%= discussion.response_count %></strong> <%= Number(discussion.response_count) === 1 ? 'response' : 'responses' %></span>
-        <span><strong><%= discussion.unique_participant_count %></strong> reader voices</span>
+        <span><strong><%= discussion.reaction_count %></strong> <%= Number(discussion.reaction_count) === 1 ? 'like' : 'likes' %></span>
+        <span><strong><%= discussion.unique_participant_count %></strong> <%= Number(discussion.unique_participant_count) === 1 ? 'participant' : 'participants' %></span>
         <span><%= Number(discussion.response_count) === 0 ? 'Posted' : 'Active' %> <%= timeAgo(discussion.last_activity_at) %></span>
         <% if (discussion.status === 'locked') { %><span class="buzz-locked">Discussion locked</span><% } %>
       </div>
+    </header>
+
+    <article class="buzz-starter buzz-starter--<%= discussion.category %>">
+      <div class="buzz-starter-brand">
+        <span class="buzz-starter-logo" aria-hidden="true">FB</span>
+        <div><strong>Florida Buzz</strong><span>Starter</span></div>
+        <time datetime="<%= discussion.created_at %>"><%= timeAgo(discussion.created_at) %></time>
+      </div>
+      <% if (discussion.context) { %><p class="buzz-starter-context"><%= discussion.context %></p><% } %>
+      <% if (discussion.status !== 'locked') { %><div class="buzz-starter-tools"><a href="<%= user ? '#response-body' : '#buzz-sign-in' %>">Reply</a></div><% } %>
     </article>
 
     <% if (discussion.relatedArticle) { %>
