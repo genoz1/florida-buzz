@@ -5,7 +5,8 @@ const { generateText, generateStructuredText } = require('../lib/aiText');
 const { newsArticle: newsArticleSchema } = require('../lib/aiSchemas');
 const { validateNewsArticle } = require('../lib/contentValidation');
 const { createArticleRetryQueue } = require('../lib/articleRetryQueue');
-const { generateArticleImage } = require('../lib/imageGen');
+const { createImageRepairQueue } = require('../lib/imageRepairQueue');
+const { generateArticleImageResult } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
 const { createPost: createThreadsPost } = require('../lib/threads');
@@ -612,6 +613,7 @@ async function run() {
 
   let postCount = 0;
   const retryQueue = createArticleRetryQueue(supabase, { dryRun: DRY_RUN });
+  const imageRepairQueue = createImageRepairQueue(supabase);
   const handledGuids = new Set();
 
   async function completeItem(guid) {
@@ -716,6 +718,18 @@ async function run() {
 
     const slug = await generateUniqueSlug(article.meta_title || article.title);
     let finalImage;
+    let imageResult = null;
+    async function attemptGeneratedImage() {
+      try {
+        return await generateArticleImageResult(
+          { title: article.title, category: realCategory, slug, ...imageDetails },
+          { store: (buffer, filename) => storeGeneratedImage(buffer, filename, 'image/png', { contentAddressed: true }) }
+        );
+      } catch (error) {
+        console.error(`  [error] Unexpected image workflow failure: ${error.message}. Article publishing will continue.`);
+        return { status: 'generation_failed', error: error.message, generationAttempts: 0, reviewAttempts: 0 };
+      }
+    }
     if (realImage) {
       if (DRY_RUN) {
         console.log(`  [dry-run] Would download and permanently store real photo from source.${cropBottomPercent ? ` (would crop bottom ${Math.round(cropBottomPercent * 100)}% for this origin's known branding banner)` : ''}`);
@@ -731,19 +745,18 @@ async function run() {
           console.log(`  Stored real photo permanently.`);
           finalImage = storedUrl;
         } else {
-          console.log(`  Could not download/store the real photo — generating an AI image instead so this article isn't left depending on the source's server.`);
-          finalImage = await generateArticleImage(
-            { title: article.title, category: realCategory, slug, ...imageDetails },
-            { store: (buffer, filename) => storeGeneratedImage(buffer, filename, 'image/png', { contentAddressed: true }) }
-          );
+          console.log(`  Could not download/store the real photo — attempting a validated AI image without blocking publication.`);
+          imageResult = await attemptGeneratedImage();
+          finalImage = imageResult.status === 'accepted' ? imageResult.url : null;
         }
       }
     } else {
       console.log(`  No real photo found — generating one...`);
-      finalImage = DRY_RUN ? null : await generateArticleImage(
-        { title: article.title, category: realCategory, slug, ...imageDetails },
-        { store: (buffer, filename) => storeGeneratedImage(buffer, filename, 'image/png', { contentAddressed: true }) }
-      );
+      if (DRY_RUN) finalImage = null;
+      else {
+        imageResult = await attemptGeneratedImage();
+        finalImage = imageResult.status === 'accepted' ? imageResult.url : null;
+      }
     }
 
     if (!DRY_RUN && finalImage && supabase) {
@@ -820,6 +833,20 @@ async function run() {
       return;
     }
     console.log(`  Saved article: /article/${slug}`);
+    if (!finalImage) {
+      try {
+        const queued = await imageRepairQueue.enqueue({ ...publication.article, ...articleRow }, {
+          reason: imageResult?.status || 'missing_image',
+          context: imageDetails,
+          result: imageResult,
+        });
+        console.log(queued
+          ? '  Image is pending durable repair; article publication and unrelated automation continue.'
+          : '  [warning] Image remains missing and could not be queued; article publication still continues.');
+      } catch (error) {
+        console.error(`  [warning] Image repair state could not be persisted (${error.message}); article publication and unrelated automation continue.`);
+      }
+    }
     if (publication.discussion.action === 'created') {
       console.log(`  Created related Buzz Board discussion: /buzz/${publication.discussion.discussion.slug}`);
     } else if (publication.discussion.action === 'reused') {
@@ -883,6 +910,8 @@ module.exports = {
   isAppropriate,
   writeArticle,
   alreadyPublishedSource,
+  extractImage,
+  originCropPercent,
   titleSimilarity,
   createArticleRetryQueue,
 };
