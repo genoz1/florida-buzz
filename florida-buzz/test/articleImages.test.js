@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const ejs = require('ejs');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -63,4 +64,26 @@ test('the fallback is a local branded asset rather than a random remote photogra
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'public', ARTICLE_PLACEHOLDER_PATH)), true);
   const route = fs.readFileSync(path.join(__dirname, '..', 'routes', 'main.js'), 'utf8');
   assert.doesNotMatch(route, /picsum\.photos/);
+});
+
+
+test('an accepted article hero renders only its canonical image URL', async () => {
+  const acceptedImage = 'https://project.supabase.co/storage/v1/object/public/article-images/article-accepted.jpg';
+  const filename = path.join(__dirname, '..', 'views', 'article.ejs');
+  const html = await ejs.renderFile(filename, {
+    article: {
+      slug: 'accepted-image', title: 'Accepted image', meta_title: 'Accepted image',
+      dek: 'The accepted image must remain visible.', body_html: '<p>Body.</p>', category: 'theme-parks',
+      source_name: 'Official source', source_url: 'https://example.com', image_url: acceptedImage,
+      published_at: '2026-10-04T12:00:00Z', is_evergreen: false, is_review: false,
+    },
+    buzzDiscussion: null, related: [], ticker: [], categoryLabels: { 'theme-parks': 'Theme Parks' },
+    placeholderImg: () => ARTICLE_PLACEHOLDER_PATH, thumbUrl: (url) => url.replace('.jpg', '-thumb.jpg'),
+    resizeImg: (value) => value, timeAgo: () => 'today',
+  }, { filename });
+
+  const heroTag = html.match(/<img\b[^>]*data-article-hero-image[^>]*>/)?.[0];
+  assert.ok(heroTag, 'article hero image should render');
+  assert.match(heroTag, new RegExp(`src="${acceptedImage}"`));
+  assert.doesNotMatch(heroTag, /srcset=|onerror=|article-placeholder-v1/);
 });
