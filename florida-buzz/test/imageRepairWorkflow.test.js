@@ -101,6 +101,25 @@ test('repair cycle passes the first rejection correction to a second generation 
   assert.equal(accepted[1].review_attempts, 2);
 });
 
+test('a persisted correction from an older reviewer is not replayed into a new paid generation', async () => {
+  const queue = queueRecorder();
+  let priorCorrection;
+  const job = {
+    ...baseJob,
+    correction: 'Require an exact hooked lip, horn proportions, branded habitat cues, and a particular viewpoint',
+  };
+  const result = await processImageRepairJob({}, queue, job, {
+    generate: async (_article, options) => {
+      priorCorrection = options.priorCorrection;
+      return { status: 'generation_failed', error: 'controlled test stop', generationAttempts: 0 };
+    },
+  });
+
+  assert.equal(priorCorrection, '');
+  assert.equal(result.status, 'generation_failed');
+  assert.equal(queue.calls[0][0], 'provider');
+});
+
 test('provider failure and timeout remain isolated repair states', async () => {
   for (const message of ['provider unavailable', 'generation timeout']) {
     const queue = queueRecorder();
