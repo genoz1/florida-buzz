@@ -15,7 +15,19 @@ const APPLY = process.env.APPLY_IMAGE_REPAIR === 'true';
 const APPROVED = process.env.PRODUCTION_IMAGE_REPAIR_APPROVED === 'true';
 const VERIFY_BYTES = process.env.VERIFY_IMAGE_BYTES !== 'false';
 const DAYS = Math.max(1, Math.min(Number(process.env.IMAGE_AUDIT_DAYS || 14), 60));
-const requested = new Set(process.argv.slice(2).filter((value) => !value.startsWith('--')));
+function requestedSlugs(argv = process.argv.slice(2), env = process.env) {
+  const positional = argv.filter((value) => !value.startsWith('--'));
+  const supplied = Object.prototype.hasOwnProperty.call(env, 'IMAGE_REPAIR_SLUGS');
+  const environment = supplied ? String(env.IMAGE_REPAIR_SLUGS).split(/[\s,]+/).filter(Boolean) : [];
+  // A malformed/empty explicit target must never silently select the whole backlog.
+  if (supplied && !environment.length) throw new Error('IMAGE_REPAIR_SLUGS must contain at least one article slug.');
+  const slugs = [...new Set([...environment, ...positional])];
+  if (slugs.some((slug) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))) {
+    throw new Error('Invalid image repair article slug.');
+  }
+  return slugs;
+}
+const requested = new Set(requestedSlugs());
 const knownBySlug = new Map(knownInventory.map((item) => [item.slug, item]));
 const parser = new Parser({ timeout: 15000, customFields: { item: [['media:content', 'mediaContent', { keepArray: true }], ['media:thumbnail', 'mediaThumbnail']] } });
 
@@ -233,6 +245,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  requestedSlugs,
   auditRecentArticles,
   easternCalendarStart,
   flagDuplicateImages,
