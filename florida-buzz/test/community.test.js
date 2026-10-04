@@ -227,6 +227,27 @@ test('discussion view escapes response text and exposes no author identifiers', 
   assert.match(html, /noindex,follow/);
 });
 
+test('discussion view labels Facebook comments separately and escapes imported text', async () => {
+  const html = await ejs.renderFile(path.join(__dirname, '../views/buzz-discussion.ejs'), {
+    discussion: {
+      id: DISCUSSION_ID, slug: 'test-question', question: 'What is your favorite Florida day?', context: null,
+      category: 'florida-life', status: 'published', response_count: 0, reaction_count: 0,
+      unique_participant_count: 0, last_activity_at: '2026-10-03T19:00:00Z', created_at: '2026-10-03T18:00:00Z',
+      indexable: false, relatedArticle: null, responses: [],
+      facebookConversation: {
+        permalinkUrl: 'https://www.facebook.com/example',
+        comments: [{ id: 'c1', parentId: null, body: '<script>alert(1)</script>', displayName: 'Facebook Reader', permalinkUrl: null, createdAt: '2026-10-03T19:00:00Z', replies: [] }],
+      },
+    },
+    categoryLabels: { 'florida-life': 'Florida Life' },
+    timeAgo: () => '1h ago', turnstileSiteKey: '', user: null,
+  }, { filename: path.join(__dirname, '../views/buzz-discussion.ejs') });
+  assert.match(html, /Conversation on Facebook/);
+  assert.match(html, /via Facebook/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.match(html, /noindex,follow/);
+});
+
 test('browser analytics sends only allowlisted state and never community content or identity', () => {
   const script = fs.readFileSync(path.join(__dirname, '../public/js/buzz-board.js'), 'utf8');
   const pushes = [...script.matchAll(/analytics\(([^\n]+)\)/g)].map((match) => match[1]);
