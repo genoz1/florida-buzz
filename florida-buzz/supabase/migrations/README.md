@@ -25,3 +25,8 @@ requires separate explicit approval.
 relationship migration. It gives each article an optional primary Buzz Board
 discussion while allowing one durable discussion to be reused by many relevant
 articles. It creates no discussions or engagement data by itself.
+
+`20261004170000_facebook_buzz_conversation.sql` stores the durable relationship
+between a Buzz Board discussion and its Facebook Page post plus moderated,
+source-labeled Facebook comments. Both tables are service-only under RLS; no
+Facebook identity is converted into a Buzz Board member account.
