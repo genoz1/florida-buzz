@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 process.env.OPENAI_API_KEY = 'test-key-not-a-secret';
 
 const { validateGeneratedImage } = require('../lib/imageValidation');
-const { generateValidatedImage } = require('../lib/imageGen');
+const { generateValidatedImage, generateValidatedImageResult } = require('../lib/imageGen');
 
 const context = { title: 'Magic Kingdom entrance update', location: 'Magic Kingdom', slug: 'entrance-update' };
 const bytes = Buffer.from('mock-png-bytes');
@@ -42,7 +42,10 @@ test('bad anatomy triggers one corrected generation; only the approved replaceme
   assert.equal(prompts.length, 2);
   assert.match(prompts[0], /Adults must push strollers from behind/);
   assert.match(prompts[1], /Remove the stroller and show the empty entrance/);
-  assert.deepEqual(stored, [{ buffer: 'image-2', filename: 'entrance-update.png' }]);
+  assert.deepEqual(stored, [
+    { buffer: 'image-1', filename: 'entrance-update.png' },
+    { buffer: 'image-2', filename: 'entrance-update.png' },
+  ]);
 });
 
 test('two rejected images leave no stored hero image', async () => {
@@ -55,7 +58,7 @@ test('two rejected images leave no stored hero image', async () => {
   });
   assert.equal(result, null);
   assert.equal(generations, 2);
-  assert.equal(stores, 0);
+  assert.equal(stores, 2);
 });
 
 test('review errors, incomplete responses, and contradictory verdicts fail closed', async (t) => {
@@ -87,5 +90,30 @@ test('review errors, incomplete responses, and contradictory verdicts fail close
     store: async () => { stores += 1; },
   }), null);
   assert.equal(generations, 1);
-  assert.equal(stores, 0);
+  assert.equal(stores, 1);
+});
+
+test('generation provider failures and timeouts return repairable state instead of throwing', async () => {
+  for (const error of [new Error('provider unavailable'), Object.assign(new Error('generation timed out'), { name: 'TimeoutError' })]) {
+    const result = await generateValidatedImageResult('Photo', context, {
+      generate: async () => { throw error; },
+      validate: async () => { throw new Error('must not review'); },
+      store: async () => { throw new Error('must not store'); },
+    });
+    assert.equal(result.status, 'generation_failed');
+    assert.equal(result.generationAttempts, 0);
+    assert.match(result.error, /provider unavailable|timed out/);
+  }
+});
+
+test('technical review failure preserves the generated candidate for retry without another generation', async () => {
+  let generations = 0;
+  const result = await generateValidatedImageResult('Photo', context, {
+    generate: async () => { generations += 1; return bytes; },
+    store: async () => 'https://storage.example/candidate.jpg',
+    validate: async () => { throw new Error('review API unavailable'); },
+  });
+  assert.equal(result.status, 'review_failed');
+  assert.equal(result.candidateUrl, 'https://storage.example/candidate.jpg');
+  assert.equal(generations, 1);
 });

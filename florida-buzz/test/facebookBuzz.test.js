@@ -20,7 +20,7 @@ test('Facebook publishing result retains both Page post and photo IDs', () => {
 test('Facebook post mapping is persisted against its Buzz Board discussion', async () => {
   let written;
   const chain = {
-    upsert(value, options) { written = { value, options }; return chain; },
+    insert(value) { written = { value }; return chain; },
     select() { return chain; },
     async single() { return { data: { discussion_id: written.value.discussion_id, facebook_post_id: written.value.facebook_post_id }, error: null }; },
   };
@@ -31,7 +31,7 @@ test('Facebook post mapping is persisted against its Buzz Board discussion', asy
     publishedAt: new Date('2026-10-04T12:00:00Z'),
   });
   assert.equal(result.facebook_post_id, 'page_post');
-  assert.equal(written.options.onConflict, 'discussion_id');
+  assert.equal(written.value.discussion_id, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 });
 
 test('Facebook comment moderation publishes ordinary discussion but holds links and contact data', () => {

@@ -11,7 +11,7 @@ const { composeRoundup } = require('../scripts/city-roundup');
 const { generateThisOrThat } = require('../scripts/engagement-post');
 const { generateCaption } = require('../scripts/promo-feature-post');
 const { researchParkDining } = require('../scripts/generate-dining-directory');
-const { generateArticleImage } = require('../lib/imageGen');
+const { generateArticleImage, generateArticleImageResult } = require('../lib/imageGen');
 
 const body = '<p>Florida travelers have a useful new detail to consider while planning their next visit.</p><p>The update includes practical timing, location, and planning information from the original source.</p><p>Check current details before leaving home so the day goes smoothly.</p>';
 const social = {
@@ -82,7 +82,11 @@ test('the image path uses a text prompt, gpt-image-1, and a visual review before
 
   const requests = [];
   global.fetch = queueFetch([{ value: 'A warm, relevant Florida springs scene without logos.' }, { image: true }, { review: { acceptable: true, relevance_acceptable: true, issues: [], correction: '' } }], requests);
-  assert.equal(await generateArticleImage({ title: 'Florida Springs Planning Update', category: 'florida-living', slug: 'springs-update' }), null);
+  const result = await generateArticleImageResult(
+    { title: 'Florida Springs Planning Update', category: 'florida-living', slug: 'springs-update' },
+    { store: async () => 'https://storage.example/springs-update.jpg' }
+  );
+  assert.equal(result.status, 'accepted');
   assert.equal(requests[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(requests[1].url, 'https://api.openai.com/v1/images/generations');
   assert.equal(requests[1].body.model, 'gpt-image-1');
