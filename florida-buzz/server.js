@@ -14,6 +14,23 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
+// Private reader-authentication foundation. Disabled by default and deliberately
+// not linked from the public site. Enabling it requires all server-side security
+// configuration to validate at startup; production also requires Turnstile.
+if (process.env.READER_AUTH_ENABLED === 'true') {
+  app.set('trust proxy', 1);
+  const { createAuthRouter, createProductionAuthFoundation } = require('./lib/auth');
+  const authFoundation = createProductionAuthFoundation(process.env);
+  app.use('/internal/auth', createAuthRouter(authFoundation));
+  console.log('Private reader authentication endpoints enabled.');
+  if (process.env.BUZZ_BOARD_ENABLED === 'true') {
+    const { supabase } = require('./lib/supabase');
+    const { createProductionCommunityRouter } = require('./lib/community');
+    app.use('/buzz', createProductionCommunityRouter({ client: supabase, authFoundation, env: process.env }));
+    console.log('Private Buzz Board routes enabled.');
+  }
+}
+
 // IndexNow key verification file — must be served at the site root with a
 // filename matching the key itself, containing just the key as plain text.
 // This is how Bing/IndexNow confirms you actually control this domain.
@@ -191,6 +208,19 @@ if (scheduleFlags.engagementPosts) {
   console.log('Engagement post scheduled: 1:30pm daily (Eastern time).');
 } else {
   console.log('Engagement post NOT scheduled — AI_CONTENT_SCHEDULES_ENABLED must be true and the OpenAI/Facebook variables must be set.');
+}
+
+// Publishes one approved Buzz Board starter per day through the existing
+// Facebook and Instagram integrations. The job is deterministic, makes no AI
+// calls, and uses post_log to avoid reposting the same discussion per platform.
+if (scheduleFlags.buzzBoardSocial) {
+  cron.schedule('30 21 * * *', () => {
+    console.log('Running scheduled Buzz Board social post...');
+    runScheduledCommand('Buzz Board social post', 'node scripts/buzz-board-social.js');
+  }, { timezone: 'America/New_York' });
+  console.log('Buzz Board social distribution scheduled: 9:30pm daily (Eastern time).');
+} else {
+  console.log('Buzz Board social distribution NOT scheduled — enable both Buzz Board flags and configure Facebook/Instagram credentials.');
 }
 
 // Sends a daily email confirming whether every platform (Facebook, Instagram,

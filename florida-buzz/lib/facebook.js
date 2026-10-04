@@ -2,7 +2,7 @@
 // posts) and scripts/generate-guide.js (evergreen guide posts).
 const { logPost } = require('./postLog');
 
-async function postToFacebookPage({ message, link, imageUrl, dryRun = false }) {
+async function postToFacebookPage({ message, link, imageUrl, dryRun = false, logDetail = null }) {
   if (dryRun) {
     console.log(`  [dry-run] Would post to Facebook: "${message}"${link ? ` (link: ${link})` : ''}${imageUrl ? ` (image: ${imageUrl})` : ''}`);
     return true;
@@ -39,7 +39,7 @@ async function postToFacebookPage({ message, link, imageUrl, dryRun = false }) {
       return false;
     }
 
-    await logPost({ platform: 'facebook', status: 'success', detail: message.slice(0, 100) });
+    await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
     return true;
   }
 
@@ -65,7 +65,7 @@ async function postToFacebookPage({ message, link, imageUrl, dryRun = false }) {
     return false;
   }
 
-  await logPost({ platform: 'facebook', status: 'success', detail: message.slice(0, 100) });
+  await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
   return true;
 }
 

@@ -29,7 +29,9 @@ connect it to a new DigitalOcean App, set environment variables, deploy. No loca
 ## Step 2: Create a NEW Supabase project
 Don't reuse the villagesgolfcarttrader Supabase project — keep these separate.
 1. supabase.com → New Project → name it `florida-buzz`.
-2. Once created, go to SQL Editor → paste in the contents of `db/schema.sql` → Run.
+2. For a fresh project only, go to SQL Editor → paste in the contents of
+   `db/schema.sql` → Run. For the existing production project, do not replay
+   the baseline; use timestamped forward migrations under `supabase/migrations/`.
 3. Go to Project Settings → API → copy the **Project URL** and the **service_role key**
    (not the anon key — the automation needs write access).
 
@@ -47,6 +49,13 @@ Some of the feed URLs in `scripts/sources.js` are marked unverified — I wrote 
 most likely official path but couldn't confirm they resolve from my end. Once deployed:
 1. Set `DRY_RUN=true` in your environment variables.
 2. Run the automation once (DigitalOcean → Console → `npm run automate:dry`).
+
+Buzz Board organic social distribution is separately gated by
+`BUZZ_BOARD_SOCIAL_ENABLED=true`. It also requires `BUZZ_BOARD_ENABLED=true`
+and the existing Facebook and Instagram credentials. The daily job makes no AI
+calls, rotates through approved Florida Buzz starters, adds source/campaign/topic
+UTM tags, and records per-platform success in `post_log`. Validate safely with
+`npm run buzz-social:dry` before enabling the schedule.
 3. Check the output — any feed that errors or returns 0 items needs a fix. Usually means
    visiting the source's website and finding their current RSS link (or removing it if they
    don't have one).

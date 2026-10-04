@@ -1,0 +1,135 @@
+<%- include('partials/header', {
+  pageTitle: discussion.question + ' — The Buzz Board',
+  pageDescription: discussion.context || 'Join verified Florida Buzz readers answering this question.',
+  canonicalPath: '/buzz/' + discussion.slug,
+  category: null,
+  isBuzzPage: true,
+  robots: 'noindex,follow'
+}) %>
+
+<main class="buzz-shell buzz-discussion-shell" data-analytics-view="discussion_view" data-category="<%= discussion.category %>">
+  <div class="wrap buzz-discussion-wrap">
+    <a class="buzz-back" href="/buzz"><span aria-hidden="true">←</span> Back to The Buzz Board</a>
+
+    <article class="buzz-starter buzz-starter--<%= discussion.category %>">
+      <div class="buzz-starter-brand">
+        <span class="buzz-starter-logo" aria-hidden="true">FB</span>
+        <div><strong>Florida Buzz asks</strong><span>Starter question</span></div>
+      </div>
+      <span class="buzz-category buzz-category--<%= discussion.category %>"><%= categoryLabels[discussion.category] %></span>
+      <h1><%= discussion.question %></h1>
+      <% if (discussion.context) { %><p class="buzz-starter-context"><%= discussion.context %></p><% } %>
+      <div class="buzz-starter-meta">
+        <span><strong><%= discussion.response_count %></strong> <%= Number(discussion.response_count) === 1 ? 'response' : 'responses' %></span>
+        <span><strong><%= discussion.unique_participant_count %></strong> reader voices</span>
+        <span><%= Number(discussion.response_count) === 0 ? 'Posted' : 'Active' %> <%= timeAgo(discussion.last_activity_at) %></span>
+        <% if (discussion.status === 'locked') { %><span class="buzz-locked">Discussion locked</span><% } %>
+      </div>
+    </article>
+
+    <% if (discussion.relatedArticle) { %>
+      <aside class="buzz-related-coverage" aria-label="Related Florida Buzz coverage">
+        <span>Related Florida Buzz coverage</span>
+        <a href="/article/<%= discussion.relatedArticle.slug %>"><%= discussion.relatedArticle.title %> <span aria-hidden="true">→</span></a>
+      </aside>
+    <% } %>
+
+    <section class="buzz-conversation" aria-labelledby="conversation-heading">
+      <div class="buzz-conversation-head">
+        <div><p class="buzz-section-label">The conversation</p><h2 id="conversation-heading">What readers are saying</h2></div>
+        <% if (user) { %><span class="buzz-signed-in">Signed in as <strong><%= user.displayName %></strong></span><% } %>
+      </div>
+
+      <% if (discussion.status !== 'locked') { %>
+        <% if (user) { %>
+          <form class="buzz-composer" data-community-form="response" data-discussion-id="<%= discussion.id %>">
+            <label for="response-body">Add your answer</label>
+            <p class="buzz-composer-prompt">Share a useful, specific take. Plain text only—no links or contact information.</p>
+            <textarea id="response-body" name="body" minlength="10" maxlength="1500" required aria-describedby="response-help response-status" placeholder="What would you tell another Florida fan?"></textarea>
+            <div class="buzz-composer-actions">
+              <span id="response-help">10–1,500 characters</span>
+              <button type="submit" class="buzz-primary-button">Post response</button>
+            </div>
+            <p class="buzz-form-status" id="response-status" role="status" aria-live="polite"></p>
+          </form>
+        <% } else { %>
+          <section class="buzz-auth-card" id="buzz-sign-in" aria-labelledby="sign-in-heading">
+            <div class="buzz-auth-copy">
+              <span class="buzz-auth-spark" aria-hidden="true">✦</span>
+              <div><p class="buzz-section-label">Your turn</p><h2 id="sign-in-heading">Join the conversation</h2><p>A verified email keeps the Board human. We’ll send one six-digit sign-in code—no password needed.</p></div>
+            </div>
+            <form class="buzz-auth-form" data-auth-step="request">
+              <div class="buzz-field-row">
+                <label>Email<input type="email" name="email" autocomplete="email" required></label>
+                <label>Display name<input type="text" name="displayName" minlength="2" maxlength="40" autocomplete="nickname" required></label>
+              </div>
+              <% if (turnstileSiteKey) { %>
+                <div class="cf-turnstile" data-sitekey="<%= turnstileSiteKey %>" data-theme="light"></div>
+              <% } %>
+              <button type="submit" class="buzz-primary-button">Email my sign-in code</button>
+            </form>
+            <form class="buzz-auth-form" data-auth-step="verify" hidden>
+              <label>Six-digit code<input type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+              <button type="submit" class="buzz-primary-button">Verify and join</button>
+            </form>
+            <p class="buzz-form-status" data-auth-status role="status" aria-live="polite"></p>
+          </section>
+        <% } %>
+      <% } %>
+
+      <% if (!discussion.responses.length) { %>
+        <div class="buzz-empty buzz-empty--conversation">
+          <span class="buzz-empty-icon" aria-hidden="true">💬</span>
+          <h3>Start the conversation.</h3>
+          <p>No manufactured buzz here—this question is waiting for its first real answer.</p>
+          <% if (!user && discussion.status !== 'locked') { %><a href="#buzz-sign-in">Be the first to weigh in</a><% } %>
+        </div>
+      <% } else { %>
+        <ol class="buzz-response-list">
+          <% discussion.responses.forEach(response => { %>
+            <li class="buzz-response" data-response-id="<%= response.id %>">
+              <div class="buzz-response-avatar" aria-hidden="true"><%= response.displayName.slice(0, 1).toUpperCase() %></div>
+              <div class="buzz-response-content">
+                <div class="buzz-response-byline"><strong><%= response.displayName %></strong><time datetime="<%= response.createdAt %>"><%= timeAgo(response.createdAt) %></time></div>
+                <p class="buzz-response-body"><%= response.body %></p>
+                <div class="buzz-response-tools">
+                  <button type="button" class="buzz-tool-button <%= response.viewerLiked ? 'active' : '' %>" data-action="reaction" <%= user ? '' : 'data-requires-auth="true"' %> aria-pressed="<%= response.viewerLiked ? 'true' : 'false' %>">♥ <span><%= response.likeCount %></span></button>
+                  <% if (discussion.status !== 'locked') { %><button type="button" class="buzz-tool-button" data-action="reply" <%= user ? '' : 'data-requires-auth="true"' %>>Reply</button><% } %>
+                  <details class="buzz-report-menu">
+                    <summary>Report</summary>
+                    <form data-community-form="report">
+                      <label>Reason<select name="reason" required><option value="">Choose one</option><option value="spam">Spam</option><option value="harassment">Harassment/abuse</option><option value="threatening">Threatening content</option><option value="personal-information">Personal information</option><option value="scam">Scam/fraud</option><option value="other">Other</option></select></label>
+                      <label>Details (optional)<textarea name="details" maxlength="500"></textarea></label>
+                      <button type="submit">Send report</button>
+                    </form>
+                  </details>
+                </div>
+                <% if (user && discussion.status !== 'locked') { %>
+                  <form class="buzz-reply-form" data-community-form="reply" hidden>
+                    <label>Reply to <%= response.displayName %><textarea name="body" minlength="10" maxlength="1500" required></textarea></label>
+                    <div><button type="button" data-action="cancel-reply">Cancel</button><button type="submit" class="buzz-primary-button">Post reply</button></div>
+                    <p class="buzz-form-status" role="status" aria-live="polite"></p>
+                  </form>
+                <% } %>
+                <% if (response.replies.length) { %>
+                  <ol class="buzz-reply-list" aria-label="Replies">
+                    <% response.replies.forEach(reply => { %>
+                      <li class="buzz-reply" data-response-id="<%= reply.id %>">
+                        <div class="buzz-response-avatar" aria-hidden="true"><%= reply.displayName.slice(0, 1).toUpperCase() %></div>
+                        <div><div class="buzz-response-byline"><strong><%= reply.displayName %></strong><time datetime="<%= reply.createdAt %>"><%= timeAgo(reply.createdAt) %></time></div><p class="buzz-response-body"><%= reply.body %></p><div class="buzz-response-tools"><button type="button" class="buzz-tool-button <%= reply.viewerLiked ? 'active' : '' %>" data-action="reaction" <%= user ? '' : 'data-requires-auth="true"' %> aria-pressed="<%= reply.viewerLiked ? 'true' : 'false' %>">♥ <span><%= reply.likeCount %></span></button><details class="buzz-report-menu"><summary>Report</summary><form data-community-form="report"><label>Reason<select name="reason" required><option value="">Choose one</option><option value="spam">Spam</option><option value="harassment">Harassment/abuse</option><option value="threatening">Threatening content</option><option value="personal-information">Personal information</option><option value="scam">Scam/fraud</option><option value="other">Other</option></select></label><button type="submit">Send report</button></form></details></div></div>
+                      </li>
+                    <% }) %>
+                  </ol>
+                <% } %>
+              </div>
+            </li>
+          <% }) %>
+        </ol>
+      <% } %>
+    </section>
+  </div>
+</main>
+
+<% if (turnstileSiteKey) { %><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script><% } %>
+<script src="/js/buzz-board.js" defer></script>
+<%- include('partials/footer') %>

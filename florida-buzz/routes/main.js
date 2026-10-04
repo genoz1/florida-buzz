@@ -8,6 +8,7 @@ const reviewPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fi
 const { logNotFound } = require('../lib/notFoundLog');
 const { createPin } = require('../lib/pinterest');
 const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
+const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
@@ -327,9 +328,15 @@ router.get('/article/:slug', async (req, res) => {
   const categoryArticles = await getArticles({ category: article.category, limit: 4 });
   const related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
   const ticker = await getArticles({ limit: 8 });
+  const buzzDiscussion = await loadArticleDiscussion(
+    supabase,
+    article,
+    process.env.BUZZ_BOARD_ENABLED === 'true'
+  );
 
   res.render('article', {
     article,
+    buzzDiscussion,
     related,
     ticker,
     categoryLabels: CATEGORY_LABELS,

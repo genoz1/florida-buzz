@@ -3,6 +3,7 @@
 // malformed/non-JSON provider output fail before it can reach publishing code.
 
 const nullableString = { anyOf: [{ type: 'string' }, { type: 'null' }] };
+const nullableNumber = { anyOf: [{ type: 'number', minimum: 0, maximum: 1 }, { type: 'null' }] };
 const nullableStringArray = { anyOf: [{ type: 'array', items: { type: 'string' }, maxItems: 10 }, { type: 'null' }] };
 
 function objectSchema(properties) {
@@ -41,6 +42,20 @@ const newsArticle = {
     image_subject: nullableString,
     image_location: nullableString,
     image_entities: nullableStringArray,
+    discussion_worthy: { type: 'boolean' },
+    discussion_reason: nullableString,
+    discussion_question: nullableString,
+    discussion_context: nullableString,
+    discussion_category: {
+      anyOf: [
+        { type: 'string', enum: ['disney', 'universal', 'cruises', 'florida-life'] },
+        { type: 'null' },
+      ],
+    },
+    discussion_topic: nullableString,
+    discussion_structure: nullableString,
+    discussion_entities: nullableStringArray,
+    discussion_confidence: nullableNumber,
   }),
 };
 

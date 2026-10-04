@@ -23,6 +23,14 @@ function getScheduleFlags(env = process.env) {
     newsletter: hasRequiredConfig(env, ['RESEND_API_KEY']),
     standardPromo: hasRequiredConfig(env, ['FB_PAGE_ID', 'FB_PAGE_ACCESS_TOKEN']),
     postHealthCheck: hasRequiredConfig(env, ['RESEND_API_KEY', 'ALERT_EMAIL_TO']),
+    buzzBoardSocial: env.BUZZ_BOARD_SOCIAL_ENABLED === 'true'
+      && env.BUZZ_BOARD_ENABLED === 'true'
+      && hasRequiredConfig(env, [
+        'FB_PAGE_ID',
+        'FB_PAGE_ACCESS_TOKEN',
+        'INSTAGRAM_USER_ID',
+        'INSTAGRAM_ACCESS_TOKEN',
+      ]),
   };
 }
 

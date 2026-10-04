@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'The Florida Buzz' %></title>
   <meta name="description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'Florida theme parks, beaches, space launches, wildlife, and travel — sourced straight from the official channels.' %>">
-  <meta name="robots" content="max-image-preview:large">
+  <meta name="robots" content="<%= typeof robots !== 'undefined' ? robots : 'max-image-preview:large' %>">
   <link rel="canonical" href="<%= typeof canonicalOverride !== 'undefined' && canonicalOverride ? canonicalOverride : (process.env.SITE_URL || 'https://thefloridabuzz.com') + (typeof canonicalPath !== 'undefined' && canonicalPath ? canonicalPath : '') %>">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
@@ -79,6 +79,7 @@
     <div class="wrap">
       <a href="/" class="logo">Florida <em>Buzz</em><span class="tm">™</span></a>
       <div class="nav-links">
+        <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
         <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
         <a href="/wait-times">Wait Times</a>
         <a href="/planner">Day Planner</a>
@@ -98,6 +99,7 @@
       </button>
     </div>
     <div class="mobile-menu" id="mobileMenu">
+      <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
       <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
       <a href="/wait-times">Wait Times</a>
       <a href="/planner">Day Planner</a>

@@ -15,6 +15,10 @@ const {
   findDuplicateImage,
   isLikelyGenericSourceImage,
 } = require('../lib/articleImages');
+const {
+  integrateArticleDiscussion,
+  publishArticleWithOptionalDiscussion,
+} = require('../lib/articleDiscussion');
 const SOURCES = require('./sources');
 
 const parser = new Parser({
@@ -390,6 +394,18 @@ businesses, events, ships, cities, beaches, hotels or destinations that an image
 silently substitute. These fields are evidence for the existing image pipeline, not permission
 to invent what a new product, attraction or construction project looks like. When skip is true,
 set all three image fields to null.
+
+Using this same response, also decide whether the article naturally supports a durable Buzz
+Board conversation. Do not force a discussion from a merely informational update. Set
+discussion_worthy true only when readers could meaningfully debate, compare, predict,
+evaluate, make a planning tradeoff, or share relevant experience. The question must be
+specific, neutral enough for disagreement, grounded only in supplied facts, and must not
+repeat the headline as a generic excitement poll. Avoid "Are you excited?" and "What do you
+think?" framing. Provide a short neutral context paragraph only when it clarifies the
+tradeoff. Classify the conversation as disney, universal, cruises, or florida-life. Supply a
+short topic, a brief structural label, the central named entities, and confidence from 0 to
+1. When discussion_worthy is false, set all discussion fields except discussion_reason to
+null and briefly explain why. When skip is true, set discussion_worthy false too.
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "skip": "boolean",
@@ -404,7 +420,16 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type (e.g. category, location, activity) without keyword-stuffing",
   "image_subject": "specific concrete visual subject for this exact article, or null when skipped",
   "image_location": "specific supported destination/city/venue, or null when no location is supported or when skipped",
-  "image_entities": "array of 1-10 central named entities that the image must preserve, or null when skipped"
+  "image_entities": "array of 1-10 central named entities that the image must preserve, or null when skipped",
+  "discussion_worthy": "boolean",
+  "discussion_reason": "short string explaining the decision, or null only for a skipped source",
+  "discussion_question": "specific conversational question ending in ?, or null",
+  "discussion_context": "short neutral context paragraph or null",
+  "discussion_category": "exactly disney, universal, cruises, florida-life, or null",
+  "discussion_topic": "2-80 character durable topic label or null",
+  "discussion_structure": "brief question-structure label or null",
+  "discussion_entities": "array of up to 10 central named entities, or null",
+  "discussion_confidence": "number from 0 to 1, or null"
 }`;
 
   const user = `Source: ${sourceName}
@@ -758,7 +783,7 @@ async function run() {
       return;
     }
 
-    const { error } = await supabase.from('articles').insert({
+    const articleRow = {
       slug,
       title: article.title,
       meta_title: article.meta_title,
@@ -770,13 +795,38 @@ async function run() {
       source_url: item.link,
       image_url: finalImage,
       fb_caption: article.fb_caption,
-    });
-    if (error) {
+    };
+    let publication;
+    try {
+      publication = await publishArticleWithOptionalDiscussion({
+        articleRow,
+        discussionMetadata: article,
+        enabled: process.env.BUZZ_BOARD_ENABLED === 'true'
+          && process.env.ARTICLE_BUZZ_INTEGRATION_ENABLED === 'true',
+        insertArticle: async (row) => {
+          const { data, error } = await supabase.from('articles').insert(row).select('id, slug').single();
+          if (error) throw error;
+          return data;
+        },
+        integrateDiscussion: (savedArticle, metadata) => integrateArticleDiscussion({
+          client: supabase,
+          article: savedArticle,
+          metadata,
+        }),
+      });
+    } catch (error) {
       console.error(`  [error] Could not save article: ${error.message}`);
       await retryQueue.recordFailure(source, item, error);
       return;
     }
     console.log(`  Saved article: /article/${slug}`);
+    if (publication.discussion.action === 'created') {
+      console.log(`  Created related Buzz Board discussion: /buzz/${publication.discussion.discussion.slug}`);
+    } else if (publication.discussion.action === 'reused') {
+      console.log(`  Reused Buzz Board discussion: /buzz/${publication.discussion.discussion.slug}`);
+    } else if (publication.discussion.action === 'skipped' && publication.discussion.reason !== 'integration_disabled') {
+      console.log(`  [skip] Buzz Board integration: ${publication.discussion.reason}`);
+    }
     await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
 
     if (postCount > 0) {

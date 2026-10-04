@@ -62,7 +62,7 @@ async function verifyRecentPublish(igUserId, accessToken, caption) {
   }
 }
 
-async function createPost({ imageUrl, caption }) {
+async function createPost({ imageUrl, caption, logDetail = null }) {
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
   const igUserId = process.env.INSTAGRAM_USER_ID;
 
@@ -109,16 +109,16 @@ async function createPost({ imageUrl, caption }) {
       const actuallyPosted = await verifyRecentPublish(igUserId, accessToken, caption);
       if (actuallyPosted) {
         console.log('  Confirmed: it posted successfully despite the error response. Logging as success.');
-        await logPost({ platform: 'instagram', status: 'success', detail: `${(caption || '').slice(0, 100)} (recovered after false-error response)` });
+        await logPost({ platform: 'instagram', status: 'success', detail: logDetail || `${(caption || '').slice(0, 100)} (recovered after false-error response)` });
         return { recovered: true };
       }
       throw new Error(`Instagram publish failed: ${JSON.stringify(publishData)}`);
     }
 
-    await logPost({ platform: 'instagram', status: 'success', detail: caption ? caption.slice(0, 100) : null });
+    await logPost({ platform: 'instagram', status: 'success', detail: logDetail || (caption ? caption.slice(0, 100) : null) });
     return publishData;
   } catch (err) {
-    await logPost({ platform: 'instagram', status: 'failed', detail: err.message });
+    await logPost({ platform: 'instagram', status: 'failed', detail: logDetail ? `${logDetail} | ${err.message}` : err.message });
     throw err;
   }
 }

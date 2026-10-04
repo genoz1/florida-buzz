@@ -1,0 +1,49 @@
+<%- include('partials/header', {
+  pageTitle: 'Buzz Board Moderation — Florida Buzz',
+  pageDescription: 'Private Buzz Board moderation queue.',
+  canonicalPath: '/buzz/moderation',
+  category: null,
+  isBuzzPage: true,
+  robots: 'noindex,nofollow'
+}) %>
+
+<main class="buzz-shell">
+  <div class="wrap buzz-moderation-wrap">
+    <a class="buzz-back" href="/buzz">← Back to The Buzz Board</a>
+    <header class="buzz-moderation-header"><p class="buzz-section-label">Private staff workspace</p><h1>Needs Review</h1><p>Held content, reported responses, and the context needed to make a restrained decision.</p></header>
+    <% if (!queue.length) { %><div class="buzz-empty"><h2>The queue is clear.</h2><p>No held or reported community content needs attention.</p></div><% } %>
+    <div class="buzz-moderation-list">
+      <% queue.forEach(item => { %>
+        <article class="buzz-review-card" data-response-id="<%= item.id %>">
+          <div class="buzz-review-meta"><span class="buzz-review-state"><%= item.moderation_status %></span><span><%= item.report_count %> reports</span><span><%= timeAgo(item.created_at) %></span></div>
+          <h2><a href="/buzz/<%= item.discussion?.slug || '' %>"><%= item.discussion?.question || 'Discussion unavailable' %></a></h2>
+          <p class="buzz-review-author">By <strong><%= item.author_display_name %></strong></p>
+          <blockquote><%= item.body %></blockquote>
+          <% if (item.moderation_signals?.length) { %><p class="buzz-review-signals">Signals: <%= item.moderation_signals.join(', ') %></p><% } %>
+          <% if (item.reports?.length) { %>
+            <div class="buzz-review-reports"><strong>Reader reports</strong><ul><% item.reports.forEach(report => { %><li><span><%= report.reason %></span><% if (report.details) { %> — <%= report.details %><% } %></li><% }) %></ul></div>
+          <% } %>
+          <form data-community-form="moderation">
+            <label>Staff note<input name="reason" maxlength="500" placeholder="Optional reason for the audit log"></label>
+            <div class="buzz-review-actions"><button name="action" value="approve">Approve</button><button name="action" value="restore">Restore</button><button name="action" value="remove" class="danger">Remove</button></div>
+            <p class="buzz-form-status" role="status" aria-live="polite"></p>
+          </form>
+          <% if (item.discussion) { %>
+            <form class="buzz-secondary-review-action" data-community-form="discussion-moderation" data-discussion-id="<%= item.discussion.id %>">
+              <button name="action" value="<%= item.discussion.status === 'locked' ? 'unlock' : 'lock' %>"><%= item.discussion.status === 'locked' ? 'Unlock discussion' : 'Lock discussion' %></button>
+              <p class="buzz-form-status" role="status" aria-live="polite"></p>
+            </form>
+          <% } %>
+          <% if (user.role === 'admin') { %>
+            <form class="buzz-secondary-review-action" data-community-form="profile-moderation" data-profile-id="<%= item.author_id %>">
+              <button name="action" value="suspend">Suspend account</button><button name="action" value="block" class="danger">Block account</button>
+              <p class="buzz-form-status" role="status" aria-live="polite"></p>
+            </form>
+          <% } %>
+        </article>
+      <% }) %>
+    </div>
+  </div>
+</main>
+<script src="/js/buzz-board.js" defer></script>
+<%- include('partials/footer') %>

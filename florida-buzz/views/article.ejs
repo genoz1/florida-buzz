@@ -24,6 +24,24 @@
 
     <div class="article-body"><%- article.body_html %></div>
 
+    <% if (typeof buzzDiscussion !== 'undefined' && buzzDiscussion) { %>
+    <aside class="article-buzz-module" data-article-buzz-module aria-labelledby="article-buzz-question">
+      <div class="article-buzz-copy">
+        <p class="article-buzz-kicker">Join the Buzz</p>
+        <h2 id="article-buzz-question"><%= buzzDiscussion.question %></h2>
+        <p class="article-buzz-meta">
+          <% if (Number(buzzDiscussion.response_count) === 0) { %>
+            Start the conversation—no responses yet.
+          <% } else { %>
+            <strong><%= buzzDiscussion.response_count %></strong> <%= Number(buzzDiscussion.response_count) === 1 ? 'response' : 'responses' %> so far.
+          <% } %>
+        </p>
+        <a href="/buzz/<%= buzzDiscussion.slug %>" class="article-buzz-cta" data-article-buzz-cta>Join the discussion <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="article-buzz-mark" aria-hidden="true">?</div>
+    </aside>
+    <% } %>
+
     <% if (article.category === 'theme-parks' && process.env.UNDERCOVER_TOURIST_URL) { %>
     <div style="margin: 28px 0; padding: 20px; background: var(--sand-100); border-radius: 4px; text-align: center;">
       <p style="margin: 0 0 12px; font-size: 15px; color: var(--ink-900);">Planning a trip? Compare current ticket prices before you book.</p>
@@ -123,4 +141,5 @@
   <% } %>
 </main>
 
+<% if (typeof buzzDiscussion !== 'undefined' && buzzDiscussion) { %><script src="/js/article-buzz.js" defer></script><% } %>
 <%- include('partials/footer') %>

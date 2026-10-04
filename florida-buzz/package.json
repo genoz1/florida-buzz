@@ -5,6 +5,11 @@
   "main": "server.js",
   "scripts": {
     "test": "node --test test/*.test.js",
+    "test:schema": "node scripts/verify-schema-contract.js",
+    "test:launch-inventory": "node scripts/build-buzz-board-launch.js --check",
+    "buzz-social": "node scripts/buzz-board-social.js",
+    "buzz-social:dry": "DRY_RUN=true node scripts/buzz-board-social.js",
+    "build:launch-inventory": "node scripts/build-buzz-board-launch.js --write",
     "start": "node server.js",
     "automate": "node scripts/automate.js",
     "automate:dry": "DRY_RUN=true node scripts/automate.js",

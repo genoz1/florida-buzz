@@ -1,0 +1,80 @@
+{
+  "capturedAt": "2026-10-03",
+  "source": "production PostgreSQL catalogs (read-only)",
+  "tables": {
+    "article_generation_queue": {
+      "columns": ["guid", "source_url", "payload", "status", "attempts", "last_error", "last_attempt_at", "created_at", "updated_at"],
+      "primaryKey": ["guid"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "articles": {
+      "columns": ["id", "slug", "title", "dek", "body_html", "category", "source_name", "source_url", "image_url", "fb_caption", "fb_posted", "featured", "published_at", "created_at", "is_evergreen", "meta_title", "city", "is_review", "review_type", "review_subject", "review_rating"],
+      "primaryKey": ["id"],
+      "unique": ["slug"],
+      "rlsEnabled": true
+    },
+    "engagement_posts": {
+      "columns": ["id", "topic", "message", "posted_at"],
+      "primaryKey": ["id"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "feature_promo_images": {
+      "columns": ["topic", "image_url", "created_at"],
+      "primaryKey": ["topic"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "feature_promo_posts": {
+      "columns": ["id", "topic", "message", "posted_at"],
+      "primaryKey": ["id"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "not_found_log": {
+      "columns": ["id", "path", "referrer", "created_at"],
+      "primaryKey": ["id"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "post_log": {
+      "columns": ["id", "platform", "status", "detail", "created_at"],
+      "primaryKey": ["id"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "restaurants": {
+      "columns": ["id", "park", "name", "land", "service_type", "reservations", "dining_plan", "character_dining", "characters", "meal_periods", "description", "last_verified_at", "created_at"],
+      "primaryKey": ["id"],
+      "unique": [],
+      "rlsEnabled": true
+    },
+    "seen_feed_items": {
+      "columns": ["id", "guid", "created_at"],
+      "primaryKey": ["id"],
+      "unique": ["guid"],
+      "rlsEnabled": true
+    },
+    "subscribers": {
+      "columns": ["id", "email", "subscribed_at", "active"],
+      "primaryKey": ["id"],
+      "unique": ["email"],
+      "rlsEnabled": true
+    }
+  },
+  "views": [],
+  "materializedViews": [],
+  "publicFunctions": [],
+  "publicTriggers": [],
+  "publicSequences": [],
+  "publicPolicies": [],
+  "storageBuckets": ["article-images"],
+  "extensions": {
+    "pg_stat_statements": "1.11",
+    "pgcrypto": "1.3",
+    "plpgsql": "1.0",
+    "supabase_vault": "0.3.1",
+    "uuid-ossp": "1.1"
+  }
+}
