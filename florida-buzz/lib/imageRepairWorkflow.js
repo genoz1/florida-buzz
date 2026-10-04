@@ -2,7 +2,7 @@ const { imageSize } = require('image-size');
 const { findDuplicateImage } = require('./articleImages');
 const { generateArticleImageResult } = require('./imageGen');
 const { validateGeneratedImage, assertCompletedReview } = require('./imageValidation');
-const { createImageRepairQueue, generationLimit } = require('./imageRepairQueue');
+const { createImageRepairQueue, generationLimit, RECOVERY_EPOCH } = require('./imageRepairQueue');
 const { storeGeneratedImage } = require('./supabase');
 
 async function fetchCandidate(url, fetchImpl = fetch) {
@@ -130,10 +130,9 @@ async function processImageRepairJob(client, queue, job, {
       imageEntities: context.imageEntities || [],
     }, {
       maxAttempts: Math.min(2, maxGenerations, generationLimit(job) - (job.generation_attempts || 0)),
-      // A persisted correction may have been written by an older reviewer contract and can
-      // reintroduce obsolete, over-prescriptive composition demands. Corrections produced by
-      // the current reviewer still guide the immediate second attempt inside imageGen.
-      priorCorrection: '',
+      // Keep a current, practical quality correction across a backed-off retry. Never replay
+      // corrections from the old prescriptive reviewer into a new paid generation.
+      priorCorrection: context.reviewContract === RECOVERY_EPOCH ? job.correction || '' : '',
       store,
       validate,
     });
@@ -200,12 +199,29 @@ async function runImageRepairBatch(client, {
     for (let job of data || []) {
       if (!slugs.includes(job.article_slug)) continue; // Fail closed even if an adapter returns extra rows.
       if (recoverLegacy) job = await queue.recoverLegacy(job);
-      if (['pending', 'review_pending'].includes(job.status) && job.next_attempt_at <= new Date().toISOString()) jobs.push(job);
+      jobs.push(job);
     }
   } else jobs = await queue.loadDue(limit);
   let remainingGenerations = Math.max(0, Math.floor(Number(limit) || 0));
   const results = [];
   for (const job of jobs) {
+    if (!['pending', 'review_pending'].includes(job.status)) {
+      const result = { status: job.status === 'accepted' ? 'already_repaired' : job.status, slug: job.article_slug, error: job.last_error || null };
+      results.push(result);
+      logger.log(`[image-repair] ${job.article_slug}: ${job.status} — ${job.last_error || 'not eligible for processing'}`);
+      continue;
+    }
+    const retryTime = new Date(job.next_attempt_at).getTime();
+    if (!Number.isFinite(retryTime)) {
+      results.push({ status: 'invalid_retry_time', slug: job.article_slug });
+      logger.error(`[image-repair] ${job.article_slug}: invalid retry timestamp; no generation or review performed`);
+      continue;
+    }
+    if (retryTime > Date.now()) {
+      results.push({ status: 'deferred_backoff', slug: job.article_slug, nextAttemptAt: job.next_attempt_at });
+      logger.log(`[image-repair] ${job.article_slug}: deferred_backoff — eligible at ${job.next_attempt_at}; no generation or review performed`);
+      continue;
+    }
     if (remainingGenerations <= 0 && !(job.status === 'review_pending' && job.candidate_image_url)) continue;
     const allowance = job.status === 'review_pending' && job.candidate_image_url ? 0 : Math.min(2, remainingGenerations, generationLimit(job) - (job.generation_attempts || 0));
     remainingGenerations -= Math.max(0, allowance); // Reserve API calls, including blocked/failed requests.
