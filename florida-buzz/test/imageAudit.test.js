@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   easternCalendarStart,
+  flagDuplicateImages,
   inspectStoredImage,
   obviousImageIssue,
 } = require('../scripts/repair-article-images');
@@ -12,6 +13,18 @@ test('14 calendar-day audit starts at Eastern midnight and includes the current 
     easternCalendarStart(14, new Date('2026-10-04T16:00:00Z')),
     '2026-09-21T04:00:00.000Z'
   );
+});
+
+test('duplicate audit preserves the oldest canonical image and flags only later reuse', () => {
+  const inspected = [
+    { article: { slug: 'newer', published_at: '2026-10-04T12:00:00Z' }, fingerprint: 'same', issue: null },
+    { article: { slug: 'oldest', published_at: '2026-10-01T12:00:00Z' }, fingerprint: 'same', issue: null },
+    { article: { slug: 'distinct', published_at: '2026-10-03T12:00:00Z' }, fingerprint: 'different', issue: null },
+  ];
+  flagDuplicateImages(inspected);
+  assert.equal(inspected.find((row) => row.article.slug === 'oldest').issue, null);
+  assert.equal(inspected.find((row) => row.article.slug === 'newer').issue, 'duplicate_recent_image');
+  assert.equal(inspected.find((row) => row.article.slug === 'distinct').issue, null);
 });
 
 test('missing and placeholder imagery is never classified as complete', () => {

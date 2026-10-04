@@ -73,6 +73,23 @@ async function mapLimit(items, limit, worker) {
   return output;
 }
 
+function flagDuplicateImages(inspected) {
+  const byFingerprint = new Map();
+  for (const row of inspected) {
+    if (!row.fingerprint) continue;
+    if (byFingerprint.has(row.fingerprint)) byFingerprint.get(row.fingerprint).push(row);
+    else byFingerprint.set(row.fingerprint, [row]);
+  }
+  for (const rows of byFingerprint.values()) {
+    if (rows.length < 2) continue;
+    const ordered = [...rows].sort((left, right) => (
+      String(left.article.published_at || '').localeCompare(String(right.article.published_at || ''))
+    ));
+    for (const row of ordered.slice(1)) row.issue = 'duplicate_recent_image';
+  }
+  return inspected;
+}
+
 async function auditRecentArticles(client = supabase, { now = new Date(), fetchImpl = fetch } = {}) {
   if (!client) throw new Error('Supabase is not configured.');
   const since = easternCalendarStart(DAYS, now);
@@ -87,16 +104,7 @@ async function auditRecentArticles(client = supabase, { now = new Date(), fetchI
     ...(await inspectStoredImage(article, fetchImpl)),
   }));
 
-  const byFingerprint = new Map();
-  for (const row of inspected) {
-    if (!row.fingerprint) continue;
-    if (byFingerprint.has(row.fingerprint)) byFingerprint.get(row.fingerprint).push(row);
-    else byFingerprint.set(row.fingerprint, [row]);
-  }
-  for (const rows of byFingerprint.values()) {
-    if (rows.length < 2) continue;
-    for (const row of rows) row.issue = 'duplicate_recent_image';
-  }
+  flagDuplicateImages(inspected);
 
   return {
     since,
@@ -225,6 +233,7 @@ if (require.main === module) {
 module.exports = {
   auditRecentArticles,
   easternCalendarStart,
+  flagDuplicateImages,
   inspectStoredImage,
   obviousImageIssue,
   recoverRssImages,
