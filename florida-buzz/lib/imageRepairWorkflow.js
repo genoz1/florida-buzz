@@ -198,6 +198,7 @@ async function runImageRepairBatch(client, {
     if (error) throw error;
     jobs = [];
     for (let job of data || []) {
+      if (!slugs.includes(job.article_slug)) continue; // Fail closed even if an adapter returns extra rows.
       if (recoverLegacy) job = await queue.recoverLegacy(job);
       if (['pending', 'review_pending'].includes(job.status) && job.next_attempt_at <= new Date().toISOString()) jobs.push(job);
     }
