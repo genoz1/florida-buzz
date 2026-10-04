@@ -759,10 +759,10 @@ footer a:hover { opacity: 1; }
 /* Buzz Board listings use a dense bulletin-board presentation at every size.
    Desktop rows spread into columns; mobile rows stack the same real data. */
 @media (min-width: 761px) {
-  .buzz-masthead-inner { padding-top: 42px; padding-bottom: 47px; }
-  .buzz-masthead h1 { font-size: clamp(3.25rem, 5.5vw, 4.8rem); }
-  .buzz-tagline { margin-top: 14px; font-size: clamp(1.2rem, 2vw, 1.55rem); }
-  .buzz-intro { font-size: 15.5px; }
+  .buzz-masthead-inner { padding-top: 27px; padding-bottom: 32px; }
+  .buzz-masthead h1 { font-size: clamp(3rem, 4.5vw, 4rem); }
+  .buzz-tagline { margin: 9px 0 4px; font-size: clamp(1.12rem, 1.7vw, 1.4rem); }
+  .buzz-intro { font-size: 14.5px; line-height: 1.42; }
   .buzz-filter-bar { margin-bottom: 30px; }
   .buzz-feed-heading { margin-bottom: 15px; }
   .buzz-featured {
