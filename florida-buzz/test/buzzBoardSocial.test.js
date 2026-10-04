@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const {
   buildCopy,
   buildFacebookImageUrl,
+  buildInstagramImageUrl,
+  buildInstagramShortTrackingUrl,
   buildShortTrackingUrl,
   buildTrackingUrl,
   logMarker,
@@ -33,6 +35,23 @@ test('Facebook uses a clean Florida Buzz redirect and discussion-specific brande
   );
 });
 
+test('Instagram uses the discussion-specific question image and an honest short discussion path', () => {
+  const slug = 'what-universal-does-better-than-disney';
+  assert.equal(
+    buildInstagramImageUrl(slug),
+    `https://thefloridabuzz.com/images/buzz-board-social/${slug}.png`
+  );
+  assert.equal(
+    buildInstagramShortTrackingUrl(slug),
+    `https://thefloridabuzz.com/go/ig/${slug}`
+  );
+  const copy = buildCopy({ slug, question: 'Do not repeat this question?' }, 'instagram');
+  assert.doesNotMatch(copy, /Do not repeat this question/);
+  assert.match(copy, /Answer here on Instagram/);
+  assert.match(copy, /Copy this short address into your browser/);
+  assert.match(copy, new RegExp(`/go/ig/${slug}$`));
+});
+
 test('daily selection is deterministic and rotates approved discussions', () => {
   const discussions = [{ slug: 'one' }, { slug: 'two' }, { slug: 'three' }];
   assert.deepEqual(
@@ -51,8 +70,8 @@ test('platform copy stays conversation-first and sends readers to the selected d
   const instagram = buildCopy(discussion, 'instagram');
   assert.equal(facebook, 'Answer here or join the conversation on Buzz Board 👇');
   assert.doesNotMatch(facebook, /Which option|https?:\/\//);
-  assert.match(instagram, /\/buzz\/sample-question\?/);
-  assert.match(instagram, /utm_source=instagram/);
+  assert.doesNotMatch(instagram, /Which option/);
+  assert.match(instagram, /\/go\/ig\/sample-question$/);
 });
 
 test('recurring schedule fails closed unless Buzz Board and both existing Meta publishers are configured', () => {

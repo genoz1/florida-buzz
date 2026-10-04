@@ -165,6 +165,15 @@ test('article template renders a polished module only when a discussion exists',
   assert.match(withDiscussion, /data-article-buzz-module/);
   assert.match(withDiscussion, /Start the conversation—no responses yet/);
   assert.match(withDiscussion, /\/buzz\/real-question/);
+  assert.doesNotMatch(withDiscussion, /article-buzz-mark/);
+
+  const longQuestion = 'For an October Disney World visit, would you prioritize EPCOT concert dates or the resortwide experience when every choice changes the shape of the trip?';
+  const withLongDiscussion = await ejs.renderFile(filename, {
+    ...base,
+    buzzDiscussion: { slug: 'long-question', question: longQuestion, response_count: 12 },
+  }, { filename });
+  assert.match(withLongDiscussion, new RegExp(longQuestion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(withLongDiscussion, /12<\/strong> responses so far/);
 
   const withoutDiscussion = await ejs.renderFile(filename, { ...base, buzzDiscussion: null }, { filename });
   assert.doesNotMatch(withoutDiscussion, /data-article-buzz-module/);
