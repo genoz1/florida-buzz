@@ -3,8 +3,13 @@ const assert = require('node:assert/strict');
 
 process.env.OPENAI_API_KEY = 'test-key-not-a-secret';
 
-const { validateGeneratedImage } = require('../lib/imageValidation');
-const { generateValidatedImage, generateValidatedImageResult } = require('../lib/imageGen');
+const { REVIEW_INSTRUCTIONS, validateGeneratedImage } = require('../lib/imageValidation');
+const {
+  buildImagePromptEvidence,
+  generateValidatedImage,
+  generateValidatedImageResult,
+  normalizeImageGenerationPrompt,
+} = require('../lib/imageGen');
 
 const context = { title: 'Magic Kingdom entrance update', location: 'Magic Kingdom', slug: 'entrance-update' };
 const bytes = Buffer.from('mock-png-bytes');
@@ -27,8 +32,47 @@ test('review sends the actual image at high detail and accepts a clean completed
   assert.match(body.instructions, /semantic relevance/i);
   assert.match(body.instructions, /Reject clear visible defects or material inaccuracies/);
   assert.match(body.instructions, /Do not reject solely\s+because a minor background detail cannot be verified/);
-  assert.match(body.instructions, /generic beach, mountain, sunset,\s*forest or generic attraction scene is not relevant/i);
+  assert.match(body.instructions, /generic beach, mountain, sunset,\s*forest or generic attraction scene is not\s*relevant/i);
   assert.match(body.instructions, /landmarks belonging to\s*another destination/i);
+  assert.match(body.instructions, /Do not require every article detail, every named\s*entity/i);
+  assert.match(body.instructions, /not debatable expert-level morphology/i);
+  assert.match(body.instructions, /minimum\s*change needed to fix the visible material defect/i);
+});
+
+test('non-person planning prompt evidence excludes incidental people and article prose', () => {
+  const evidence = buildImagePromptEvidence({
+    title: 'Disney World Annual Pass 2026: Which Tier Is Worth It?',
+    category: 'theme-parks',
+    imageBrief: {
+      subject: 'Disney World park entrance in a practical annual-pass planning scene',
+      location: 'Disney World Resort, Orlando',
+      entities: ['Disney World', 'Bob Iger', 'Annual Pass'],
+    },
+    dek: 'A Disney executive explained the program.',
+    bodyHtml: '<p>Bob Iger discussed the company.</p>',
+  });
+  assert.match(evidence, /Annual Pass 2026/);
+  assert.match(evidence, /park entrance in a practical annual-pass planning scene/);
+  assert.match(evidence, /Disney World Resort, Orlando/);
+  assert.doesNotMatch(evidence, /Iger|executive|discussed the company/i);
+  assert.doesNotMatch(evidence, /Article excerpt|Subhead|named entities/i);
+});
+
+test('image prompt normalization keeps destination specificity without requesting its namesake', () => {
+  const prompt = normalizeImageGenerationPrompt('Photorealistic Walt Disney World entrance at Magic Kingdom in Orlando');
+  assert.equal(prompt, 'Photorealistic Disney World Resort entrance at Magic Kingdom in Orlando');
+  assert.match(prompt, /Magic Kingdom in Orlando/);
+  assert.doesNotMatch(prompt, /\bWalt\b/i);
+});
+
+test('review standard accepts relevant editorial latitude but preserves material rejection grounds', () => {
+  assert.match(REVIEW_INSTRUCTIONS, /Accept a strong photorealistic image when it clearly illustrates\s*the main story subject/i);
+  assert.match(REVIEW_INSTRUCTIONS, /different but\s*credible composition/i);
+  assert.match(REVIEW_INSTRUCTIONS, /a particular camera viewpoint, branded signage/i);
+  assert.match(REVIEW_INSTRUCTIONS, /clearly wrong subject or materially important location/i);
+  assert.match(REVIEW_INSTRUCTIONS, /obvious AI artifact/i);
+  assert.match(REVIEW_INSTRUCTIONS, /impossible anatomy or orientation/i);
+  assert.match(REVIEW_INSTRUCTIONS, /materially false depiction/i);
 });
 
 test('production token exhaustion stays a technical failure with safe diagnostic details', async (t) => {

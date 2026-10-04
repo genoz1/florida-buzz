@@ -81,15 +81,29 @@ test('the image path uses a text prompt, gpt-image-1, and a visual review before
   t.after(() => { global.fetch = originalFetch; });
 
   const requests = [];
-  global.fetch = queueFetch([{ value: 'A warm, relevant Florida springs scene without logos.' }, { image: true }, { review: { acceptable: true, relevance_acceptable: true, issues: [], correction: '' } }], requests);
+  global.fetch = queueFetch([{ value: 'A warm, relevant Walt Disney World springs scene without logos.' }, { image: true }, { review: { acceptable: true, relevance_acceptable: true, issues: [], correction: '' } }], requests);
   const result = await generateArticleImageResult(
-    { title: 'Florida Springs Planning Update', category: 'florida-living', slug: 'springs-update' },
+    {
+      title: 'Florida Springs Planning Update',
+      category: 'florida-living',
+      slug: 'springs-update',
+      dek: 'A public figure said something unrelated to the scene.',
+      bodyHtml: '<p>Bob Iger discussed an unrelated business issue.</p>',
+      imageSubject: 'A specific Florida springs landscape',
+      location: 'Central Florida',
+      imageEntities: ['Bob Iger', 'Florida springs'],
+    },
     { store: async () => 'https://storage.example/springs-update.jpg' }
   );
   assert.equal(result.status, 'accepted');
   assert.equal(requests[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(requests[1].url, 'https://api.openai.com/v1/images/generations');
   assert.equal(requests[1].body.model, 'gpt-image-1');
+  assert.doesNotMatch(requests[0].body.input, /Bob Iger|public figure|unrelated business/i);
+  assert.match(requests[0].body.input, /specific Florida springs landscape/);
+  assert.match(requests[0].body.input, /Central Florida/);
+  assert.doesNotMatch(requests[1].body.prompt, /\bWalt\b/i);
+  assert.match(requests[1].body.prompt, /Disney World Resort/);
   assert.equal(requests[2].url, 'https://api.openai.com/v1/responses');
   assert.equal(requests[2].body.input[0].content[1].type, 'input_image');
 
