@@ -42,10 +42,18 @@ function buildFacebookImageUrl(slug, siteUrl = SITE_URL) {
   return new URL(`/images/buzz-board-social/${encodeURIComponent(slug)}.png`, siteUrl).toString();
 }
 
+function buildInstagramImageUrl(slug, siteUrl = SITE_URL) {
+  return buildFacebookImageUrl(slug, siteUrl);
+}
+
+function buildInstagramShortTrackingUrl(slug, siteUrl = SITE_URL) {
+  return new URL(`/go/ig/${encodeURIComponent(slug)}`, siteUrl).toString();
+}
+
 function buildCopy(discussion, platform, siteUrl = SITE_URL) {
   if (platform === 'instagram') {
-    const url = buildTrackingUrl(discussion.slug, platform, siteUrl);
-    return `${discussion.question}\n\nFlorida travelers will not all agree on this one. Join the conversation on Buzz Board:\n${url}`;
+    const url = buildInstagramShortTrackingUrl(discussion.slug, siteUrl);
+    return `Answer here on Instagram or continue this exact conversation on Buzz Board.\n\nCopy this short address into your browser:\n${url}`;
   }
   return 'Answer here or join the conversation on Buzz Board 👇';
 }
@@ -95,7 +103,7 @@ async function run({
   const discussion = selectDailyDiscussion(discussions, now);
   if (!discussion) throw new Error('No published Florida Buzz starter discussions are available.');
 
-  const instagramImageUrl = `${SITE_URL}/images/buzz-board-social.png`;
+  const instagramImageUrl = buildInstagramImageUrl(discussion.slug);
   const results = { discussion: discussion.slug, facebook: 'not_requested', instagram: 'not_requested' };
 
   if (platform === 'both' || platform === 'facebook') {
@@ -156,6 +164,8 @@ module.exports = {
   CAMPAIGN,
   buildCopy,
   buildFacebookImageUrl,
+  buildInstagramImageUrl,
+  buildInstagramShortTrackingUrl,
   buildShortTrackingUrl,
   buildTrackingUrl,
   easternDateKey,
