@@ -80,11 +80,13 @@ img { max-width: 100%; display: block; }
   padding-bottom: 18px;
 }
 .logo {
+  flex: 0 0 auto;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 28px;
   letter-spacing: -0.01em;
   color: var(--teal-900);
+  white-space: nowrap;
 }
 .logo em {
   font-style: italic;
@@ -754,26 +756,243 @@ footer a:hover { opacity: 1; }
 .buzz-secondary-review-action button.danger { color: #952e22; border-color: rgba(149,46,34,.28); }
 .buzz-secondary-review-action .buzz-form-status { flex-basis: 100%; margin-top: 2px; }
 
-@media (max-width: 760px) {
-  .buzz-masthead-inner { padding-top: 52px; padding-bottom: 60px; }
-  .buzz-filter-bar { margin-top: -22px; margin-left: -8px; margin-right: -8px; border-radius: 15px; }
-  .buzz-featured { grid-template-columns: 1fr; }
+/* Buzz Board listings use a dense bulletin-board presentation at every size.
+   Desktop rows spread into columns; mobile rows stack the same real data. */
+@media (min-width: 761px) {
+  .buzz-masthead-inner { padding-top: 42px; padding-bottom: 47px; }
+  .buzz-masthead h1 { font-size: clamp(3.25rem, 5.5vw, 4.8rem); }
+  .buzz-tagline { margin-top: 14px; font-size: clamp(1.2rem, 2vw, 1.55rem); }
+  .buzz-intro { font-size: 15.5px; }
+  .buzz-filter-bar { margin-bottom: 30px; }
+  .buzz-feed-heading { margin-bottom: 15px; }
+  .buzz-featured {
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin-bottom: 30px;
+    padding: 22px 28px 20px;
+    border-radius: 18px;
+  }
+  .buzz-featured h2 { margin: 12px 0 6px; font-size: clamp(1.55rem, 2.4vw, 2.15rem); line-height: 1.1; }
+  .buzz-featured-copy > p { font-size: 14px; }
   .buzz-featured-mark { display: none; }
-  .buzz-card-grid { grid-template-columns: 1fr; }
-  .buzz-feed-heading, .buzz-conversation-head { align-items: flex-start; flex-direction: column; }
+  .buzz-card-stats { margin: 12px 0 9px; }
+
+  .buzz-card-grid {
+    display: block;
+    overflow: hidden;
+    background: rgba(255,253,248,.88);
+    border: 1px solid rgba(14,59,67,.14);
+    border-radius: 18px;
+    box-shadow: 0 13px 34px rgba(14,59,67,.09);
+  }
+  .buzz-card {
+    display: grid;
+    grid-template-columns: 118px minmax(0,1fr) minmax(178px,auto) 90px;
+    grid-template-areas:
+      "category question stats time"
+      "category context stats time";
+    gap: 5px 22px;
+    min-height: 0;
+    padding: 18px 20px 17px 27px;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    transition: background .18s, transform .18s;
+  }
+  .buzz-card + .buzz-card { border-top: 1px solid rgba(14,59,67,.11); }
+  .buzz-card:hover {
+    transform: translateX(2px);
+    background: #fffdf8;
+    border-color: rgba(14,59,67,.11);
+    box-shadow: none;
+  }
+  .buzz-card-accent { inset: 0 auto 0 0; width: 5px; height: auto; }
+  .buzz-card-topline { display: contents; }
+  .buzz-card .buzz-category {
+    grid-area: category;
+    align-self: start;
+    justify-self: start;
+    margin-top: 2px;
+  }
+  .buzz-time {
+    grid-area: time;
+    align-self: center;
+    justify-self: end;
+    max-width: 90px;
+    line-height: 1.45;
+    text-align: right;
+  }
+  .buzz-card > .buzz-question-link { grid-area: question; min-width: 0; }
+  .buzz-card h3 {
+    margin: 0;
+    font-size: clamp(1.28rem, 1.65vw, 1.62rem);
+    line-height: 1.14;
+  }
+  .buzz-card-context {
+    grid-area: context;
+    display: block;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--ink-600);
+    font-size: 13.5px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .buzz-card-footer {
+    grid-area: stats;
+    align-self: center;
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    font-size: 12.5px;
+    line-height: 1.3;
+  }
+  .buzz-card-footer strong { color: var(--teal-900); }
+  .buzz-card-footer a {
+    width: fit-content;
+    margin: 6px 0 0;
+    padding: 5px 10px;
+    color: var(--coral-600);
+    background: #fff0e8;
+    border-radius: 99px;
+  }
+  .buzz-first-voice { font-size: 12.5px; }
+}
+
+@media (min-width: 761px) and (max-width: 1020px) {
+  .buzz-card {
+    grid-template-columns: 100px minmax(0,1fr) 150px 76px;
+    column-gap: 14px;
+    padding-left: 23px;
+    padding-right: 16px;
+  }
+  .buzz-card h3 { font-size: 1.25rem; }
+}
+
+@media (max-width: 760px) {
+  .buzz-masthead-inner { padding-top: 34px; padding-bottom: 42px; }
+  .buzz-masthead h1 { font-size: clamp(2.7rem, 13vw, 3.45rem); }
+  .buzz-tagline { margin: 10px 0 5px; font-size: 1.18rem; }
+  .buzz-intro { font-size: 14.5px; line-height: 1.45; }
+  .buzz-feed-wrap { padding-bottom: 55px; }
+  .buzz-filter-bar {
+    gap: 4px;
+    margin: -17px -8px 25px;
+    padding: 6px;
+    border-radius: 14px;
+  }
+  .buzz-filter { min-height: 36px; padding: 7px 11px; border-radius: 9px; font-size: 12.5px; }
+  .buzz-featured {
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin-bottom: 25px;
+    padding: 17px 16px 16px;
+    border-radius: 15px;
+  }
+  .buzz-featured h2 { margin: 10px 0 6px; font-size: 1.4rem; line-height: 1.13; }
+  .buzz-featured-copy > p { margin: 0; font-size: 12.5px; line-height: 1.4; }
+  .buzz-card-stats { gap: 12px; margin: 10px 0 8px; font-size: 11.5px; }
+  .buzz-card-stats strong { font-size: 14px; }
+  .buzz-join-link { font-size: 12.5px; }
+  .buzz-featured-mark { display: none; }
+  .buzz-feed-heading { margin-bottom: 13px; }
+  .buzz-feed-heading h2 { font-size: 1.75rem; }
+  .buzz-section-label { margin-bottom: 5px; font-size: 10px; }
+  .buzz-card-grid {
+    display: block;
+    overflow: hidden;
+    background: rgba(255,253,248,.9);
+    border: 1px solid rgba(14,59,67,.14);
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(14,59,67,.08);
+  }
+  .buzz-card {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-areas:
+      "category time"
+      "question question"
+      "context context"
+      "stats stats";
+    gap: 6px 12px;
+    min-height: 0;
+    padding: 14px 14px 13px 19px;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .buzz-card + .buzz-card { border-top: 1px solid rgba(14,59,67,.11); }
+  .buzz-card:hover { transform: none; background: #fffdf8; border-color: transparent; box-shadow: none; }
+  .buzz-card-accent { inset: 0 auto 0 0; width: 4px; height: auto; }
+  .buzz-card-topline { display: contents; }
+  .buzz-card .buzz-category {
+    grid-area: category;
+    align-self: center;
+    justify-self: start;
+    min-height: 23px;
+    padding: 4px 8px;
+    font-size: 9.5px;
+  }
+  .buzz-time {
+    grid-area: time;
+    align-self: center;
+    justify-self: end;
+    font-size: 9.5px;
+    line-height: 1.3;
+    text-align: right;
+  }
+  .buzz-card > .buzz-question-link { grid-area: question; min-width: 0; }
+  .buzz-card h3 { margin: 1px 0 0; font-size: 1.27rem; line-height: 1.14; }
+  .buzz-card-context {
+    grid-area: context;
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--ink-600);
+    font-size: 12.5px;
+    line-height: 1.32;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .buzz-card-footer {
+    grid-area: stats;
+    display: flex;
+    align-items: center;
+    gap: 5px 12px;
+    margin: 1px 0 0;
+    padding: 0;
+    color: var(--ink-600);
+    font-size: 11.5px;
+  }
+  .buzz-card-footer strong { color: var(--teal-900); }
+  .buzz-card-footer a {
+    width: auto;
+    margin: 0 0 0 auto;
+    padding: 4px 9px;
+    color: var(--coral-600);
+    background: #fff0e8;
+    border-radius: 99px;
+  }
+  .buzz-first-voice { font-size: 11.5px; }
+  .buzz-conversation-head { align-items: flex-start; flex-direction: column; }
   .buzz-field-row { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .article-buzz-module { grid-template-columns: 1fr; margin: 30px 0 24px; padding: 25px 22px; border-radius: 18px; }
   .article-buzz-mark { display: none; }
   .buzz-shell .wrap { padding-left: 16px; padding-right: 16px; }
-  .buzz-masthead h1 { font-size: 3.4rem; }
   .buzz-intro { font-size: 15px; }
   .buzz-featured, .buzz-starter { border-radius: 20px; }
   .buzz-featured { padding: 28px 23px; }
-  .buzz-card { min-height: 260px; padding: 23px 20px 20px; border-radius: 17px; }
-  .buzz-card-footer { align-items: flex-start; flex-wrap: wrap; }
-  .buzz-card-footer a { width: 100%; margin-left: 0; }
   .buzz-starter { padding: 27px 22px; }
   .buzz-starter h1 { font-size: 2.55rem; }
   .buzz-starter-meta { gap: 12px 18px; }
