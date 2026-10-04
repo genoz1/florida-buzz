@@ -69,6 +69,8 @@ function createCommunityStore({ client, now = () => new Date() }) {
         .select('facebook_post_id, permalink_url, published_at')
         .eq('discussion_id', discussion.id)
         .eq('status', 'active')
+        .order('published_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       throwOnError(facebookPostError, 'Could not load Facebook conversation mapping.');
       if (facebookPost) {
