@@ -72,6 +72,18 @@ router.get('/go/buzz/:slug', (req, res) => {
   return res.redirect(302, `${destination.pathname}${destination.search}`);
 });
 
+router.get('/go/ig/:slug', (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return render404(req, res);
+  const destination = new URL(`/buzz/${slug}`, process.env.SITE_URL || 'https://thefloridabuzz.com');
+  destination.searchParams.set('utm_source', 'instagram');
+  destination.searchParams.set('utm_medium', 'organic_social');
+  destination.searchParams.set('utm_campaign', 'buzz_board_launch');
+  destination.searchParams.set('utm_content', slug);
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, `${destination.pathname}${destination.search}`);
+});
+
 router.get('/images/buzz-board-social/:slug.png', async (req, res) => {
   if (!supabase) return render404(req, res);
   const slug = String(req.params.slug || '').toLowerCase();
