@@ -86,7 +86,7 @@
       event.preventDefault();
       const data = new FormData(requestForm);
       const widgetToken = data.get('cf-turnstile-response') || (window.turnstile?.getResponse?.() || '');
-      showStatus(authStatus, 'Sending your six-digit code…');
+      showStatus(authStatus, 'Sending your eight-digit code…');
       try {
         const result = await postJSON('/internal/auth/request-otp', {
           email: data.get('email'),
@@ -98,7 +98,7 @@
         requestForm.hidden = true;
         verifyForm.hidden = false;
         verifyForm.querySelector('input').focus();
-        showStatus(authStatus, 'Check your email for a six-digit code.');
+        showStatus(authStatus, 'Check your email for an eight-digit code.');
       } catch (error) {
         showStatus(authStatus, friendly(error), true);
         window.turnstile?.reset?.();

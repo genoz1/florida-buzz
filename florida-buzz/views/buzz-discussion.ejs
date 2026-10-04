@@ -56,7 +56,7 @@
           <section class="buzz-auth-card" id="buzz-sign-in" aria-labelledby="sign-in-heading">
             <div class="buzz-auth-copy">
               <span class="buzz-auth-spark" aria-hidden="true">✦</span>
-              <div><p class="buzz-section-label">Your turn</p><h2 id="sign-in-heading">Join the conversation</h2><p>A verified email keeps the Board human. We’ll send one six-digit sign-in code—no password needed.</p></div>
+              <div><p class="buzz-section-label">Your turn</p><h2 id="sign-in-heading">Join the conversation</h2><p>A verified email keeps the Board human. We’ll send one eight-digit sign-in code—no password needed.</p></div>
             </div>
             <form class="buzz-auth-form" data-auth-step="request">
               <div class="buzz-field-row">
@@ -69,7 +69,7 @@
               <button type="submit" class="buzz-primary-button">Email my sign-in code</button>
             </form>
             <form class="buzz-auth-form" data-auth-step="verify" hidden>
-              <label>Six-digit code<input type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+              <label>Eight-digit code<input type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" minlength="8" maxlength="8" required></label>
               <button type="submit" class="buzz-primary-button">Verify and join</button>
             </form>
             <p class="buzz-form-status" data-auth-status role="status" aria-live="polite"></p>
@@ -131,5 +131,5 @@
 </main>
 
 <% if (turnstileSiteKey) { %><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script><% } %>
-<script src="/js/buzz-board.js" defer></script>
+<script src="/js/buzz-board.js?v=20261004-otp8" defer></script>
 <%- include('partials/footer') %>

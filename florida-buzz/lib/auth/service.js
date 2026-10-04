@@ -26,7 +26,7 @@ function normalizeDisplayName(value) {
 
 function normalizeOtp(value) {
   const otp = typeof value === 'string' ? value.trim() : '';
-  if (!/^\d{6}$/.test(otp)) throw new AuthError('invalid_otp');
+  if (!/^\d{8}$/.test(otp)) throw new AuthError('invalid_otp');
   return otp;
 }
 

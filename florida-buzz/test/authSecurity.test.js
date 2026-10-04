@@ -231,7 +231,7 @@ test('invalid OTP increments attempts and creates no profile or session', async 
   });
   foundation.setVerified(null);
   await assert.rejects(
-    foundation.service.verifyOtp({ challengeId: request.challengeId, otp: '123456' }),
+    foundation.service.verifyOtp({ challengeId: request.challengeId, otp: '12345678' }),
     (error) => error.code === 'invalid_otp'
   );
   assert.equal(foundation.state.challenges.get(request.challengeId).otpAttempts, 1);
@@ -249,7 +249,7 @@ test('verified OTP creates a private member profile and server-side session with
     user: { id: 'user-1', email: 'reader@example.com' },
     session: { access_token: 'provider-access', refresh_token: 'provider-refresh', expires_at: 1791046800 },
   });
-  const result = await foundation.service.verifyOtp({ challengeId: request.challengeId, otp: '123456' });
+  const result = await foundation.service.verifyOtp({ challengeId: request.challengeId, otp: '12345678' });
 
   assert.deepEqual(result.user, { id: 'user-1', displayName: 'Reader', role: 'member', status: 'active' });
   assert.equal(JSON.stringify(result).includes('reader@example.com'), false);
@@ -268,7 +268,7 @@ test('newsletter record is written only after explicit boolean consent and succe
     user: { id: 'user-2', email: 'optin@example.com' },
     session: { access_token: 'a', refresh_token: 'r', expires_at: 1791046800 },
   });
-  await foundation.service.verifyOtp({ challengeId: request.challengeId, otp: '654321' });
+  await foundation.service.verifyOtp({ challengeId: request.challengeId, otp: '87654321' });
   assert.deepEqual(foundation.state.subscribers, ['optin@example.com']);
 });
 
