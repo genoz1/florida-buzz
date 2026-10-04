@@ -224,10 +224,12 @@ async function run() {
 }
 
 if (require.main === module) {
-  run().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
+  run()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error(error.message);
+      process.exit(1);
+    });
 }
 
 module.exports = {
