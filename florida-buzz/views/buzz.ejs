@@ -8,6 +8,7 @@
 }) %>
 
 <main class="buzz-shell" data-analytics-view="buzz_board_view">
+  <% const indexDiscussions = featured ? [featured, ...discussions] : discussions; %>
   <section class="buzz-masthead">
     <div class="buzz-masthead-glow" aria-hidden="true"></div>
     <div class="wrap buzz-masthead-inner">
@@ -28,38 +29,15 @@
       <% }) %>
     </nav>
 
-    <% if (featured) { %>
-      <section class="buzz-featured" aria-labelledby="featured-question">
-        <div class="buzz-featured-copy">
-          <div class="buzz-card-topline">
-            <span class="buzz-category buzz-category--<%= featured.category %>"><%= categoryLabels[featured.category] %></span>
-            <span class="buzz-live-dot"><span aria-hidden="true"></span> Active conversation</span>
-          </div>
-          <a href="/buzz/<%= featured.slug %>" class="buzz-question-link">
-            <h2 id="featured-question"><%= featured.question %></h2>
-          </a>
-          <% if (featured.context) { %><p><%= featured.context %></p><% } %>
-          <div class="buzz-card-stats">
-            <span><strong><%= featured.response_count %></strong> <%= Number(featured.response_count) === 1 ? 'response' : 'responses' %></span>
-            <span><strong><%= featured.unique_participant_count %></strong> voices</span>
-            <span>Active <%= timeAgo(featured.last_activity_at) %></span>
-          </div>
-          <a class="buzz-join-link" href="/buzz/<%= featured.slug %>">See what readers are saying <span aria-hidden="true">→</span></a>
-        </div>
-        <div class="buzz-featured-mark" aria-hidden="true">?</div>
-      </section>
-    <% } %>
-
     <section class="buzz-feed" aria-labelledby="feed-heading">
       <div class="buzz-feed-heading">
         <div>
-          <p class="buzz-section-label"><%= filter === 'buzzing' ? 'Reader activity, ranked honestly' : filter === 'latest' ? 'Newest questions and activity' : categoryLabels[filter] + ' conversations' %></p>
-          <h2 id="feed-heading"><%= filter === 'buzzing' ? (featured ? 'More conversations' : 'Questions worth answering') : filter === 'latest' ? 'Latest on the Board' : categoryLabels[filter] %></h2>
+          <h2 id="feed-heading"><%= filter === 'buzzing' ? 'Discussions' : filter === 'latest' ? 'Latest discussions' : categoryLabels[filter] %></h2>
         </div>
         <% if (user) { %><span class="buzz-signed-in">Signed in as <strong><%= user.displayName %></strong></span><% } %>
       </div>
 
-      <% if (!discussions.length) { %>
+      <% if (!indexDiscussions.length) { %>
         <div class="buzz-empty">
           <span class="buzz-empty-icon" aria-hidden="true">✦</span>
           <h3>No conversations here yet.</h3>
@@ -67,25 +45,26 @@
           <a href="/buzz?filter=latest">See the latest questions</a>
         </div>
       <% } else { %>
+        <div class="buzz-index-head" aria-hidden="true">
+          <span class="buzz-index-head-topic">Category / Topic</span>
+          <span>Replies</span>
+          <span>Likes</span>
+          <span>Last activity</span>
+        </div>
         <div class="buzz-card-grid">
-          <% discussions.forEach(discussion => { %>
+          <% indexDiscussions.forEach(discussion => { %>
             <article class="buzz-card buzz-card--<%= discussion.category %>">
               <div class="buzz-card-accent" aria-hidden="true"></div>
-              <div class="buzz-card-topline">
-                <span class="buzz-category buzz-category--<%= discussion.category %>"><%= categoryLabels[discussion.category] %></span>
-                <span class="buzz-time"><%= Number(discussion.response_count) === 0 ? 'Posted' : 'Active' %> <%= timeAgo(discussion.last_activity_at) %></span>
+              <span class="buzz-category buzz-category--<%= discussion.category %>"><%= categoryLabels[discussion.category] %></span>
+              <div class="buzz-card-copy">
+                <a href="/buzz/<%= discussion.slug %>" class="buzz-question-link"><h3><%= discussion.question %></h3></a>
+                <% if (discussion.context) { %><p class="buzz-card-context"><%= discussion.context %></p><% } %>
               </div>
-              <a href="/buzz/<%= discussion.slug %>" class="buzz-question-link"><h3><%= discussion.question %></h3></a>
-              <% if (discussion.context) { %><p class="buzz-card-context"><%= discussion.context %></p><% } %>
-              <div class="buzz-card-footer">
-                <% if (Number(discussion.response_count) === 0) { %>
-                  <span class="buzz-first-voice">Be the first to weigh in</span>
-                <% } else { %>
-                  <span><strong><%= discussion.response_count %></strong> <%= Number(discussion.response_count) === 1 ? 'response' : 'responses' %></span>
-                  <span><strong><%= discussion.reaction_count %></strong> likes</span>
-                <% } %>
-                <a href="/buzz/<%= discussion.slug %>" aria-label="Open discussion: <%= discussion.question %>">Join in <span aria-hidden="true">→</span></a>
+              <div class="buzz-card-activity">
+                <span class="buzz-count buzz-count--replies"><strong><%= discussion.response_count %></strong><span> <%= Number(discussion.response_count) === 1 ? 'reply' : 'replies' %></span></span>
+                <span class="buzz-count buzz-count--likes"><strong><%= discussion.reaction_count %></strong><span> likes</span></span>
               </div>
+              <span class="buzz-time"><%= Number(discussion.response_count) === 0 ? 'Posted' : 'Active' %> <%= timeAgo(discussion.last_activity_at) %></span>
             </article>
           <% }) %>
         </div>
