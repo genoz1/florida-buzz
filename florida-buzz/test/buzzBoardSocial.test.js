@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const {
   buildCopy,
+  buildFacebookImageUrl,
+  buildShortTrackingUrl,
   buildTrackingUrl,
   logMarker,
   run,
@@ -18,6 +20,17 @@ test('Buzz Board social links identify platform, campaign, and discussion withou
   assert.equal(url.searchParams.get('utm_campaign'), 'buzz_board_launch');
   assert.equal(url.searchParams.get('utm_content'), 'rope-drop-or-slow-disney-morning');
   assert.equal(url.search.includes('@'), false);
+});
+
+test('Facebook uses a clean Florida Buzz redirect and discussion-specific branded image', () => {
+  assert.equal(
+    buildShortTrackingUrl('what-universal-does-better-than-disney'),
+    'https://thefloridabuzz.com/go/buzz/what-universal-does-better-than-disney'
+  );
+  assert.equal(
+    buildFacebookImageUrl('what-universal-does-better-than-disney'),
+    'https://thefloridabuzz.com/images/buzz-board-social/what-universal-does-better-than-disney.png'
+  );
 });
 
 test('daily selection is deterministic and rotates approved discussions', () => {
@@ -36,8 +49,8 @@ test('platform copy stays conversation-first and sends readers to the selected d
   const discussion = { slug: 'sample-question', question: 'Which option is actually worth the tradeoff?' };
   const facebook = buildCopy(discussion, 'facebook');
   const instagram = buildCopy(discussion, 'instagram');
-  assert.match(facebook, /^Which option/);
-  assert.doesNotMatch(facebook, /click here/i);
+  assert.equal(facebook, 'Answer here or join the conversation on Buzz Board 👇');
+  assert.doesNotMatch(facebook, /Which option|https?:\/\//);
   assert.match(instagram, /\/buzz\/sample-question\?/);
   assert.match(instagram, /utm_source=instagram/);
 });
@@ -56,6 +69,7 @@ test('recurring schedule fails closed unless Buzz Board and both existing Meta p
 
 test('dry run exercises both publishers without writing post-log state', async () => {
   const rows = [{
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     slug: 'sample-question',
     question: 'Which option is actually worth the tradeoff?',
     category: 'florida-life',
@@ -89,4 +103,7 @@ test('dry run exercises both publishers without writing post-log state', async (
   assert.equal(result.facebook, 'dry_run');
   assert.equal(result.instagram, 'dry_run');
   assert.equal(facebookCalls[0].logDetail, logMarker('facebook', 'sample-question'));
+  assert.equal(facebookCalls[0].message, 'Answer here or join the conversation on Buzz Board 👇');
+  assert.equal(facebookCalls[0].link, 'https://thefloridabuzz.com/go/buzz/sample-question');
+  assert.equal(facebookCalls[0].imageUrl, 'https://thefloridabuzz.com/images/buzz-board-social/sample-question.png');
 });

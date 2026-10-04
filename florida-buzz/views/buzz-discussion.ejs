@@ -4,7 +4,7 @@
   canonicalPath: '/buzz/' + discussion.slug,
   category: null,
   isBuzzPage: true,
-  robots: 'noindex,follow'
+  robots: discussion.indexable ? 'index,follow' : 'noindex,follow'
 }) %>
 
 <main class="buzz-shell buzz-discussion-shell" data-analytics-view="discussion_view" data-category="<%= discussion.category %>">
@@ -133,6 +133,38 @@
         </ol>
       <% } %>
     </section>
+
+    <% if (discussion.facebookConversation) { %>
+      <section class="buzz-facebook-conversation" aria-labelledby="facebook-conversation-heading">
+        <div class="buzz-facebook-head">
+          <div><p class="buzz-section-label">From the Florida Buzz Facebook Page</p><h2 id="facebook-conversation-heading">Conversation on Facebook</h2></div>
+          <% if (discussion.facebookConversation.permalinkUrl) { %><a href="<%= discussion.facebookConversation.permalinkUrl %>" rel="noopener noreferrer">View on Facebook <span aria-hidden="true">↗</span></a><% } %>
+        </div>
+        <% if (!discussion.facebookConversation.comments.length) { %>
+          <p class="buzz-facebook-empty">No approved Facebook comments are available yet.</p>
+        <% } else { %>
+          <ol class="buzz-facebook-list">
+            <% discussion.facebookConversation.comments.forEach(comment => { %>
+              <li class="buzz-facebook-comment">
+                <div class="buzz-facebook-avatar" aria-hidden="true">f</div>
+                <div>
+                  <div class="buzz-facebook-byline"><strong><%= comment.displayName %></strong><span>via Facebook</span><% if (comment.createdAt) { %><time datetime="<%= comment.createdAt %>"><%= timeAgo(comment.createdAt) %></time><% } %></div>
+                  <p><%= comment.body %></p>
+                  <% if (comment.permalinkUrl) { %><a class="buzz-facebook-source" href="<%= comment.permalinkUrl %>" rel="noopener noreferrer">Original Facebook comment ↗</a><% } %>
+                  <% if (comment.replies.length) { %>
+                    <ol class="buzz-facebook-replies" aria-label="Facebook replies">
+                      <% comment.replies.forEach(reply => { %>
+                        <li><div class="buzz-facebook-byline"><strong><%= reply.displayName %></strong><span>via Facebook</span><% if (reply.createdAt) { %><time datetime="<%= reply.createdAt %>"><%= timeAgo(reply.createdAt) %></time><% } %></div><p><%= reply.body %></p><% if (reply.permalinkUrl) { %><a class="buzz-facebook-source" href="<%= reply.permalinkUrl %>" rel="noopener noreferrer">Original Facebook reply ↗</a><% } %></li>
+                      <% }) %>
+                    </ol>
+                  <% } %>
+                </div>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </section>
+    <% } %>
   </div>
 </main>
 

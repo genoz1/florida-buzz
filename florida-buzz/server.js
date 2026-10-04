@@ -223,6 +223,18 @@ if (scheduleFlags.buzzBoardSocial) {
   console.log('Buzz Board social distribution NOT scheduled — enable both Buzz Board flags and configure Facebook/Instagram credentials.');
 }
 
+// Low-frequency reconciliation complements the signed Meta Page webhook and
+// recovers missed comment edits/removals without continuously polling Meta.
+if (scheduleFlags.facebookBuzzCommentSync) {
+  cron.schedule('20 */6 * * *', () => {
+    console.log('Running scheduled Facebook Buzz comment reconciliation...');
+    runScheduledCommand('Facebook Buzz comment reconciliation', 'node scripts/sync-facebook-buzz-comments.js');
+  }, { timezone: 'America/New_York' });
+  console.log('Facebook Buzz comment reconciliation scheduled: every 6 hours at :20 (Eastern time).');
+} else {
+  console.log('Facebook Buzz comment reconciliation NOT scheduled — enable it after Meta comment-read access is granted.');
+}
+
 // Sends a daily email confirming whether every platform (Facebook, Instagram,
 // Pinterest, Threads) posted successfully in the last 24 hours — a genuine
 // pass/fail confirmation, not just an alert-on-failure. Runs at 8:15am,

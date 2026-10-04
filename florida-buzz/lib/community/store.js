@@ -64,6 +64,39 @@ function createCommunityStore({ client, now = () => new Date() }) {
         relatedArticle = originatingArticle || null;
       }
 
+      let facebookConversation = null;
+      const { data: facebookPost, error: facebookPostError } = await client.from('facebook_buzz_posts')
+        .select('facebook_post_id, permalink_url, published_at')
+        .eq('discussion_id', discussion.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      throwOnError(facebookPostError, 'Could not load Facebook conversation mapping.');
+      if (facebookPost) {
+        const { data: facebookComments, error: facebookCommentsError } = await client.from('facebook_buzz_comments')
+          .select('facebook_comment_id, parent_facebook_comment_id, body, commenter_name, commenter_page_scoped_id, permalink_url, facebook_created_at, facebook_updated_at')
+          .eq('discussion_id', discussion.id)
+          .eq('moderation_status', 'published')
+          .eq('is_hidden', false)
+          .eq('is_deleted', false)
+          .order('facebook_created_at', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
+        throwOnError(facebookCommentsError, 'Could not load approved Facebook comments.');
+        facebookConversation = {
+          permalinkUrl: facebookPost.permalink_url,
+          publishedAt: facebookPost.published_at,
+          comments: (facebookComments || []).map((comment) => ({
+            id: comment.facebook_comment_id,
+            parentId: comment.parent_facebook_comment_id,
+            body: comment.body,
+            displayName: comment.commenter_name || 'Facebook commenter',
+            commenterId: comment.commenter_page_scoped_id,
+            permalinkUrl: comment.permalink_url,
+            createdAt: comment.facebook_created_at,
+            updatedAt: comment.facebook_updated_at,
+          })),
+        };
+      }
+
       const profileMap = await profilesById((responses || []).map((response) => response.author_id));
       let viewerReactions = new Set();
       if (viewerId && responses?.length) {
@@ -75,9 +108,23 @@ function createCommunityStore({ client, now = () => new Date() }) {
         viewerReactions = new Set((reactions || []).map((reaction) => reaction.response_id));
       }
 
+      const substantiveNative = (responses || []).filter((response) => normalizeForIndexing(response.body).length >= 40);
+      const substantiveFacebook = (facebookConversation?.comments || []).filter((comment) => normalizeForIndexing(comment.body).length >= 40);
+      const substantive = [...substantiveNative, ...substantiveFacebook];
+      const knownParticipants = new Set([
+        ...substantiveNative.map((response) => `native:${response.author_id}`),
+        ...substantiveFacebook.filter((comment) => comment.commenterId).map((comment) => `facebook:${comment.commenterId}`),
+      ]);
+      const substantiveCharacters = substantive.reduce((total, item) => total + normalizeForIndexing(item.body).length, 0);
+      const indexable = substantive.length >= 3
+        && substantiveCharacters >= 300
+        && (knownParticipants.size >= 2 || substantive.length >= 5);
+
       return {
         ...discussion,
         relatedArticle,
+        facebookConversation,
+        indexable,
         responses: (responses || []).map((response) => ({
           id: response.id,
           parentResponseId: response.parent_response_id,
@@ -257,6 +304,10 @@ function createCommunityStore({ client, now = () => new Date() }) {
       return Array.isArray(data) ? data[0] : data;
     },
   };
+}
+
+function normalizeForIndexing(value) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 }
 
 module.exports = { createCommunityStore };

@@ -193,12 +193,25 @@ function createCommunityRouter({ store, service, authMiddleware, csrf, config })
           responses.push(response);
         }
       }
+      let facebookConversation = discussion.facebookConversation;
+      if (facebookConversation) {
+        const commentMap = new Map(facebookConversation.comments.map((comment) => [comment.id, { ...comment, replies: [] }]));
+        const comments = [];
+        for (const comment of commentMap.values()) {
+          if (comment.parentId && commentMap.has(comment.parentId)) {
+            commentMap.get(comment.parentId).replies.push(comment);
+          } else {
+            comments.push(comment);
+          }
+        }
+        facebookConversation = { ...facebookConversation, comments };
+      }
       service.recordImpression(discussion.id, { user: req.auth?.user, ip: req.ip }).catch(() => {});
       res.set('Cache-Control', 'private, no-store');
       res.render('buzz-discussion', {
         category: null,
         categoryLabels: CATEGORY_LABELS,
-        discussion: { ...discussion, responses },
+        discussion: { ...discussion, facebookConversation, responses },
         isBuzzPage: true,
         timeAgo,
         turnstileSiteKey: config.turnstileSiteKey,

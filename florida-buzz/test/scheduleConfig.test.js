@@ -50,6 +50,12 @@ test('non-AI schedules remain independent of the AI gate', () => {
   assert.equal(hasRequiredConfig(env, ['FB_PAGE_ID', 'FB_PAGE_ACCESS_TOKEN']), true);
 });
 
+test('Facebook Buzz reconciliation remains off until explicitly enabled after Meta approval', () => {
+  const base = { BUZZ_BOARD_ENABLED: 'true', FB_PAGE_ACCESS_TOKEN: 'configured' };
+  assert.equal(getScheduleFlags(base).facebookBuzzCommentSync, false);
+  assert.equal(getScheduleFlags({ ...base, FACEBOOK_BUZZ_COMMENT_SYNC_ENABLED: 'true' }).facebookBuzzCommentSync, true);
+});
+
 test('server schedule map disables every AI group by default while preserving non-AI groups', () => {
   const env = {
     OPENAI_API_KEY: 'configured',

@@ -2,10 +2,10 @@
 // posts) and scripts/generate-guide.js (evergreen guide posts).
 const { logPost } = require('./postLog');
 
-async function postToFacebookPage({ message, link, imageUrl, dryRun = false, logDetail = null }) {
+async function postToFacebookPage({ message, link, imageUrl, dryRun = false, logDetail = null, returnResult = false }) {
   if (dryRun) {
     console.log(`  [dry-run] Would post to Facebook: "${message}"${link ? ` (link: ${link})` : ''}${imageUrl ? ` (image: ${imageUrl})` : ''}`);
-    return true;
+    return returnResult ? { ok: true, dryRun: true } : true;
   }
   if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
     console.log('  [skip] FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN not set — skipping Facebook post.');
@@ -32,15 +32,21 @@ async function postToFacebookPage({ message, link, imageUrl, dryRun = false, log
       }),
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error) {
+      const errText = JSON.stringify(payload);
       console.error(`  [error] Facebook photo post failed: ${errText}`);
       await logPost({ platform: 'facebook', status: 'failed', detail: errText });
       return false;
     }
 
     await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
-    return true;
+    if (!returnResult) return true;
+    return {
+      ok: true,
+      postId: payload.post_id || payload.id,
+      photoId: payload.id || null,
+    };
   }
 
   // No image available for this post (e.g. engagement posts, or a fallback
@@ -58,15 +64,16 @@ async function postToFacebookPage({ message, link, imageUrl, dryRun = false, log
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || payload.error) {
+    const errText = JSON.stringify(payload);
     console.error(`  [error] Facebook post failed: ${errText}`);
     await logPost({ platform: 'facebook', status: 'failed', detail: errText });
     return false;
   }
 
   await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
-  return true;
+  return returnResult ? { ok: true, postId: payload.id, photoId: null } : true;
 }
 
 module.exports = { postToFacebookPage };

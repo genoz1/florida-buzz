@@ -31,6 +31,9 @@ function getScheduleFlags(env = process.env) {
         'INSTAGRAM_USER_ID',
         'INSTAGRAM_ACCESS_TOKEN',
       ]),
+    facebookBuzzCommentSync: env.FACEBOOK_BUZZ_COMMENT_SYNC_ENABLED === 'true'
+      && env.BUZZ_BOARD_ENABLED === 'true'
+      && hasRequiredConfig(env, ['FB_PAGE_ACCESS_TOKEN']),
   };
 }
 
