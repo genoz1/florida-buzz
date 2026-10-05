@@ -1,4 +1,4 @@
-test('Christmas facts omit unpublished optional details but keep required used facts verified',()=>{
+require('node:test')('Christmas facts omit unpublished optional details but keep required used facts verified',()=>{
   const topic={title:"Is Mickey's Very Merry Christmas Party Actually Worth the Money?"};
   const core={...facts(),verified:false,missing:['exact cookie flavors are not published'],claims:facts().claims.filter(c=>['pricing','dates','entry','hours'].includes(c.subject))};
   const checked=validateFacts(core,new Date(),topic);
