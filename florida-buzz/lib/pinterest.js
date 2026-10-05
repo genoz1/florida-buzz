@@ -78,4 +78,28 @@ async function createPin({ imageUrl, title, description, link }) {
   return res.json();
 }
 
-module.exports = { createPin };
+async function createVideoPin({ videoUrl, coverImageUrl, title, description, link }) {
+  const token=await getAccessToken();
+  if(!token||!process.env.PINTEREST_BOARD_ID)throw new Error('Pinterest video publishing is not configured.');
+  const registered=await fetch(`${PINTEREST_API_BASE}/v5/media`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({media_type:'video'})});
+  const registration=await registered.json().catch(()=>({}));
+  if(!registered.ok)throw new Error(`Pinterest video registration failed: ${JSON.stringify(registration)}`);
+  const video=await fetch(videoUrl);if(!video.ok)throw new Error(`Pinterest could not download Reel: ${video.status}`);
+  const form=new FormData();for(const [key,value] of Object.entries(registration.upload_parameters||{}))form.append(key,value);
+  form.append('file',await video.blob(),'Florida-Buzz-Reel.mp4');
+  const uploaded=await fetch(registration.upload_url,{method:'POST',body:form});
+  if(!uploaded.ok)throw new Error(`Pinterest video upload failed: ${uploaded.status}`);
+  let ready=false;
+  for(let attempt=0;attempt<60;attempt++){
+    const response=await fetch(`${PINTEREST_API_BASE}/v5/media/${registration.media_id}`,{headers:{Authorization:`Bearer ${token}`}}),state=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(`Pinterest video status failed: ${JSON.stringify(state)}`);
+    if(state.status==='succeeded'){ready=true;break;}if(state.status==='failed')throw new Error(`Pinterest video processing failed: ${JSON.stringify(state)}`);
+    await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  if(!ready)throw new Error('Pinterest video processing did not finish in time.');
+  const res=await fetch(`${PINTEREST_API_BASE}/v5/pins`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({link,title,description,board_id:process.env.PINTEREST_BOARD_ID,media_source:{source_type:'video_id',cover_image_url:coverImageUrl,media_id:registration.media_id}})});
+  if(!res.ok){const detail=await res.text();await logPost({platform:'pinterest',status:'failed',detail});throw new Error(`Pinterest API error ${res.status}: ${detail}`);}
+  await logPost({platform:'pinterest',status:'success',detail:title?.slice(0,100)});return res.json();
+}
+
+module.exports = { createPin, createVideoPin };

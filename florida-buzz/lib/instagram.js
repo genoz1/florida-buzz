@@ -62,7 +62,7 @@ async function verifyRecentPublish(igUserId, accessToken, caption) {
   }
 }
 
-async function createPost({ imageUrl, caption, logDetail = null }) {
+async function createPost({ imageUrl, videoUrl, caption, logDetail = null }) {
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
   const igUserId = process.env.INSTAGRAM_USER_ID;
 
@@ -75,11 +75,8 @@ async function createPost({ imageUrl, caption, logDetail = null }) {
     const createRes = await fetch(`${GRAPH_BASE}/${igUserId}/media`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        caption,
-        access_token: accessToken,
-      }),
+      body: JSON.stringify(videoUrl ? { media_type:'REELS',video_url:videoUrl,caption,share_to_feed:true,access_token:accessToken }
+        : { image_url:imageUrl,caption,access_token:accessToken }),
     });
     const createData = await createRes.json();
     if (!createRes.ok) {
@@ -89,7 +86,7 @@ async function createPost({ imageUrl, caption, logDetail = null }) {
     const containerId = createData.id;
 
     // Step 2: wait for Instagram to finish processing the image.
-    await waitForContainerReady(containerId, accessToken);
+    await waitForContainerReady(containerId, accessToken, videoUrl ? 90 : 10);
 
     // Step 3: publish the container.
     const publishRes = await fetch(`${GRAPH_BASE}/${igUserId}/media_publish`, {

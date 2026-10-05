@@ -55,7 +55,7 @@ async function verifyRecentPublish(userId, accessToken, text) {
   }
 }
 
-async function createPost({ text, imageUrl }) {
+async function createPost({ text, imageUrl, videoUrl }) {
   const accessToken = process.env.THREADS_ACCESS_TOKEN;
   const userId = process.env.THREADS_USER_ID;
 
@@ -71,8 +71,9 @@ async function createPost({ text, imageUrl }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        media_type: imageUrl ? 'IMAGE' : 'TEXT',
+        media_type: videoUrl ? 'VIDEO' : imageUrl ? 'IMAGE' : 'TEXT',
         text,
+        ...(videoUrl ? { video_url: videoUrl } : {}),
         ...(imageUrl ? { image_url: imageUrl } : {}),
         access_token: accessToken,
       }),
@@ -85,8 +86,8 @@ async function createPost({ text, imageUrl }) {
     const containerId = createData.id;
 
     // Step 2: wait for Threads to finish processing (only really matters for images).
-    if (imageUrl) {
-      await waitForContainerReady(containerId, accessToken);
+    if (imageUrl || videoUrl) {
+      await waitForContainerReady(containerId, accessToken, videoUrl ? 90 : 10);
       // Meta's own "FINISHED" status has a documented quirk: it can report
       // ready a beat before the container is genuinely available to publish,
       // causing an immediate "Media Not Found" on the very next call. A short
