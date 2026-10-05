@@ -1,3 +1,12 @@
+test('Christmas facts omit unpublished optional details but keep required used facts verified',()=>{
+  const topic={title:"Is Mickey's Very Merry Christmas Party Actually Worth the Money?"};
+  const core={...facts(),verified:false,missing:['exact cookie flavors are not published'],claims:facts().claims.filter(c=>['pricing','dates','entry','hours'].includes(c.subject))};
+  const checked=validateFacts(core,new Date(),topic);
+  assert.equal(checked.verified,true);assert.deepEqual(checked.missing,[]);
+  assert.deepEqual(checked.claims.map(c=>c.subject),['pricing','dates','entry','hours']);
+  assert.throws(()=>validateFacts({...core,claims:core.claims.filter(c=>c.subject!=='pricing')},new Date(),topic),/Essential current Christmas-party facts/);
+  assert.throws(()=>validateFacts({...core,claims:core.claims.map((c,i)=>i?c:{...c,verified:false})},new Date(),topic),/verified primary sources/);
+});
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {config,KLING,QWEN,voiceInput,videoInput}=require('../lib/reels/config');

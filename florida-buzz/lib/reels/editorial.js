@@ -11,15 +11,18 @@ const primary = raw => {
 };
 const unsafe = /\b(accident|evacuation|arrest|injur(?:y|ies)|ride failure|breaking news|flooding|emergency)\b/i;
 function validateFacts(facts, now = new Date(), topic) {
-  if (!facts.verified || facts.missing.length || !facts.claims.length) throw new Error(`Unverified current facts: ${facts.missing.join(', ') || 'research incomplete'}`);
+  const christmasParty = Boolean(topic && /Christmas Party/i.test(topic.title));
+  if (!facts.claims.length || (!christmasParty && (!facts.verified || facts.missing.length))) throw new Error(`Unverified current facts: ${facts.missing.join(', ') || 'research incomplete'}`);
   if (!facts.claims.every(c => c.verified && c.source_urls.length && c.source_urls.every(primary))) throw new Error('Facts require verified primary sources');
   const age = now - new Date(facts.checked_at);
   if (!Number.isFinite(age) || age < -60000 || age > 86400000) throw new Error('Facts are stale');
-  if(topic && /Christmas Party/i.test(topic.title)) {
+  if(christmasParty) {
     const subjects=new Set(facts.claims.map(c=>c.subject.toLowerCase()));
-    const required=['pricing','dates','entry','hours','parade','fireworks','entertainment','treats','attractions','crowds'];
+    const required=['pricing','dates','entry','hours'];
     if(required.some(s=>!subjects.has(s)))throw new Error('Essential current Christmas-party facts are missing');
     if(!facts.claims.some(c=>c.subject==='dates'&&c.fact.includes(String(now.getUTCFullYear()))))throw new Error('Christmas party facts must identify the current year');
+    // Optional unpublished details must not be exposed to downstream guide/script prompts.
+    return {...facts,verified:true,missing:[]};
   }
   return facts;
 }
@@ -59,9 +62,9 @@ function createEditorial(ai, store, cfg, notify = async () => {}) {
     async facts(topic) {
       if (unsafe.test(topic.title)) throw new Error('Topic requires incident reporting; held');
       const now = new Date().toISOString();
-      const facts = await complete('Research current Florida travel facts using live web search. Use primary official sources only. Never guess. Distinguish confirmed facts from editorial opinions. Mark missing details and verified=false when any essential current fact is unavailable. Do not invent source URLs.',
+      const facts = await complete('Research current Florida travel facts using live web search. Use primary official sources only. Never guess. Distinguish confirmed facts from editorial opinions. Include only verified claims. Mark verified=false when any required current fact is unavailable. Optional unpublished details may be listed as missing without making otherwise sufficient verified facts unusable. Do not invent source URLs.',
         `Topic: ${topic.title}. Destination: ${topic.destination}. Checked_at must be ${now}. Current year: ${new Date().getUTCFullYear()}.
-For a Christmas party verify the CURRENT YEAR Christmas event only: exact dates, current ticket price range and tax basis, entry time, hours, named parade/fireworks/entertainment, included treats, available attractions, crowd considerations and limits. Use these exact claim subjects at minimum: pricing, dates, entry, hours, parade, fireworks, entertainment, treats, attractions, crowds. Dates must explicitly state the current year. Do not substitute Halloween facts. Verify policy/price/date/closure claims for other topics. Include 8–18 independently useful claims.`,
+For a Christmas party verify the CURRENT YEAR Christmas event only. Required claim subjects are pricing, dates, entry and hours. Add parade, fireworks, entertainment, treats, attractions or crowds only when the current detail is officially published and verified. If an optional detail is unavailable, list it as missing and omit it from claims rather than guessing. Do not invent tax rates, times, menus, attraction rosters, crowd measurements or availability. Dates must explicitly state the current year. Do not substitute prior-year or Halloween facts. Verify policy/price/date/closure claims for other topics. Include 4–18 independently useful verified claims.`,
         schema('reel_facts', object({ verified: bool, checked_at: str, missing: array(str),
           claims: array(object({ subject: str, fact: str, verified: bool, source_urls: array(str) })) })), true);
       return validateFacts(facts,new Date(),topic);
