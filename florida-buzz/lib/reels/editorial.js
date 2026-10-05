@@ -81,9 +81,15 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
           schema('reel_guide_adequacy', object({ adequate: bool, reason: str })));
         if (assessment.adequate) return { ...existing, url: `${cfg.site}/article/${existing.slug}`, handling: 'REUSED' };
       }
-      const draft = await complete('Write an original substantial Florida Buzz travel guide using ONLY the verified fact bundle for factual claims. Include practical advice, alternatives, value tradeoffs and who should skip a purchase when appropriate. Do not claim personal visits or affiliation. Opinions must read as advice, not measured facts. 800–1600 words, at least six useful sections. No HTML in fields. Never invent showtimes, crowd measurements or savings.',
-        JSON.stringify({topic, facts, existing}), schema('reel_guide_draft', object({title:str, dek:str,
-          sections:array(object({heading:str, paragraphs:array(str), bullets:array(str)}))})), false, 7000);
+      const guideShape = schema('reel_guide_draft', object({title:str, dek:str,
+        sections:array(object({heading:str, paragraphs:array(str), bullets:array(str)}))}));
+      const guidePrompt = 'Write an original substantial Florida Buzz travel guide using ONLY the verified fact bundle for factual claims. Include practical advice, alternatives, value tradeoffs and who should skip a purchase when appropriate. Do not claim personal visits or affiliation. Opinions must read as advice, not measured facts. Hard output constraints: title must be 1–100 characters; dek/meta description must be 1–200 characters; body must be 900–1200 useful words across at least six useful sections. No HTML in fields. Never invent showtimes, crowd measurements or savings. Do not pad with repetitive or low-value text.';
+      let draft = await complete(guidePrompt, JSON.stringify({topic, facts, existing}), guideShape, false, 7000);
+      const guideWordCount = value => value.sections.flatMap(s => [s.heading,...s.paragraphs,...s.bullets]).join(' ').trim().split(/\s+/).filter(Boolean).length;
+      if (!draft.title || draft.title.length > 100 || !draft.dek || draft.dek.length > 200 || guideWordCount(draft) < 900 || guideWordCount(draft) > 1200 || draft.sections.length < 6) {
+        draft = await complete('Revise this Florida Buzz Reel guide draft to satisfy every existing publication constraint before validation. Keep factual claims limited to the supplied verified facts. Return a title of 1–100 characters, a dek/meta description of 1–200 characters, and 900–1200 useful words across at least six useful sections. Preserve practical advice and value tradeoffs without repetitive filler. No HTML. Do not invent facts.',
+          JSON.stringify({topic, facts, draft}), guideShape, false, 7000);
+      }
       const count = draft.sections.flatMap(s => [s.heading,...s.paragraphs,...s.bullets]).join(' ').split(/\s+/).length;
       if (count < 800 || count > 1800 || draft.sections.length < 6) throw new Error('Guide is too thin or incomplete');
       if(!draft.title || draft.title.length>100 || !draft.dek || draft.dek.length>200)throw new Error('Invalid guide headline or description');
