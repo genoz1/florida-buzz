@@ -1,0 +1,154 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
+const {config,KLING,QWEN,voiceInput,videoInput}=require('../lib/reels/config');
+const {seeds,score,strongest,selectQueued,criteria}=require('../lib/reels/topics');
+const {createFal,queueUrl}=require('../lib/reels/fal');
+const {validateFacts,validateScript,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
+const {naturalPauses,fitDuration,captions}=require('../lib/reels/media');
+const {createPipeline}=require('../lib/reels/pipeline');
+const facts=()=>({verified:true,checked_at:new Date().toISOString(),missing:[],claims:['pricing','dates','entry','hours','parade','fireworks','entertainment','treats','attractions','crowds'].map(subject=>({subject,fact:`Verified ${new Date().getUTCFullYear()} ${subject} rule`,verified:true,source_urls:['https://disneyworld.disney.go.com/events/']}))});
+const thoughts=['A lot of people get to Magic Kingdom later than they probably should.','If you want shorter waits and an easier start to the day, that first hour after opening can make a big difference.','The key is knowing which rides are worth doing right away and which ones can wait until later.','We’ve got the full Magic Kingdom morning strategy at TheFloridaBuzz.com.'];
+const script=()=>({hook:'A useful planning question',thoughts,shots:['establishing','crowd','detail','icon'].map(type=>({type,description:`${type} view at Main Street U.S.A., Magic Kingdom with Cinderella Castle`})),social:{facebook:'Plan your morning.',instagram:'A calmer start.',pinterest:'Magic Kingdom morning tips.',threads:'What would you do first?'}});
+test('seed order skips the existing proof and starts with Christmas party',()=>{assert.equal(selectQueued(seeds).key,'christmas-party-2026');assert.equal(seeds.length,10);assert.equal(seeds[0].status,'EXISTING_PROOF');});
+test('topic scores require usefulness/verifiability and selection favors variety',()=>{
+  const topic=(key,destination,angle,value)=>({key,destination,angle,scores:Object.fromEntries(criteria.map(c=>[c,value]))});
+  assert.equal(score(topic('x','MK','value',6)),0);
+  assert.throws(()=>score({...topic('x','MK','value',8),scores:{}}));
+  const picked=strongest([topic('a','Magic Kingdom','mistake',10),topic('b','Magic Kingdom','value',9),topic('c','Epic Universe','strategy',9),topic('d','Cruises','value',8)]);
+  assert.deepEqual(picked.map(t=>t.key),['a','c','d']);
+});
+test('facts fail closed on stale, missing, unverified or secondary-only facts',()=>{
+  assert.ok(validateFacts(facts()));
+  assert.throws(()=>validateFacts({...facts(),missing:['price']}));
+  assert.throws(()=>validateFacts({...facts(),checked_at:'2020-01-01'}));
+  assert.throws(()=>validateFacts({...facts(),claims:[{verified:true,source_urls:['https://example.com']}] }));
+});
+test('script requires four thoughts, CTA and varied real-location shots',()=>{
+  assert.ok(validateScript(script(),5));
+  assert.throws(()=>validateScript({...script(),thoughts:['Too short']},5));
+  assert.match(promptFor(script().shots[0],{destination:'Magic Kingdom'}),/Cinderella Castle/);
+  assert.throws(()=>validateScript({...script(),shots:script().shots.map(s=>({...s,description:'Breaking news evacuation'}))},6));
+});
+test('Kling and Qwen inputs preserve approved models and exact cloned voice settings',()=>{
+  assert.deepEqual(videoInput('Real Magic Kingdom',5),{prompt:'Real Magic Kingdom',duration:'5',aspect_ratio:'9:16',generate_audio:false,cfg_scale:.5});
+  const input=voiceInput('Hello','https://voice.example/approved');
+  assert.equal(input.speaker_voice_embedding_file_url,'https://voice.example/approved');assert.equal(input.language,'English');assert.equal(input.max_new_tokens,1000);assert.equal(input.temperature,.9);assert.equal(input.voice,undefined);
+});
+test('social copy links directly to guide; all platforms remain drafts',()=>{
+  const copy=socialCopy(script(),{title:'Morning strategy',url:'https://thefloridabuzz.com/article/morning'});
+  assert.match(copy.facebook,/\/article\/morning/);assert.equal(copy.pinterest.link,'https://thefloridabuzz.com/article/morning');assert.match(copy.instagram,/not make it clickable/);assert.match(copy.threads,/illustrative footage/);
+});
+test('fal only submits approved endpoints once and resumes returned queue URLs',async()=>{
+  const calls=[];const fal=createFal({falKey:'test',billingKey:'test'},async(url,options)=>{
+    calls.push({url,options});return {ok:true,json:async()=>url.includes('status')?{status:'COMPLETED'}:url.includes('response')?{video:{url:'https://v3.fal.media/test.mp4'}}:{request_id:'r1',status_url:'https://queue.fal.run/kling/requests/r1/status',response_url:'https://queue.fal.run/kling/requests/r1/response'}};
+  });
+  const receipt=await fal.submit(KLING,videoInput('test'));assert.equal(receipt.request_id,'r1');assert.ok((await fal.poll(receipt)).result.video);
+  assert.equal(calls.filter(c=>c.options.method==='POST').length,1);
+  await assert.rejects(()=>fal.submit('some/other/model',{}));assert.throws(()=>queueUrl('https://evil.example/collect-key'));
+});
+test('fal billing records are per-request actual charges, never quotes',async()=>{
+  const fal=createFal({falKey:'test',billingKey:'test'},async()=>({ok:true,json:async()=>({billing_events:[{request_id:'r',endpoint_id:KLING,cost_total:.42},{request_id:'other',endpoint_id:KLING,cost_total:9}]})}));
+  assert.equal((await fal.actual({request_id:'r',endpoint:KLING,created_at:new Date().toISOString()})).amount,.42);
+});
+test('Qwen quote handles character versus thousand-character units conservatively',async()=>{
+  for(const [unit,unit_price] of [['character',.00009],['1000 characters',.09]]){
+    const fal=createFal({falKey:'test',billingKey:'test'},async()=>({ok:true,json:async()=>({prices:[{endpoint_id:QWEN,unit,unit_price,currency:'USD'}]})}));
+    assert.equal((await fal.quote(QWEN,380)).amount,.09);
+  }
+});
+test('native audio gaps are replaced without stretching spoken samples and captions remap',()=>{
+  const sr=1000,parts=[];const chunks=[];let at=0;
+  ['One.','Two.','Three.','Four.'].forEach((text,i)=>{const b=Buffer.alloc(2000);for(let j=0;j<1000;j++)b.writeInt16LE(10000,j*2);parts.push(b);chunks.push({text,timestamp:[at,at+1]});at+=1;if(i<3){parts.push(Buffer.alloc(1600));at+=.8;}});
+  const out=naturalPauses(Buffer.concat(parts),sr,['One.','Two.','Three.','Four.'],chunks);
+  assert.equal(out.speed,1);assert.ok(Math.abs(out.duration-5.5)<.001);assert.deepEqual(out.pauses.map(g=>g[2]),[.4,.4,.7]);
+  const spoken=Buffer.alloc(8000);for(let i=0;i<4000;i++)spoken.writeInt16LE(10000,i*2);
+  const kept=[];for(let i=0;i<out.pcm.length;i+=2)if(out.pcm.readInt16LE(i)!==0)kept.push(out.pcm.subarray(i,i+2));assert.deepEqual(Buffer.concat(kept),spoken);
+  assert.match(captions(out.words,6),/FLORIDA BUZZ/);assert.match(captions(out.words,6),/illustrative footage/);
+  assert.throws(()=>fitDuration(5,20));assert.throws(()=>fitDuration(25,24));assert.doesNotThrow(()=>fitDuration(19,20));
+});
+
+async function fixture(options={}) {
+  const cfg={...config({REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SHOT_SECONDS:'6'}),caps:{single:2,package:3,day:3,week:6,month:24}};
+  const pkg={id:'p1',topic_key:'christmas-party-2026',status:'WORKING',data:{}},gens=[],submitted=[];let leased=false;
+  const store={
+    voice:async()=> {if(options.missingVoice)throw new Error('Approved private Qwen voice unavailable');return 'https://v3.fal.media/private-approved-voice';},
+    claim:async()=>{if(leased||pkg.status!=='WORKING')return null;leased=true;return {token:'lease',package:structuredClone(pkg)};},
+    lease:async(token,release)=>{if(release)leased=false;return true;},
+    save:async(token,p,patch,status='WORKING')=>{assert.ok(leased,'lease must be held until awaited saves complete');pkg.data={...pkg.data,...patch};pkg.status=status;return structuredClone(pkg);},
+    topic:async()=>({key:pkg.topic_key,title:'Christmas party value',destination:'Magic Kingdom',status:'SELECTED'}),
+    generations:async()=>structuredClone(gens),
+    reserve:async(token,p,item,quote)=>{
+      assert.ok(leased);if(options.cap)throw new Error('package spending cap reached');
+      const existing=gens.find(g=>g.kind===item.kind&&g.shot===(item.shot||0)&&g.attempt===(item.attempt||0));if(existing)return {...existing,new_reservation:false};
+      const g={...item,id:`g${gens.length+1}`,shot:item.shot||0,attempt:item.attempt||0,status:'SUBMITTING',actual_usd:null,created_at:new Date().toISOString(),quote};gens.push(g);return {...g,new_reservation:true};
+    },
+    generation:async(token,id,patch)=>{assert.ok(leased,'paid request receipt must be saved before lease release');Object.assign(gens.find(g=>g.id===id),patch);},
+    pause:async()=>{},asset:async(p)=>p,signed:async p=>'https://v3.fal.media/'+p,
+  };
+  const fal={quote:async()=>({amount:.1}),balance:async()=>4.4,
+    submit:async(endpoint,input)=>{submitted.push({endpoint,input});await Promise.resolve();if(options.lostReceipt)throw new Error('POST timeout');return {request_id:`r${submitted.length}`,status_url:'https://queue.fal.run/x/status',response_url:'https://queue.fal.run/x/response'};},
+    poll:async g=>options.refused?{failed:true,refusal:true}:{result:g.kind==='clip'?{video:{url:'https://v3.fal.media/clip.mp4'}}:g.kind==='narration'?{audio:{url:'https://v3.fal.media/audio.mp3'}}:{chunks:[]}},actual:async()=>({amount:.1,events:[]})};
+  const editorial={facts:async()=>facts(),guide:async()=>({title:'Christmas party guide',url:'https://thefloridabuzz.com/article/party',body_html:'Substantial guide'}),script:async()=>script()};
+  const media={download:async(u,p)=>{await fs.writeFile(p,'fixture');return p;},probe:async()=>({format:{duration:20}}),review:async()=>({classification:options.failedReview?'REGENERATE_ONCE':'PASS',issues:options.failedReview?['Severe malformed foreground person']:[],correction:'Fix the malformed person'}),
+    assemble:async(c,a,t,s,dir)=>{const master=path.join(dir,'master.mp4'),ass=path.join(dir,'captions.ass'),paused=path.join(dir,'paused.wav');for(const f of [master,ass,paused])await fs.writeFile(f,'fixture');return {master,ass,paused,timing:{duration:20,speed:1},quality:{vertical:true,oldNarrator:false}};}};
+  return {pipeline:createPipeline({cfg,store,fal,editorial,media}),pkg,gens,submitted};
+}
+test('full mocked pipeline produces four clips, narration, synchronized package and approval stop',async()=>{
+  const f=await fixture();for(let i=0;i<50&&f.pkg.status==='WORKING';i++)await f.pipeline.tick('2026-10-05');
+  assert.equal(f.pkg.status,'READY_FOR_APPROVAL',f.pkg.data.warning);assert.equal(f.submitted.filter(s=>s.endpoint===KLING).length,4);assert.equal(f.submitted.filter(s=>s.endpoint===QWEN).length,1);assert.equal(f.gens.length,6);assert.ok(Math.abs(f.pkg.data.actualCost-.6)<1e-8);assert.ok(f.pkg.data.social.facebook.includes('/article/party'));assert.ok(f.pkg.data.master);
+  await f.pipeline.tick('2026-10-05');assert.equal(f.submitted.length,6,'ready package must not submit again');
+});
+test('one automatic replacement maximum; second failed review stops spending',async()=>{const f=await fixture({failedReview:true});for(let i=0;i<30&&f.pkg.status==='WORKING';i++)await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.submitted.length,2);assert.deepEqual(f.gens.map(g=>g.attempt),[0,1]);});
+test('refusal preserves explicit prompt and submits no alternatives',async()=>{const f=await fixture({refused:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.match(f.pkg.data.warning,/REFUSED/);assert.equal(f.submitted.length,1);assert.match(f.submitted[0].input.prompt,/Magic Kingdom/);});
+test('lost paid receipt survives restarts as manual review and is never submitted twice',async()=>{const f=await fixture({lostReceipt:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.gens[0].status,'SUBMITTING');assert.equal(f.submitted.length,1);});
+test('spending ceiling stops before paid POST',async()=>{const f=await fixture({cap:true});await f.pipeline.tick();assert.equal(f.pkg.status,'HELD');assert.equal(f.submitted.length,0);});
+test('missing approved private voice stops before any paid generation',async()=>{const f=await fixture({missingVoice:true});await f.pipeline.tick();assert.equal(f.pkg.status,'HELD');assert.equal(f.submitted.length,0);assert.match(f.pkg.data.warning,/private Qwen voice/);});
+test('concurrent workers in one process do not overlap',async()=>{const f=await fixture();await Promise.all([f.pipeline.tick(),f.pipeline.tick()]);assert.equal(f.submitted.length,1);});
+test('feature defaults off and never schedules or touches DB when disabled',()=>{assert.equal(config({}).enabled,false);assert.equal(config({}).generation,false);assert.equal(config({}).caps.package,0);const app={use:()=>{throw new Error('must not mount');}};require('../lib/reels').mount(app,{});});
+test('new feature has no social-publisher imports or publishing call',async()=>{
+  const dir=path.join(__dirname,'../lib/reels');for(const f of (await fs.readdir(dir)).filter(f=>f.endsWith('.js'))){const source=await fs.readFile(path.join(dir,f),'utf8');assert.doesNotMatch(source,/require\([^\n]*(?:socialChamp|buffer|facebook|instagram|pinterest|threads|socialPublisher)/i);assert.doesNotMatch(source,/postToFacebook|postToInstagram|createPin|publishVideo/);}
+});
+test('existing adequate guide is reused without insert/update and all guides are searched',async()=>{
+  let writes=0;const guide={id:'g',slug:'existing-party',title:'Christmas Party',dek:'Value',body_html:'Existing substantial current guide',image_url:'image'};
+  const store={allGuides:async()=>[guide],publishGuide:async()=>{writes++;},updateGuide:async()=>{writes++;}};
+  const ai={generateStructuredText:async(system,user,s)=>s.name==='reel_guide_match'?{id:'g',reason:'same subject'}:{adequate:true,reason:'current'}};
+  const result=await createEditorial(ai,store,{site:'https://thefloridabuzz.com'}).guide({title:'Christmas party'},facts(),{id:'p'},async()=>{});
+  assert.equal(result.handling,'REUSED');assert.equal(result.url,'https://thefloridabuzz.com/article/existing-party');assert.equal(writes,0);
+});
+test('new substantial guide uses verified facts, relevant existing image and a direct article URL',async()=>{
+  let inserted,checkpoint;
+  const paragraphs=Array.from({length:6},(_,i)=>({heading:`Planning point ${i+1}`,paragraphs:[Array.from({length:140},()=> 'useful').join(' ')],bullets:[]}));
+  const ai={generateStructuredText:async(system,user,s)=>s.name==='reel_guide_match'?{id:'',reason:'no same-subject guide'}:{title:'Christmas party value',dek:'Who gets the most value',sections:paragraphs}};
+  const store={allGuides:async()=>[{id:'other',title:'Magic Kingdom morning strategy',dek:'Arrival',image_url:'https://existing.example/castle.jpg'}],publishGuide:async(g,p)=>{inserted=g;return {...g,slug:'guide-christmas'};}};
+  const result=await createEditorial(ai,store,{site:'https://thefloridabuzz.com'}).guide({title:'Christmas party value',destination:'Magic Kingdom'},facts(),{id:'p',topic_key:'christmas'},async p=>{checkpoint=p;});
+  assert.equal(result.handling,'CREATED');assert.equal(result.url,'https://thefloridabuzz.com/article/guide-christmas');assert.equal(inserted.image_url,'https://existing.example/castle.jpg');assert.match(inserted.body_html,/Official planning information/);assert.ok(checkpoint.guideDraft);assert.equal(inserted.category,'theme-parks');
+});
+test('admin requires authentication and valid CSRF, and approval only changes review state',async()=>{
+  const express=require('express'),{createRouter}=require('../lib/reels/router');
+  const app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../views'));app.use(express.urlencoded({extended:false}));
+  let status='READY_FOR_APPROVAL',decisions=0;
+  const pkg={id:'p',data:{script:script(),social:socialCopy(script(),{title:'Guide',url:'https://thefloridabuzz.com/article/guide'})}};
+  const store={package:async()=>({...pkg,status}),generations:async()=>[],decision:async(id,action)=>{assert.equal(status,'READY_FOR_APPROVAL');assert.ok(['APPROVED','REJECTED'].includes(action));status=action;decisions++;}};
+  app.use('/admin/reels',createRouter({store,cfg:{},env:{ADMIN_PASSWORD:'a-long-test-password'}}));
+  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+  try{
+    const url=`http://127.0.0.1:${server.address().port}/admin/reels/p`,headers={Authorization:'Basic '+Buffer.from('admin:a-long-test-password').toString('base64')};
+    assert.equal((await fetch(url)).status,401);
+    const html=await (await fetch(url,{headers})).text();assert.match(html,/READY_FOR_APPROVAL/);assert.match(html,/do not publish|does not publish|never call a social publisher/i);
+    const csrf=html.match(/name="csrf" value="([^"]+)"/)[1];
+    assert.equal((await fetch(url+'/decision',{method:'POST',headers:{...headers,'Content-Type':'application/x-www-form-urlencoded'},body:'action=APPROVED&csrf=wrong',redirect:'manual'})).status,403);assert.equal(decisions,0);
+    assert.equal((await fetch(url+'/decision',{method:'POST',headers:{...headers,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'APPROVED',csrf}),redirect:'manual'})).status,303);assert.equal(status,'APPROVED');assert.equal(decisions,1);
+  }finally{await new Promise(resolve=>server.close(resolve));}
+});
+test('actual FFmpeg assembly decodes a complete vertical master with remapped captions and new audio',async()=>{
+  const {createMedia,run}=require('../lib/reels/media'),ffmpeg=require('ffmpeg-static');
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-media-test-'));
+  try{
+    const source=path.join(dir,'color.mp4');await run(ffmpeg,['-v','error','-y','-f','lavfi','-i','color=c=navy:s=720x1280:r=24:d=6','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',source]);
+    const raw=path.join(dir,'input.pcm'),audio=path.join(dir,'input.wav'),parts=[],chunks=[];let at=0;const sr=48000;
+    ['One.','Two.','Three.','Four.'].forEach((text,i)=>{const pcm=Buffer.alloc(sr*5*2);for(let j=0;j<sr*5;j++)pcm.writeInt16LE(Math.round(Math.sin(j/sr*2*Math.PI*220)*6000),j*2);parts.push(pcm);chunks.push({text,timestamp:[at,at+5]});at+=5;if(i<3){parts.push(Buffer.alloc(sr*.8*2));at+=.8;}});
+    await fs.writeFile(raw,Buffer.concat(parts));await run(ffmpeg,['-v','error','-y','-f','s16le','-ar',String(sr),'-ac','1','-i',raw,audio]);
+    const output=await createMedia({...config({REELS_SHOT_SECONDS:'6'})}).assemble([source,source,source,source],audio,{chunks},['One.','Two.','Three.','Four.'],dir);
+    assert.equal(output.quality.decode,true);assert.equal(output.quality.oldNarrator,false);assert.equal(output.timing.speed,1);assert.ok(Math.abs(output.timing.duration-21.5)<.01);assert.match(await fs.readFile(output.ass,'utf8'),/Four\./);
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});

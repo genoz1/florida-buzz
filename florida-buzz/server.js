@@ -78,6 +78,8 @@ app.use((req, res, next) => {
   next();
 });
 
+// Independent additive feature; disabled by default, with no social publishing.
+require('./lib/reels').mount(app);
 app.use('/', require('./routes/main'));
 
 app.use((req, res) => {
