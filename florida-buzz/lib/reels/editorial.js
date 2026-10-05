@@ -1,3 +1,4 @@
+'use strict';
 const { criteria, strongest, score } = require('./topics');
 const str = { type: 'string' }, bool = { type: 'boolean' };
 const array = items => ({ type: 'array', items });
