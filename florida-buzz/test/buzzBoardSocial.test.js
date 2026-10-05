@@ -2,11 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { imageSize } = require('image-size');
+const { Jimp } = require('jimp');
 
 const {
   buildCopy,
-  buildFacebookImageUrl,
-  buildInstagramImageUrl,
+  buildFacebookPreview,
   buildInstagramShortTrackingUrl,
   buildShortTrackingUrl,
   buildTrackingUrl,
@@ -18,6 +19,13 @@ const {
   selectDailyDiscussion,
   selectSocialDiscussion,
 } = require('../scripts/buzz-board-social');
+const {
+  FACEBOOK_PRESENTATIONS,
+  buildFacebookImagePrompt,
+  ensureInstagramBuzzImage,
+  facebookImageFilename,
+  instagramImageFilename,
+} = require('../lib/facebookBuzzPresentation');
 const { getScheduleFlags } = require('../lib/scheduleConfig');
 
 test('Buzz Board social links identify platform, campaign, and discussion without PII', () => {
@@ -30,32 +38,75 @@ test('Buzz Board social links identify platform, campaign, and discussion withou
   assert.equal(url.search.includes('@'), false);
 });
 
-test('Facebook uses a clean Florida Buzz redirect and discussion-specific branded image', () => {
+test('Facebook keeps its clean Florida Buzz redirect and uses a discussion-specific photo asset', () => {
   assert.equal(
     buildShortTrackingUrl('what-universal-does-better-than-disney'),
     'https://thefloridabuzz.com/go/buzz/what-universal-does-better-than-disney'
   );
-  assert.equal(
-    buildFacebookImageUrl('what-universal-does-better-than-disney'),
-    'https://thefloridabuzz.com/images/buzz-board-social/what-universal-does-better-than-disney.png'
-  );
+  assert.equal(facebookImageFilename('what-universal-does-better-than-disney'), 'facebook-buzz-what-universal-does-better-than-disney.jpg');
 });
 
-test('Instagram uses the discussion-specific question image and an honest short discussion path', () => {
+test('Instagram keeps its square discussion photo and honest short discussion path', () => {
   const slug = 'what-universal-does-better-than-disney';
-  assert.equal(
-    buildInstagramImageUrl(slug),
-    `https://thefloridabuzz.com/images/buzz-board-social/${slug}.png`
-  );
+  assert.equal(instagramImageFilename(slug), `instagram-buzz-${slug}.jpg`);
   assert.equal(
     buildInstagramShortTrackingUrl(slug),
     `https://thefloridabuzz.com/go/ig/${slug}`
   );
   const copy = buildCopy({ slug, question: 'Do not repeat this question?' }, 'instagram');
   assert.doesNotMatch(copy, /Do not repeat this question/);
-  assert.match(copy, /Answer here on Instagram/);
+  assert.match(copy, /Does Universal do theme parks better than Disney now\?/);
+  assert.match(copy, /Answer here or continue the discussion on Buzz Board/);
   assert.match(copy, /Copy this short address into your browser/);
   assert.match(copy, new RegExp(`/go/ig/${slug}$`));
+});
+
+test('every approved launch discussion has an engagement-first hook and exact photo subject', () => {
+  const inventory = require('../content/buzz-board-launch-inventory.json');
+  assert.equal(Object.keys(FACEBOOK_PRESENTATIONS).length, inventory.discussions.length);
+  for (const discussion of inventory.discussions) {
+    const presentation = FACEBOOK_PRESENTATIONS[discussion.slug];
+    assert.ok(presentation, `missing presentation for ${discussion.slug}`);
+    assert.match(presentation.hook, /\?$/);
+    assert.ok(presentation.hook.length <= 90, `hook is too long for ${discussion.slug}`);
+    assert.ok(presentation.setup.length >= 30);
+    assert.ok(presentation.imageSubject.length >= 50);
+  }
+});
+
+test('photo prompt explicitly rejects branded cards and keeps the exact discussion subject', () => {
+  const prompt = buildFacebookImagePrompt({
+    slug: 'hollywood-studios-complete-park-day',
+    question: 'How would you change Hollywood Studios so it feels like a complete, unhurried park day?',
+  });
+  assert.match(prompt, /Hollywood Studios/);
+  assert.match(prompt, /candid, photorealistic/);
+  assert.match(prompt, /No text overlay/);
+  assert.match(prompt, /square crop for Instagram/);
+});
+
+test('Instagram Buzz Board creative is a 1080-square crop of the reviewed discussion photo', async () => {
+  const sourceImage = new Jimp({ width: 1200, height: 800, color: 0x336699ff });
+  const sourceBuffer = await sourceImage.getBuffer('image/jpeg', { quality: 80 });
+  let stored;
+  const bucket = {
+    getPublicUrl: (filename) => ({ data: { publicUrl: `https://storage.example/${filename}` } }),
+    list: async () => ({ data: [], error: null }),
+    download: async () => ({ data: new Blob([sourceBuffer]), error: null }),
+  };
+  const client = { storage: { from: () => bucket } };
+  const url = await ensureInstagramBuzzImage({ slug: 'rope-drop-or-slow-disney-morning' }, {
+    client,
+    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-rope-drop-or-slow-disney-morning.jpg',
+    store: async (buffer, filename, contentType) => {
+      stored = { buffer, filename, contentType };
+      return `https://storage.example/${filename}`;
+    },
+  });
+  assert.equal(url, 'https://storage.example/instagram-buzz-rope-drop-or-slow-disney-morning.jpg');
+  assert.equal(stored.contentType, 'image/jpeg');
+  assert.equal(stored.filename, 'instagram-buzz-rope-drop-or-slow-disney-morning.jpg');
+  assert.deepEqual(imageSize(stored.buffer), { height: 1080, type: 'jpg', width: 1080 });
 });
 
 test('daily selection is deterministic and rotates approved discussions', () => {
@@ -98,13 +149,20 @@ test('selection excludes discussions inside the platform cooldown and falls back
 });
 
 test('platform copy stays conversation-first and sends readers to the selected discussion', () => {
-  const discussion = { slug: 'sample-question', question: 'Which option is actually worth the tradeoff?' };
+  const discussion = {
+    slug: 'hollywood-studios-complete-park-day',
+    question: 'How would you change Hollywood Studios so it feels like a complete, unhurried park day?',
+  };
   const facebook = buildCopy(discussion, 'facebook');
   const instagram = buildCopy(discussion, 'instagram');
-  assert.equal(facebook, 'Answer here or join the conversation on Buzz Board 👇');
-  assert.doesNotMatch(facebook, /Which option|https?:\/\//);
-  assert.doesNotMatch(instagram, /Which option/);
-  assert.match(instagram, /\/go\/ig\/sample-question$/);
+  assert.equal(facebook, 'Hollywood Studios: full-day park or half-day park?');
+  assert.doesNotMatch(facebook, /Join the conversation|https?:\/\//);
+  assert.match(instagram, /^Hollywood Studios: full-day park or half-day park\?/);
+  assert.doesNotMatch(instagram, /Some guests can stay/);
+  assert.match(instagram, /\/go\/ig\/hollywood-studios-complete-park-day$/);
+  const preview = buildFacebookPreview(discussion);
+  assert.equal(preview.unchangedBuzzBoardQuestion, discussion.question);
+  assert.equal(preview.destination, 'https://thefloridabuzz.com/go/buzz/hollywood-studios-complete-park-day');
 });
 
 test('recurring schedule fails closed unless Buzz Board and both existing Meta publishers are configured', () => {
@@ -147,6 +205,8 @@ test('dry run exercises both publishers without writing post-log state', async (
   const result = await run({
     client,
     dryRun: true,
+    facebookImageResolver: async () => 'https://storage.example/facebook-photo.jpg',
+    instagramImageResolver: async () => 'https://storage.example/instagram-square.jpg',
     facebookPublisher: async (payload) => {
       facebookCalls.push(payload);
       return true;
@@ -155,9 +215,18 @@ test('dry run exercises both publishers without writing post-log state', async (
   assert.equal(result.facebook, 'dry_run');
   assert.equal(result.instagram, 'dry_run');
   assert.equal(facebookCalls[0].logDetail, logMarker('facebook', 'sample-question'));
-  assert.equal(facebookCalls[0].message, 'Answer here or join the conversation on Buzz Board 👇');
+  assert.equal(facebookCalls[0].message, 'Which option is actually worth the tradeoff?');
   assert.equal(facebookCalls[0].link, 'https://thefloridabuzz.com/go/buzz/sample-question');
-  assert.equal(facebookCalls[0].imageUrl, 'https://thefloridabuzz.com/images/buzz-board-social/sample-question.png');
+  assert.equal(facebookCalls[0].imageUrl, 'https://storage.example/facebook-photo.jpg');
+});
+
+test('article social publishing and both Buzz Board redirect routes remain separate and unchanged', () => {
+  const automate = fs.readFileSync(path.join(__dirname, '../scripts/automate.js'), 'utf8');
+  const routes = fs.readFileSync(path.join(__dirname, '../routes/main.js'), 'utf8');
+  assert.match(automate, /postToFacebook\(\{ title: article\.title, fb_caption: article\.fb_caption, slug, imageUrl: finalImage \}\)/);
+  assert.match(automate, /postToInstagram\(\{ caption: toInstagramCaption\(article\.fb_caption\), imageUrl: finalImage \}\)/);
+  assert.match(routes, /router\.get\('\/go\/buzz\/:slug'/);
+  assert.match(routes, /router\.get\('\/go\/ig\/:slug'/);
 });
 
 test('production scheduler spaces three Facebook posts and one Instagram post in Eastern time', () => {
