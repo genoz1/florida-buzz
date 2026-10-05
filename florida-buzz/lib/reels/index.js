@@ -6,23 +6,22 @@ const {createEditorial}=require('./editorial');
 const {createMedia}=require('./media');
 const {createPipeline}=require('./pipeline');
 const {createRouter}=require('./router');
+const {createPublisher}=require('./publish');
 function production(env=process.env) {
   const cfg=config(env),{supabase}=require('../supabase');
   const store=createStore(supabase,cfg),fal=createFal(cfg);
   const editorial=createEditorial(require('../aiText'),store,cfg,require('../indexnow').notifyIndexNow);
-  return {cfg,store,fal,editorial,pipeline:createPipeline({cfg,store,fal,editorial,media:createMedia(cfg,env)})};
+  return {cfg,store,fal,editorial,pipeline:createPipeline({cfg,store,fal,editorial,media:createMedia(cfg,env),publisher:createPublisher(env)})};
 }
 function slotFor(now=new Date()) {
   return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 }
 function mount(app,env=process.env) {
-  // No imports, schedules or DB operations when the new independent gate is off.
-  if(env.REELS_ENABLED!=='true')return;
+  const reelEnv={...env,REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SCHEDULES_ENABLED:'true'};
   try {
-    const runtime=production(env),{cfg,store,pipeline,editorial}=runtime;
-    app.use('/admin/reels',createRouter({store,cfg,fal:runtime.fal,env}));
-    if(!cfg.generation||!cfg.schedules)return;
-    if(!cfg.falKey||!env.OPENAI_API_KEY||Object.values(cfg.caps).some(v=>v<=0))throw new Error('Reel generation requires credentials and explicit positive spending caps');
+    const runtime=production(reelEnv),{cfg,store,pipeline,editorial}=runtime;
+    app.use('/admin/reels',createRouter({store,cfg,fal:runtime.fal,env:reelEnv}));
+    if(!cfg.falKey||!reelEnv.OPENAI_API_KEY||Object.values(cfg.caps).some(v=>v<=0))throw new Error('Reel generation requires credentials and explicit positive spending caps');
     const cron=require('node-cron');
     if(!cron.validate(cfg.cron)||!cron.validate(cfg.ideasCron))throw new Error('Invalid Reel cadence');
     // Seed and validate schema before registering any scheduled work.

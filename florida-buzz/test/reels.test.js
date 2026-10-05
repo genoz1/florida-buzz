@@ -15,6 +15,7 @@ const {createFal,queueUrl}=require('../lib/reels/fal');
 const {validateFacts,validateScript,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
 const {naturalPauses,fitDuration,captions}=require('../lib/reels/media');
 const {createPipeline}=require('../lib/reels/pipeline');
+const {createPublisher}=require('../lib/reels/publish');
 const facts=()=>({verified:true,checked_at:new Date().toISOString(),missing:[],claims:['pricing','dates','entry','hours','parade','fireworks','entertainment','treats','attractions','crowds'].map(subject=>({subject,fact:`Verified ${new Date().getUTCFullYear()} ${subject} rule`,verified:true,source_urls:['https://disneyworld.disney.go.com/events/']}))});
 const thoughts=['A lot of people get to Magic Kingdom later than they probably should.','If you want shorter waits and an easier start to the day, that first hour after opening can make a big difference.','The key is knowing which rides are worth doing right away and which ones can wait until later.','We’ve got the full Magic Kingdom morning strategy at TheFloridaBuzz.com.'];
 const script=()=>({hook:'A useful planning question',thoughts,shots:['establishing','crowd','detail','icon'].map(type=>({type,description:`${type} view at Main Street U.S.A., Magic Kingdom with Cinderella Castle`})),social:{facebook:'Plan your morning.',instagram:'A calmer start.',pinterest:'Magic Kingdom morning tips.',threads:'What would you do first?'}});
@@ -97,25 +98,33 @@ async function fixture(options={}) {
   const fal={quote:async()=>({amount:.1}),balance:async()=>4.4,
     submit:async(endpoint,input)=>{submitted.push({endpoint,input});await Promise.resolve();if(options.lostReceipt)throw new Error('POST timeout');return {request_id:`r${submitted.length}`,status_url:'https://queue.fal.run/x/status',response_url:'https://queue.fal.run/x/response'};},
     poll:async g=>options.refused?{failed:true,refusal:true}:{result:g.kind==='clip'?{video:{url:'https://v3.fal.media/clip.mp4'}}:g.kind==='narration'?{audio:{url:'https://v3.fal.media/audio.mp3'}}:{chunks:[]}},actual:async()=>({amount:.1,events:[]})};
-  const editorial={facts:async()=>facts(),guide:async()=>({title:'Christmas party guide',url:'https://thefloridabuzz.com/article/party',body_html:'Substantial guide'}),script:async()=>script()};
+  const editorial={facts:async()=>facts(),guide:async()=>({title:'Christmas party guide',url:'https://thefloridabuzz.com/article/party',image_url:'https://thefloridabuzz.com/party.jpg',body_html:'Substantial guide'}),script:async()=>script()};
   const media={download:async(u,p)=>{await fs.writeFile(p,'fixture');return p;},probe:async()=>({format:{duration:20}}),review:async()=>({classification:options.failedReview?'REGENERATE_ONCE':'PASS',issues:options.failedReview?['Severe malformed foreground person']:[],correction:'Fix the malformed person'}),
     assemble:async(c,a,t,s,dir)=>{const master=path.join(dir,'master.mp4'),ass=path.join(dir,'captions.ass'),paused=path.join(dir,'paused.wav');for(const f of [master,ass,paused])await fs.writeFile(f,'fixture');return {master,ass,paused,timing:{duration:20,speed:1},quality:{vertical:true,oldNarrator:false}};}};
-  return {pipeline:createPipeline({cfg,store,fal,editorial,media}),pkg,gens,submitted};
+  const published=[];const publisher={publish:async input=>{published.push(input);if(options.publishFail)throw new Error('Instagram Reel publish failed');return {facebook:{status:'POSTED'},instagram:{status:'POSTED'},pinterest:{status:'POSTED'},threads:{status:'POSTED'}};}};
+  return {pipeline:createPipeline({cfg,store,fal,editorial,media,publisher}),pkg,gens,submitted,published};
 }
-test('full mocked pipeline produces four clips, narration, synchronized package and approval stop',async()=>{
+test('full mocked pipeline produces four clips, narration and one automatic publication',async()=>{
   const f=await fixture();for(let i=0;i<50&&f.pkg.status==='WORKING';i++)await f.pipeline.tick('2026-10-05');
-  assert.equal(f.pkg.status,'READY_FOR_APPROVAL',f.pkg.data.warning);assert.equal(f.submitted.filter(s=>s.endpoint===KLING).length,4);assert.equal(f.submitted.filter(s=>s.endpoint===QWEN).length,1);assert.equal(f.gens.length,6);assert.ok(Math.abs(f.pkg.data.actualCost-.6)<1e-8);assert.ok(f.pkg.data.social.facebook.includes('/article/party'));assert.ok(f.pkg.data.master);
-  await f.pipeline.tick('2026-10-05');assert.equal(f.submitted.length,6,'ready package must not submit again');
+  assert.equal(f.pkg.status,'APPROVED',f.pkg.data.warning);assert.equal(f.submitted.filter(s=>s.endpoint===KLING).length,4);assert.equal(f.submitted.filter(s=>s.endpoint===QWEN).length,1);assert.equal(f.gens.length,6);assert.ok(Math.abs(f.pkg.data.actualCost-.6)<1e-8);assert.ok(f.pkg.data.social.facebook.includes('/article/party'));assert.ok(f.pkg.data.master);assert.equal(f.published.length,1);
+  await f.pipeline.tick('2026-10-05');assert.equal(f.submitted.length,6,'published package must not submit again');assert.equal(f.published.length,1);
 });
 test('one automatic replacement maximum; second failed review stops spending',async()=>{const f=await fixture({failedReview:true});for(let i=0;i<30&&f.pkg.status==='WORKING';i++)await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.submitted.length,2);assert.deepEqual(f.gens.map(g=>g.attempt),[0,1]);});
 test('refusal preserves explicit prompt and submits no alternatives',async()=>{const f=await fixture({refused:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.match(f.pkg.data.warning,/REFUSED/);assert.equal(f.submitted.length,1);assert.match(f.submitted[0].input.prompt,/Magic Kingdom/);});
 test('lost paid receipt survives restarts as manual review and is never submitted twice',async()=>{const f=await fixture({lostReceipt:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.gens[0].status,'SUBMITTING');assert.equal(f.submitted.length,1);});
 test('spending ceiling stops before paid POST',async()=>{const f=await fixture({cap:true});await f.pipeline.tick();assert.equal(f.pkg.status,'HELD');assert.equal(f.submitted.length,0);});
 test('missing approved private voice stops before any paid generation',async()=>{const f=await fixture({missingVoice:true});await f.pipeline.tick();assert.equal(f.pkg.status,'HELD');assert.equal(f.submitted.length,0);assert.match(f.pkg.data.warning,/private Qwen voice/);});
+test('social publication failure holds a completed package instead of claiming success',async()=>{const f=await fixture({publishFail:true});for(let i=0;i<50&&f.pkg.status==='WORKING';i++)await f.pipeline.tick();assert.equal(f.pkg.status,'HELD');assert.match(f.pkg.data.warning,/publish failed/);});
 test('concurrent workers in one process do not overlap',async()=>{const f=await fixture();await Promise.all([f.pipeline.tick(),f.pipeline.tick()]);assert.equal(f.submitted.length,1);});
-test('feature defaults off and never schedules or touches DB when disabled',()=>{assert.equal(config({}).enabled,false);assert.equal(config({}).generation,false);assert.equal(config({}).caps.package,0);const app={use:()=>{throw new Error('must not mount');}};require('../lib/reels').mount(app,{});});
-test('new feature has no social-publisher imports or publishing call',async()=>{
-  const dir=path.join(__dirname,'../lib/reels');for(const f of (await fs.readdir(dir)).filter(f=>f.endsWith('.js'))){const source=await fs.readFile(path.join(dir,f),'utf8');assert.doesNotMatch(source,/require\([^\n]*(?:socialChamp|buffer|facebook|instagram|pinterest|threads|socialPublisher)/i);assert.doesNotMatch(source,/postToFacebook|postToInstagram|createPin|publishVideo/);}
+test('configuration parser retains safe explicit gates and spending defaults',()=>{assert.equal(config({}).enabled,false);assert.equal(config({}).generation,false);assert.equal(config({}).schedules,false);assert.equal(config({}).caps.package,0);});
+test('automatic publisher reuses one master and journals every existing social channel',async()=>{
+  const calls=[],env={FB_PAGE_ID:'1',FB_PAGE_ACCESS_TOKEN:'x',INSTAGRAM_ACCESS_TOKEN:'x',INSTAGRAM_USER_ID:'1',PINTEREST_BOARD_ID:'1',PINTEREST_ACCESS_TOKEN:'x',THREADS_ACCESS_TOKEN:'x',THREADS_USER_ID:'1'};
+  const channel=name=>async input=>{calls.push({name,input});return {id:name};},publisher=createPublisher(env,{facebook:channel('facebook'),instagram:channel('instagram'),pinterest:channel('pinterest'),threads:channel('threads')});
+  const pkg={id:'p',data:{guide:{url:'https://thefloridabuzz.com/article/party'},social:socialCopy(script(),{title:'Guide',url:'https://thefloridabuzz.com/article/party'})}};
+  const save=async patch=>{Object.assign(pkg.data,patch);return pkg;};await publisher.publish({pkg,masterUrl:'https://signed.example/reel.mp4',coverImageUrl:'https://thefloridabuzz.com/cover.jpg',save});
+  assert.deepEqual(calls.map(c=>c.name),['pinterest','facebook','instagram','threads']);for(const call of calls)assert.equal(call.input.videoUrl,'https://signed.example/reel.mp4');
+  assert.ok(Object.values(pkg.data.publication).every(item=>item.status==='POSTED'));
+  await publisher.publish({pkg,masterUrl:'https://signed.example/reel.mp4',coverImageUrl:'https://thefloridabuzz.com/cover.jpg',save});assert.equal(calls.length,4,'restart must not duplicate published channels');
 });
 test('existing adequate guide is reused without insert/update and all guides are searched',async()=>{
   let writes=0;const guide={id:'g',slug:'existing-party',title:'Christmas Party',dek:'Value',body_html:'Existing substantial current guide',image_url:'image'};

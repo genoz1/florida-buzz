@@ -2,10 +2,26 @@
 // posts) and scripts/generate-guide.js (evergreen guide posts).
 const { logPost } = require('./postLog');
 
-async function postToFacebookPage({ message, link, imageUrl, dryRun = false, logDetail = null, returnResult = false }) {
+async function postToFacebookPage({ message, link, imageUrl, videoUrl, dryRun = false, logDetail = null, returnResult = false }) {
   if (dryRun) {
-    console.log(`  [dry-run] Would post to Facebook: "${message}"${link ? ` (link: ${link})` : ''}${imageUrl ? ` (image: ${imageUrl})` : ''}`);
+    console.log(`  [dry-run] Would post to Facebook: "${message}"${link ? ` (link: ${link})` : ''}${videoUrl ? ` (video: ${videoUrl})` : imageUrl ? ` (image: ${imageUrl})` : ''}`);
     return returnResult ? { ok: true, dryRun: true } : true;
+  }
+
+  if (videoUrl) {
+    const description = link ? `${message}\n\n${link}` : message;
+    const res = await fetch(`https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/videos`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_url: videoUrl, description, access_token: process.env.FB_PAGE_ACCESS_TOKEN }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error) {
+      const errText = JSON.stringify(payload);
+      await logPost({ platform: 'facebook', status: 'failed', detail: errText });
+      throw new Error(`Facebook video post failed: ${errText}`);
+    }
+    await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
+    return returnResult ? { ok: true, postId: payload.id } : true;
   }
   if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
     console.log('  [skip] FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN not set — skipping Facebook post.');

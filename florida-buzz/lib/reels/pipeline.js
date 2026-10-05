@@ -2,7 +2,7 @@
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {KLING,QWEN,WHISPER,videoInput,voiceInput}=require('./config');
 const {promptFor,socialCopy,validateFacts}=require('./editorial');
-function createPipeline({cfg,store,fal,editorial,media}) {
+function createPipeline({cfg,store,fal,editorial,media,publisher}) {
   let busy=false;
   async function tick(slot) {
     if(busy || !cfg.enabled || !cfg.generation) return {skipped:'disabled or already running'};
@@ -113,8 +113,10 @@ function createPipeline({cfg,store,fal,editorial,media}) {
           await save({master,captionAsset,pausedAudio,narrationTiming:output.timing,quality:output.quality});
         } finally {await fs.rm(dir,{recursive:true,force:true});}
       }
-      const actualCost=gens.reduce((sum,g)=>sum+Number(g.actual_usd),0);
-      return await save({actualCost,balanceAfter:await fal.balance(),warning:'AI-assisted frame review cannot prove every frame. Watch the entire Reel before approval. Approval records a decision only; it does not publish.'},'READY_FOR_APPROVAL');
+      const actualCost=gens.reduce((sum,g)=>sum+Number(g.actual_usd),0),balanceAfter=await fal.balance();
+      await save({actualCost,balanceAfter});
+      const publication=await publisher.publish({pkg,masterUrl:await store.signed(pkg.data.master,21600),coverImageUrl:pkg.data.guide.image_url,save});
+      return await save({publication,publishedAt:new Date().toISOString(),warning:'Automated Reel passed factual, media and publication checks.'},'APPROVED');
     } catch(error) {
       if(claim) {
         try {
