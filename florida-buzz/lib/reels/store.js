@@ -33,6 +33,21 @@ function createStore(client, cfg) {
     addTopics: topics => checked(client.from('reel_topics').upsert(topics, { onConflict: 'key', ignoreDuplicates: true })),
     packages: () => checked(client.from('reel_packages').select('*').order('created_at', { ascending: false }).limit(100)),
     package: id => checked(client.from('reel_packages').select('*').eq('id', id).single()),
+    async resumeHeldPackage(id, topicKey, marker) {
+      let pkg=await checked(client.from('reel_packages').select('*').eq('id',id).single());
+      if(pkg.topic_key!==topicKey)throw new Error('One-shot Reel package topic mismatch');
+      if(pkg.status==='READY_FOR_APPROVAL'||(pkg.status==='WORKING'&&pkg.data?.oneShotResume===marker))return pkg;
+      if(pkg.status!=='HELD'||pkg.data?.oneShotResume)throw new Error(`One-shot Reel package cannot resume from ${pkg.status}`);
+      if(!pkg.data?.facts||pkg.data.guide||pkg.data.master)throw new Error('One-shot Reel package is not at the verified guide-drafting checkpoint');
+      const generations=await checked(client.from('reel_generations').select('id').eq('package_id',id).limit(1));
+      if(generations.length)throw new Error('One-shot Reel package already has a generation journal');
+      const active=await checked(client.from('reel_packages').select('id').eq('status','WORKING').neq('id',id).limit(1));
+      if(active.length)throw new Error('Another Reel package is already active');
+      const rows=await checked(client.from('reel_packages').update({status:'WORKING',data:{...pkg.data,oneShotResume:marker}})
+        .eq('id',id).eq('topic_key',topicKey).eq('status','HELD').select('*'));
+      if(rows.length!==1)throw new Error('One-shot Reel resume lost its guarded update');
+      return rows[0];
+    },
     async allGuides() {
       const guides = [];
       for (let offset = 0; ; offset += 500) {
