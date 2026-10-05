@@ -3,6 +3,13 @@ require('dotenv').config();
 const { supabase } = require('../lib/supabase');
 const { postToFacebookPage } = require('../lib/facebook');
 const { saveFacebookPostMapping } = require('../lib/facebookBuzz');
+const {
+  buildFacebookCopy,
+  buildFacebookPreview,
+  buildInstagramCopy,
+  ensureFacebookBuzzImage,
+  ensureInstagramBuzzImage,
+} = require('../lib/facebookBuzzPresentation');
 const { createPost: createInstagramPost } = require('../lib/instagram');
 
 const CAMPAIGN = 'buzz_board_launch';
@@ -78,24 +85,15 @@ function buildShortTrackingUrl(slug, siteUrl = SITE_URL) {
   return new URL(`/go/buzz/${encodeURIComponent(slug)}`, siteUrl).toString();
 }
 
-function buildFacebookImageUrl(slug, siteUrl = SITE_URL) {
-  return new URL(`/images/buzz-board-social/${encodeURIComponent(slug)}.png`, siteUrl).toString();
-}
-
-function buildInstagramImageUrl(slug, siteUrl = SITE_URL) {
-  return buildFacebookImageUrl(slug, siteUrl);
-}
-
 function buildInstagramShortTrackingUrl(slug, siteUrl = SITE_URL) {
   return new URL(`/go/ig/${encodeURIComponent(slug)}`, siteUrl).toString();
 }
 
 function buildCopy(discussion, platform, siteUrl = SITE_URL) {
   if (platform === 'instagram') {
-    const url = buildInstagramShortTrackingUrl(discussion.slug, siteUrl);
-    return `Answer here on Instagram or continue this exact conversation on Buzz Board.\n\nCopy this short address into your browser:\n${url}`;
+    return buildInstagramCopy(discussion, siteUrl);
   }
-  return 'Answer here or join the conversation on Buzz Board 👇';
+  return buildFacebookCopy(discussion);
 }
 
 function logMarker(platform, slug) {
@@ -104,7 +102,7 @@ function logMarker(platform, slug) {
 
 async function loadLaunchDiscussions(client) {
   const { data, error } = await client.from('discussions')
-    .select('id, slug, question, category, topic, created_at')
+    .select('id, slug, question, context, category, topic, created_at')
     .eq('source_type', 'florida_buzz')
     .eq('status', 'published')
     .eq('moderation_status', 'published')
@@ -148,6 +146,8 @@ async function run({
   platform = process.env.SOCIAL_PLATFORM || 'both',
   facebookPublisher = postToFacebookPage,
   instagramPublisher = createInstagramPost,
+  facebookImageResolver = ensureFacebookBuzzImage,
+  instagramImageResolver = ensureInstagramBuzzImage,
   slot = process.env.BUZZ_SOCIAL_SLOT || 'daily',
 } = {}) {
   if (!client) throw new Error('Supabase is required for Buzz Board social distribution.');
@@ -169,30 +169,39 @@ async function run({
     return skipped;
   }
 
-  const instagramImageUrl = buildInstagramImageUrl(discussion.slug);
   const results = { discussion: discussion.slug, facebook: 'not_requested', instagram: 'not_requested' };
 
   if (platform === 'both' || platform === 'facebook') {
-    const publishResult = await facebookPublisher({
-      message: buildCopy(discussion, 'facebook'),
-      link: buildShortTrackingUrl(discussion.slug),
-      imageUrl: buildFacebookImageUrl(discussion.slug),
-      dryRun,
-      logDetail: logMarker('facebook', discussion.slug),
-      returnResult: true,
-    });
-    if (publishResult && !dryRun) {
-      await saveFacebookPostMapping(client, {
-        discussionId: discussion.id,
-        publishResult,
-        publishedAt: now,
+    const facebookImageUrl = await facebookImageResolver(discussion, { client, generateMissing: !dryRun });
+    if (!facebookImageUrl) {
+      console.error(`  [skip] No reviewed Facebook photo is available for Buzz Board discussion ${discussion.slug}.`);
+      results.facebook = 'image_unavailable';
+    } else {
+      const publishResult = await facebookPublisher({
+        message: buildCopy(discussion, 'facebook'),
+        link: buildShortTrackingUrl(discussion.slug),
+        imageUrl: facebookImageUrl,
+        dryRun,
+        logDetail: logMarker('facebook', discussion.slug),
+        returnResult: true,
       });
+      if (publishResult && !dryRun) {
+        await saveFacebookPostMapping(client, {
+          discussionId: discussion.id,
+          publishResult,
+          publishedAt: now,
+        });
+      }
+      results.facebook = publishResult ? (dryRun ? 'dry_run' : 'posted') : 'failed';
     }
-    results.facebook = publishResult ? (dryRun ? 'dry_run' : 'posted') : 'failed';
   }
 
   if (platform === 'both' || platform === 'instagram') {
-    if (dryRun) {
+    const instagramImageUrl = await instagramImageResolver(discussion, { client, generateMissing: !dryRun });
+    if (!instagramImageUrl) {
+      console.error(`  [skip] No reviewed Instagram photo is available for Buzz Board discussion ${discussion.slug}.`);
+      results.instagram = 'image_unavailable';
+    } else if (dryRun) {
       console.log(`[dry-run] Would post to Instagram: "${buildCopy(discussion, 'instagram')}" (image: ${instagramImageUrl})`);
       results.instagram = 'dry_run';
     } else {
@@ -219,8 +228,7 @@ if (require.main === module) {
 module.exports = {
   CAMPAIGN,
   buildCopy,
-  buildFacebookImageUrl,
-  buildInstagramImageUrl,
+  buildFacebookPreview,
   buildInstagramShortTrackingUrl,
   buildShortTrackingUrl,
   buildTrackingUrl,
