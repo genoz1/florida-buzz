@@ -110,7 +110,7 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         } finally {await fs.rm(dir,{recursive:true,force:true});}
       }
 
-      const utility=async(key,endpoint,input)=>{
+      const utility=async(key,endpoint,input,{fallbackOnFailure=false}={})=>{
         const state=pkg.data[key];
         if(!state) {
           await assertLease();
@@ -125,10 +125,15 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         if(state.status==='QUEUED') {
           const outcome=await fal.poll(state);
           if(!outcome)return {stop:{waitingUtility:state.request_id,step:key}};
-          if(outcome.failed)return {stop:await save({warning:`Remote Reel utility failed at ${key}.`},'MANUAL_REVIEW')};
+          if(outcome.failed) {
+            await save({[key]:{...state,status:'FAILED',failedAt:new Date().toISOString()}});
+            if(fallbackOnFailure)return {failed:true};
+            return {stop:await save({warning:`Remote Reel utility failed at ${key}.`},'MANUAL_REVIEW')};
+          }
           await save({[key]:{...state,status:'COMPLETE',result:outcome.result}});
           return {stop:{completedUtility:state.request_id,step:key}};
         }
+        if(state.status==='FAILED'&&fallbackOnFailure)return {failed:true};
         if(state.status!=='COMPLETE')return {stop:await save({warning:`Unexpected remote assembly state at ${key}.`},'MANUAL_REVIEW')};
         return {result:state.result};
       };
@@ -154,8 +159,25 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         language:'en',font_name:'Montserrat',font_size:48,font_weight:'bold',
         font_color:'white',highlight_color:'white',stroke_width:3,stroke_color:'black',
         background_color:'none',position:'bottom',y_offset:-300,words_per_subtitle:4,enable_animation:false
-      });
+      },{fallbackOnFailure:true});
       if(subtitled.stop)return subtitled.stop;
+
+      // fal's subtitle utility is useful but not a single point of failure. The
+      // local assembler uses the already-approved clips, transcript and ASS
+      // safe-zone captions, and performs a full decode check before returning.
+      if(subtitled.failed&&!pkg.data.master) {
+        const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-local-fallback-'));
+        try {
+          const clips=[];
+          for(const [index,url] of clipUrls.entries()) {
+            const clip=path.join(dir,`clip-${index+1}.mp4`);await media.download(url,clip);clips.push(clip);
+          }
+          const audio=path.join(dir,'narration.mp3');await media.download(await store.signed(pkg.data.audioAsset,21600),audio);
+          const output=await media.assemble(clips,audio,transcript.result,pkg.data.script.thoughts,dir);
+          const master=await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(output.master),'video/mp4');
+          await save({master,localAssembly:{status:'COMPLETE',reason:'remoteSubtitle failed',completedAt:new Date().toISOString()},quality:{...(pkg.data.quality||{}),...output.quality,localAssembly:true,remoteAssembly:false}});
+        } finally {await fs.rm(dir,{recursive:true,force:true});}
+      }
 
       if(!hasPassedFinalReview(pkg)) {
         const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-remote-master-'));
