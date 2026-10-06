@@ -81,3 +81,6 @@ The second command advances or polls one safe step; repeat as requests finish, n
 Before merging/deploying, inspect the diff: only feature files, the migration/tests, required dependencies/lockfile and the two-line server hook are allowed. Deploy through the existing GitHub → DigitalOcean process after applying the new migration. Preserve all existing environment flags. Verify homepage, representative existing articles/Resources/images/Buzz Board and current schedule/social configuration. Do not publish social posts or spend image credits just to smoke-test unchanged paths. If an existing path changes unexpectedly, roll back the feature commit and disable the three feature gates; report unrelated issues instead of repairing them in this change.
 
 **Current deployment status:** not deployed. The browser tooling exposes the separate Chrome session but not the user's signed-in in-app DigitalOcean tab; the separate DigitalOcean page was unavailable, and the Supabase dashboard requires sign-in. Production migration, credential verification, smoke tests and the one live Christmas package remain blocked. Local tests do not establish production success.
+
+
+<!-- Deployment trigger: remote Reel assembly rollout -->
