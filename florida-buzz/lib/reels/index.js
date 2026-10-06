@@ -71,7 +71,8 @@ function mount(app,env=process.env) {
   try {
     const runtime=production(reelEnv),{cfg,store,pipeline,editorial}=runtime;
     app.use('/admin/reels',createRouter({store,cfg,fal:runtime.fal,env:reelEnv}));
-    runControlledChristmasTest(env).catch(err=>console.error('[reels controlled test]',err.message));
+    // Controlled Reel generation stopped after repeated location-fidelity failures.
+    // Keep admin review available, but do not launch any paid controlled generation on app startup.
     if(!cfg.enabled||!cfg.generation||!cfg.schedules){console.log('[reels disabled] emergency quality hold');return;}
     if(!cfg.falKey||!reelEnv.OPENAI_API_KEY||Object.values(cfg.caps).some(v=>v<=0))throw new Error('Reel generation requires credentials and explicit positive spending caps');
     const cron=require('node-cron');
