@@ -1,6 +1,7 @@
 'use strict';
 
 const KLING = 'fal-ai/kling-video/v3/standard/text-to-video';
+const SEEDANCE = 'bytedance/seedance-2.5/text-to-video';
 const QWEN = 'fal-ai/qwen-3-tts/text-to-speech/1.7b';
 const WHISPER = 'fal-ai/whisper';
 const MERGE_VIDEOS = 'fal-ai/ffmpeg-api/merge-videos';
@@ -23,7 +24,8 @@ function config(env = process.env) {
     ideasCron: env.REELS_IDEAS_CRON || '0 9 * * 0',
     timezone: 'America/New_York', seconds,
     caps: { package: amount('REELS_PACKAGE_CAP_USD'), day: amount('REELS_DAY_CAP_USD'),
-      week: amount('REELS_WEEK_CAP_USD'), month: amount('REELS_MONTH_CAP_USD'), single: 2 },
+      week: amount('REELS_WEEK_CAP_USD'), month: amount('REELS_MONTH_CAP_USD'),
+      single: env.REELS_SINGLE_CAP_USD === undefined ? 3 : amount('REELS_SINGLE_CAP_USD') },
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     falKey: env.FAL_KEY, billingKey: env.FAL_BILLING_KEY || env.FAL_KEY,
     voicePath: 'voice/approved-qwen.safetensors', bucket: 'guide-reels',
@@ -35,5 +37,6 @@ const voiceInput = (text, embedding) => ({ text, language: 'English', speaker_vo
   max_new_tokens: 1000, top_k: 50, top_p: 1, temperature: 0.9, repetition_penalty: 1.05,
   subtalker_dosample: true, subtalker_top_k: 50, subtalker_top_p: 1, subtalker_temperature: 0.9 });
 const videoInput = (prompt, seconds = 5) => ({ prompt, duration: String(seconds),
-  aspect_ratio: '9:16', generate_audio: false, cfg_scale: 0.5 });
-module.exports = { config, KLING, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE, voiceInput, videoInput };
+  resolution: '720p', aspect_ratio: '9:16', generate_audio: false,
+  bitrate_mode: 'high', codec: 'H264', end_user_id: 'florida-buzz' });
+module.exports = { config, KLING, SEEDANCE, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE, voiceInput, videoInput };

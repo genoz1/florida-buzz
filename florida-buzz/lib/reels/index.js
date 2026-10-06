@@ -2,7 +2,7 @@
 const {config}=require('./config');
 const {createStore}=require('./store');
 const {createFal}=require('./fal');
-const {createEditorial}=require('./editorial');
+const {createEditorial,continuousChristmasScript,socialCopy}=require('./editorial');
 const {createMedia}=require('./media');
 const {createPipeline}=require('./pipeline');
 const {createRouter}=require('./router');
@@ -15,10 +15,10 @@ function production(env=process.env) {
 }
 
 async function runControlledChristmasTest(env=process.env) {
-  const testEnv={...env,REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SCHEDULES_ENABLED:'false',REELS_AUTO_PUBLISH_ENABLED:'false',REELS_PACKAGE_CAP_USD:'3',REELS_DAY_CAP_USD:'7',REELS_WEEK_CAP_USD:'12',REELS_MONTH_CAP_USD:'24'};
+  const testEnv={...env,REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SCHEDULES_ENABLED:'false',REELS_AUTO_PUBLISH_ENABLED:'false',REELS_SINGLE_CAP_USD:'3',REELS_PACKAGE_CAP_USD:'5',REELS_DAY_CAP_USD:'7',REELS_WEEK_CAP_USD:'12',REELS_MONTH_CAP_USD:'24'};
   const runtime=production(testEnv),{store,pipeline}=runtime;
-  const key='christmas-party-2026-controlled-walkthrough-v6';
-  const slot='quality-test-christmas-controlled-walkthrough-v6';
+  const key='christmas-party-2026-controlled-walkthrough-v7';
+  const slot='quality-test-christmas-controlled-walkthrough-v7';
   await store.clearPause();
   await store.rejectWorkingForTopic('christmas-party-2026');
   await store.addTopics([{
@@ -30,6 +30,24 @@ async function runControlledChristmasTest(env=process.env) {
     seed_order:2,
     score:100
   }]);
+  if(!await store.packageForTopic(key)) {
+    const source=await store.packageForTopic('christmas-party-2026-controlled-walkthrough-v6');
+    if(!source)throw new Error('Approved v6 source package is unavailable for the two-scene repair');
+    const sourceGenerations=await store.generations(source);
+    const reusedClips={};
+    for(const shot of [1,2]) {
+      const passed=sourceGenerations.filter(g=>g.kind==='clip'&&g.shot===shot&&g.review?.classification==='PASS').sort((a,b)=>b.attempt-a.attempt)[0];
+      if(!passed?.review?.asset)throw new Error(`Approved v6 shot ${shot} is unavailable for reuse`);
+      reusedClips[shot]=passed.review.asset;
+    }
+    const transcript=sourceGenerations.find(g=>g.kind==='transcript'&&g.status==='COMPLETE');
+    const script=continuousChristmasScript();
+    const data={facts:source.data.facts,guide:source.data.guide,script,social:socialCopy(script,source.data.guide),reusedClips,
+      audioAsset:source.data.audioAsset,audioDuration:source.data.audioDuration,pausedAudio:source.data.pausedAudio,
+      captionAsset:source.data.captionAsset,narrationTiming:source.data.narrationTiming,reusedTranscript:transcript?.result};
+    if(!data.facts||!data.guide||!data.audioAsset||!data.pausedAudio||!data.reusedTranscript)throw new Error('Approved v6 narration or editorial assets are unavailable for reuse');
+    await store.createControlledRepairPackage(key,slot,data);
+  }
   for(let i=0;i<180;i++) {
     const pkg=await store.packageForTopic(key);
     if(pkg && ['READY_FOR_APPROVAL','MANUAL_REVIEW','HELD','REJECTED','APPROVED'].includes(pkg.status)) {

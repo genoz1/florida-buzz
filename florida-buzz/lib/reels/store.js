@@ -35,6 +35,13 @@ function createStore(client, cfg) {
     packages: () => checked(client.from('reel_packages').select('*').order('created_at', { ascending: false }).limit(100)),
     package: id => checked(client.from('reel_packages').select('*').eq('id', id).single()),
     packageForTopic: key => checked(client.from('reel_packages').select('*').eq('topic_key', key).maybeSingle()),
+    async createControlledRepairPackage(topicKey, slot, data) {
+      const existing=await checked(client.from('reel_packages').select('*').eq('topic_key',topicKey).maybeSingle());
+      if(existing)return existing;
+      const created=await checked(client.from('reel_packages').insert({topic_key:topicKey,slot,data,status:'WORKING'}).select('*').single());
+      await checked(client.from('reel_topics').update({status:'SELECTED'}).eq('key',topicKey));
+      return created;
+    },
     rejectWorkingForTopic: key => checked(client.from('reel_packages').update({status:'REJECTED',updated_at:new Date().toISOString()}).eq('topic_key',key).eq('status','WORKING').select('id')),
     async allGuides() {
       const guides = [];

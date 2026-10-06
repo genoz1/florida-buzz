@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
-const {KLING,QWEN,WHISPER,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,videoInput,voiceInput}=require('./config');
+const {SEEDANCE,QWEN,WHISPER,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,videoInput,voiceInput}=require('./config');
 const {promptFor,socialCopy,validateFacts}=require('./editorial');
 const {hasPassedFinalReview}=require('./publish');
 function createPipeline({cfg,store,fal,editorial,media,publisher}) {
@@ -63,9 +63,10 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         return {submitted:receipt.request_id};
       };
       for(let shot=1;shot<=4;shot++) {
+        if(pkg.data.reusedClips?.[shot])continue;
         const attempts=gens.filter(g=>g.kind==='clip'&&g.shot===shot).sort((a,b)=>a.attempt-b.attempt),last=attempts.at(-1);
         const prompt=promptFor(pkg.data.script.shots[shot-1],topic);
-        if(!last)return await submit({kind:'clip',shot,attempt:0,endpoint:KLING,input:videoInput(prompt,cfg.seconds)},cfg.seconds);
+        if(!last)return await submit({kind:'clip',shot,attempt:0,endpoint:SEEDANCE,input:videoInput(prompt,cfg.seconds)},cfg.seconds);
         if(last.status==='FAILED')return await save({warning:`Shot ${shot} failed; manual review required.`},'MANUAL_REVIEW');
         if(!last.review) {
           const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-clip-'));
@@ -79,15 +80,15 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         }
         if(last.review.classification==='PASS')continue;
         if(last.review.classification==='REGENERATE_ONCE'&&last.attempt===0) {
-          return await submit({kind:'clip',shot,attempt:1,endpoint:KLING,input:videoInput(`${prompt} Correct only this severe visible defect: ${last.review.correction}`,cfg.seconds)},cfg.seconds);
+          return await submit({kind:'clip',shot,attempt:1,endpoint:SEEDANCE,input:videoInput(`${prompt} Correct only this severe visible defect: ${last.review.correction}`,cfg.seconds)},cfg.seconds);
         }
         return await save({warning:`Shot ${shot}: ${last.attempt?'replacement failed; maximum one replacement reached':'requires manual review'}.`},'MANUAL_REVIEW');
       }
       const narration=gens.find(g=>g.kind==='narration');
-      if(!narration) {
+      if(!narration&&!pkg.data.audioAsset) {
         return await submit({kind:'narration',endpoint:QWEN,input:voiceInput(pkg.data.script.thoughts.join('\n\n'),approvedVoice)},pkg.data.script.thoughts.join(' ').length);
       }
-      if(!pkg.data.audioAsset) {
+      if(narration&&!pkg.data.audioAsset) {
         const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-audio-'));
         try {
           const file=path.join(dir,'original.mp3');await media.download(narration.result.audio.url,file);
@@ -97,12 +98,13 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         } finally {await fs.rm(dir,{recursive:true,force:true});}
       }
       const transcript=gens.find(g=>g.kind==='transcript');
-      if(!transcript)return await submit({kind:'transcript',endpoint:WHISPER,input:{audio_url:await store.signed(pkg.data.audioAsset,86400),task:'transcribe',chunk_level:'word',batch_size:64}},pkg.data.audioDuration);
+      if(!transcript&&!pkg.data.reusedTranscript)return await submit({kind:'transcript',endpoint:WHISPER,input:{audio_url:await store.signed(pkg.data.audioAsset,86400),task:'transcribe',chunk_level:'word',batch_size:64}},pkg.data.audioDuration);
+      const transcriptResult=transcript?.result||pkg.data.reusedTranscript;
       if(!pkg.data.pausedAudio) {
         const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-audio-final-'));
         try {
           const audio=path.join(dir,'audio.mp3');await media.download(await store.signed(pkg.data.audioAsset),audio);
-          const output=await media.prepareNarration(audio,transcript.result,pkg.data.script.thoughts,dir);
+          const output=await media.prepareNarration(audio,transcriptResult,pkg.data.script.thoughts,dir);
           const captionAsset=await store.asset(`${pkg.id}/captions.ass`,await fs.readFile(output.ass),'text/plain');
           const pausedAudio=await store.asset(`${pkg.id}/Narration-Qwen-paused.wav`,await fs.readFile(output.paused),'audio/wav');
           await save({captionAsset,pausedAudio,narrationTiming:output.timing,quality:output.quality,assemblyBalanceBefore:await fal.balance()});
@@ -140,9 +142,12 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
 
       const clipUrls=[];
       for(let shot=1;shot<=4;shot++) {
+        if(pkg.data.reusedClips?.[shot]){clipUrls.push(await store.signed(pkg.data.reusedClips[shot],21600));continue;}
         const g=gens.filter(g=>g.kind==='clip'&&g.shot===shot&&g.review?.classification==='PASS').sort((a,b)=>b.attempt-a.attempt)[0];
         clipUrls.push(await store.signed(g.review.asset,21600));
       }
+
+      if(pkg.data.assemblyBalanceBefore===undefined){await save({assemblyBalanceBefore:await fal.balance()});return {preparedAssemblyBilling:true};}
 
       const videoMerge=await utility('remoteVideoMerge',MERGE_VIDEOS,{video_urls:clipUrls,target_fps:24,resolution:{width:720,height:1280}});
       if(videoMerge.stop)return videoMerge.stop;
@@ -173,7 +178,7 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
             const clip=path.join(dir,`clip-${index+1}.mp4`);await media.download(url,clip);clips.push(clip);
           }
           const audio=path.join(dir,'narration.mp3');await media.download(await store.signed(pkg.data.audioAsset,21600),audio);
-          const output=await media.assemble(clips,audio,transcript.result,pkg.data.script.thoughts,dir);
+          const output=await media.assemble(clips,audio,transcriptResult,pkg.data.script.thoughts,dir);
           const master=await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(output.master),'video/mp4');
           await save({master,localAssembly:{status:'COMPLETE',reason:'remoteSubtitle failed',completedAt:new Date().toISOString()},quality:{...(pkg.data.quality||{}),...output.quality,localAssembly:true,remoteAssembly:false}});
         } finally {await fs.rm(dir,{recursive:true,force:true});}
