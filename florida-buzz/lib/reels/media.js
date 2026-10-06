@@ -121,7 +121,9 @@ function createMedia(cfg, env=process.env) {
     },
     async review(file, context) {
       const info=await probe(file), v=info.streams.find(s=>s.codec_type==='video');
-      if(!v || v.width*16!==v.height*9 || Number(info.format.duration)<cfg.seconds-.15) return {classification:'REGENERATE_ONCE',issues:['Wrong aspect ratio or truncated clip'],correction:'Use a complete 9:16 portrait shot.'};
+      const rotation=Number(v?.tags?.rotate ?? v?.side_data_list?.find(x=>Number.isFinite(Number(x.rotation)))?.rotation ?? 0);
+      if(rotation%360!==0)return {classification:'REGENERATE_ONCE',issues:['Clip is rotated or sideways'],correction:'Keep the phone physically upright with a level horizon; output true portrait video with no rotation metadata.'};
+      if(!v || v.width*16!==v.height*9 || Number(info.format.duration)<cfg.seconds-.15) return {classification:'REGENERATE_ONCE',issues:['Wrong aspect ratio or truncated clip'],correction:'Use a complete upright 9:16 portrait shot.'};
       if(v.width<720||v.height<1280)return {classification:'MANUAL_REVIEW',issues:['Source below 720×1280; automatic upscaling is disabled'],correction:''};
       const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-review-'));
       try {
@@ -136,6 +138,32 @@ function createMedia(cfg, env=process.env) {
         const text=result.output_text||(result.output||[]).flatMap(o=>(o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text)).join('');
         const review=JSON.parse(text);
         if(!['PASS','REGENERATE_ONCE','MANUAL_REVIEW'].includes(review.classification)||!Array.isArray(review.issues))throw new Error('Invalid quality review');
+        return review;
+      } finally {await fs.rm(dir,{recursive:true,force:true});}
+    },
+    async finalReview(file, context) {
+      const info=await probe(file),v=info.streams.find(s=>s.codec_type==='video');
+      const rotation=Number(v?.tags?.rotate ?? v?.side_data_list?.find(x=>Number.isFinite(Number(x.rotation)))?.rotation ?? 0);
+      if(!v||v.width!==720||v.height!==1280||rotation%360!==0)return {classification:'MANUAL_REVIEW',issues:['Final Reel is not true upright 720×1280 portrait video']};
+      const duration=Number(info.format.duration),dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-final-review-'));
+      try {
+        const times=[.5,2.5,5.5,7.5,10.5,12.5,15.5,Math.max(0,duration-.5)].filter(t=>t<duration);
+        const images=[];
+        for(const [i,time] of times.entries()){
+          const frame=path.join(dir,`final-${i}.jpg`);
+          await run(ffmpeg,['-v','error','-y','-ss',String(time),'-i',file,'-frames:v','1','-vf','scale=360:640',frame]);
+          images.push(await fs.readFile(frame));
+        }
+        const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(120000),
+          body:JSON.stringify({model:env.REELS_REVIEW_MODEL||env.AI_IMAGE_VALIDATION_MODEL||env.AI_TEXT_MODEL||'gpt-5.6-terra',
+            instructions:'Review the assembled vertical travel Reel as a whole. FAIL unless: (1) every scene is visually upright with a level horizon, never sideways; (2) the four shots are meaningfully different locations/compositions rather than repeated people walking through the same place; (3) shot 1 may be Main Street but later shots must visibly differ; (4) captions are fully visible in a safe lower-middle area, not in the bottom social-app control zone and not clipped; (5) no severe AI artifacts. Be strict about repetition, rotation and caption placement because these are publication blockers.',
+            input:[{role:'user',content:[{type:'input_text',text:JSON.stringify(context)},...images.map(b=>({type:'input_image',image_url:`data:image/jpeg;base64,${b.toString('base64')}`,detail:'high'}))]}],
+            max_output_tokens:1200,text:{format:{type:'json_schema',name:'final_reel_review',strict:true,schema:{type:'object',properties:{classification:{type:'string',enum:['PASS','MANUAL_REVIEW']},issues:{type:'array',items:{type:'string'}}},required:['classification','issues'],additionalProperties:false}}}})});
+        if(!response.ok)throw new Error('Final Reel reviewer unavailable');
+        const result=await response.json();if(result.status!=='completed')throw new Error('Incomplete final Reel review');
+        const text=result.output_text||(result.output||[]).flatMap(o=>(o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text)).join('');
+        const review=JSON.parse(text);
+        if(!['PASS','MANUAL_REVIEW'].includes(review.classification)||!Array.isArray(review.issues))throw new Error('Invalid final Reel review');
         return review;
       } finally {await fs.rm(dir,{recursive:true,force:true});}
     },
