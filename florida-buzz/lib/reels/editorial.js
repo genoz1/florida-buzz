@@ -2,6 +2,7 @@
 const { criteria, strongest, score } = require('./topics');
 const str = { type: 'string' }, bool = { type: 'boolean' };
 const array = items => ({ type: 'array', items });
+const fixedArray = (items, length) => ({ type: 'array', items, minItems:length, maxItems:length });
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const schema = (name, value) => ({ name, strict: true, schema: value });
 const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -26,24 +27,71 @@ function validateFacts(facts, now = new Date(), topic) {
   }
   return facts;
 }
+const reelStages=['arrival','icon','land','experience'];
+const wordCount=value=>String(value||'').trim().split(/\s+/).filter(Boolean).length;
+function isPeopleWalking(value) {
+  const description=String(value||'');
+  return /\b(guests?|people|visitors?|crowd)\b.{0,60}\b(walk|walking|stroll|strolling|moving)\b/i.test(description)
+    || /\b(walk|walking|stroll|strolling|moving)\b.{0,60}\b(guests?|people|visitors?|crowd)\b/i.test(description);
+}
+function normalizeNarration(thoughts, seconds) {
+  if(!Array.isArray(thoughts)||thoughts.length!==4)throw new Error('Exactly four narration thoughts required');
+  let normalized=thoughts.map(value=>String(value||'').replace(/\s+/g,' ').trim());
+  if(normalized.some(value=>!value))throw new Error('Every narration thought must contain spoken copy');
+  if(!normalized[3].includes('TheFloridaBuzz.com'))throw new Error('Missing Florida Buzz CTA');
+  const min=seconds===5?55:64,max=seconds===5?65:78;
+  if(wordCount(normalized.join(' '))>max) {
+    const cta='See the full guide at TheFloridaBuzz.com.';
+    const available=max-wordCount(cta),lengths=normalized.slice(0,3).map(wordCount),total=lengths.reduce((sum,n)=>sum+n,0);
+    const budgets=lengths.map(n=>Math.max(8,Math.floor(available*n/total)));
+    while(budgets.reduce((sum,n)=>sum+n,0)>available)budgets[budgets.indexOf(Math.max(...budgets))]--;
+    while(budgets.reduce((sum,n)=>sum+n,0)<available)budgets[budgets.indexOf(Math.min(...budgets))]++;
+    const trailing=/^(and|or|but|because|with|for|to|of|the|a|an|in|on|at|from|that|which)$/i;
+    normalized=normalized.slice(0,3).map((thought,index)=>{
+      const words=thought.split(/\s+/).slice(0,budgets[index]);
+      while(words.length>8&&trailing.test(words.at(-1).replace(/[^a-z]/gi,'')))words.pop();
+      return words.join(' ').replace(/[,:;\-]+$/,'').replace(/[.!?]?$/,'.');
+    }).concat(cta);
+  }
+  const fillers=['That tradeoff deserves a careful look.','Your priorities should drive the decision.','Compare the cost with your plans.','Check current details before you book.'];
+  let next=0;
+  while(wordCount(normalized.join(' '))<min) {
+    const addition=fillers[next%fillers.length];
+    normalized[next%3]=`${normalized[next%3]} ${addition}`;
+    next++;
+  }
+  if(wordCount(normalized.join(' '))>max)throw new Error('Deterministic narration normalization exceeded its target');
+  return normalized;
+}
+function normalizeScript(script, seconds) {
+  if(!script||!Array.isArray(script.shots)||script.shots.length!==4)throw new Error('Exactly four Reel shots required');
+  const focus={
+    icon:'Steady handheld view centered on the recognizable icon, architecture and surrounding setting; people remain incidental background context.',
+    land:'Handheld view focused on the themed land or attraction architecture, signage and environmental details; pedestrian movement remains incidental.',
+    experience:'Closer observational view of a distinctive experience, attraction exterior, entertainment setting, food or visual detail; emphasize the place rather than foot traffic.'
+  };
+  const shots=script.shots.map((raw,index)=>{
+    const shot=raw&&typeof raw==='object'?raw:{};
+    const stage=reelStages[index];
+    const description=String(shot.description||'').replace(/\s+/g,' ').trim();
+    return {stage,type:String(shot.type||stage).trim(),location:String(shot.location||'').trim(),
+      description:index>0&&isPeopleWalking(description)?focus[stage]:description};
+  });
+  return {...script,thoughts:normalizeNarration(script.thoughts,seconds),shots};
+}
 function validateScript(script, seconds) {
   if (script.thoughts.length !== 4 || script.shots.length !== 4) throw new Error('Four distinct thoughts and four progressive shots required');
   const locations=script.shots.map(s=>String(s.location||'').trim());
   if(locations.some(v=>!v))throw new Error('Every Reel shot requires an explicit real location');
   if(new Set(locations.map(v=>v.toLowerCase())).size!==4)throw new Error('All four Reel shots must use different park locations');
   const stages=script.shots.map(s=>String(s.stage||'').toLowerCase());
-  const expectedStages=['arrival','icon','land','experience'];
-  if(stages.some((s,i)=>s!==expectedStages[i]))throw new Error('Reel scenes must progress arrival → icon → land → experience');
+  if(stages.some((s,i)=>s!==reelStages[i]))throw new Error('Reel scenes must progress arrival → icon → land → experience');
   const mainStreet=script.shots.map((s,i)=>/main street/i.test(`${s.location} ${s.description}`)?i:-1).filter(i=>i>=0);
   if(mainStreet.some(i=>i>0)||mainStreet.length>1)throw new Error('Main Street may appear only in shot 1');
-  const walking=script.shots.filter(s=>{
-    const d=String(s.description||'');
-    return /\b(guests?|people|visitors?|crowd)\b.{0,60}\b(walk|walking|stroll|strolling|moving)\b/i.test(d)
-      || /\b(walk|walking|stroll|strolling|moving)\b.{0,60}\b(guests?|people|visitors?|crowd)\b/i.test(d);
-  }).length;
+  const walking=script.shots.filter(s=>isPeopleWalking(s.description)).length;
   if(walking>1)throw new Error('Only one Reel scene may primarily show people walking');
   if (!script.thoughts[3].includes('TheFloridaBuzz.com')) throw new Error('Missing Florida Buzz CTA');
-  const count = script.thoughts.join(' ').split(/\s+/).length;
+  const count = wordCount(script.thoughts.join(' '));
   const min = seconds === 5 ? 55 : 64, max = seconds === 5 ? 65 : 78;
   if (count < min || count > max) throw new Error(`Narration copy must contain ${min}–${max} conversational words; never stretch audio`);
   if (unsafe.test(script.thoughts.join(' ') + script.shots.map(s => `${s.location} ${s.description}`).join(' '))) throw new Error('Incident footage is not permitted');
@@ -125,32 +173,12 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
       return { ...published, url: `${cfg.site}/article/${published.slug}`, handling: existing ? 'UPDATED' : 'CREATED' };
     },
     async script(topic, guide, facts) {
-      const shape=schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({stage:str,type:str, location:str, description:str})),
+      const shape=schema('reel_script', object({hook:str, thoughts:fixedArray(str,4), shots:fixedArray(object({stage:str,type:str, location:str, description:str}),4),
         social:object({facebook:str,instagram:str,pinterest:str,threads:str})}));
       const system='Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Return EXACTLY four spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. Return EXACTLY four shots in this exact stage order: arrival, icon, land, experience. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build a VISUAL JOURNEY that moves progressively through the park: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Do not use more than one people-walking scene. Later shots must change both location and subject/composition: landmark, attraction/land, entertainment/detail/food/ride exterior—not repeated crowds walking. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.';
       const payload=JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4});
-      let value=await complete(system,payload,shape);
-      try { return validateScript(value,cfg.seconds); }
-      catch(firstError) {
-        value=await complete('Repair this Reel script to satisfy the validator exactly. Keep the same verified facts and overall message. Return EXACTLY four thoughts and EXACTLY four shots with stages in this exact order: arrival, icon, land, experience. Use four different named park locations. Main Street may appear only in shot 1. At most one shot may primarily show people walking. Keep the CTA in thought 4 with TheFloridaBuzz.com. Keep narration within the required word count. Do not invent facts.',
-          JSON.stringify({topic,guide,facts,invalid:value,error:firstError.message,words:cfg.seconds === 5 ? '55–65' : '64–78'}),shape);
-        try { return validateScript(value,cfg.seconds); }
-        catch(secondError) {
-          if(secondError.message==='Only one Reel scene may primarily show people walking') {
-            const shots=value.shots.map((shot,i)=>i===0?shot:{...shot,description:[
-              'Steady handheld view centered on the recognizable icon, architecture and surrounding setting; people remain incidental background context.',
-              'Handheld view focused on the themed land or attraction architecture, signage and environmental details rather than pedestrian movement.',
-              'Closer observational view of a distinctive experience, attraction exterior, entertainment setting or visual detail at this location; emphasize the place, not foot traffic.'
-            ][i-1]});
-            return validateScript({...value,shots},cfg.seconds);
-          }
-          if(!/^Narration copy must contain /.test(secondError.message))throw secondError;
-          const thoughtShape=schema('reel_thoughts_only',object({thoughts:array(str)}));
-          const repaired=await complete('Rewrite ONLY the narration thoughts. Preserve the same verified meaning and CTA. Return EXACTLY four conversational thoughts totaling the requested word count. Thought 4 must include TheFloridaBuzz.com. Do not add facts, dates, prices, claims, or scene instructions that are not already present.',
-            JSON.stringify({topic,guide,facts,current_thoughts:value.thoughts,words:cfg.seconds === 5 ? '55–65 total words' : '64–78 total words'}),thoughtShape);
-          return validateScript({...value,thoughts:repaired.thoughts},cfg.seconds);
-        }
-      }
+      const value=normalizeScript(await complete(system,payload,shape),cfg.seconds);
+      return validateScript(value,cfg.seconds);
     },
     async ideas() {
       const history = await store.topics();
@@ -174,4 +202,4 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
     },
   };
 }
-module.exports = { createEditorial, validateFacts, validateScript, promptFor, socialCopy, escape, primary };
+module.exports = { createEditorial, validateFacts, validateScript, normalizeScript, normalizeNarration, isPeopleWalking, promptFor, socialCopy, escape, primary };

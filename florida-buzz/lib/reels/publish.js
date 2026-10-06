@@ -4,9 +4,16 @@ const {createPost:createInstagramPost}=require('../instagram');
 const {createPost:createThreadsPost}=require('../threads');
 const {createVideoPin}=require('../pinterest');
 
+function hasPassedFinalReview(pkg) {
+  const data=pkg?.data;
+  return Boolean(data?.master&&data.finalReview?.classification==='PASS'&&data.finalReview.master===data.master&&
+    data.finalReview.passedAt&&data.quality?.finalReview===true);
+}
+
 function createPublisher(env=process.env,channels={facebook:postToFacebookPage,instagram:createInstagramPost,pinterest:createVideoPin,threads:createThreadsPost}) {
   const required=['FB_PAGE_ID','FB_PAGE_ACCESS_TOKEN','INSTAGRAM_ACCESS_TOKEN','INSTAGRAM_USER_ID','PINTEREST_BOARD_ID','THREADS_ACCESS_TOKEN','THREADS_USER_ID'];
   return {async publish({pkg,masterUrl,coverImageUrl,save}) {
+    if(!hasPassedFinalReview(pkg))throw new Error('Reel master lacks persisted final QA proof; publication blocked');
     if(!pkg.data?.guide?.url)throw new Error('Reel guide URL missing; publication blocked');
     if(!masterUrl||!coverImageUrl)throw new Error('Reel master or Pinterest cover missing; publication blocked');
     const missing=required.filter(key=>!env[key]);if(missing.length)throw new Error(`Reel social publishing credentials missing: ${missing.join(', ')}`);
@@ -27,4 +34,4 @@ function createPublisher(env=process.env,channels={facebook:postToFacebookPage,i
     return journal;
   }};
 }
-module.exports={createPublisher};
+module.exports={createPublisher,hasPassedFinalReview};
