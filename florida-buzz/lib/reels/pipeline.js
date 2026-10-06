@@ -175,6 +175,7 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
       const balanceAfter=pkg.data.balanceAfter??await fal.balance();
       const actualCost=gens.reduce((sum,g)=>sum+Number(g.actual_usd),0)+Number(pkg.data.remoteAssemblyCost||0);
       await save({actualCost,balanceAfter});
+      if(!cfg.autoPublish)return await save({warning:'Controlled Reel test passed generation and final QA. Social publishing remains disabled.'},'READY_FOR_APPROVAL');
       const publication=await publisher.publish({pkg,masterUrl:await store.signed(pkg.data.master,21600),coverImageUrl:pkg.data.guide.image_url,save});
       return await save({publication,publishedAt:new Date().toISOString(),warning:'Automated Reel passed factual, media and publication checks.'},'APPROVED');
     } catch(error) {

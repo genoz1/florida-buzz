@@ -33,6 +33,8 @@ function createStore(client, cfg) {
     addTopics: topics => checked(client.from('reel_topics').upsert(topics, { onConflict: 'key', ignoreDuplicates: true })),
     packages: () => checked(client.from('reel_packages').select('*').order('created_at', { ascending: false }).limit(100)),
     package: id => checked(client.from('reel_packages').select('*').eq('id', id).single()),
+    packageForTopic: key => checked(client.from('reel_packages').select('*').eq('topic_key', key).maybeSingle()),
+    rejectWorkingForTopic: key => checked(client.from('reel_packages').update({status:'REJECTED',updated_at:new Date().toISOString()}).eq('topic_key',key).eq('status','WORKING').select('id')),
     async allGuides() {
       const guides = [];
       for (let offset = 0; ; offset += 500) {
