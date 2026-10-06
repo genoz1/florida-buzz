@@ -111,36 +111,17 @@ function createMedia(cfg, env=process.env) {
         const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(120000),
           body:JSON.stringify({model:env.REELS_REVIEW_MODEL||env.AI_IMAGE_VALIDATION_MODEL||env.AI_TEXT_MODEL||'gpt-5.6-terra',
             instructions:'Review five ordered frames from a travel-guide video for visible severe artifacts and temporal instability. Check malformed/reversed heads, hands, duplicate guests, sliding or impossible walking, backwards strollers, disappearing objects, severe flicker, warped or changing landmarks/buildings, wrong location, broken prominent signage, impossible camera motion. Reject only genuinely unusable clips. PASS plausible tourist footage. REGENERATE_ONCE only a clear correctable severe failure. MANUAL_REVIEW when evidence is ambiguous or motion cannot be judged confidently. Do not demand perfect tiny background faces or signage. Return actual visible defects, not speculative ones.',
-            input:[{role:'user',content:[{type:'input_text',text:JSON.stringify(context)},...images.map(b=>({type:'input_image',image_url:`data:image/jpeg;base64,${b.toString('base64')}`,detail:'high'}))]}],
-            max_output_tokens:1500,text:{format:{type:'json_schema',name:'reel_clip_review',strict:true,schema:{type:'object',properties:{classification:{type:'string',enum:['PASS','REGENERATE_ONCE','MANUAL_REVIEW']},issues:{type:'array',items:{type:'string'}},correction:{type:'string'}},required:['classification','issues','correction'],additionalProperties:false}}}})});
-        if(!response.ok) throw new Error('Video quality reviewer unavailable');
-        const result=await response.json();if(result.status!=='completed')throw new Error('Incomplete video review');
-        const text=result.output_text||(result.output||[]).flatMap(o=>(o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text)).join('');
+            input:[{role:user,content:[{type:input_text,text:JSON.stringify(context)},...images.map(b=>({type:input_image,image_url:`data:image/jpeg;base64,${b.toString(base64)}`,detail:high}))]}],
+            max_output_tokens:1500,text:{format:{type:json_schema,name:reel_clip_review,\"name\":true,schema:{type:object,properties:{classification:{type:string,enum:[PASS,REGENERATE_ONCE,^ANUAL_REVIEW]},issues:{type:array,items:{type:string}},correction:{type:string}},required:[classification,issues,correction],additionalProperties:false}}}})});
+        if(!response.ok)throw new Error(Video quality reviewer unavailable);
+        const result=await response.json();if(result.status!==completed)throw new Error(Incomplete video review);
+        const text=result.output_text||(result.output||[]).flatMap(o=>(o.content||[]).filter(c=>c.type===output_text).map(c=>c.text)).join(');
         const review=JSON.parse(text);
-        if(!['PASS','REGENERATE_ONCE','MANUAL_REVIEW'].includes(review.classification)||!Array.isArray(review.issues))throw new Error('Invalid quality review');
+        if(![PASS,REGENERATE_ONCE,MANUAL_REVIEW].includes(review.classification)||!Array.isArray(review.issues))throw new Error(Invalid quality review);
         return review;
       } finally {await fs.rm(dir,{recursive:true,force:true});}
     },
     async assemble(clips, audio, transcript, thoughts, dir) {
       const sr=48000;
       const pcm=await run(ffmpeg,['-v','error','-i',audio,'-f','s16le','-ac','1','-ar',String(sr),'pipe:1']);
-      const timing=naturalPauses(pcm,sr,thoughts,transcript.chunks), duration=cfg.seconds*4;
-      fitDuration(timing.duration,duration);
-      const raw=path.join(dir,'narration-paused.pcm'), ass=path.join(dir,'captions.ass'), master=path.join(dir,'Florida-Buzz-Reel.mp4');
-      await fs.writeFile(raw,timing.pcm);await fs.writeFile(ass,captions(timing.words,duration));
-      const args=['-v','error','-y',...clips.flatMap(c=>['-i',c]),'-f','s16le','-ar',String(sr),'-ac','1','-i',raw];
-      const filters=clips.map((_,i)=>`[${i}:v]scale=720:1280,setsar=1,fps=24,trim=duration=${cfg.seconds},setpts=PTS-STARTPTS[v${i}]`);
-      filters.push(`[v0][v1][v2][v3]concat=n=4:v=1:a=0,ass=${ass}[v]`,'[4:a]acompressor=threshold=0.12:ratio=1.5:attack=5:release=120,loudnorm=I=-16:TP=-1.5:LRA=7,apad[a]');
-      args.push('-filter_complex',filters.join(';'),'-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-ar',String(sr),'-t',String(duration),'-movflags','+faststart',master);
-      await run(ffmpeg,args);
-      const info=await probe(master);
-      if(!info.streams.some(s=>s.codec_type==='audio')||!info.streams.some(s=>s.codec_type==='video'&&s.width===720&&s.height===1280)||Math.abs(Number(info.format.duration)-duration)>.15)throw new Error('Rendered Reel failed stream/duration validation');
-      // Decode the entire final media to catch truncation or invalid packets.
-      await run(ffmpeg,['-v','error','-i',master,'-f','null','-']);
-      const paused=path.join(dir,'Narration-Qwen.wav');
-      await run(ffmpeg,['-v','error','-y','-f','s16le','-ar',String(sr),'-ac','1','-i',raw,paused]);
-      return {master,ass,paused,timing:{duration:timing.duration,pauses:timing.pauses,speed:1,words:timing.words},quality:{vertical:true,audio:true,decode:true,captions:true,oldNarrator:false}};
-    },
-  };
-}
-module.exports={createMedia,naturalPauses,wordBoundaries,fitDuration,captions,run};
+      const timing=naturalPauses(pcm,sr,
