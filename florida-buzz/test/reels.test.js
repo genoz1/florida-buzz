@@ -12,7 +12,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
 const {config,KLING,QWEN,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,voiceInput,videoInput}=require('../lib/reels/config');
 const {seeds,score,strongest,selectQueued,criteria}=require('../lib/reels/topics');
 const {createFal,queueUrl}=require('../lib/reels/fal');
-const {validateFacts,validateScript,normalizeScript,normalizeNarration,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
+const {validateFacts,validateScript,normalizeScript,normalizeNarration,continuousChristmasScript,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
 const {naturalPauses,fitDuration,timedNarration,captions}=require('../lib/reels/media');
 const {createPipeline}=require('../lib/reels/pipeline');
 const {createPublisher}=require('../lib/reels/publish');
@@ -77,6 +77,20 @@ test('later Kling prompts focus on places instead of inheriting generic people-w
   assert.match(prompts[0],/some people walking/);
   for(const prompt of prompts.slice(1)){assert.match(prompt,/pedestrian movement secondary/);assert.doesNotMatch(prompt,/some people walking/);}
 });
+test('controlled Christmas Reel is a continuous native-portrait guest-eye walkthrough with an immediate subject hook',()=>{
+  const value=continuousChristmasScript();
+  assert.doesNotThrow(()=>validateScript(value,5));
+  assert.match(value.thoughts[0],/Mickey’s Very Merry Christmas Party/);
+  assert.deepEqual(value.shots.map(shot=>shot.stage),['arrival','icon','land','experience']);
+  for(const shot of value.shots)assert.match(shot.description,/guest viewpoint|walkthrough/i);
+  const prompts=value.shots.map(shot=>promptFor(shot,{destination:'Magic Kingdom'}));
+  for(const prompt of prompts){
+    assert.match(prompt,/first-person point of view/);
+    assert.match(prompt,/Fill the entire portrait canvas/);
+    assert.match(prompt,/never add letterboxing, duplicated or blurred background filler/);
+    assert.match(prompt,/no staged people, presenter, visible camera operator, selfie, text, logo, watermark/);
+  }
+});
 test('Kling and Qwen inputs preserve approved models and exact cloned voice settings',()=>{
   assert.deepEqual(videoInput('Real Magic Kingdom',5),{prompt:'Real Magic Kingdom',duration:'5',aspect_ratio:'9:16',generate_audio:false,cfg_scale:.5});
   const input=voiceInput('Hello','https://voice.example/approved');
@@ -112,7 +126,7 @@ test('native audio gaps are replaced without stretching spoken samples and capti
   assert.equal(out.speed,1);assert.ok(Math.abs(out.duration-5.5)<.001);assert.deepEqual(out.pauses.map(g=>g[2]),[.4,.4,.7]);
   const spoken=Buffer.alloc(8000);for(let i=0;i<4000;i++)spoken.writeInt16LE(10000,i*2);
   const kept=[];for(let i=0;i<out.pcm.length;i+=2)if(out.pcm.readInt16LE(i)!==0)kept.push(out.pcm.subarray(i,i+2));assert.deepEqual(Buffer.concat(kept),spoken);
-  assert.match(captions(out.words,6),/FLORIDA BUZZ/);assert.match(captions(out.words,6),/illustrative footage/);
+  assert.doesNotMatch(captions(out.words,6),/FLORIDA BUZZ/);assert.doesNotMatch(captions(out.words,6),/illustrative footage/);
   assert.throws(()=>fitDuration(5,20));assert.throws(()=>fitDuration(25,24));assert.doesNotThrow(()=>fitDuration(19,20));
 });
 test('near-limit narration uses compact natural pauses without stretching speech',()=>{
@@ -162,12 +176,13 @@ async function fixture(options={}) {
     poll:async g=>{
       if(g.endpoint===MERGE_VIDEOS)return {result:{video:{url:'https://v3.fal.media/merged-video.mp4'}}};
       if(g.endpoint===MERGE_AUDIO_VIDEO)return {result:{video:{url:'https://v3.fal.media/merged-audio.mp4'}}};
-      if(g.endpoint===AUTO_SUBTITLE)return {result:{video:{url:'https://v3.fal.media/subtitled.mp4'},transcription:'test'}};
+      if(g.endpoint===AUTO_SUBTITLE)return options.subtitleFail?{failed:true}:{result:{video:{url:'https://v3.fal.media/subtitled.mp4'},transcription:'test'}};
       return options.refused?{failed:true,refusal:true}:{result:g.kind==='clip'?{video:{url:'https://v3.fal.media/clip.mp4'}}:g.kind==='narration'?{audio:{url:'https://v3.fal.media/audio.mp3'}}:{chunks:[]}};
     },actual:async()=>({amount:.1,events:[]})};
   const editorial={facts:async()=>facts(),guide:async()=>({title:'Christmas party guide',url:'https://thefloridabuzz.com/article/party',image_url:'https://thefloridabuzz.com/party.jpg',body_html:'Substantial guide'}),script:async()=>script()};
   let finalReviewCalls=0;
   const media={download:async(u,p)=>{await fs.writeFile(p,'fixture');return p;},probe:async()=>({format:{duration:24},streams:[{codec_type:'video',width:720,height:1280},{codec_type:'audio'}]}),review:async()=>({classification:options.failedReview?'REGENERATE_ONCE':'PASS',issues:options.failedReview?['Severe malformed foreground person']:[],correction:'Fix the malformed person'}),finalReview:async()=>{finalReviewCalls++;return options.finalReviewIssue?{classification:'MANUAL_REVIEW',issues:[options.finalReviewIssue]}:{classification:'PASS',issues:[]};},
+    assemble:async(c,a,t,s,dir)=>{const master=path.join(dir,'fallback.mp4');await fs.writeFile(master,'fixture');return {master,quality:{vertical:true,audio:true,decode:true,captions:true,oldNarrator:false}};},
     prepareNarration:async(a,t,s,dir)=>{const ass=path.join(dir,'captions.ass'),paused=path.join(dir,'paused.wav');for(const f of [ass,paused])await fs.writeFile(f,'fixture');return {ass,paused,timing:{duration:20,speed:1},quality:{audio:true,captions:true,oldNarrator:false}};}};
   const published=[];const publisher={publish:async input=>{published.push(input);if(options.publishFail)throw new Error('Instagram Reel publish failed');return {facebook:{status:'POSTED'},instagram:{status:'POSTED'},pinterest:{status:'POSTED'},threads:{status:'POSTED'}};}};
   return {pipeline:createPipeline({cfg,store,fal,editorial,media,publisher}),pkg,gens,submitted,utilitySubmitted,published,get finalReviewCalls(){return finalReviewCalls;}};
@@ -178,6 +193,7 @@ test('full mocked pipeline produces paid media once, assembles remotely, and pub
   await f.pipeline.tick('2026-10-05');assert.equal(f.submitted.length,6,'published package must not submit paid media again');assert.equal(f.utilitySubmitted.length,3,'published package must not resubmit assembly utilities');assert.equal(f.published.length,1);
 });
 test('controlled Reel test reaches review-ready state without social publishing',async()=>{const f=await fixture({noPublish:true});for(let i=0;i<80&&f.pkg.status==='WORKING';i++)await f.pipeline.tick('quality-test');assert.equal(f.pkg.status,'READY_FOR_APPROVAL',f.pkg.data.warning);assert.ok(f.pkg.data.master);assert.equal(f.published.length,0);assert.match(f.pkg.data.warning,/Social publishing remains disabled/);});
+test('failed remote subtitle utility falls back to local safe-zone assembly without publishing',async()=>{const f=await fixture({noPublish:true,subtitleFail:true});for(let i=0;i<80&&f.pkg.status==='WORKING';i++)await f.pipeline.tick('quality-test');assert.equal(f.pkg.status,'READY_FOR_APPROVAL',f.pkg.data.warning);assert.equal(f.pkg.data.remoteSubtitle.status,'FAILED');assert.equal(f.pkg.data.localAssembly.status,'COMPLETE');assert.equal(f.pkg.data.quality.localAssembly,true);assert.equal(f.published.length,0);});
 test('one automatic replacement maximum; second failed review stops spending',async()=>{const f=await fixture({failedReview:true});for(let i=0;i<30&&f.pkg.status==='WORKING';i++)await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.submitted.length,2);assert.deepEqual(f.gens.map(g=>g.attempt),[0,1]);});
 test('refusal preserves explicit prompt and submits no alternatives',async()=>{const f=await fixture({refused:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.match(f.pkg.data.warning,/REFUSED/);assert.equal(f.submitted.length,1);assert.match(f.submitted[0].input.prompt,/Magic Kingdom/);});
 test('lost paid receipt survives restarts as manual review and is never submitted twice',async()=>{const f=await fixture({lostReceipt:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.gens[0].status,'SUBMITTING');assert.equal(f.submitted.length,1);});
