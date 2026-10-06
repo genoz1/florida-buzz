@@ -79,6 +79,29 @@ function normalizeScript(script, seconds) {
   });
   return {...script,thoughts:normalizeNarration(script.thoughts,seconds),shots};
 }
+function continuousChristmasScript() {
+  return {
+    hook:'Is Mickey’s Very Merry Christmas Party actually worth the money?',
+    thoughts:[
+      'Mickey’s Very Merry Christmas Party—is it actually worth the money? Let’s walk through the night together.',
+      'Enter at 4 p.m., then use the early hours to settle in before the party runs from 7 to midnight.',
+      'The value comes from the parade, fireworks, holiday overlays, and included treats—not just regular rides.',
+      'See the full guide at TheFloridaBuzz.com.'
+    ],
+    shots:[
+      {stage:'arrival',type:'first-person arrival',location:'Magic Kingdom entrance beneath the Main Street U.S.A. train station',description:'Begin an uninterrupted guest-eye walkthrough at warm dusk, moving forward beneath the decorated train-station arch after event check-in; a holiday party wristband briefly enters the bottom edge of frame.'},
+      {stage:'icon',type:'first-person continuation',location:'Cinderella Castle central hub',description:'Continue the same eye-level handheld journey into the central hub and gently settle on Cinderella Castle glowing with holiday lighting; preserve the same guest viewpoint, forward-motion cadence, dusk color and camera height.'},
+      {stage:'land',type:'first-person turn',location:'Tomorrowland bridge',description:'From the hub, turn right and continue forward across the Tomorrowland bridge toward the illuminated land entrance; preserve the same guest viewpoint, forward-motion cadence, evening light and camera height.'},
+      {stage:'experience',type:'first-person arrival detail',location:'Tomorrowland Terrace holiday refreshment area',description:'Complete the continuous walk by stopping at a holiday refreshment table; a festive cookie and drink rise naturally into the lower foreground while Tomorrowland lights remain visible beyond, using the same guest viewpoint and evening.'}
+    ],
+    social:{
+      facebook:'Walk through the party from entry to a holiday treat and decide whether the special-event atmosphere is worth it for your trip.',
+      instagram:'A guest-eye walk through Mickey’s Very Merry Christmas Party, from entry to the holiday atmosphere inside the park.',
+      pinterest:'A practical look at whether Mickey’s Very Merry Christmas Party is worth the ticket price.',
+      threads:'Would the parade, fireworks, overlays and treats make the party worth it for you?'
+    }
+  };
+}
 function validateScript(script, seconds) {
   if (script.thoughts.length !== 4 || script.shots.length !== 4) throw new Error('Four distinct thoughts and four progressive shots required');
   const locations=script.shots.map(s=>String(s.location||'').trim());
@@ -101,11 +124,11 @@ function promptFor(shot, topic) {
   const movement=String(shot.stage||'').toLowerCase()==='arrival'
     ? 'Natural guest movement is acceptable in the background, including some people walking into the park, but the location remains the subject. '
     : 'Keep pedestrian movement secondary; focus the frame on the named landmark, attraction, themed environment or event detail rather than people walking. ';
-  return `Vertical 9:16 upright portrait ordinary guest handheld iPhone video at ${shot.location}, ${topic.destination} in Florida. ${shot.description} ` +
+  return `Native full-frame vertical 9:16 upright portrait video, filmed from one adult guest's eye-level first-person point of view on the same continuous visit at ${shot.location}, ${topic.destination} in Florida. ${shot.description} ` +
     'Accurately preserve the named real location, recognizable landmarks, street layout and stable architecture. ' +
     movement +
-    'Slight natural phone shake, tiny autofocus/exposure adjustments, imperfect framing. ' +
-    'Camera remains physically upright with the horizon level; never rotate the phone sideways and never output landscape footage inside a portrait frame. Natural available light appropriate to this scene. Observational vacation footage, no staged people, presenter, text, narration, audio, slow motion, drone, cinematic camera move or polished advertisement. ' +
+    'The camera moves forward naturally like a real guest walking, with slight footstep motion, natural phone shake, tiny autofocus/exposure adjustments and imperfect framing. Maintain coherent spatial direction, eye level, warm dusk-to-evening lighting and visual continuity with the adjacent scenes. ' +
+    'Camera remains physically upright with the horizon level. Fill the entire portrait canvas with native vertical footage: never rotate the phone sideways, never embed a horizontal image, never add letterboxing, duplicated or blurred background filler, borders, split screens or picture-in-picture. Natural available light appropriate to this scene. Observational vacation footage, no staged people, presenter, visible camera operator, selfie, text, logo, watermark, narration, audio, slow motion, drone, cinematic camera move or polished advertisement. ' +
     'Illustrative travel-guide B-roll; do not portray a specific real incident or imply this documents an actual event.';
 }
 function socialCopy(script, guide) {
@@ -175,7 +198,8 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
     async script(topic, guide, facts) {
       const shape=schema('reel_script', object({hook:str, thoughts:fixedArray(str,4), shots:fixedArray(object({stage:str,type:str, location:str, description:str}),4),
         social:object({facebook:str,instagram:str,pinterest:str,threads:str})}));
-      const system='Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Return EXACTLY four spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. Return EXACTLY four shots in this exact stage order: arrival, icon, land, experience. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build a VISUAL JOURNEY that moves progressively through the park: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Do not use more than one people-walking scene. Later shots must change both location and subject/composition: landmark, attraction/land, entertainment/detail/food/ride exterior—not repeated crowds walking. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.';
+      if(/Christmas Party/i.test(topic.title))return validateScript(continuousChristmasScript(),cfg.seconds);
+      const system='Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Return EXACTLY four spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. The first spoken thought must immediately name the subject. Return EXACTLY four shots in this exact stage order: arrival, icon, land, experience. No first-person visit claims in narration. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build one continuous first-person guest-eye VISUAL JOURNEY that moves progressively through the park: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Every shot must preserve the same eye-level viewpoint, travel direction, time of day and handheld phone character so the cuts feel like one person continuing through the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Later shots must change both location and subject while preserving the continuous journey. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.';
       const payload=JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4});
       const value=normalizeScript(await complete(system,payload,shape),cfg.seconds);
       return validateScript(value,cfg.seconds);
@@ -202,4 +226,4 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
     },
   };
 }
-module.exports = { createEditorial, validateFacts, validateScript, normalizeScript, normalizeNarration, isPeopleWalking, promptFor, socialCopy, escape, primary };
+module.exports = { createEditorial, validateFacts, validateScript, normalizeScript, normalizeNarration, continuousChristmasScript, isPeopleWalking, promptFor, socialCopy, escape, primary };
