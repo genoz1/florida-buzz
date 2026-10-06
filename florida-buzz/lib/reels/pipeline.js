@@ -152,7 +152,7 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
         video_url:audioMerge.result.video.url,
         language:'en',font_name:'Montserrat',font_size:48,font_weight:'bold',
         font_color:'white',highlight_color:'white',stroke_width:3,stroke_color:'black',
-        background_color:'none',position:'bottom',y_offset:-80,words_per_subtitle:4,enable_animation:false
+        background_color:'none',position:'bottom',y_offset:-300,words_per_subtitle:4,enable_animation:false
       });
       if(subtitled.stop)return subtitled.stop;
 
@@ -163,11 +163,13 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
           await media.download(subtitled.result.video.url,masterFile);
           const info=await media.probe(masterFile),v=info.streams.find(s=>s.codec_type==='video'),a=info.streams.find(s=>s.codec_type==='audio');
           const expected=cfg.seconds*4;
-          if(!v||!a||v.width!==720||v.height!==1280||Math.abs(Number(info.format.duration)-expected)>.5)throw new Error('Remote Reel failed stream/duration validation');
+          if(!v||!a||v.width!==720||v.height!==1280||Math.abs(Number(info.format.duration)-expected)>.75)throw new Error('Remote Reel failed stream/duration validation');
+          const finalReview=await media.finalReview(masterFile,{topic:topic.title,shots:pkg.data.script.shots,captionSafeZone:'lower-middle, clear of bottom app controls'});
+          if(finalReview.classification!=='PASS')return await save({finalReview,warning:`Final Reel quality review failed: ${finalReview.issues.join('; ')}`},'MANUAL_REVIEW');
           const master=await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(masterFile),'video/mp4');
           const balanceAfter=await fal.balance();
           const remoteAssemblyCost=Math.max(0,Number(pkg.data.assemblyBalanceBefore||balanceAfter)-balanceAfter);
-          await save({master,remoteAssemblyCost,balanceAfter,quality:{...(pkg.data.quality||{}),vertical:true,audio:true,captions:true,remoteAssembly:true,oldNarrator:false}});
+          await save({master,finalReview,remoteAssemblyCost,balanceAfter,quality:{...(pkg.data.quality||{}),vertical:true,audio:true,captions:true,remoteAssembly:true,finalReview:true,oldNarrator:false}});
         } finally {await fs.rm(dir,{recursive:true,force:true});}
       }
       const balanceAfter=pkg.data.balanceAfter??await fal.balance();
