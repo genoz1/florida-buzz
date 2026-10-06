@@ -117,11 +117,17 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
       return { ...published, url: `${cfg.site}/article/${published.slug}`, handling: existing ? 'UPDATED' : 'CREATED' };
     },
     async script(topic, guide, facts) {
-      const value = await complete('Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Four separate spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build a VISUAL JOURNEY that moves progressively through the park in four stages: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Do not use more than one people-walking scene. Later shots must change both location and subject/composition: e.g. landmark, attraction/land, entertainment/detail/food/ride exterior—not four crowds walking. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.',
-        JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4}),
-        schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({stage:str,type:str, location:str, description:str})),
-          social:object({facebook:str,instagram:str,pinterest:str,threads:str})})));
-      return validateScript(value, cfg.seconds);
+      const shape=schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({stage:str,type:str, location:str, description:str})),
+        social:object({facebook:str,instagram:str,pinterest:str,threads:str})}));
+      const system='Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Return EXACTLY four spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. Return EXACTLY four shots in this exact stage order: arrival, icon, land, experience. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build a VISUAL JOURNEY that moves progressively through the park: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Do not use more than one people-walking scene. Later shots must change both location and subject/composition: landmark, attraction/land, entertainment/detail/food/ride exterior—not repeated crowds walking. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.';
+      const payload=JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4});
+      let value=await complete(system,payload,shape);
+      try { return validateScript(value,cfg.seconds); }
+      catch(firstError) {
+        value=await complete('Repair this Reel script to satisfy the validator exactly. Keep the same verified facts and overall message. Return EXACTLY four thoughts and EXACTLY four shots with stages in this exact order: arrival, icon, land, experience. Use four different named park locations. Main Street may appear only in shot 1. At most one shot may primarily show people walking. Keep the CTA in thought 4 with TheFloridaBuzz.com. Keep narration within the required word count. Do not invent facts.',
+          JSON.stringify({topic,guide,facts,invalid:value,error:firstError.message,words:cfg.seconds === 5 ? '55–65' : '64–78'}),shape);
+        return validateScript(value,cfg.seconds);
+      }
     },
     async ideas() {
       const history = await store.topics();
