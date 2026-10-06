@@ -50,9 +50,13 @@ function validateScript(script, seconds) {
   return script;
 }
 function promptFor(shot, topic) {
+  const movement=String(shot.stage||'').toLowerCase()==='arrival'
+    ? 'Natural guest movement is acceptable in the background, including some people walking into the park, but the location remains the subject. '
+    : 'Keep pedestrian movement secondary; focus the frame on the named landmark, attraction, themed environment or event detail rather than people walking. ';
   return `Vertical 9:16 upright portrait ordinary guest handheld iPhone video at ${shot.location}, ${topic.destination} in Florida. ${shot.description} ` +
     'Accurately preserve the named real location, recognizable landmarks, street layout and stable architecture. ' +
-    'Realistic casual crowd and stroller motion, normal human walking, slight natural phone shake, tiny autofocus/exposure adjustments, imperfect framing. ' +
+    movement +
+    'Slight natural phone shake, tiny autofocus/exposure adjustments, imperfect framing. ' +
     'Camera remains physically upright with the horizon level; never rotate the phone sideways and never output landscape footage inside a portrait frame. Natural available light appropriate to this scene. Observational vacation footage, no staged people, presenter, text, narration, audio, slow motion, drone, cinematic camera move or polished advertisement. ' +
     'Illustrative travel-guide B-roll; do not portray a specific real incident or imply this documents an actual event.';
 }
@@ -132,6 +136,14 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
           JSON.stringify({topic,guide,facts,invalid:value,error:firstError.message,words:cfg.seconds === 5 ? '55–65' : '64–78'}),shape);
         try { return validateScript(value,cfg.seconds); }
         catch(secondError) {
+          if(secondError.message==='Only one Reel scene may primarily show people walking') {
+            const shots=value.shots.map((shot,i)=>i===0?shot:{...shot,description:[
+              'Steady handheld view centered on the recognizable icon, architecture and surrounding setting; people remain incidental background context.',
+              'Handheld view focused on the themed land or attraction architecture, signage and environmental details rather than pedestrian movement.',
+              'Closer observational view of a distinctive experience, attraction exterior, entertainment setting or visual detail at this location; emphasize the place, not foot traffic.'
+            ][i-1]});
+            return validateScript({...value,shots},cfg.seconds);
+          }
           if(!/^Narration copy must contain /.test(secondError.message))throw secondError;
           const thoughtShape=schema('reel_thoughts_only',object({thoughts:array(str)}));
           const repaired=await complete('Rewrite ONLY the narration thoughts. Preserve the same verified meaning and CTA. Return EXACTLY four conversational thoughts totaling the requested word count. Thought 4 must include TheFloridaBuzz.com. Do not add facts, dates, prices, claims, or scene instructions that are not already present.',
