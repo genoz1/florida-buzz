@@ -18,6 +18,7 @@ function config(env = process.env) {
     enabled: env.REELS_ENABLED === 'true',
     generation: env.REELS_GENERATION_ENABLED === 'true',
     schedules: env.REELS_SCHEDULES_ENABLED === 'true',
+    autoPublish: env.REELS_AUTO_PUBLISH_ENABLED === 'true',
     cron: env.REELS_CRON || '0 10 * * 1,3,5',
     ideasCron: env.REELS_IDEAS_CRON || '0 9 * * 0',
     timezone: 'America/New_York', seconds,
