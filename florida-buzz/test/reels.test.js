@@ -12,7 +12,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
 const {config,KLING,QWEN,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,voiceInput,videoInput}=require('../lib/reels/config');
 const {seeds,score,strongest,selectQueued,criteria}=require('../lib/reels/topics');
 const {createFal,queueUrl}=require('../lib/reels/fal');
-const {validateFacts,validateScript,normalizeScript,normalizeNarration,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
+const {validateFacts,validateScript,normalizeScript,normalizeNarration,continuousChristmasScript,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
 const {naturalPauses,fitDuration,timedNarration,captions}=require('../lib/reels/media');
 const {createPipeline}=require('../lib/reels/pipeline');
 const {createPublisher}=require('../lib/reels/publish');
@@ -77,6 +77,20 @@ test('later Kling prompts focus on places instead of inheriting generic people-w
   assert.match(prompts[0],/some people walking/);
   for(const prompt of prompts.slice(1)){assert.match(prompt,/pedestrian movement secondary/);assert.doesNotMatch(prompt,/some people walking/);}
 });
+test('controlled Christmas Reel is a continuous native-portrait guest-eye walkthrough with an immediate subject hook',()=>{
+  const value=continuousChristmasScript();
+  assert.doesNotThrow(()=>validateScript(value,5));
+  assert.match(value.thoughts[0],/Mickey’s Very Merry Christmas Party/);
+  assert.deepEqual(value.shots.map(shot=>shot.stage),['arrival','icon','land','experience']);
+  for(const shot of value.shots)assert.match(shot.description,/guest viewpoint|walkthrough/i);
+  const prompts=value.shots.map(shot=>promptFor(shot,{destination:'Magic Kingdom'}));
+  for(const prompt of prompts){
+    assert.match(prompt,/first-person point of view/);
+    assert.match(prompt,/Fill the entire portrait canvas/);
+    assert.match(prompt,/never add letterboxing, duplicated or blurred background filler/);
+    assert.match(prompt,/no staged people, presenter, visible camera operator, selfie, text, logo, watermark/);
+  }
+});
 test('Kling and Qwen inputs preserve approved models and exact cloned voice settings',()=>{
   assert.deepEqual(videoInput('Real Magic Kingdom',5),{prompt:'Real Magic Kingdom',duration:'5',aspect_ratio:'9:16',generate_audio:false,cfg_scale:.5});
   const input=voiceInput('Hello','https://voice.example/approved');
@@ -112,7 +126,7 @@ test('native audio gaps are replaced without stretching spoken samples and capti
   assert.equal(out.speed,1);assert.ok(Math.abs(out.duration-5.5)<.001);assert.deepEqual(out.pauses.map(g=>g[2]),[.4,.4,.7]);
   const spoken=Buffer.alloc(8000);for(let i=0;i<4000;i++)spoken.writeInt16LE(10000,i*2);
   const kept=[];for(let i=0;i<out.pcm.length;i+=2)if(out.pcm.readInt16LE(i)!==0)kept.push(out.pcm.subarray(i,i+2));assert.deepEqual(Buffer.concat(kept),spoken);
-  assert.match(captions(out.words,6),/FLORIDA BUZZ/);assert.match(captions(out.words,6),/illustrative footage/);
+  assert.doesNotMatch(captions(out.words,6),/FLORIDA BUZZ/);assert.doesNotMatch(captions(out.words,6),/illustrative footage/);
   assert.throws(()=>fitDuration(5,20));assert.throws(()=>fitDuration(25,24));assert.doesNotThrow(()=>fitDuration(19,20));
 });
 test('near-limit narration uses compact natural pauses without stretching speech',()=>{
