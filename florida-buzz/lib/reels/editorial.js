@@ -36,7 +36,11 @@ function validateScript(script, seconds) {
   if(stages.some((s,i)=>s!==expectedStages[i]))throw new Error('Reel scenes must progress arrival → icon → land → experience');
   const mainStreet=script.shots.map((s,i)=>/main street/i.test(`${s.location} ${s.description}`)?i:-1).filter(i=>i>=0);
   if(mainStreet.some(i=>i>0)||mainStreet.length>1)throw new Error('Main Street may appear only in shot 1');
-  const walking=script.shots.filter(s=>/\b(walk|walking|walkway|stroll|strolling|crowd moving)\b/i.test(s.description||'')).length;
+  const walking=script.shots.filter(s=>{
+    const d=String(s.description||'');
+    return /\b(guests?|people|visitors?|crowd)\b.{0,60}\b(walk|walking|stroll|strolling|moving)\b/i.test(d)
+      || /\b(walk|walking|stroll|strolling|moving)\b.{0,60}\b(guests?|people|visitors?|crowd)\b/i.test(d);
+  }).length;
   if(walking>1)throw new Error('Only one Reel scene may primarily show people walking');
   if (!script.thoughts[3].includes('TheFloridaBuzz.com')) throw new Error('Missing Florida Buzz CTA');
   const count = script.thoughts.join(' ').split(/\s+/).length;
