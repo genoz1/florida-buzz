@@ -64,6 +64,7 @@ function fitDuration(duration, videoDuration) {
 function timedNarration(pcm, sampleRate, thoughts, chunks, videoDuration) {
   let timing=naturalPauses(pcm,sampleRate,thoughts,chunks);
   if(timing.duration>videoDuration-.2)timing=naturalPauses(pcm,sampleRate,thoughts,chunks,[.15,.15,.25]);
+  if(timing.duration>videoDuration-.2)timing=naturalPauses(pcm,sampleRate,thoughts,chunks,[.05,.05,.1]);
   fitDuration(timing.duration,videoDuration);
   return timing;
 }
