@@ -9,7 +9,7 @@ require('node:test')('Christmas facts omit unpublished optional details but keep
 });
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
-const {config,KLING,QWEN,voiceInput,videoInput}=require('../lib/reels/config');
+const {config,KLING,QWEN,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,voiceInput,videoInput}=require('../lib/reels/config');
 const {seeds,score,strongest,selectQueued,criteria}=require('../lib/reels/topics');
 const {createFal,queueUrl}=require('../lib/reels/fal');
 const {validateFacts,validateScript,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
@@ -54,7 +54,8 @@ test('fal only submits approved endpoints once and resumes returned queue URLs',
   });
   const receipt=await fal.submit(KLING,videoInput('test'));assert.equal(receipt.request_id,'r1');assert.ok((await fal.poll(receipt)).result.video);
   assert.equal(calls.filter(c=>c.options.method==='POST').length,1);
-  await assert.rejects(()=>fal.submit('some/other/model',{}));assert.throws(()=>queueUrl('https://evil.example/collect-key'));
+  const utility=await fal.submitUtility(MERGE_VIDEOS,{video_urls:['https://v3.fal.media/a.mp4']});assert.equal(utility.request_id,'r1');
+  await assert.rejects(()=>fal.submit('some/other/model',{}));await assert.rejects(()=>fal.submitUtility('some/other/utility',{}));assert.throws(()=>queueUrl('https://evil.example/collect-key'));
 });
 test('fal billing records are per-request actual charges, never quotes',async()=>{
   const fal=createFal({falKey:'test',billingKey:'test'},async()=>({ok:true,json:async()=>({billing_events:[{request_id:'r',endpoint_id:KLING,cost_total:.42},{request_id:'other',endpoint_id:KLING,cost_total:9}]})}));
@@ -79,7 +80,7 @@ test('native audio gaps are replaced without stretching spoken samples and capti
 
 async function fixture(options={}) {
   const cfg={...config({REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SHOT_SECONDS:'6'}),caps:{single:2,package:3,day:3,week:6,month:24}};
-  const pkg={id:'p1',topic_key:'christmas-party-2026',status:'WORKING',data:{}},gens=[],submitted=[];let leased=false;
+  const pkg={id:'p1',topic_key:'christmas-party-2026',status:'WORKING',data:{}},gens=[],submitted=[],utilitySubmitted=[];let leased=false;
   const store={
     voice:async()=> {if(options.missingVoice)throw new Error('Approved private Qwen voice unavailable');return 'https://v3.fal.media/private-approved-voice';},
     claim:async()=>{if(leased||pkg.status!=='WORKING')return null;leased=true;return {token:'lease',package:structuredClone(pkg)};},
@@ -97,17 +98,23 @@ async function fixture(options={}) {
   };
   const fal={quote:async()=>({amount:.1}),balance:async()=>4.4,
     submit:async(endpoint,input)=>{submitted.push({endpoint,input});await Promise.resolve();if(options.lostReceipt)throw new Error('POST timeout');return {request_id:`r${submitted.length}`,status_url:'https://queue.fal.run/x/status',response_url:'https://queue.fal.run/x/response'};},
-    poll:async g=>options.refused?{failed:true,refusal:true}:{result:g.kind==='clip'?{video:{url:'https://v3.fal.media/clip.mp4'}}:g.kind==='narration'?{audio:{url:'https://v3.fal.media/audio.mp3'}}:{chunks:[]}},actual:async()=>({amount:.1,events:[]})};
+    submitUtility:async(endpoint,input)=>{utilitySubmitted.push({endpoint,input});return {request_id:`u${utilitySubmitted.length}`,status_url:'https://queue.fal.run/u/status',response_url:'https://queue.fal.run/u/response'};},
+    poll:async g=>{
+      if(g.endpoint===MERGE_VIDEOS)return {result:{video:{url:'https://v3.fal.media/merged-video.mp4'}}};
+      if(g.endpoint===MERGE_AUDIO_VIDEO)return {result:{video:{url:'https://v3.fal.media/merged-audio.mp4'}}};
+      if(g.endpoint===AUTO_SUBTITLE)return {result:{video:{url:'https://v3.fal.media/subtitled.mp4'},transcription:'test'}};
+      return options.refused?{failed:true,refusal:true}:{result:g.kind==='clip'?{video:{url:'https://v3.fal.media/clip.mp4'}}:g.kind==='narration'?{audio:{url:'https://v3.fal.media/audio.mp3'}}:{chunks:[]}};
+    },actual:async()=>({amount:.1,events:[]})};
   const editorial={facts:async()=>facts(),guide:async()=>({title:'Christmas party guide',url:'https://thefloridabuzz.com/article/party',image_url:'https://thefloridabuzz.com/party.jpg',body_html:'Substantial guide'}),script:async()=>script()};
-  const media={download:async(u,p)=>{await fs.writeFile(p,'fixture');return p;},probe:async()=>({format:{duration:20}}),review:async()=>({classification:options.failedReview?'REGENERATE_ONCE':'PASS',issues:options.failedReview?['Severe malformed foreground person']:[],correction:'Fix the malformed person'}),
-    assemble:async(c,a,t,s,dir)=>{const master=path.join(dir,'master.mp4'),ass=path.join(dir,'captions.ass'),paused=path.join(dir,'paused.wav');for(const f of [master,ass,paused])await fs.writeFile(f,'fixture');return {master,ass,paused,timing:{duration:20,speed:1},quality:{vertical:true,oldNarrator:false}};}};
+  const media={download:async(u,p)=>{await fs.writeFile(p,'fixture');return p;},probe:async()=>({format:{duration:24},streams:[{codec_type:'video',width:720,height:1280},{codec_type:'audio'}]}),review:async()=>({classification:options.failedReview?'REGENERATE_ONCE':'PASS',issues:options.failedReview?['Severe malformed foreground person']:[],correction:'Fix the malformed person'}),
+    prepareNarration:async(a,t,s,dir)=>{const ass=path.join(dir,'captions.ass'),paused=path.join(dir,'paused.wav');for(const f of [ass,paused])await fs.writeFile(f,'fixture');return {ass,paused,timing:{duration:20,speed:1},quality:{audio:true,captions:true,oldNarrator:false}};}};
   const published=[];const publisher={publish:async input=>{published.push(input);if(options.publishFail)throw new Error('Instagram Reel publish failed');return {facebook:{status:'POSTED'},instagram:{status:'POSTED'},pinterest:{status:'POSTED'},threads:{status:'POSTED'}};}};
-  return {pipeline:createPipeline({cfg,store,fal,editorial,media,publisher}),pkg,gens,submitted,published};
+  return {pipeline:createPipeline({cfg,store,fal,editorial,media,publisher}),pkg,gens,submitted,utilitySubmitted,published};
 }
-test('full mocked pipeline produces four clips, narration and one automatic publication',async()=>{
-  const f=await fixture();for(let i=0;i<50&&f.pkg.status==='WORKING';i++)await f.pipeline.tick('2026-10-05');
-  assert.equal(f.pkg.status,'APPROVED',f.pkg.data.warning);assert.equal(f.submitted.filter(s=>s.endpoint===KLING).length,4);assert.equal(f.submitted.filter(s=>s.endpoint===QWEN).length,1);assert.equal(f.gens.length,6);assert.ok(Math.abs(f.pkg.data.actualCost-.6)<1e-8);assert.ok(f.pkg.data.social.facebook.includes('/article/party'));assert.ok(f.pkg.data.master);assert.equal(f.published.length,1);
-  await f.pipeline.tick('2026-10-05');assert.equal(f.submitted.length,6,'published package must not submit again');assert.equal(f.published.length,1);
+test('full mocked pipeline produces paid media once, assembles remotely, and publishes once',async()=>{
+  const f=await fixture();for(let i=0;i<80&&f.pkg.status==='WORKING';i++)await f.pipeline.tick('2026-10-05');
+  assert.equal(f.pkg.status,'APPROVED',f.pkg.data.warning);assert.equal(f.submitted.filter(s=>s.endpoint===KLING).length,4);assert.equal(f.submitted.filter(s=>s.endpoint===QWEN).length,1);assert.equal(f.gens.length,6);assert.deepEqual(f.utilitySubmitted.map(s=>s.endpoint),[MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE]);assert.ok(Math.abs(f.pkg.data.actualCost-.6)<1e-8);assert.ok(f.pkg.data.social.facebook.includes('/article/party'));assert.ok(f.pkg.data.master);assert.equal(f.pkg.data.quality.remoteAssembly,true);assert.equal(f.published.length,1);
+  await f.pipeline.tick('2026-10-05');assert.equal(f.submitted.length,6,'published package must not submit paid media again');assert.equal(f.utilitySubmitted.length,3,'published package must not resubmit assembly utilities');assert.equal(f.published.length,1);
 });
 test('one automatic replacement maximum; second failed review stops spending',async()=>{const f=await fixture({failedReview:true});for(let i=0;i<30&&f.pkg.status==='WORKING';i++)await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.equal(f.submitted.length,2);assert.deepEqual(f.gens.map(g=>g.attempt),[0,1]);});
 test('refusal preserves explicit prompt and submits no alternatives',async()=>{const f=await fixture({refused:true});await f.pipeline.tick();await f.pipeline.tick();assert.equal(f.pkg.status,'MANUAL_REVIEW');assert.match(f.pkg.data.warning,/REFUSED/);assert.equal(f.submitted.length,1);assert.match(f.submitted[0].input.prompt,/Magic Kingdom/);});

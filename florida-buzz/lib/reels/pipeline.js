@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
-const {KLING,QWEN,WHISPER,videoInput,voiceInput}=require('./config');
+const {KLING,QWEN,WHISPER,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,videoInput,voiceInput}=require('./config');
 const {promptFor,socialCopy,validateFacts}=require('./editorial');
 function createPipeline({cfg,store,fal,editorial,media,publisher}) {
   let busy=false;
@@ -97,23 +97,81 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
       }
       const transcript=gens.find(g=>g.kind==='transcript');
       if(!transcript)return await submit({kind:'transcript',endpoint:WHISPER,input:{audio_url:await store.signed(pkg.data.audioAsset,86400),task:'transcribe',chunk_level:'word',batch_size:64}},pkg.data.audioDuration);
-      if(!pkg.data.master) {
-        const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-assembly-'));
+      if(!pkg.data.pausedAudio) {
+        const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-audio-final-'));
         try {
-          const clips=[];
-          for(let shot=1;shot<=4;shot++) {
-            const g=gens.filter(g=>g.kind==='clip'&&g.shot===shot&&g.review?.classification==='PASS').sort((a,b)=>b.attempt-a.attempt)[0];
-            const file=path.join(dir,`clip-${shot}.mp4`);await media.download(await store.signed(g.review.asset),file);clips.push(file);
-          }
           const audio=path.join(dir,'audio.mp3');await media.download(await store.signed(pkg.data.audioAsset),audio);
-          const output=await media.assemble(clips,audio,transcript.result,pkg.data.script.thoughts,dir);
-          const master=await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(output.master),'video/mp4');
+          const output=await media.prepareNarration(audio,transcript.result,pkg.data.script.thoughts,dir);
           const captionAsset=await store.asset(`${pkg.id}/captions.ass`,await fs.readFile(output.ass),'text/plain');
           const pausedAudio=await store.asset(`${pkg.id}/Narration-Qwen-paused.wav`,await fs.readFile(output.paused),'audio/wav');
-          await save({master,captionAsset,pausedAudio,narrationTiming:output.timing,quality:output.quality});
+          await save({captionAsset,pausedAudio,narrationTiming:output.timing,quality:output.quality,assemblyBalanceBefore:await fal.balance()});
+          return {preparedNarration:true};
         } finally {await fs.rm(dir,{recursive:true,force:true});}
       }
-      const actualCost=gens.reduce((sum,g)=>sum+Number(g.actual_usd),0),balanceAfter=await fal.balance();
+
+      const utility=async(key,endpoint,input)=>{
+        const state=pkg.data[key];
+        if(!state) {
+          await assertLease();
+          await save({[key]:{status:'SUBMITTING',endpoint}});
+          const receipt=await fal.submitUtility(endpoint,input);
+          await save({[key]:{status:'QUEUED',endpoint,...receipt}});
+          return {stop:{submittedUtility:receipt.request_id,step:key}};
+        }
+        if(state.status==='SUBMITTING') {
+          return {stop:await save({warning:`Ambiguous ${key} utility submission; do not resubmit automatically.`},'MANUAL_REVIEW')};
+        }
+        if(state.status==='QUEUED') {
+          const outcome=await fal.poll(state);
+          if(!outcome)return {stop:{waitingUtility:state.request_id,step:key}};
+          if(outcome.failed)return {stop:await save({warning:`Remote Reel utility failed at ${key}.`},'MANUAL_REVIEW')};
+          await save({[key]:{...state,status:'COMPLETE',result:outcome.result}});
+          return {stop:{completedUtility:state.request_id,step:key}};
+        }
+        if(state.status!=='COMPLETE')return {stop:await save({warning:`Unexpected remote assembly state at ${key}.`},'MANUAL_REVIEW')};
+        return {result:state.result};
+      };
+
+      const clipUrls=[];
+      for(let shot=1;shot<=4;shot++) {
+        const g=gens.filter(g=>g.kind==='clip'&&g.shot===shot&&g.review?.classification==='PASS').sort((a,b)=>b.attempt-a.attempt)[0];
+        clipUrls.push(await store.signed(g.review.asset,21600));
+      }
+
+      const videoMerge=await utility('remoteVideoMerge',MERGE_VIDEOS,{video_urls:clipUrls,target_fps:24,resolution:{width:720,height:1280}});
+      if(videoMerge.stop)return videoMerge.stop;
+
+      const audioMerge=await utility('remoteAudioMerge',MERGE_AUDIO_VIDEO,{
+        video_url:videoMerge.result.video.url,
+        audio_url:await store.signed(pkg.data.pausedAudio,21600),
+        start_offset:0
+      });
+      if(audioMerge.stop)return audioMerge.stop;
+
+      const subtitled=await utility('remoteSubtitle',AUTO_SUBTITLE,{
+        video_url:audioMerge.result.video.url,
+        language:'en',font_name:'Montserrat',font_size:48,font_weight:'bold',
+        font_color:'white',highlight_color:'white',stroke_width:3,stroke_color:'black',
+        background_color:'none',position:'bottom',y_offset:-80,words_per_subtitle:4,enable_animation:false
+      });
+      if(subtitled.stop)return subtitled.stop;
+
+      if(!pkg.data.master) {
+        const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-remote-master-'));
+        try {
+          const masterFile=path.join(dir,'Florida-Buzz-Reel.mp4');
+          await media.download(subtitled.result.video.url,masterFile);
+          const info=await media.probe(masterFile),v=info.streams.find(s=>s.codec_type==='video'),a=info.streams.find(s=>s.codec_type==='audio');
+          const expected=cfg.seconds*4;
+          if(!v||!a||v.width!==720||v.height!==1280||Math.abs(Number(info.format.duration)-expected)>.5)throw new Error('Remote Reel failed stream/duration validation');
+          const master=await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(masterFile),'video/mp4');
+          const balanceAfter=await fal.balance();
+          const remoteAssemblyCost=Math.max(0,Number(pkg.data.assemblyBalanceBefore||balanceAfter)-balanceAfter);
+          await save({master,remoteAssemblyCost,balanceAfter,quality:{...(pkg.data.quality||{}),vertical:true,audio:true,captions:true,remoteAssembly:true,oldNarrator:false}});
+        } finally {await fs.rm(dir,{recursive:true,force:true});}
+      }
+      const balanceAfter=pkg.data.balanceAfter??await fal.balance();
+      const actualCost=gens.reduce((sum,g)=>sum+Number(g.actual_usd),0)+Number(pkg.data.remoteAssemblyCost||0);
       await save({actualCost,balanceAfter});
       const publication=await publisher.publish({pkg,masterUrl:await store.signed(pkg.data.master,21600),coverImageUrl:pkg.data.guide.image_url,save});
       return await save({publication,publishedAt:new Date().toISOString(),warning:'Automated Reel passed factual, media and publication checks.'},'APPROVED');

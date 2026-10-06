@@ -87,9 +87,17 @@ function createMedia(cfg, env=process.env) {
     if(u.protocol!=='https:' || !(u.hostname==='fal.media'||u.hostname.endsWith('.fal.media')||u.hostname===storageHost)) throw new Error('Unexpected media URL');
     const response=await fetch(u,{redirect:'error',signal:AbortSignal.timeout(120000)});
     if(!response.ok) throw new Error('Source media download failed');
-    const reader=response.body.getReader();let length=0;const parts=[];
-    while(true){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>104857600){await reader.cancel();throw new Error('Source exceeds media size limit');}parts.push(Buffer.from(value));}
-    await fs.writeFile(file,Buffer.concat(parts));return file;
+    const reader=response.body.getReader();let length=0;const handle=await fs.open(file,'w');
+    try {
+      while(true){
+        const {done,value}=await reader.read();if(done)break;
+        length+=value.length;if(length>104857600){await reader.cancel();throw new Error('Source exceeds media size limit');}
+        await handle.write(Buffer.from(value));
+      }
+    } catch(error) {
+      await fs.rm(file,{force:true}).catch(()=>{});throw error;
+    } finally {await handle.close();}
+    return file;
   }
   const frames=async(file,dir,seconds)=>{
     const output=[];
@@ -101,6 +109,16 @@ function createMedia(cfg, env=process.env) {
     return output;
   };
   return { probe, download,
+    async prepareNarration(audio, transcript, thoughts, dir) {
+      const sr=48000;
+      const pcm=await run(ffmpeg,['-v','error','-i',audio,'-f','s16le','-ac','1','-ar',String(sr),'pipe:1']);
+      const timing=naturalPauses(pcm,sr,thoughts,transcript.chunks), duration=cfg.seconds*4;
+      fitDuration(timing.duration,duration);
+      const raw=path.join(dir,'narration-paused.pcm'), ass=path.join(dir,'captions.ass'), paused=path.join(dir,'Narration-Qwen.wav');
+      await fs.writeFile(raw,timing.pcm);await fs.writeFile(ass,captions(timing.words,duration));
+      await run(ffmpeg,['-v','error','-y','-f','s16le','-ar',String(sr),'-ac','1','-i',raw,paused]);
+      return {ass,paused,timing:{duration:timing.duration,pauses:timing.pauses,speed:1,words:timing.words},quality:{audio:true,captions:true,oldNarrator:false}};
+    },
     async review(file, context) {
       const info=await probe(file), v=info.streams.find(s=>s.codec_type==='video');
       if(!v || v.width*16!==v.height*9 || Number(info.format.duration)<cfg.seconds-.15) return {classification:'REGENERATE_ONCE',issues:['Wrong aspect ratio or truncated clip'],correction:'Use a complete 9:16 portrait shot.'};

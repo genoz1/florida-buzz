@@ -3,6 +3,9 @@
 const KLING = 'fal-ai/kling-video/v3/standard/text-to-video';
 const QWEN = 'fal-ai/qwen-3-tts/text-to-speech/1.7b';
 const WHISPER = 'fal-ai/whisper';
+const MERGE_VIDEOS = 'fal-ai/ffmpeg-api/merge-videos';
+const MERGE_AUDIO_VIDEO = 'fal-ai/ffmpeg-api/merge-audio-video';
+const AUTO_SUBTITLE = 'fal-ai/workflow-utilities/auto-subtitle';
 function config(env = process.env) {
   const amount = (key) => {
     const value = Number(env[key] || 0);
@@ -32,4 +35,4 @@ const voiceInput = (text, embedding) => ({ text, language: 'English', speaker_vo
   subtalker_dosample: true, subtalker_top_k: 50, subtalker_top_p: 1, subtalker_temperature: 0.9 });
 const videoInput = (prompt, seconds = 5) => ({ prompt, duration: String(seconds),
   aspect_ratio: '9:16', generate_audio: false, cfg_scale: 0.5 });
-module.exports = { config, KLING, QWEN, WHISPER, voiceInput, videoInput };
+module.exports = { config, KLING, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE, voiceInput, videoInput };

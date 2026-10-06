@@ -1,6 +1,7 @@
 'use strict';
-const { KLING, QWEN, WHISPER } = require('./config');
+const { KLING, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE } = require('./config');
 const ENDPOINTS = new Set([KLING, QWEN, WHISPER]);
+const UTILITIES = new Set([MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE]);
 function queueUrl(raw) {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || url.hostname !== 'queue.fal.run' || url.username || url.password) throw new Error('Unexpected fal queue URL');
@@ -41,6 +42,12 @@ function createFal({ falKey, billingKey }, fetcher = fetch) {
       if (!ENDPOINTS.has(endpoint)) throw new Error('Unapproved model');
       const result = await json(`https://queue.fal.run/${endpoint}`, 'POST', input);
       if (!result.request_id) throw new Error('Missing fal request ID; do not resubmit');
+      return { request_id: result.request_id, status_url: queueUrl(result.status_url), response_url: queueUrl(result.response_url) };
+    },
+    async submitUtility(endpoint, input) {
+      if (!UTILITIES.has(endpoint)) throw new Error('Unapproved utility');
+      const result = await json(`https://queue.fal.run/${endpoint}`, 'POST', input);
+      if (!result.request_id) throw new Error('Missing fal utility request ID; do not resubmit');
       return { request_id: result.request_id, status_url: queueUrl(result.status_url), response_url: queueUrl(result.response_url) };
     },
     async poll(generation) {
