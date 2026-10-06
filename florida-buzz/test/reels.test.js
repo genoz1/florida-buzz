@@ -158,7 +158,7 @@ test('Reel guide writer repairs output to the existing validator limits before p
     assert.equal((await fetch(url+'/decision',{method:'POST',headers:{...headers,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'APPROVED',csrf}),redirect:'manual'})).status,303);assert.equal(status,'APPROVED');assert.equal(decisions,1);
   }finally{await new Promise(resolve=>server.close(resolve));}
 });
-test('actual FFmpeg assembly decodes a complete vertical master with remapped captions and new audio',async()=>{
+test('actual FFmpeg assembly normalizes sequentially, cleans intermediates, and decodes a complete vertical master',async()=>{
   const {createMedia,run}=require('../lib/reels/media'),ffmpeg=require('ffmpeg-static');
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-media-test-'));
   try{
@@ -167,6 +167,6 @@ test('actual FFmpeg assembly decodes a complete vertical master with remapped ca
     ['One.','Two.','Three.','Four.'].forEach((text,i)=>{const pcm=Buffer.alloc(sr*5*2);for(let j=0;j<sr*5;j++)pcm.writeInt16LE(Math.round(Math.sin(j/sr*2*Math.PI*220)*6000),j*2);parts.push(pcm);chunks.push({text,timestamp:[at,at+5]});at+=5;if(i<3){parts.push(Buffer.alloc(sr*.8*2));at+=.8;}});
     await fs.writeFile(raw,Buffer.concat(parts));await run(ffmpeg,['-v','error','-y','-f','s16le','-ar',String(sr),'-ac','1','-i',raw,audio]);
     const output=await createMedia({...config({REELS_SHOT_SECONDS:'6'})}).assemble([source,source,source,source],audio,{chunks},['One.','Two.','Three.','Four.'],dir);
-    assert.equal(output.quality.decode,true);assert.equal(output.quality.oldNarrator,false);assert.equal(output.timing.speed,1);assert.ok(Math.abs(output.timing.duration-21.5)<.01);assert.match(await fs.readFile(output.ass,'utf8'),/Four\./);
+    assert.equal(output.quality.decode,true);assert.equal(output.quality.oldNarrator,false);assert.equal(output.timing.speed,1);assert.ok(Math.abs(output.timing.duration-21.5)<.01);assert.match(await fs.readFile(output.ass,'utf8'),/Four\./);assert.equal((await fs.readdir(dir)).includes('normalized-clips'),false,'temporary normalized clips must be cleaned up');
   }finally{await fs.rm(dir,{recursive:true,force:true});}
 });

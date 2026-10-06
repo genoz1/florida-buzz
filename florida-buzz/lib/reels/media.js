@@ -128,11 +128,35 @@ function createMedia(cfg, env=process.env) {
       fitDuration(timing.duration,duration);
       const raw=path.join(dir,'narration-paused.pcm'), ass=path.join(dir,'captions.ass'), master=path.join(dir,'Florida-Buzz-Reel.mp4');
       await fs.writeFile(raw,timing.pcm);await fs.writeFile(ass,captions(timing.words,duration));
-      const args=['-v','error','-y',...clips.flatMap(c=>['-i',c]),'-f','s16le','-ar',String(sr),'-ac','1','-i',raw];
-      const filters=clips.map((_,i)=>`[${i}:v]scale=720:1280,setsar=1,fps=24,trim=duration=${cfg.seconds},setpts=PTS-STARTPTS[v${i}]`);
-      filters.push(`[v0][v1][v2][v3]concat=n=4:v=1:a=0,ass=${ass}[v]`,'[4:a]acompressor=threshold=0.12:ratio=1.5:attack=5:release=120,loudnorm=I=-16:TP=-1.5:LRA=7,apad[a]');
-      args.push('-filter_complex',filters.join(';'),'-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-ar',String(sr),'-t',String(duration),'-movflags','+faststart',master);
-      await run(ffmpeg,args);
+
+      // Normalize source clips sequentially so production never decodes all four
+      // 720x1280 inputs in one FFmpeg graph. This keeps peak memory bounded.
+      const work=path.join(dir,'normalized-clips');
+      await fs.mkdir(work,{recursive:true});
+      try {
+        const normalized=[];
+        for(let i=0;i<clips.length;i++) {
+          const out=path.join(work,`clip-${i+1}.mp4`);
+          await run(ffmpeg,['-v','error','-y','-i',clips[i],'-an',
+            '-vf',`scale=720:1280,setsar=1,fps=24,trim=duration=${cfg.seconds},setpts=PTS-STARTPTS`,
+            '-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p',out]);
+          normalized.push(out);
+        }
+
+        const list=path.join(work,'concat.txt');
+        const escapeConcat=file=>file.replace(/'/g,"'\\''");
+        await fs.writeFile(list,normalized.map(file=>`file '${escapeConcat(file)}'`).join('\n'));
+        const joined=path.join(work,'joined.mp4');
+        await run(ffmpeg,['-v','error','-y','-f','concat','-safe','0','-i',list,'-c','copy',joined]);
+
+        await run(ffmpeg,['-v','error','-y','-i',joined,'-f','s16le','-ar',String(sr),'-ac','1','-i',raw,
+          '-filter_complex',`[0:v]ass=${ass}[v];[1:a]acompressor=threshold=0.12:ratio=1.5:attack=5:release=120,loudnorm=I=-16:TP=-1.5:LRA=7,apad[a]`,
+          '-map','[v]','-map','[a]','-c:v','libx264','-preset','fast','-crf','19','-pix_fmt','yuv420p',
+          '-c:a','aac','-b:a','160k','-ar',String(sr),'-t',String(duration),'-movflags','+faststart',master]);
+      } finally {
+        await fs.rm(work,{recursive:true,force:true});
+      }
+
       const info=await probe(master);
       if(!info.streams.some(s=>s.codec_type==='audio')||!info.streams.some(s=>s.codec_type==='video'&&s.width===720&&s.height===1280)||Math.abs(Number(info.format.duration)-duration)>.15)throw new Error('Rendered Reel failed stream/duration validation');
       // Decode the entire final media to catch truncation or invalid packets.
