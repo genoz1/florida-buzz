@@ -31,8 +31,13 @@ function validateScript(script, seconds) {
   const locations=script.shots.map(s=>String(s.location||'').trim());
   if(locations.some(v=>!v))throw new Error('Every Reel shot requires an explicit real location');
   if(new Set(locations.map(v=>v.toLowerCase())).size!==4)throw new Error('All four Reel shots must use different park locations');
+  const stages=script.shots.map(s=>String(s.stage||'').toLowerCase());
+  const expectedStages=['arrival','icon','land','experience'];
+  if(stages.some((s,i)=>s!==expectedStages[i]))throw new Error('Reel scenes must progress arrival → icon → land → experience');
   const mainStreet=script.shots.map((s,i)=>/main street/i.test(`${s.location} ${s.description}`)?i:-1).filter(i=>i>=0);
   if(mainStreet.some(i=>i>0)||mainStreet.length>1)throw new Error('Main Street may appear only in shot 1');
+  const walking=script.shots.filter(s=>/\b(walk|walking|walkway|stroll|strolling|crowd moving)\b/i.test(s.description||'')).length;
+  if(walking>1)throw new Error('Only one Reel scene may primarily show people walking');
   if (!script.thoughts[3].includes('TheFloridaBuzz.com')) throw new Error('Missing Florida Buzz CTA');
   const count = script.thoughts.join(' ').split(/\s+/).length;
   const min = seconds === 5 ? 55 : 64, max = seconds === 5 ? 65 : 78;
@@ -112,9 +117,9 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
       return { ...published, url: `${cfg.site}/article/${published.slug}`, handling: existing ? 'UPDATED' : 'CREATED' };
     },
     async script(topic, guide, facts) {
-      const value = await complete('Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Four separate spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Create FOUR visually different shots at FOUR explicitly named, recognizable real locations inside the destination. Main Street U.S.A. may be used only for shot 1. Shots 2–4 must be different areas/lands/attractions or event-specific locations, not additional walking-down-Main-Street scenes. Vary composition and subject matter as well as location. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.',
+      const value = await complete('Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Four separate spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build a VISUAL JOURNEY that moves progressively through the park in four stages: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Do not use more than one people-walking scene. Later shots must change both location and subject/composition: e.g. landmark, attraction/land, entertainment/detail/food/ride exterior—not four crowds walking. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.',
         JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4}),
-        schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({type:str, location:str, description:str})),
+        schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({stage:str,type:str, location:str, description:str})),
           social:object({facebook:str,instagram:str,pinterest:str,threads:str})})));
       return validateScript(value, cfg.seconds);
     },

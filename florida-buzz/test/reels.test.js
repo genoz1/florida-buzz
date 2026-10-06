@@ -18,7 +18,7 @@ const {createPipeline}=require('../lib/reels/pipeline');
 const {createPublisher}=require('../lib/reels/publish');
 const facts=()=>({verified:true,checked_at:new Date().toISOString(),missing:[],claims:['pricing','dates','entry','hours','parade','fireworks','entertainment','treats','attractions','crowds'].map(subject=>({subject,fact:`Verified ${new Date().getUTCFullYear()} ${subject} rule`,verified:true,source_urls:['https://disneyworld.disney.go.com/events/']}))});
 const thoughts=['A lot of people get to Magic Kingdom later than they probably should.','If you want shorter waits and an easier start to the day, that first hour after opening can make a big difference.','The key is knowing which rides are worth doing right away and which ones can wait until later.','We’ve got the full Magic Kingdom morning strategy at TheFloridaBuzz.com.'];
-const script=()=>({hook:'A useful planning question',thoughts,shots:[{type:'establishing',location:'Main Street U.S.A.',description:'Main Street view toward Cinderella Castle'},{type:'castle',location:'Cinderella Castle hub',description:'Castle hub and forecourt with holiday atmosphere'},{type:'land',location:'Fantasyland',description:'Fantasyland walkway near recognizable attractions'},{type:'detail',location:'Tomorrowland',description:'Tomorrowland evening atmosphere with distinct architecture'}],social:{facebook:'Plan your morning.',instagram:'A calmer start.',pinterest:'Magic Kingdom morning tips.',threads:'What would you do first?'}});
+const script=()=>({hook:'A useful planning question',thoughts,shots:[{stage:'arrival',type:'establishing',location:'Main Street U.S.A.',description:'Arrival view up Main Street toward Cinderella Castle'},{stage:'icon',type:'castle',location:'Cinderella Castle hub',description:'Castle hub and forecourt with holiday atmosphere'},{stage:'land',type:'land',location:'Fantasyland',description:'Fantasyland attraction area with recognizable architecture'},{stage:'experience',type:'detail',location:'Tomorrowland',description:'Tomorrowland evening attraction detail with distinct architecture'}],social:{facebook:'Plan your morning.',instagram:'A calmer start.',pinterest:'Magic Kingdom morning tips.',threads:'What would you do first?'}});
 test('seed order skips the existing proof and starts with Christmas party',()=>{assert.equal(selectQueued(seeds).key,'christmas-party-2026');assert.equal(seeds.length,10);assert.equal(seeds[0].status,'EXISTING_PROOF');});
 test('topic scores require usefulness/verifiability and selection favors variety',()=>{
   const topic=(key,destination,angle,value)=>({key,destination,angle,scores:Object.fromEntries(criteria.map(c=>[c,value]))});
@@ -33,11 +33,15 @@ test('facts fail closed on stale, missing, unverified or secondary-only facts',(
   assert.throws(()=>validateFacts({...facts(),checked_at:'2020-01-01'}));
   assert.throws(()=>validateFacts({...facts(),claims:[{verified:true,source_urls:['https://example.com']}] }));
 });
-test('script requires four thoughts, CTA and four distinct real-location shots',()=>{
+test('script requires progressive park movement and distinct scenes',()=>{
   assert.ok(validateScript(script(),5));
   assert.throws(()=>validateScript({...script(),thoughts:['Too short']},5));
   assert.match(promptFor(script().shots[0],{destination:'Magic Kingdom'}),/Main Street U\.S\.A\./);
   assert.throws(()=>validateScript({...script(),shots:script().shots.map((s,i)=>({...s,location:i?'Main Street U.S.A.':s.location}))},5),/Main Street|different park locations/);
+  const badStages=script().shots.map((s,i)=>({...s,stage:i===2?'icon':s.stage}));
+  assert.throws(()=>validateScript({...script(),shots:badStages},5),/arrival.*icon.*land.*experience/);
+  const walking=script().shots.map((s,i)=>({...s,description:i<2?'Guests walking through the area':s.description}));
+  assert.throws(()=>validateScript({...script(),shots:walking},5),/Only one Reel scene may primarily show people walking/);
   assert.throws(()=>validateScript({...script(),shots:script().shots.map(s=>({...s,description:'Breaking news evacuation'}))},6));
 });
 test('Kling and Qwen inputs preserve approved models and exact cloned voice settings',()=>{
