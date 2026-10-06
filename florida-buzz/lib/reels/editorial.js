@@ -130,7 +130,14 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
       catch(firstError) {
         value=await complete('Repair this Reel script to satisfy the validator exactly. Keep the same verified facts and overall message. Return EXACTLY four thoughts and EXACTLY four shots with stages in this exact order: arrival, icon, land, experience. Use four different named park locations. Main Street may appear only in shot 1. At most one shot may primarily show people walking. Keep the CTA in thought 4 with TheFloridaBuzz.com. Keep narration within the required word count. Do not invent facts.',
           JSON.stringify({topic,guide,facts,invalid:value,error:firstError.message,words:cfg.seconds === 5 ? '55–65' : '64–78'}),shape);
-        return validateScript(value,cfg.seconds);
+        try { return validateScript(value,cfg.seconds); }
+        catch(secondError) {
+          if(!/^Narration copy must contain /.test(secondError.message))throw secondError;
+          const thoughtShape=schema('reel_thoughts_only',object({thoughts:array(str)}));
+          const repaired=await complete('Rewrite ONLY the narration thoughts. Preserve the same verified meaning and CTA. Return EXACTLY four conversational thoughts totaling the requested word count. Thought 4 must include TheFloridaBuzz.com. Do not add facts, dates, prices, claims, or scene instructions that are not already present.',
+            JSON.stringify({topic,guide,facts,current_thoughts:value.thoughts,words:cfg.seconds === 5 ? '55–65 total words' : '64–78 total words'}),thoughtShape);
+          return validateScript({...value,thoughts:repaired.thoughts},cfg.seconds);
+        }
       }
     },
     async ideas() {
