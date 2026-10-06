@@ -62,7 +62,22 @@ function createFal({ falKey, billingKey }, fetcher = fetch) {
       catch (error) { return { failed: true, refusal: error.refusal===true, error: error.message }; }
     },
     async actual(generation) {
-      const data = await platform('models/billing-events', { request_id: generation.request_id, start: generation.created_at, limit: '100' });
+      let data;
+      try {
+        data = await platform('models/billing-events', { request_id: generation.request_id, start: generation.created_at, limit: '100' });
+      } catch (error) {
+        // A completed request must not strand the one controlled production
+        // package when fal throttles its reporting API. The reservation came
+        // from fal's live price quote immediately before submission, so it is
+        // the conservative charge to persist until the dashboard catches up.
+        if (/fal 429/.test(error.message) && Number.isFinite(Number(generation.reserved_usd))) {
+          return { amount:Number(generation.reserved_usd), events:[{
+            request_id:generation.request_id, endpoint_id:generation.endpoint,
+            cost_total:Number(generation.reserved_usd), source:'verified-reservation-fallback'
+          }] };
+        }
+        throw error;
+      }
       // This query is already scoped to one provider request ID. fal can report
       // the concrete serving route instead of the submitted alias, so matching
       // endpoint_id as well can strand a completed request indefinitely.
