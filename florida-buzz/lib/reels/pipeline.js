@@ -1,8 +1,9 @@
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
-const {SEEDANCE,QWEN,WHISPER,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,videoInput,voiceInput}=require('./config');
+const {SEEDANCE,SEEDANCE_IMAGE,QWEN,WHISPER,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,videoInput,imageVideoInput,voiceInput}=require('./config');
 const {promptFor,socialCopy,validateFacts}=require('./editorial');
 const {hasPassedFinalReview}=require('./publish');
+const {locationReference}=require('./location-references');
 function createPipeline({cfg,store,fal,editorial,media,publisher}) {
   let busy=false;
   async function tick(slot) {
@@ -65,22 +66,26 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
       for(let shot=1;shot<=4;shot++) {
         if(pkg.data.reusedClips?.[shot])continue;
         const attempts=gens.filter(g=>g.kind==='clip'&&g.shot===shot).sort((a,b)=>a.attempt-b.attempt),last=attempts.at(-1);
-        const prompt=promptFor(pkg.data.script.shots[shot-1],topic);
-        if(!last)return await submit({kind:'clip',shot,attempt:0,endpoint:SEEDANCE,input:videoInput(prompt,cfg.seconds)},cfg.seconds);
+        const scriptShot=pkg.data.script.shots[shot-1],prompt=promptFor(scriptShot,topic),reference=locationReference(scriptShot,topic);
+        const endpoint=reference?SEEDANCE_IMAGE:SEEDANCE;
+        const referenceImageUrl=reference?`${cfg.site}${reference.path}`:null;
+        const input=text=>reference?imageVideoInput(text,referenceImageUrl,cfg.seconds):videoInput(text,cfg.seconds);
+        if(reference&&!pkg.data.referenceCredits?.[reference.path])await save({referenceCredits:{...(pkg.data.referenceCredits||{}),[reference.path]:reference.credit}});
+        if(!last)return await submit({kind:'clip',shot,attempt:0,endpoint,input:input(prompt)},cfg.seconds);
         if(last.status==='FAILED')return await save({warning:`Shot ${shot} failed; manual review required.`},'MANUAL_REVIEW');
         if(!last.review) {
           const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-clip-'));
           try {
             const source=path.join(dir,'source.mp4');await media.download(last.result.video.url,source);
             const asset=await store.asset(`${pkg.id}/clip-${shot}-attempt-${last.attempt}.mp4`,await fs.readFile(source),'video/mp4');
-            const review=await media.review(source,{topic:topic.title,shot:pkg.data.script.shots[shot-1],seconds:cfg.seconds});
+            const review=await media.review(source,{topic:topic.title,shot:scriptShot,seconds:cfg.seconds,referenceImageUrl});
             await store.generation(token,last.id,{review:{...review,asset}});
             return {reviewed:shot,classification:review.classification};
           } finally {await fs.rm(dir,{recursive:true,force:true});}
         }
         if(last.review.classification==='PASS')continue;
         if(last.review.classification==='REGENERATE_ONCE'&&last.attempt===0) {
-          return await submit({kind:'clip',shot,attempt:1,endpoint:SEEDANCE,input:videoInput(`${prompt} Correct only this severe visible defect: ${last.review.correction}`,cfg.seconds)},cfg.seconds);
+          return await submit({kind:'clip',shot,attempt:1,endpoint,input:input(`${prompt} Preserve the supplied reference landmark exactly. Correct only this severe visible defect: ${last.review.correction}`)},cfg.seconds);
         }
         return await save({warning:`Shot ${shot}: ${last.attempt?'replacement failed; maximum one replacement reached':'requires manual review'}.`},'MANUAL_REVIEW');
       }

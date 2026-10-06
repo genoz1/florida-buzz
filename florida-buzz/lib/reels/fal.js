@@ -1,6 +1,6 @@
 'use strict';
-const { KLING, SEEDANCE, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE } = require('./config');
-const ENDPOINTS = new Set([KLING, SEEDANCE, QWEN, WHISPER]);
+const { KLING, SEEDANCE, SEEDANCE_IMAGE, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE } = require('./config');
+const ENDPOINTS = new Set([KLING, SEEDANCE, SEEDANCE_IMAGE, QWEN, WHISPER]);
 const UTILITIES = new Set([MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE]);
 function queueUrl(raw) {
   const url = new URL(raw);
@@ -26,13 +26,14 @@ function createFal({ falKey, billingKey }, fetcher = fetch) {
       if (!ENDPOINTS.has(endpoint)) throw new Error('Unapproved model');
       const data = await platform('models/pricing', { endpoint_id: endpoint });
       const price = data.prices?.find(p => p.endpoint_id === endpoint);
-      const validUnit = endpoint === SEEDANCE ? /token|second/i : endpoint === KLING ? /second/i : endpoint === QWEN ? /character|1000/i : /second|minute/i;
+      const seedance = endpoint === SEEDANCE || endpoint === SEEDANCE_IMAGE;
+      const validUnit = seedance ? /token|second/i : endpoint === KLING ? /second/i : endpoint === QWEN ? /character|1000/i : /second|minute/i;
       if (!price || price.currency !== 'USD' || !validUnit.test(price.unit) || !(price.unit_price > 0)) throw new Error('Model pricing unavailable or changed; manual review required');
       // Qwen is billed in thousand-character blocks; reserve at least one block.
       const roundedCharacters=Math.max(1000,Math.ceil(quantity/1000)*1000);
       const videoTokens=720*1280*quantity*24/1024;
       const units = endpoint === QWEN ? (/1000|1k|thousand/i.test(price.unit)?roundedCharacters/1000:roundedCharacters)
-        : endpoint === SEEDANCE && /token/i.test(price.unit) ? (/1000|1k|thousand/i.test(price.unit)?videoTokens/1000:videoTokens)
+        : seedance && /token/i.test(price.unit) ? (/1000|1k|thousand/i.test(price.unit)?videoTokens/1000:videoTokens)
         : endpoint === WHISPER && /minute/i.test(price.unit) ? quantity / 60 : quantity;
       return { ...price, quantity: units, amount: Math.ceil(price.unit_price * units * 1e6 - 1e-9) / 1e6 };
     },

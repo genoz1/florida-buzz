@@ -7,7 +7,7 @@ const object = properties => ({ type: 'object', properties, required: Object.key
 const schema = (name, value) => ({ name, strict: true, schema: value });
 const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const primary = raw => {
-  try { const u = new URL(raw); return u.protocol === 'https:' && ['disneyworld.disney.go.com','disneyparksblog.com','universalorlando.com','www.universalorlando.com','universalepicuniverse.com','disneycruise.disney.go.com','visitflorida.com','www.visitflorida.com'].includes(u.hostname); }
+  try { const u = new URL(raw); return u.protocol === 'https:' && (['disneyworld.disney.go.com','disneyparksblog.com','universalorlando.com','www.universalorlando.com','universalepicuniverse.com','disneycruise.disney.go.com','visitflorida.com','www.visitflorida.com','floridastateparks.org','www.floridastateparks.org','nps.gov','www.nps.gov'].includes(u.hostname)||u.hostname.endsWith('.gov')||u.hostname.endsWith('.fl.us')); }
   catch { return false; }
 };
 const unsafe = /\b(accident|evacuation|arrest|injur(?:y|ies)|ride failure|breaking news|flooding|emergency)\b/i;
@@ -67,8 +67,8 @@ function normalizeScript(script, seconds) {
   if(!script||!Array.isArray(script.shots)||script.shots.length!==4)throw new Error('Exactly four Reel shots required');
   const focus={
     icon:'Steady handheld view centered on the recognizable icon, architecture and surrounding setting; people remain incidental background context.',
-    land:'Handheld view focused on the themed land or attraction architecture, signage and environmental details; pedestrian movement remains incidental.',
-    experience:'Closer observational view of a distinctive experience, attraction exterior, entertainment setting, food or visual detail; emphasize the place rather than foot traffic.'
+    land:'Handheld view focused on a distinctive district, landmark, natural feature, attraction or environmental detail; pedestrian movement remains incidental.',
+    experience:'Closer observational view of a distinctive experience, landmark, attraction exterior, beach, historic setting, food or visual detail; emphasize the real place rather than foot traffic.'
   };
   const shots=script.shots.map((raw,index)=>{
     const shot=raw&&typeof raw==='object'?raw:{};
@@ -106,7 +106,7 @@ function validateScript(script, seconds) {
   if (script.thoughts.length !== 4 || script.shots.length !== 4) throw new Error('Four distinct thoughts and four progressive shots required');
   const locations=script.shots.map(s=>String(s.location||'').trim());
   if(locations.some(v=>!v))throw new Error('Every Reel shot requires an explicit real location');
-  if(new Set(locations.map(v=>v.toLowerCase())).size!==4)throw new Error('All four Reel shots must use different park locations');
+  if(new Set(locations.map(v=>v.toLowerCase())).size!==4)throw new Error('All four Reel shots must use different real locations');
   const stages=script.shots.map(s=>String(s.stage||'').toLowerCase());
   if(stages.some((s,i)=>s!==reelStages[i]))throw new Error('Reel scenes must progress arrival → icon → land → experience');
   const mainStreet=script.shots.map((s,i)=>/main street/i.test(`${s.location} ${s.description}`)?i:-1).filter(i=>i>=0);
@@ -199,7 +199,7 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
       const shape=schema('reel_script', object({hook:str, thoughts:fixedArray(str,4), shots:fixedArray(object({stage:str,type:str, location:str, description:str}),4),
         social:object({facebook:str,instagram:str,pinterest:str,threads:str})}));
       if(/Christmas Party/i.test(topic.title))return validateScript(continuousChristmasScript(),cfg.seconds);
-      const system='Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Return EXACTLY four spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. The first spoken thought must immediately name the subject. Return EXACTLY four shots in this exact stage order: arrival, icon, land, experience. No first-person visit claims in narration. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build one continuous first-person guest-eye VISUAL JOURNEY that moves progressively through the park: shot 1 = arrival/entrance approach, shot 2 = central icon or hub, shot 3 = a clearly different themed land or attraction area, shot 4 = a deeper experience/event/detail scene farther into the park. Every shot must preserve the same eye-level viewpoint, travel direction, time of day and handheld phone character so the cuts feel like one person continuing through the park. Use four explicitly named, recognizable real locations. Main Street U.S.A. may appear only in shot 1. Later shots must change both location and subject while preserving the continuous journey. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.';
+      const system='Create a useful conversational Florida travel Reel from the supplied guide. Adult American woman casually advising a friend. Return EXACTLY four spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. The first spoken thought must immediately name the subject. Return EXACTLY four shots in this exact stage order: arrival, icon, land, experience. No first-person visit claims in narration. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Build one continuous first-person visitor-eye VISUAL JOURNEY appropriate to the actual destination, whether it is a theme park, beach, historic district, city, trail, resort or other Florida place: shot 1 = arrival or entrance approach, shot 2 = the defining icon, landmark or vista, shot 3 = a clearly different area or feature, shot 4 = a deeper experience or detail farther into the visit. Every shot must preserve the same eye-level viewpoint, travel direction, time of day and handheld phone character so the cuts feel like one person continuing through the place. Use four explicitly named, recognizable real locations or features and never invent a landmark. Main Street U.S.A. may appear only in shot 1 when the destination is Magic Kingdom. Later shots must change both location and subject while preserving the continuous journey. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.';
       const payload=JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4});
       const value=normalizeScript(await complete(system,payload,shape),cfg.seconds);
       return validateScript(value,cfg.seconds);

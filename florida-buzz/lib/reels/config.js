@@ -2,6 +2,7 @@
 
 const KLING = 'fal-ai/kling-video/v3/standard/text-to-video';
 const SEEDANCE = 'bytedance/seedance-2.5/text-to-video';
+const SEEDANCE_IMAGE = 'bytedance/seedance-2.5/image-to-video';
 const QWEN = 'fal-ai/qwen-3-tts/text-to-speech/1.7b';
 const WHISPER = 'fal-ai/whisper';
 const MERGE_VIDEOS = 'fal-ai/ffmpeg-api/merge-videos';
@@ -39,4 +40,7 @@ const voiceInput = (text, embedding) => ({ text, language: 'English', speaker_vo
 const videoInput = (prompt, seconds = 5) => ({ prompt, duration: String(seconds),
   resolution: '720p', aspect_ratio: '9:16', generate_audio: false,
   bitrate_mode: 'high', codec: 'H264', end_user_id: 'florida-buzz' });
-module.exports = { config, KLING, SEEDANCE, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE, voiceInput, videoInput };
+const imageVideoInput = (prompt, imageUrl, seconds = 5) => ({ prompt, image_url: imageUrl,
+  duration: String(seconds), resolution: '720p', aspect_ratio: '9:16', generate_audio: false,
+  bitrate_mode: 'high', codec: 'H264', end_user_id: 'florida-buzz' });
+module.exports = { config, KLING, SEEDANCE, SEEDANCE_IMAGE, QWEN, WHISPER, MERGE_VIDEOS, MERGE_AUDIO_VIDEO, AUTO_SUBTITLE, voiceInput, videoInput, imageVideoInput };
