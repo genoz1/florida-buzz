@@ -27,19 +27,24 @@ function validateFacts(facts, now = new Date(), topic) {
   return facts;
 }
 function validateScript(script, seconds) {
-  if (script.thoughts.length !== 4 || script.shots.length !== 4 || new Set(script.shots.map(s => s.type)).size < 3) throw new Error('Four distinct thoughts and varied shots required');
+  if (script.thoughts.length !== 4 || script.shots.length !== 4 || new Set(script.shots.map(s => s.type)).size < 4) throw new Error('Four distinct thoughts and four distinct shot types required');
+  const locations=script.shots.map(s=>String(s.location||'').trim());
+  if(locations.some(v=>!v))throw new Error('Every Reel shot requires an explicit real location');
+  if(new Set(locations.map(v=>v.toLowerCase())).size!==4)throw new Error('All four Reel shots must use different park locations');
+  const mainStreet=script.shots.map((s,i)=>/main street/i.test(`${s.location} ${s.description}`)?i:-1).filter(i=>i>=0);
+  if(mainStreet.some(i=>i>0)||mainStreet.length>1)throw new Error('Main Street may appear only in shot 1');
   if (!script.thoughts[3].includes('TheFloridaBuzz.com')) throw new Error('Missing Florida Buzz CTA');
   const count = script.thoughts.join(' ').split(/\s+/).length;
   const min = seconds === 5 ? 55 : 64, max = seconds === 5 ? 65 : 78;
   if (count < min || count > max) throw new Error(`Narration copy must contain ${min}–${max} conversational words; never stretch audio`);
-  if (unsafe.test(script.thoughts.join(' ') + script.shots.map(s => s.description).join(' '))) throw new Error('Incident footage is not permitted');
+  if (unsafe.test(script.thoughts.join(' ') + script.shots.map(s => `${s.location} ${s.description}`).join(' '))) throw new Error('Incident footage is not permitted');
   return script;
 }
 function promptFor(shot, topic) {
-  return `Vertical 9:16 ordinary guest handheld iPhone video at ${topic.destination} in Florida. ${shot.description} ` +
+  return `Vertical 9:16 upright portrait ordinary guest handheld iPhone video at ${shot.location}, ${topic.destination} in Florida. ${shot.description} ` +
     'Accurately preserve the named real location, recognizable landmarks, street layout and stable architecture. ' +
     'Realistic casual crowd and stroller motion, normal human walking, slight natural phone shake, tiny autofocus/exposure adjustments, imperfect framing. ' +
-    'Natural available light appropriate to this scene. Observational vacation footage, no staged people, presenter, text, narration, audio, slow motion, drone, cinematic camera move or polished advertisement. ' +
+    'Camera remains physically upright with the horizon level; never rotate the phone sideways and never output landscape footage inside a portrait frame. Natural available light appropriate to this scene. Observational vacation footage, no staged people, presenter, text, narration, audio, slow motion, drone, cinematic camera move or polished advertisement. ' +
     'Illustrative travel-guide B-roll; do not portray a specific real incident or imply this documents an actual event.';
 }
 function socialCopy(script, guide) {
@@ -107,9 +112,9 @@ For a Christmas party verify the CURRENT YEAR Christmas event only. Required cla
       return { ...published, url: `${cfg.site}/article/${published.slug}`, handling: existing ? 'UPDATED' : 'CREATED' };
     },
     async script(topic, guide, facts) {
-      const value = await complete('Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Four separate spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Four varied real-location shots support the topic; no specific incident or purported live event footage. Prepare distinct platform copy; no publishing.',
+      const value = await complete('Create a useful conversational travel Reel from the supplied guide. Adult American woman casually advising a friend. Four separate spoken thoughts: hook, two useful points, and CTA with TheFloridaBuzz.com. No first-person visit claims. Avoid formal prose, announcer language, exaggerated negative hooks and invented facts. Create FOUR visually different shots at FOUR explicitly named, recognizable real locations inside the destination. Main Street U.S.A. may be used only for shot 1. Shots 2–4 must be different areas/lands/attractions or event-specific locations, not additional walking-down-Main-Street scenes. Vary composition and subject matter as well as location. No specific incident or purported live event footage. Prepare distinct platform copy; no publishing.',
         JSON.stringify({topic, guide, facts, words:cfg.seconds === 5 ? '55–65' : '64–78', seconds:cfg.seconds*4}),
-        schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({type:str, description:str})),
+        schema('reel_script', object({hook:str, thoughts:array(str), shots:array(object({type:str, location:str, description:str})),
           social:object({facebook:str,instagram:str,pinterest:str,threads:str})})));
       return validateScript(value, cfg.seconds);
     },

@@ -17,10 +17,13 @@ function slotFor(now=new Date()) {
   return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 }
 function mount(app,env=process.env) {
-  const reelEnv={...env,REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SCHEDULES_ENABLED:'true'};
+  // Emergency quality hold: keep all Reel generation, schedules and auto-publishing off
+  // until the revised visual QA is explicitly approved for re-enable.
+  const reelEnv={...env,REELS_ENABLED:'false',REELS_GENERATION_ENABLED:'false',REELS_SCHEDULES_ENABLED:'false'};
   try {
     const runtime=production(reelEnv),{cfg,store,pipeline,editorial}=runtime;
     app.use('/admin/reels',createRouter({store,cfg,fal:runtime.fal,env:reelEnv}));
+    if(!cfg.enabled||!cfg.generation||!cfg.schedules){console.log('[reels disabled] emergency quality hold');return;}
     if(!cfg.falKey||!reelEnv.OPENAI_API_KEY||Object.values(cfg.caps).some(v=>v<=0))throw new Error('Reel generation requires credentials and explicit positive spending caps');
     const cron=require('node-cron');
     if(!cron.validate(cfg.cron)||!cron.validate(cfg.ideasCron))throw new Error('Invalid Reel cadence');
