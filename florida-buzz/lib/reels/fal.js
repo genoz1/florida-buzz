@@ -63,7 +63,10 @@ function createFal({ falKey, billingKey }, fetcher = fetch) {
     },
     async actual(generation) {
       const data = await platform('models/billing-events', { request_id: generation.request_id, start: generation.created_at, limit: '100' });
-      const events = data.billing_events?.filter(e => e.request_id === generation.request_id && e.endpoint_id === generation.endpoint);
+      // This query is already scoped to one provider request ID. fal can report
+      // the concrete serving route instead of the submitted alias, so matching
+      // endpoint_id as well can strand a completed request indefinitely.
+      const events = data.billing_events?.filter(e => e.request_id === generation.request_id);
       if (!events?.length) return null;
       if (events.some(e => !Number.isFinite(e.cost_total) || e.cost_total < 0)) throw new Error('Invalid fal billing record');
       return { amount: events.reduce((s, e) => s + e.cost_total, 0), events };
