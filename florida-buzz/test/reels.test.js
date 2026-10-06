@@ -125,6 +125,18 @@ test('near-limit narration uses compact natural pauses without stretching speech
   const out=timedNarration(Buffer.concat(parts),sr,['One.','Two.','Three.','Four.'],chunks,20);
   assert.deepEqual(out.pauses.map(g=>g[2]),[.15,.15,.25]);assert.ok(out.duration<=19.8);assert.equal(out.speed,1);
 });
+test('extreme near-limit narration uses minimal safe pauses and keeps every spoken sample',()=>{
+  const sr=1000,parts=[],chunks=[];let at=0;
+  ['One.','Two.','Three.','Four.'].forEach((text,i)=>{
+    const speech=Buffer.alloc(9750);for(let j=0;j<4875;j++)speech.writeInt16LE(10000,j*2);
+    parts.push(speech);chunks.push({text,timestamp:[at,at+4.875]});at+=4.875;
+    if(i<3){parts.push(Buffer.alloc(100));at+=.05;}
+  });
+  const input=Buffer.concat(parts),out=timedNarration(input,sr,['One.','Two.','Three.','Four.'],chunks,20);
+  assert.deepEqual(out.pauses.map(g=>g[2]),[.05,.05,.1]);assert.ok(out.duration<=19.8);assert.equal(out.speed,1);
+  const spoken=buffer=>{const kept=[];for(let i=0;i<buffer.length;i+=2)if(buffer.readInt16LE(i)!==0)kept.push(buffer.subarray(i,i+2));return Buffer.concat(kept);};
+  assert.deepEqual(spoken(out.pcm),spoken(input));
+});
 
 async function fixture(options={}) {
   const cfg={...config({REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_AUTO_PUBLISH_ENABLED:options.noPublish?'false':'true',REELS_SHOT_SECONDS:'6'}),caps:{single:2,package:3,day:3,week:6,month:24}};
