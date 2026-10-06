@@ -13,7 +13,7 @@ const {config,KLING,QWEN,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,voiceInput
 const {seeds,score,strongest,selectQueued,criteria}=require('../lib/reels/topics');
 const {createFal,queueUrl}=require('../lib/reels/fal');
 const {validateFacts,validateScript,normalizeScript,normalizeNarration,promptFor,socialCopy,createEditorial}=require('../lib/reels/editorial');
-const {naturalPauses,fitDuration,captions}=require('../lib/reels/media');
+const {naturalPauses,fitDuration,timedNarration,captions}=require('../lib/reels/media');
 const {createPipeline}=require('../lib/reels/pipeline');
 const {createPublisher}=require('../lib/reels/publish');
 const facts=()=>({verified:true,checked_at:new Date().toISOString(),missing:[],claims:['pricing','dates','entry','hours','parade','fireworks','entertainment','treats','attractions','crowds'].map(subject=>({subject,fact:`Verified ${new Date().getUTCFullYear()} ${subject} rule`,verified:true,source_urls:['https://disneyworld.disney.go.com/events/']}))});
@@ -70,6 +70,7 @@ test('narration length is deterministically normalized and keeps the CTA',()=>{
   assert.ok(trimmedCount>=55&&trimmedCount<=65);assert.match(trimmed[3],/TheFloridaBuzz\.com/);
   const missingCta=normalizeNarration(['Is it worth it?','Compare the price with the included event time.','Think about the entertainment, treats, and attraction access.','Read the complete planning guide before deciding.'],5);
   assert.match(missingCta[3],/TheFloridaBuzz\.com/);assert.doesNotThrow(()=>validateScript({...script(),thoughts:missingCta},5));
+  assert.equal(missingCta[3],'See the full guide at TheFloridaBuzz.com.');
 });
 test('later Kling prompts focus on places instead of inheriting generic people-walking direction',()=>{
   const prompts=script().shots.map(shot=>promptFor(shot,{destination:'Magic Kingdom'}));
@@ -113,6 +114,16 @@ test('native audio gaps are replaced without stretching spoken samples and capti
   const kept=[];for(let i=0;i<out.pcm.length;i+=2)if(out.pcm.readInt16LE(i)!==0)kept.push(out.pcm.subarray(i,i+2));assert.deepEqual(Buffer.concat(kept),spoken);
   assert.match(captions(out.words,6),/FLORIDA BUZZ/);assert.match(captions(out.words,6),/illustrative footage/);
   assert.throws(()=>fitDuration(5,20));assert.throws(()=>fitDuration(25,24));assert.doesNotThrow(()=>fitDuration(19,20));
+});
+test('near-limit narration uses compact natural pauses without stretching speech',()=>{
+  const sr=1000,parts=[],chunks=[];let at=0;
+  ['One.','Two.','Three.','Four.'].forEach((text,i)=>{
+    const speech=Buffer.alloc(9500);for(let j=0;j<4750;j++)speech.writeInt16LE(10000,j*2);
+    parts.push(speech);chunks.push({text,timestamp:[at,at+4.75]});at+=4.75;
+    if(i<3){parts.push(Buffer.alloc(200));at+=.1;}
+  });
+  const out=timedNarration(Buffer.concat(parts),sr,['One.','Two.','Three.','Four.'],chunks,20);
+  assert.deepEqual(out.pauses.map(g=>g[2]),[.15,.15,.25]);assert.ok(out.duration<=19.8);assert.equal(out.speed,1);
 });
 
 async function fixture(options={}) {

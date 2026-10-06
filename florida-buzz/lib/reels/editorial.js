@@ -38,7 +38,7 @@ function normalizeNarration(thoughts, seconds) {
   if(!Array.isArray(thoughts)||thoughts.length!==4)throw new Error('Exactly four narration thoughts required');
   let normalized=thoughts.map(value=>String(value||'').replace(/\s+/g,' ').trim());
   if(normalized.some(value=>!value))throw new Error('Every narration thought must contain spoken copy');
-  if(!normalized[3].includes('TheFloridaBuzz.com'))normalized[3]=`${normalized[3]} See the full guide at TheFloridaBuzz.com.`;
+  normalized[3]='See the full guide at TheFloridaBuzz.com.';
   const min=seconds===5?55:64,max=seconds===5?65:78;
   if(wordCount(normalized.join(' '))>max) {
     const cta='See the full guide at TheFloridaBuzz.com.';

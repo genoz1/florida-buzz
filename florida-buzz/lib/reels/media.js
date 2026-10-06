@@ -61,6 +61,12 @@ function naturalPauses(pcm, sampleRate, thoughts, chunks, pauses = [.4,.4,.7]) {
 function fitDuration(duration, videoDuration) {
   if (duration < videoDuration*.75 || duration > videoDuration-.2) throw new Error('Narration does not fit: revise copy manually; never slow or stretch speech');
 }
+function timedNarration(pcm, sampleRate, thoughts, chunks, videoDuration) {
+  let timing=naturalPauses(pcm,sampleRate,thoughts,chunks);
+  if(timing.duration>videoDuration-.2)timing=naturalPauses(pcm,sampleRate,thoughts,chunks,[.15,.15,.25]);
+  fitDuration(timing.duration,videoDuration);
+  return timing;
+}
 const stamp = n => {const c=Math.round(n*100);return `${Math.floor(c/360000)}:${String(Math.floor(c/6000)%60).padStart(2,'0')}:${String(Math.floor(c/100)%60).padStart(2,'0')}.${String(c%100).padStart(2,'0')}`;};
 function captions(words, duration) {
   const safe = s=>s.replace(/[{}\\\r\n]/g,' ');
@@ -112,8 +118,7 @@ function createMedia(cfg, env=process.env) {
     async prepareNarration(audio, transcript, thoughts, dir) {
       const sr=48000;
       const pcm=await run(ffmpeg,['-v','error','-i',audio,'-f','s16le','-ac','1','-ar',String(sr),'pipe:1']);
-      const timing=naturalPauses(pcm,sr,thoughts,transcript.chunks), duration=cfg.seconds*4;
-      fitDuration(timing.duration,duration);
+      const duration=cfg.seconds*4,timing=timedNarration(pcm,sr,thoughts,transcript.chunks,duration);
       const raw=path.join(dir,'narration-paused.pcm'), ass=path.join(dir,'captions.ass'), paused=path.join(dir,'Narration-Qwen.wav');
       await fs.writeFile(raw,timing.pcm);await fs.writeFile(ass,captions(timing.words,duration));
       await run(ffmpeg,['-v','error','-y','-f','s16le','-ar',String(sr),'-ac','1','-i',raw,paused]);
@@ -170,8 +175,7 @@ function createMedia(cfg, env=process.env) {
     async assemble(clips, audio, transcript, thoughts, dir) {
       const sr=48000;
       const pcm=await run(ffmpeg,['-v','error','-i',audio,'-f','s16le','-ac','1','-ar',String(sr),'pipe:1']);
-      const timing=naturalPauses(pcm,sr,thoughts,transcript.chunks), duration=cfg.seconds*4;
-      fitDuration(timing.duration,duration);
+      const duration=cfg.seconds*4,timing=timedNarration(pcm,sr,thoughts,transcript.chunks,duration);
       const raw=path.join(dir,'narration-paused.pcm'), ass=path.join(dir,'captions.ass'), master=path.join(dir,'Florida-Buzz-Reel.mp4');
       await fs.writeFile(raw,timing.pcm);await fs.writeFile(ass,captions(timing.words,duration));
 
@@ -213,4 +217,4 @@ function createMedia(cfg, env=process.env) {
     },
   };
 }
-module.exports={createMedia,naturalPauses,wordBoundaries,fitDuration,captions,run};
+module.exports={createMedia,naturalPauses,wordBoundaries,fitDuration,timedNarration,captions,run};
