@@ -14,6 +14,7 @@ function createStore(client, cfg) {
     claim: slot => rpc('reels_claim', { p_slot: slot || null }),
     lease: (token, release = false) => rpc('reels_lease', { p_token: token, p_release: release }),
     pause: (token, reason) => rpc('reels_pause', {p_token:token,p_reason:reason}),
+    clearPause: () => checked(client.from('reel_control').update({paused_reason:null,token:null,expires_at:null,updated_at:new Date().toISOString()}).eq('id',true).select('id')),
     async beginIdeas(week) {
       const rows=await checked(client.from('reel_idea_batches').upsert({week,status:'CREATING'}, {onConflict:'week',ignoreDuplicates:true}).select('week'));
       return rows.length===1;
