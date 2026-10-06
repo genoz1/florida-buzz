@@ -17,8 +17,8 @@ function production(env=process.env) {
 async function runControlledChristmasTest(env=process.env) {
   const testEnv={...env,REELS_ENABLED:'true',REELS_GENERATION_ENABLED:'true',REELS_SCHEDULES_ENABLED:'false',REELS_AUTO_PUBLISH_ENABLED:'false'};
   const runtime=production(testEnv),{store,pipeline}=runtime;
-  const key='christmas-party-2026-progressive-test-1';
-  const slot='quality-test-christmas-progressive-v1';
+  const key='christmas-party-2026-progressive-test-2';
+  const slot='quality-test-christmas-progressive-v2';
   await store.rejectWorkingForTopic('christmas-party-2026');
   await store.addTopics([{
     key,
