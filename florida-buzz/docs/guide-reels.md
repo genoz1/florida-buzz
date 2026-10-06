@@ -1,6 +1,6 @@
 # Guide → Reel pipeline, Phase 1
 
-This feature prepares a useful guide, four distinct Kling clips, native-speed Qwen narration, captions, one vertical master and four social drafts. It stops at `READY_FOR_APPROVAL`. Approval records a decision **only**; there is no video publisher in this feature.
+This feature prepares a useful guide, four distinct Seedance 2.5 clips, native-speed Qwen narration, captions, one vertical master and four social drafts. It stops at `READY_FOR_APPROVAL`. Approval records a decision **only**; there is no video publisher in this feature.
 
 ## Scope and activation
 
@@ -28,7 +28,7 @@ REELS_CRON=0 10 * * 1,3,5
 REELS_IDEAS_CRON=0 9 * * 0
 ```
 
-These example ceilings are for **one controlled initial package**, not permission to spend or replenish the account. Every request must also fit the freshly checked existing fal balance and the $2 single-generation limit. Keep schedules off for the first live run. Later authorized cadence is independently configurable Monday/Wednesday/Friday 10 a.m. Eastern by default; it never starts all three together. Shot duration may be five or six seconds, producing a 20- or 24-second master. No automatic upscale or audio speed control is used.
+These example ceilings are for **one controlled package**, not permission to spend or replenish the account. Every request must also fit the freshly checked existing fal balance and the configured single-generation limit. Keep schedules off for controlled repair runs. Later authorized cadence is independently configurable Monday/Wednesday/Friday 10 a.m. Eastern by default; it never starts all three together. Shot duration may be five or six seconds, producing a 20- or 24-second master. No automatic upscale or audio speed control is used.
 
 ## Schema and durable state
 
@@ -55,7 +55,7 @@ The private `guide-reels` Storage bucket keeps the original source clips, origin
 9. One fal Whisper request supplies word timestamps for caption sync. The audio is decoded at native speed; only safely identified quiet intervals between thoughts are replaced with 0.4/0.4/0.7 seconds. All spoken PCM samples remain unchanged. If no safe gap exists, the transcript differs, or duration fails to fit, stop for copy correction. Never time-stretch, rush, slow or regenerate the voice automatically.
 10. FFmpeg makes clean cuts, burns synchronized captions and subtle Florida Buzz branding with an illustrative-footage label, maps only new narration, checks vertical/audio/duration streams, and decodes the complete master. Originals are retained. `READY_FOR_APPROVAL` is the terminal automation state.
 
-The cost dashboard distinguishes confirmed fal charges from pending reservations. These totals cover Kling, Qwen, Whisper and replacement requests. Existing OpenAI editorial research and frame-review usage is billed separately by that existing provider and must also be checked in its usage dashboard; it is **not falsely included as measured fal cost**. No paid image generation is introduced. A cap violation pauses the feature globally and surfaces the reason on the held package. Resume requires an operator to review ceilings/current balance and clear `reel_control.paused_reason`; do not change ambiguous journal rows to bypass the submission guard.
+The cost dashboard distinguishes confirmed fal charges from pending reservations. These totals cover Seedance 2.5, Qwen, Whisper and replacement requests. Seedance video-token quotes are converted from the requested 720×1280 frame area, duration and 24 fps before the paid request is reserved. Existing OpenAI editorial research and frame-review usage is billed separately by that existing provider and must also be checked in its usage dashboard; it is **not falsely included as measured fal cost**. No paid image generation is introduced. A cap violation pauses the feature globally and surfaces the reason on the held package. Resume requires an operator to review ceilings/current balance and clear `reel_control.paused_reason`; do not change ambiguous journal rows to bypass the submission guard.
 
 ## Initial topics and weekly ideas
 
