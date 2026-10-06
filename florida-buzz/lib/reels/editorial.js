@@ -27,7 +27,7 @@ function validateFacts(facts, now = new Date(), topic) {
   return facts;
 }
 function validateScript(script, seconds) {
-  if (script.thoughts.length !== 4 || script.shots.length !== 4 || new Set(script.shots.map(s => s.type)).size < 4) throw new Error('Four distinct thoughts and four distinct shot types required');
+  if (script.thoughts.length !== 4 || script.shots.length !== 4) throw new Error('Four distinct thoughts and four progressive shots required');
   const locations=script.shots.map(s=>String(s.location||'').trim());
   if(locations.some(v=>!v))throw new Error('Every Reel shot requires an explicit real location');
   if(new Set(locations.map(v=>v.toLowerCase())).size!==4)throw new Error('All four Reel shots must use different park locations');
