@@ -2,6 +2,7 @@
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {KLING,QWEN,WHISPER,MERGE_VIDEOS,MERGE_AUDIO_VIDEO,AUTO_SUBTITLE,videoInput,voiceInput}=require('./config');
 const {promptFor,socialCopy,validateFacts}=require('./editorial');
+const {hasPassedFinalReview}=require('./publish');
 function createPipeline({cfg,store,fal,editorial,media,publisher}) {
   let busy=false;
   async function tick(slot) {
@@ -156,25 +157,26 @@ function createPipeline({cfg,store,fal,editorial,media,publisher}) {
       });
       if(subtitled.stop)return subtitled.stop;
 
-      if(!pkg.data.master) {
+      if(!hasPassedFinalReview(pkg)) {
         const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reel-remote-master-'));
         try {
           const masterFile=path.join(dir,'Florida-Buzz-Reel.mp4');
-          await media.download(subtitled.result.video.url,masterFile);
+          await media.download(pkg.data.master?await store.signed(pkg.data.master,21600):subtitled.result.video.url,masterFile);
           const info=await media.probe(masterFile),v=info.streams.find(s=>s.codec_type==='video'),a=info.streams.find(s=>s.codec_type==='audio');
           const expected=cfg.seconds*4;
           if(!v||!a||v.width!==720||v.height!==1280||Math.abs(Number(info.format.duration)-expected)>.75)throw new Error('Remote Reel failed stream/duration validation');
           const finalReview=await media.finalReview(masterFile,{topic:topic.title,shots:pkg.data.script.shots,captionSafeZone:'lower-middle, clear of bottom app controls'});
-          if(finalReview.classification!=='PASS')return await save({finalReview,warning:`Final Reel quality review failed: ${finalReview.issues.join('; ')}`},'MANUAL_REVIEW');
-          const master=await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(masterFile),'video/mp4');
+          if(finalReview.classification!=='PASS')return await save({finalReview:{...finalReview,master:pkg.data.master||null},warning:`Final Reel quality review failed: ${finalReview.issues.join('; ')}`},'MANUAL_REVIEW');
+          const master=pkg.data.master||await store.asset(`${pkg.id}/Florida-Buzz-Reel.mp4`,await fs.readFile(masterFile),'video/mp4');
           const balanceAfter=await fal.balance();
           const remoteAssemblyCost=Math.max(0,Number(pkg.data.assemblyBalanceBefore||balanceAfter)-balanceAfter);
-          await save({master,finalReview,remoteAssemblyCost,balanceAfter,quality:{...(pkg.data.quality||{}),vertical:true,audio:true,captions:true,remoteAssembly:true,finalReview:true,oldNarrator:false}});
+          await save({master,finalReview:{...finalReview,master,passedAt:new Date().toISOString()},remoteAssemblyCost,balanceAfter,quality:{...(pkg.data.quality||{}),vertical:true,audio:true,captions:true,remoteAssembly:true,finalReview:true,oldNarrator:false}});
         } finally {await fs.rm(dir,{recursive:true,force:true});}
       }
       const balanceAfter=pkg.data.balanceAfter??await fal.balance();
       const actualCost=gens.reduce((sum,g)=>sum+Number(g.actual_usd),0)+Number(pkg.data.remoteAssemblyCost||0);
       await save({actualCost,balanceAfter});
+      if(!hasPassedFinalReview(pkg))throw new Error('Reel master lacks persisted final QA proof; publication blocked');
       if(!cfg.autoPublish)return await save({warning:'Controlled Reel test passed generation and final QA. Social publishing remains disabled.'},'READY_FOR_APPROVAL');
       const publication=await publisher.publish({pkg,masterUrl:await store.signed(pkg.data.master,21600),coverImageUrl:pkg.data.guide.image_url,save});
       return await save({publication,publishedAt:new Date().toISOString(),warning:'Automated Reel passed factual, media and publication checks.'},'APPROVED');
