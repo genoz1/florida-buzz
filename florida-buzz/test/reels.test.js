@@ -68,6 +68,8 @@ test('narration length is deterministically normalized and keeps the CTA',()=>{
   const long=thoughts.map(value=>`${value} ${Array.from({length:35},()=> 'extra').join(' ')}`);
   const trimmed=normalizeNarration(long,5),trimmedCount=trimmed.join(' ').split(/\s+/).length;
   assert.ok(trimmedCount>=55&&trimmedCount<=65);assert.match(trimmed[3],/TheFloridaBuzz\.com/);
+  const missingCta=normalizeNarration(['Is it worth it?','Compare the price with the included event time.','Think about the entertainment, treats, and attraction access.','Read the complete planning guide before deciding.'],5);
+  assert.match(missingCta[3],/TheFloridaBuzz\.com/);assert.doesNotThrow(()=>validateScript({...script(),thoughts:missingCta},5));
 });
 test('later Kling prompts focus on places instead of inheriting generic people-walking direction',()=>{
   const prompts=script().shots.map(shot=>promptFor(shot,{destination:'Magic Kingdom'}));
