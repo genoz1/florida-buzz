@@ -62,6 +62,35 @@ test('generateText preserves prompts and normalizes a Responses API result', asy
   assert.equal(request.body.tools, undefined);
 });
 
+test('generateText accepts an options object so OpenAI always gets input', async () => {
+  let requestBody;
+  global.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return response(200, { status: 'completed', output_text: 'ok' });
+  };
+  assert.equal(
+    await generateText({
+      system: 'sys',
+      user: 'user from object',
+      maxOutputTokens: 32,
+    }),
+    'ok'
+  );
+  assert.equal(requestBody.instructions, 'sys');
+  assert.equal(requestBody.input, 'user from object');
+  assert.equal(requestBody.max_output_tokens, 32);
+});
+
+test('generateText rejects blank user prompts before calling OpenAI', async () => {
+  let called = false;
+  global.fetch = async () => {
+    called = true;
+    return response(200, { status: 'completed', output_text: 'nope' });
+  };
+  await assert.rejects(() => generateText('system', '   '), /non-empty user prompt/i);
+  assert.equal(called, false);
+});
+
 test('Responses API output limit is clamped to 16 for the production suitability failure', async () => {
   let requestBody;
   global.fetch = async (url, options) => {

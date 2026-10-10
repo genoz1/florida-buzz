@@ -25,14 +25,17 @@
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (error) { %><p class="error"><%= error %></p><% } %>
   <% if (episode.last_error) { %><p class="error"><strong>Last error:</strong> <%= episode.last_error %></p><% } %>
-  <% const isScaffold = (episode.outline_json && episode.outline_json.fallback) || /scaffold for review|not for publication until approved/i.test(episode.script_text || ''); %>
+  <% const scriptShown = (typeof conversation !== 'undefined' && conversation && conversation.content_text) ? conversation.content_text : (episode.script_text || ''); %>
+  <% const isScaffold = /scaffold for review|not for publication until approved/i.test(scriptShown); %>
   <% if (isScaffold) { %>
     <p class="error">
-      <strong>This is only a short scaffold (~2 minutes), not the full 25–35 minute episode.</strong>
-      Do not Approve or Publish this yet. Scroll to Conversation script, <em>clear the script box</em>, click
-      <strong>Save / generate script</strong> (wait — this can take a few minutes), then click
-      <strong>Generate private preview (fal TTS)</strong>.
+      <strong>This is only a short scaffold (~2 minutes), not the full ~30 minute episode.</strong>
+      The script box below is cleared on purpose so the next click asks AI for a full script.
+      Click <strong>Save / generate script</strong> and wait a few minutes — do not Approve or Publish until
+      a long Gena/Diane script appears in the box, then click <strong>Generate private preview (fal TTS)</strong>.
     </p>
+  <% } else if (notice === 'script-generated') { %>
+    <p class="notice">Full AI script generated. Scroll down to confirm the Conversation script box is filled before generating audio.</p>
   <% } %>
   <p class="notice"><%= show.disclosure %></p>
   <p class="notice">Drafts are not on the public site or RSS until you Approve → Publish (or schedule then publish). Friday 6:00 AM ET is the intended release target only — auto-publish is off. A real episode should be about 25–35 minutes once the full AI script + audio succeed.</p>
@@ -109,10 +112,11 @@
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/script">
     <h2>Conversation script</h2>
     <input type="hidden" name="csrf" value="<%= csrf %>">
-    <label>Script (Gena:/Diane: lines; leave blank to generate the full ~25–35 minute conversation)
-      <textarea name="script_text" rows="16"><%= isScaffold ? '' : (conversation ? conversation.content_text : (episode.script_text || '')) %></textarea>
+    <label>Script (Gena:/Diane: lines; leave blank to generate the full ~30 minute conversation)
+      <textarea name="script_text" rows="16"><%= isScaffold ? '' : scriptShown %></textarea>
       <small>
         <% if (isScaffold) { %>Scaffold text was cleared above so Generate will create a real full script. <% } %>
+        <% else if (scriptShown) { %>Script loaded (<%= String(scriptShown).trim().split(/\s+/).filter(Boolean).length %> words). <% } %>
         Full episodes: lively Gena/Diane conversation with park anecdotes. Wait for the page to finish — script generation is slow.
       </small>
     </label>

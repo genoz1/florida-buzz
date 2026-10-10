@@ -312,24 +312,60 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       const show = await defaultShow();
       const sources = await store.listSources(episode.id);
       const outlineRow = await store.latestScript(episode.id, 'outline');
-      const outline = String(req.body.outline_text || outlineRow?.content_text || '').trim();
+      const outline = String(req.body.outline_text || outlineRow?.content_text || episode.outline_json?.text || '').trim();
       let script = String(req.body.script_text || '').trim();
+      let generated = false;
       if (!script) {
         if (!outline) throw new Error('Generate or paste an outline before creating a script');
         if (!aiText) throw new Error('AI text service unavailable');
-        script = await generateConversation({ aiText, show, episode, outline, sources });
+        try {
+          script = await generateConversation({ aiText, show, episode, outline, sources });
+          generated = true;
+        } catch (err) {
+          const message = `Script AI unavailable: ${String(err.message || err).slice(0, 500)}`;
+          await store.updateEpisode(episode.id, { last_error: message });
+          throw new Error(message);
+        }
       }
-      await store.saveScript(episode.id, 'conversation', script);
-      await store.updateEpisode(episode.id, { script_text: script });
+      const looksScaffold = /scaffold for review|not for publication until approved/i.test(script);
+      await store.saveScript(episode.id, 'conversation', script, {
+        target_minutes: looksScaffold ? 'scaffold-only' : '25-35',
+        fallback: looksScaffold,
+        generated,
+      });
+      const prevOutline =
+        episode.outline_json && typeof episode.outline_json === 'object' ? episode.outline_json : {};
+      await store.updateEpisode(episode.id, {
+        script_text: script,
+        last_error: looksScaffold ? episode.last_error || 'Scaffold script saved — generate a full AI script before publish.' : null,
+        outline_json: {
+          ...prevOutline,
+          text: outline || prevOutline.text || '',
+          // Real conversation scripts must not keep the weekly-draft fallback flag,
+          // or the admin UI hides the script box forever.
+          fallback: looksScaffold,
+        },
+      });
       if (['draft', 'failed'].includes(episode.status)) {
-        await store.setStatus(episode.id, 'script_ready');
+        if (looksScaffold) {
+          // Avoid setStatus — it clears last_error, and scaffold drafts need that warning.
+          await store.updateEpisode(episode.id, { status: 'script_ready' });
+        } else {
+          await store.setStatus(episode.id, 'script_ready');
+          await store.updateEpisode(episode.id, { last_error: null });
+        }
       } else if (episode.status === 'script_ready') {
         /* already ready */
       } else {
         // Keep preview/approved/published statuses when regenerating script text.
         await store.updateEpisode(episode.id, { updated_at: new Date().toISOString() });
       }
-      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=script-saved`);
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent(
+          generated ? 'script-generated' : 'script-saved'
+        )}`
+      );
     })
   );
 

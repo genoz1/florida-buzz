@@ -136,10 +136,18 @@ async function openAIRequest({
     ? `\n\nUse live web search before answering. Prefer current primary or official sources. Use no more than ${maxSearches} search actions unless a fact cannot otherwise be verified.`
     : '';
 
+  const inputText = String(userPrompt || '').trim();
+  if (!inputText) {
+    throw new AIProviderError('OpenAI request missing required parameter: input.', {
+      code: 'request_rejected',
+      retryable: false,
+    });
+  }
+
   const requestBody = {
     model: modelName(withResearch),
     instructions: `${systemPrompt}${researchInstruction}`,
-    input: userPrompt,
+    input: inputText,
     // The Responses API rejects values below 16. Clamp at the provider
     // boundary as a final guard even when a caller accidentally asks for less.
     max_output_tokens: Math.max(MIN_OUTPUT_TOKENS, maxTokens),
@@ -245,15 +253,39 @@ async function requestWithRetry(options) {
   throw lastError;
 }
 
+function normalizeGenerateTextArgs(systemPrompt, userPrompt, maxTokens = 1500, requestTimeoutMs = null) {
+  // Older call sites occasionally passed one options object. Accept that shape so
+  // OpenAI never sees a missing `input` field (undefined is omitted by JSON.stringify).
+  if (systemPrompt && typeof systemPrompt === 'object' && !Array.isArray(systemPrompt)) {
+    const opts = systemPrompt;
+    return {
+      systemPrompt: opts.system || opts.systemPrompt || '',
+      userPrompt: opts.user || opts.userPrompt || opts.input || '',
+      maxTokens: opts.maxTokens || opts.maxOutputTokens || maxTokens,
+      requestTimeoutMs: opts.requestTimeoutMs || opts.timeoutMs || requestTimeoutMs,
+    };
+  }
+  return { systemPrompt, userPrompt, maxTokens, requestTimeoutMs };
+}
+
 async function generateText(systemPrompt, userPrompt, maxTokens = 1500, requestTimeoutMs = null) {
+  const args = normalizeGenerateTextArgs(systemPrompt, userPrompt, maxTokens, requestTimeoutMs);
+  const system = String(args.systemPrompt || '');
+  const user = String(args.userPrompt || '').trim();
+  if (!user) {
+    throw new AIProviderError('generateText requires a non-empty user prompt (OpenAI input).', {
+      code: 'request_rejected',
+      retryable: false,
+    });
+  }
   const result = await requestWithRetry({
-    systemPrompt,
-    userPrompt,
-    maxTokens,
+    systemPrompt: system,
+    userPrompt: user,
+    maxTokens: args.maxTokens,
     withResearch: false,
     maxSearches: 0,
     outputSchema: null,
-    requestTimeoutMs,
+    requestTimeoutMs: args.requestTimeoutMs,
   });
   return result.text;
 }
@@ -293,5 +325,12 @@ module.exports = {
   generateTextWithResearch,
   generateStructuredText,
   generateStructuredTextWithResearch,
-  _test: { extractResponseText, countSearches, stopReason, classifyHttpError, requestWithRetry },
+  _test: {
+    extractResponseText,
+    countSearches,
+    stopReason,
+    classifyHttpError,
+    requestWithRetry,
+    normalizeGenerateTextArgs,
+  },
 };
