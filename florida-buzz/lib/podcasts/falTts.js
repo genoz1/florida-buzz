@@ -44,7 +44,7 @@ function createFalTts(cfg, fetcher = fetch) {
       temperature: cfg.temperature,
       output_format: cfg.outputFormat,
       style_instructions:
-        'Warm, natural US English conversation between two adult friends. No cartoon voices, no heavy accents, no announcer cadence.',
+        'Warm, natural US English conversation between two adult friends. No cartoon voices, no heavy accents, no announcer cadence. The host name Gena is spelled G-E-N-A but must be pronounced like Gina (JEEN-uh), never Jenna or Gee-nuh.',
       speakers: [
         { speaker_id: 'Gena', voice: cfg.genaVoice },
         { speaker_id: 'Diane', voice: cfg.dianeVoice },

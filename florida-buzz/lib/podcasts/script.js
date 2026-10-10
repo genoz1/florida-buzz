@@ -10,8 +10,9 @@ function buildOutlinePrompt({ show, episode, sources }) {
     .join('\n');
   return {
     system: `You outline episodes for "${show.title}" from The Florida Buzz.
-Hosts: Gena (guides the episode) and Diane (equal cohost).
+Hosts: Gena (guides the episode; spelled Gena, pronounced like Gina) and Diane (equal cohost).
 Rules:
+- Always spell the host name Gena (never Gina) in outlines and names.
 - Summarize source stories in original language; never copy large article passages.
 - Separate verified facts from host opinions.
 - No Disney affiliation or inside-access claims.
@@ -36,6 +37,10 @@ function buildConversationPrompt({ show, episode, outline, sources }) {
 Format every spoken line as:
 Gena: ...
 Diane: ...
+
+Naming:
+- Always spell the host name Gena (never Gina) in speaker labels and spoken dialogue.
+- Pronunciation for TTS: Gena sounds like Gina (JEEN-uh). Do not write phonetic respellings in the script.
 
 Style:
 - Genuine friends, not announcers reading alternating statements

@@ -148,6 +148,15 @@ test('fal TTS submit refuses when generation disabled', async () => {
   await assert.rejects(() => fal.submit('Gena: hi\nDiane: hello'), /disabled/i);
 });
 
+test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
+  const cfg = config({ PODCASTS_GENERATION_ENABLED: 'true', FAL_KEY: 'test-key' });
+  const fal = createFalTts(cfg);
+  const input = fal.buildInput('Gena: Hello\nDiane: Hi');
+  assert.equal(input.speakers[0].speaker_id, 'Gena');
+  assert.match(input.style_instructions, /pronounced like Gina/i);
+  assert.match(input.style_instructions, /JEEN-uh/);
+});
+
 test('audio pipeline refuses paid generation when flag off', async () => {
   const store = createMemoryStore();
   const show = await store.getShow('florida-buzz-disney');

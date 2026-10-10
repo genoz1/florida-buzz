@@ -42,6 +42,7 @@ Defaults come from **public fal.ai documentation** for:
 - Endpoint: `fal-ai/gemini-tts`
 - Model: `gemini-2.5-pro-tts`
 - Voices: Gena=`Aoede`, Diane=`Zephyr`
+- Spelling vs pronunciation: always spell **Gena**; pronounce like **Gina** (JEEN-uh) in TTS
 - Language: `English (US)`
 - Output: `mp3`
 - Temperature: `0.85`
