@@ -201,52 +201,91 @@ function createAudioPipeline({ cfg, store, fal, ffmpegPath }) {
     try {
       const buffers = [];
       let jobResult = { ...(job.result || {}) };
-      for (let i = 0; i < sections.length; i += 1) {
-        jobResult = {
-          ...jobResult,
-          heartbeat_at: new Date().toISOString(),
-          phase: 'submit',
-          section: i + 1,
-        };
-        await store.updateJob(job.id, { section_index: i, status: 'running', result: jobResult });
-        const prompt = formatScriptForTts(sections[i]);
-        const submitted = await fal.submit(prompt);
-        jobResult = {
-          ...jobResult,
-          [`section_${i}_request`]: submitted.request_id,
-          heartbeat_at: new Date().toISOString(),
-          phase: 'poll',
-          section: i + 1,
-        };
-        await store.updateJob(job.id, {
-          fal_request_id: submitted.request_id,
-          result: jobResult,
-        });
+      const pollAttempts =
+        Number.isFinite(cfg.falPollAttempts) && cfg.falPollAttempts > 0 ? cfg.falPollAttempts : 180;
+      const pollIntervalMs =
+        Number.isFinite(cfg.falPollIntervalMs) && cfg.falPollIntervalMs > 0 ? cfg.falPollIntervalMs : 2000;
+      const sectionRetries =
+        Number.isFinite(cfg.falSectionRetries) && cfg.falSectionRetries > 0 ? cfg.falSectionRetries : 2;
 
+      for (let i = 0; i < sections.length; i += 1) {
+        const prompt = formatScriptForTts(sections[i]);
         let audioUrl = null;
-        for (let poll = 0; poll < 90; poll += 1) {
-          const status = await fal.status(submitted);
-          // Heartbeat every fal poll so admin UI can tell LIVE vs DEAD after a 503.
+        let lastSectionError = null;
+
+        for (let attempt = 1; attempt <= sectionRetries && !audioUrl; attempt += 1) {
           jobResult = {
             ...jobResult,
             heartbeat_at: new Date().toISOString(),
-            fal_status: status.status,
-            poll,
+            phase: 'submit',
+            section: i + 1,
+            section_attempt: attempt,
+          };
+          await store.updateJob(job.id, { section_index: i, status: 'running', result: jobResult });
+
+          let submitted;
+          try {
+            submitted = await fal.submit(prompt);
+          } catch (err) {
+            lastSectionError = err;
+            console.warn(`[podcasts] fal submit failed section ${i + 1} attempt ${attempt}:`, err.message);
+            continue;
+          }
+
+          jobResult = {
+            ...jobResult,
+            [`section_${i}_request`]: submitted.request_id,
+            [`section_${i}_attempt_${attempt}`]: submitted.request_id,
+            heartbeat_at: new Date().toISOString(),
             phase: 'poll',
             section: i + 1,
+            section_attempt: attempt,
           };
-          await store.updateJob(job.id, { status: 'running', section_index: i, result: jobResult });
-          if (status.status === 'COMPLETED' || status.status === 'OK') {
-            const result = await fal.result(submitted);
-            audioUrl = result?.audio?.url || result?.data?.audio?.url;
-            break;
+          await store.updateJob(job.id, {
+            fal_request_id: submitted.request_id,
+            result: jobResult,
+          });
+
+          for (let poll = 0; poll < pollAttempts; poll += 1) {
+            const status = await fal.status(submitted);
+            // Heartbeat every fal poll so admin UI can tell LIVE vs DEAD after a 503.
+            jobResult = {
+              ...jobResult,
+              heartbeat_at: new Date().toISOString(),
+              fal_status: status.status,
+              poll,
+              phase: 'poll',
+              section: i + 1,
+              section_attempt: attempt,
+            };
+            await store.updateJob(job.id, { status: 'running', section_index: i, result: jobResult });
+            if (status.status === 'COMPLETED' || status.status === 'OK') {
+              const result = await fal.result(submitted);
+              audioUrl = result?.audio?.url || result?.data?.audio?.url;
+              break;
+            }
+            if (status.status === 'FAILED' || status.status === 'ERROR') {
+              lastSectionError = new Error(`fal section ${i + 1} failed`);
+              break;
+            }
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
           }
-          if (status.status === 'FAILED' || status.status === 'ERROR') {
-            throw new Error(`fal section ${i + 1} failed`);
+          if (!audioUrl && !lastSectionError) {
+            lastSectionError = new Error(
+              `fal section ${i + 1} timed out after ${(pollAttempts * pollIntervalMs) / 1000}s`
+            );
           }
-          await new Promise((r) => setTimeout(r, 2000));
+          if (!audioUrl && attempt < sectionRetries) {
+            console.warn(
+              `[podcasts] retrying fal section ${i + 1} (attempt ${attempt + 1}/${sectionRetries}):`,
+              lastSectionError?.message
+            );
+          }
         }
-        if (!audioUrl) throw new Error(`fal section ${i + 1} timed out`);
+
+        if (!audioUrl) {
+          throw lastSectionError || new Error(`fal section ${i + 1} timed out`);
+        }
         jobResult = {
           ...jobResult,
           heartbeat_at: new Date().toISOString(),

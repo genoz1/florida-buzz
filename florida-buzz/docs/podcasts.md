@@ -25,6 +25,10 @@ PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=24000
 PODCASTS_SCRIPT_MIN_WORDS=4000
 PODCASTS_SCRIPT_TIMEOUT_MS=420000
 PODCASTS_SCRIPT_CONTINUE_ATTEMPTS=2
+PODCASTS_TTS_SECTION_CHARS=2800
+PODCASTS_FAL_POLL_ATTEMPTS=180
+PODCASTS_FAL_POLL_INTERVAL_MS=2000
+PODCASTS_FAL_SECTION_RETRIES=2
 ```
 
 Script generation requests up to 24k output tokens (was 12k), requires at least ~4,000 spoken words (~30 minutes at ~150 wpm), continues the script if the first pass is short, and fails loudly instead of accepting a teaser-length draft.

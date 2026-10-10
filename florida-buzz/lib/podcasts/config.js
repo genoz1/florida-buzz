@@ -22,7 +22,8 @@ const DISNEY_SHOW_SLUG = 'florida-buzz-disney';
 
 function config(env = process.env) {
   const temperature = Number(env.PODCASTS_TTS_TEMPERATURE ?? 0.85);
-  const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 3500);
+  // Smaller sections are more reliable with fal Pro TTS (fewer section timeouts).
+  const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 2800);
   const maxUploadMb = Number(env.PODCASTS_MAX_UPLOAD_MB || 80);
   return Object.freeze({
     // Public directory/show/episode/RSS are on unless explicitly disabled.
