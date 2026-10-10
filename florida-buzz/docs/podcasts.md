@@ -71,6 +71,18 @@ FAL_KEY=<set securely in DO; never commit>
 6. Do not submit the RSS feed to Apple/Spotify until approved.
 7. Optional intro/outro audio fields exist on `podcast_shows`; supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
 
+## Host voices (full episodes)
+
+Gena and Diane are longtime friends — Disney-loving Central Florida moms in their mid-thirties. Geno (Gena) and Michael (Diane) may appear in family/park stories. Scripts must feel like friends exchanging stories and opinions, not presenters summarizing articles.
+
+Every full episode outline/script should include 2–3 brief topic-linked park anecdotes with reactions/callbacks. Never invent dated news facts, wait times, closures, prices, or policies outside approved weekly sources; use timeless composites when needed.
+
+Every episode’s show notes must include:
+
+> Florida Buzz uses AI-generated hosts. Personal anecdotes may be dramatized or composite experiences created for entertainment.
+
+Admin save appends this (and the unofficial Disney disclosure) if missing. Generation and publication remain manual-approval only — do not auto-generate or auto-publish.
+
 ## Admin
 
 `/admin/podcasts` uses HTTP Basic auth with the existing `ADMIN_PASSWORD` (same pattern as `/admin/reels`).

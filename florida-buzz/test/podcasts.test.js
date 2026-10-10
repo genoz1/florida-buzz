@@ -11,7 +11,17 @@ const { createMemoryStore } = require('../lib/podcasts/memoryStore');
 const { buildRss } = require('../lib/podcasts/rss');
 const { assertTransition, validateEpisodeFields, slugify } = require('../lib/podcasts/validation');
 const { sanitizeShowNotesHtml } = require('../lib/podcasts/sanitize');
-const { splitScriptIntoSections, formatScriptForTts } = require('../lib/podcasts/script');
+const {
+  splitScriptIntoSections,
+  formatScriptForTts,
+  buildOutlinePrompt,
+  buildConversationPrompt,
+} = require('../lib/podcasts/script');
+const {
+  HOST_BIBLE,
+  AI_ANECDOTE_DISCLOSURE,
+  ensureShowNotesDisclosures,
+} = require('../lib/podcasts/hosts');
 const { createPublicRouter } = require('../lib/podcasts/routerPublic');
 const { createAdminRouter } = require('../lib/podcasts/routerAdmin');
 const { createFalTts } = require('../lib/podcasts/falTts');
@@ -44,6 +54,46 @@ test('show notes sanitizer strips scripts and unsafe urls', () => {
   assert.doesNotMatch(clean, /script/i);
   assert.doesNotMatch(clean, /javascript:/i);
   assert.match(clean, /https:\/\/example\.com/);
+});
+
+test('show notes always receive AI anecdote disclosure', () => {
+  const withBoth = ensureShowNotesDisclosures('<p>Episode notes</p>');
+  assert.match(withBoth, /AI-generated hosts/);
+  assert.match(withBoth, /dramatized or composite/);
+  assert.match(withBoth, /not affiliated with/i);
+  assert.equal(ensureShowNotesDisclosures(withBoth), withBoth);
+  assert.match(AI_ANECDOTE_DISCLOSURE, /AI-generated hosts/);
+});
+
+test('full-episode prompts keep host bible and anecdote rules', () => {
+  assert.match(HOST_BIBLE, /Geno/);
+  assert.match(HOST_BIBLE, /Michael/);
+  assert.match(HOST_BIBLE, /mid-thirties/i);
+  const show = { title: 'Florida Buzz: Disney' };
+  const episode = { title: 'Week in the parks', description: 'News and tips' };
+  const sources = [
+    {
+      included: true,
+      title: 'New dessert',
+      url: 'https://example.com/dessert',
+      summary: 'A new dessert arrives at a park restaurant.',
+    },
+  ];
+  const outline = buildOutlinePrompt({ show, episode, sources });
+  assert.match(outline.system, /2–3 brief/);
+  assert.match(outline.system, /Never invent breaking-news/);
+  assert.match(outline.system, /Geno/);
+  assert.doesNotMatch(outline.system, /taking turns reading/i);
+  const conversation = buildConversationPrompt({
+    show,
+    episode,
+    outline: '1. Open\n2. Dessert talk\nAnecdote: mobile order mixup',
+    sources,
+  });
+  assert.match(conversation.system, /not presenters summarizing articles/i);
+  assert.match(conversation.system, /callback/i);
+  assert.match(conversation.system, /timeless composite/i);
+  assert.match(conversation.user, /AI-generated hosts/);
 });
 
 test('script sections split for long episodes and keep dialogue prefixes', () => {

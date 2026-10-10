@@ -11,6 +11,7 @@ const {
   slugify,
 } = require('./validation');
 const { sanitizeShowNotesHtml } = require('./sanitize');
+const { ensureShowNotesDisclosures } = require('./hosts');
 const { generateOutline, generateConversation } = require('./script');
 const { DISNEY_SHOW_SLUG } = require('./config');
 
@@ -80,6 +81,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) 
       if (!checkCsrf('create', req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       const fields = validateEpisodeFields(req.body);
       if (!fields.slug) fields.slug = slugify(fields.title);
+      fields.show_notes_html = sanitizeShowNotesHtml(ensureShowNotesDisclosures(fields.show_notes_html));
       const episode = await store.createEpisode(show.id, fields);
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}`);
     })
@@ -121,7 +123,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) 
       await store.updateEpisode(episode.id, {
         title: fields.title,
         description: fields.description,
-        show_notes_html: sanitizeShowNotesHtml(fields.show_notes_html),
+        show_notes_html: sanitizeShowNotesHtml(ensureShowNotesDisclosures(fields.show_notes_html)),
         episode_number: fields.episode_number,
         artwork_alt: fields.artwork_alt,
         slug: fields.slug || episode.slug,
