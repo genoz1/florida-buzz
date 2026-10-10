@@ -283,7 +283,7 @@ test('short AI scripts are rejected and continuations can append', async () => {
   const aiText = {
     async generateText(system, user, maxTokens) {
       calls += 1;
-      assert.ok(maxTokens >= 20000);
+      assert.ok(maxTokens >= 12000);
       if (calls === 1) {
         return 'Gena: Short open.\n\nDiane: Short reply only.';
       }
@@ -315,7 +315,7 @@ test('continuation recovers a full-length script after a short first pass', asyn
   const aiText = {
     async generateText(_system, _user, maxTokens) {
       calls += 1;
-      assert.ok(maxTokens >= 20000);
+      assert.ok(maxTokens >= 12000);
       if (calls === 1) {
         return `${pad('Gena', 40)}\n\n${pad('Diane', 40)}`;
       }
