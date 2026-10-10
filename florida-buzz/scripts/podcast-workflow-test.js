@@ -154,7 +154,9 @@ async function main() {
       report.warnings.push('aiText module unavailable — draft packaging/script will use fallbacks');
     }
   } else {
-    report.warnings.push('OPENAI_API_KEY missing — weekly draft uses fallback title/description and skips AI script');
+    report.warnings.push(
+      'OPENAI_API_KEY missing — weekly draft uses fallback packaging plus source-grounded script scaffold (not full AI conversation)'
+    );
   }
   if (!cfg.generation) {
     report.warnings.push(
