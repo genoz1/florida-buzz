@@ -83,7 +83,7 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(outline.system, /2–3 brief/);
   assert.match(outline.system, /Never invent breaking-news/);
   assert.match(outline.system, /Geno/);
-  assert.doesNotMatch(outline.system, /taking turns reading/i);
+  assert.match(outline.system, /not a news rundown|friends exchanging stories/i);
   const conversation = buildConversationPrompt({
     show,
     episode,
@@ -94,6 +94,7 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /callback/i);
   assert.match(conversation.system, /timeless composite/i);
   assert.match(conversation.user, /AI-generated hosts/);
+  assert.match(conversation.system, /taking turns reading article summaries/i);
 });
 
 test('script sections split for long episodes and keep dialogue prefixes', () => {
