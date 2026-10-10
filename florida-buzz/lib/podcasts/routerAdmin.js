@@ -520,7 +520,17 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         `/admin/podcasts/episodes/${id}?error=${encodeURIComponent(err.message.slice(0, 300))}`
       );
     }
-    res.status(503).send('Podcast admin temporarily unavailable.');
+    // Prefer a readable HTML error over a bare 503 so OpenAI/fal failures are actionable.
+    res
+      .status(500)
+      .type('html')
+      .send(
+        `<!doctype html><html><body style="font:16px system-ui;max-width:720px;margin:40px auto;padding:20px">
+        <h1>Podcast admin error</h1>
+        <p>${String(err.message || err).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</p>
+        <p><a href="/admin/podcasts">Back to podcast admin</a></p>
+        </body></html>`
+      );
   });
 
   return router;

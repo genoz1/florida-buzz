@@ -116,21 +116,15 @@ ${verifiedToolsBlock()}`,
 
 async function generateOutline({ aiText, show, episode, sources }) {
   const prompt = buildOutlinePrompt({ show, episode, sources });
-  const text = await aiText.generateText({
-    system: prompt.system,
-    user: prompt.user,
-    maxOutputTokens: 1400,
-  });
+  // Florida Buzz aiText.generateText(system, user, maxTokens) — positional args only.
+  const text = await aiText.generateText(prompt.system, prompt.user, 1400);
   return String(text || '').trim();
 }
 
 async function generateConversation({ aiText, show, episode, outline, sources }) {
   const prompt = buildConversationPrompt({ show, episode, outline, sources });
-  const text = await aiText.generateText({
-    system: prompt.system,
-    user: prompt.user,
-    maxOutputTokens: 12000,
-  });
+  // Florida Buzz aiText.generateText(system, user, maxTokens) — positional args only.
+  const text = await aiText.generateText(prompt.system, prompt.user, 12000);
   const script = String(text || '').trim();
   if (!/^Gena:/m.test(script) || !/^Diane:/m.test(script)) {
     throw new Error('Generated script must include Gena: and Diane: dialogue lines');

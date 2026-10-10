@@ -105,13 +105,8 @@ Evergreen topic: ${collection.sources.find((s) => s.source_kind === 'evergreen_t
   };
 
   try {
-    const text = String(
-      await aiText.generateText({
-        system: prompt.system,
-        user: prompt.user,
-        maxOutputTokens: 300,
-      })
-    );
+    // Florida Buzz aiText.generateText(system, user, maxTokens) — positional args only.
+    const text = String(await aiText.generateText(prompt.system, prompt.user, 300));
     const title = (text.match(/TITLE:\s*(.+)/i) || [])[1]?.trim() || fallbackTitle;
     const description = (text.match(/DESCRIPTION:\s*(.+)/i) || [])[1]?.trim() || fallbackDescription;
     return { title: title.slice(0, 200), description: description.slice(0, 4000) };
