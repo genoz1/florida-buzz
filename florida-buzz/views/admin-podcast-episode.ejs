@@ -24,8 +24,18 @@
   </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (error) { %><p class="error"><%= error %></p><% } %>
+  <% if (episode.last_error) { %><p class="error"><strong>Last error:</strong> <%= episode.last_error %></p><% } %>
+  <% const isScaffold = (episode.outline_json && episode.outline_json.fallback) || /scaffold for review|not for publication until approved/i.test(episode.script_text || ''); %>
+  <% if (isScaffold) { %>
+    <p class="error">
+      <strong>This is only a short scaffold (~2 minutes), not the full 25–35 minute episode.</strong>
+      Do not Approve or Publish this yet. Scroll to Conversation script, <em>clear the script box</em>, click
+      <strong>Save / generate script</strong> (wait — this can take a few minutes), then click
+      <strong>Generate private preview (fal TTS)</strong>.
+    </p>
+  <% } %>
   <p class="notice"><%= show.disclosure %></p>
-  <p class="notice">Drafts are not on the public site or RSS until you Approve → Publish (or schedule then publish). Friday 6:00 AM ET is the intended release target only — auto-publish is off.</p>
+  <p class="notice">Drafts are not on the public site or RSS until you Approve → Publish (or schedule then publish). Friday 6:00 AM ET is the intended release target only — auto-publish is off. A real episode should be about 25–35 minutes once the full AI script + audio succeed.</p>
 
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>">
     <h2>Episode details</h2>

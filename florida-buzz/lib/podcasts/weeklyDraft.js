@@ -253,7 +253,11 @@ async function createWeeklyDraft({
     const sources = await store.listSources(episode.id);
     let outline = '';
     let script = '';
-    if (aiText) {
+    let usedFallbackScript = false;
+    let scriptAiError = null;
+    if (!aiText) {
+      scriptAiError = 'AI text module unavailable — full 25–35 minute script was not generated';
+    } else {
       try {
         outline = await generateOutline({ aiText, show, episode: { ...episode, ...copy }, sources });
         await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey });
@@ -266,40 +270,46 @@ async function createWeeklyDraft({
           sources,
         });
         await store.saveScript(episode.id, 'conversation', script, { week_key: weekKey, target_minutes: '25-35' });
-        await store.updateEpisode(episode.id, { script_text: script });
+        await store.updateEpisode(episode.id, { script_text: script, last_error: null });
         await store.setStatus(episode.id, 'script_ready');
       } catch (err) {
+        scriptAiError = `Script AI unavailable: ${String(err.message || err).slice(0, 500)}`;
         console.warn('[podcasts] outline/script generation failed; keeping draft for manual script:', err.message);
-        await store.updateEpisode(episode.id, {
-          last_error: `Script AI unavailable: ${String(err.message || err).slice(0, 500)}`,
-        });
+        await store.updateEpisode(episode.id, { last_error: scriptAiError });
       }
     }
     if (!script) {
-      // Deterministic source-grounded scaffold so drafts always carry a reviewable script
-      // when OpenAI is unavailable. Replace via regenerate once AI keys are configured.
+      // Short source-grounded scaffold for debugging only — NOT a publishable episode.
+      // Do not run fal TTS on this scaffold (avoids confusing ~2 minute "previews").
+      usedFallbackScript = true;
       outline = buildFallbackOutline({ weekKey, sources, copy });
       script = buildFallbackScript({ weekKey, sources, copy });
       await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey, fallback: true });
       await store.updateEpisode(episode.id, {
         outline_json: { text: outline, week_key: weekKey, fallback: true },
         script_text: script,
+        last_error:
+          scriptAiError ||
+          'Full AI conversation script was not generated. This draft is only a short scaffold — do not publish. Clear the script box and click Save / generate script, then Generate private preview.',
       });
       await store.saveScript(episode.id, 'conversation', script, {
         week_key: weekKey,
-        target_minutes: '25-35',
+        target_minutes: 'scaffold-only',
         fallback: true,
       });
       const current = await store.getEpisodeById(episode.id);
       if (current.status === 'draft') {
-        await store.setStatus(episode.id, 'script_ready');
+        // Stay in draft/script_ready without wiping last_error via setStatus side effects.
+        await store.updateEpisode(episode.id, { status: 'script_ready' });
       }
     }
 
     let audioGenerated = false;
-    if (cfg.generation && pipeline && script) {
+    if (cfg.generation && pipeline && script && !usedFallbackScript) {
       await pipeline.generatePreview({ ...episode, script_text: script }, script);
       audioGenerated = true;
+    } else if (usedFallbackScript && cfg.generation) {
+      console.warn('[podcasts] skipping fal TTS for fallback scaffold script');
     }
 
     const fresh = await store.getEpisodeById(episode.id);

@@ -129,7 +129,7 @@ async function generateConversation({ aiText, show, episode, outline, sources })
   const text = await aiText.generateText({
     system: prompt.system,
     user: prompt.user,
-    maxOutputTokens: 4500,
+    maxOutputTokens: 12000,
   });
   const script = String(text || '').trim();
   if (!/^Gena:/m.test(script) || !/^Diane:/m.test(script)) {
