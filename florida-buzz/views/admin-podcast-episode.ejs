@@ -26,8 +26,13 @@
 <body>
   <p><a href="/admin/podcasts">&larr; All episodes</a></p>
   <h1><%= episode.title %></h1>
+  <% const releaseDayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; %>
+  <% const intendedDay = episode.intended_publish_weekday != null
+      ? releaseDayNames[episode.intended_publish_weekday]
+      : (episode.outline_json && episode.outline_json.release_label) || null; %>
   <p>Status: <span class="status"><%= episode.status %></span>
     <% if (episode.week_key) { %> · Week <code><%= episode.week_key %></code><% } %>
+    <% if (intendedDay) { %> · Intended <strong><%= intendedDay %></strong> release (manual; auto-publish off)<% } %>
   </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (error) { %><p class="error"><%= error %></p><% } %>
@@ -45,7 +50,7 @@
     <p class="notice">Full AI script generated. Scroll down to confirm the Conversation script box is filled before generating audio.</p>
   <% } %>
   <p class="notice"><%= show.disclosure %></p>
-  <p class="notice">Drafts are not on the public site or RSS until you Approve → Publish (or schedule then publish). Friday 6:00 AM ET is the intended release target only — auto-publish is off. A real episode should be about 25–35 minutes once the full AI script + audio succeed.</p>
+  <p class="notice">This is a <strong>standalone</strong> weekly episode (not Part 1/Part 2 of another show). Drafts stay off the public site and RSS until you Approve → Publish. Intended release is <%= intendedDay || 'Tuesday or Friday' %> 6:00 AM ET after manual approval — auto-publish is off. Target length is about 20–25 minutes once the full AI script + audio succeed.</p>
 
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>">
     <h2>Episode details</h2>

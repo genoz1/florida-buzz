@@ -170,7 +170,9 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
     .filter((s) => s.source_kind === 'article')
     .map((s) => s.title)
     .slice(0, 6);
-  const focusHint = articleTitles[0] ? articleTitles[0].slice(0, 48) : 'Planning talk & park opinions';
+  const focusHint = articleTitles[0]
+    ? articleTitles[0].slice(0, 48)
+    : `${slot.label} planning talk & park opinions`;
   const fallbackTitle = `Florida Buzz: Disney — ${focusHint}`;
   const fallbackDescription = `Standalone ${slot.label} episode: Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Visit https://thefloridabuzz.com. Unofficial fan podcast.`;
 

@@ -33,7 +33,7 @@ PODCASTS_FAL_POLL_INTERVAL_MS=2000
 PODCASTS_FAL_SECTION_RETRIES=2
 ```
 
-Weekly draft creates **2 focused ~20–25 minute episode scripts** (override with `PODCASTS_EPISODES_PER_WEEK`). Each script requires at least ~3,000 spoken words, continues if the first pass is short, and fails loudly instead of accepting a teaser-length draft. Generate fal TTS separately on each episode.
+Weekly draft creates **2 standalone ~20–25 minute episodes** for different release days (Tuesday and Friday) — not Part 1/Part 2 of one show (override count with `PODCASTS_EPISODES_PER_WEEK`). Each has its own title, description, slug, and intended publish day. Each script requires at least ~3,000 spoken words, continues if the first pass is short, and fails loudly instead of accepting a teaser-length draft. Generate fal TTS separately on each episode.
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `FAL_KEY` when generation is later enabled.
 
@@ -87,7 +87,12 @@ FAL_KEY=<set securely in DO; never commit>
 
 ## Weekly draft schedule (America/New_York)
 
-Default target: **Thursday 7:00 PM Eastern** create a review draft; intended public release **Friday 6:00 AM Eastern** after manual approval.
+Default target: **Thursday 7:00 PM Eastern** create **two standalone review drafts** for the week:
+
+- Episode A — intended public release **Tuesday 6:00 AM Eastern**
+- Episode B — intended public release **Friday 6:00 AM Eastern**
+
+Each episode has its own title, sources focus, and slug (e.g. `…-tue` / `…-fri`). They are not halves of one topic. Publication stays manual after approval; auto-publish stays off.
 
 Admin controls (`/admin/podcasts`):
 
@@ -97,8 +102,9 @@ Admin controls (`/admin/podcasts`):
 - Preview/download audio; edit title/description/show notes
 - Approve & publish, reject & regenerate, schedule an approved episode
 - View failures and retry
+- See each episode’s intended Tuesday/Friday release day
 
-Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. A run only proceeds when weekly drafts are enabled **and** the Eastern clock matches the configured slot. Drafts are never auto-published. `auto_publish_enabled` stays false (Friday 6am is documented intent only).
+Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. A run only proceeds when weekly drafts are enabled **and** the Eastern clock matches the configured slot. Drafts are never auto-published. `auto_publish_enabled` stays false (Tuesday/Friday 6am are documented intent only).
 
 Content priority for every weekly episode (always produces a draft):
 
