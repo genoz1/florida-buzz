@@ -30,8 +30,11 @@ function appendContinuation(existing, continuation) {
   const base = String(existing || '').trim();
   let next = String(continuation || '').trim();
   if (!next) return base;
-  // Drop accidental full restarts that repeat the cold open.
-  if (/^Gena:\s*Hey Diane/i.test(next) && /welcome back to Florida Buzz/i.test(next)) {
+  // Drop accidental full restarts that repeat the warm open / episode restart.
+  const looksLikeRestart =
+    (/^Gena:\s*(Hey|Hi|Okay,? hey)/i.test(next) && /Florida Buzz/i.test(next.slice(0, 500))) ||
+    (/welcome back to Florida Buzz/i.test(next.slice(0, 400)));
+  if (looksLikeRestart) {
     const lines = next.split(/\n+/).filter((line) => line.trim());
     // Keep from first line that isn't an exact duplicate of an early base line.
     const baseHead = base.slice(0, 400);
@@ -60,14 +63,18 @@ ${HOST_BIBLE}
 
 Outline rules:
 - Always spell Gena (never Gina).
-- Shape a conversation between friends, not a news rundown or article roundup.
+- Shape a lively aftershow-style conversation between friends, not a news rundown or article roundup.
+- Segment 1 MUST be a Warm Open (30–90 seconds when spoken): friend hello / life or recent-park catch-up banter — before any topic hook.
+- Warm-open ideas: what they did since last episode, whether they went to a park, kid chaos, Geno/Michael plans, weather, parking, a small funny life detail.
+- After Warm Open: Topic Hook → Affiliation Disclosure → main discussion. Never cold-open on the headline.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
-- Plan exactly 2–3 brief "recent park experience" anecdote beats tied directly to episode topics.
+- Plan exactly 2–3 brief "recent park experience" anecdote beats tied directly to episode topics (in addition to the warm-open banter).
 - Anecdotes may involve Geno or Michael, long waits, parking, transportation, weather, mobile ordering, tired kids, crowds, cast members, or something amusing another guest did.
 - Mark anecdote beats clearly (e.g. "Anecdote:") and note a later callback opportunity when natural.
-- Plan 3–5 natural Florida Buzz resource mentions across the episode (not ads): at least one near the open, one or more in the main discussion, and a brief CTA near the close.
+- Plan 3–5 natural Florida Buzz resource mentions across the episode (not ads): at least one after the warm open / near the early topic, one or more in the main discussion, and a brief CTA near the close.
 - Mark resource beats (e.g. "Resource:") naming only verified tools/articles from the lists below, with a one-line note on how it helps the listener.
+- Prefer short punchy exchange beats over long equal-length host monologues — avoid polished symmetrical essay-dialogue.
 - Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, or URLs. Those must come from approved source material / verified tools only.
 - When source notes lack a dated park detail, plan timeless composite experiences — do not claim a specific date.
 - Do not place a promotion inside an emotional, humorous, or personal anecdote beat.
@@ -85,7 +92,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted) with 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. End with a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted). Start with Warm Open (30–90s friend hello / life or park banter), then topic hook + affiliation disclosure, then 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. End with a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -104,24 +111,26 @@ ${HOST_BIBLE}
 
 Conversation requirements:
 - Target roughly 20–25 minutes of natural dialogue (~3,000–3,800 spoken words; substantive, not rushed; not padded filler).
-- Write a FULL episode script in one pass when possible — do not stop after a short cold open or a few topics.
+- Write a FULL episode script in one pass when possible — do not stop after a short warm open or a few topics.
 - Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles.
-- Lean into lively aftershow/reaction energy: shorter turns, frequent reactions, excited bounce between hosts.
+- Lean into lively aftershow/reaction energy (AfterBuzz-style bounce): shorter punchier turns, frequent reactions, excited overlap energy between hosts.
+- OPEN SHAPE (critical): Start with 30–90 seconds of warm friend hello / life or recent-park banter BEFORE the topic hook. Examples: “hey, how was your week,” whether they went to a park, kid chaos, Geno/Michael, weather, parking. Then transition into the topic hook. Then the unofficial affiliation disclosure. Never cold-open on the news headline (“Okay if you were calling EPCOT…” / “Okay we have resort news…” as line 1).
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
 - Confirm time-sensitive details against approved source notes before stating them as fact; if unsure, speak generally or as opinion.
 - When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer differing host opinions, and invite listeners to visit the Buzz Board.
-- Include two or three brief recent-park-experience stories connected directly to the episode topics.
+- Include two or three brief recent-park-experience stories connected directly to the episode topics (separate from the warm-open banter).
 - Make stories specific and conversational with small believable details; keep each anecdote concise.
-- The other host must react quickly: ask a follow-up, laugh, disagree, interrupt briefly, drop a short affirmation, or relate a similar experience.
-- Prefer many medium/short exchanges over one host speaking for long stretches.
+- The other host must react quickly: ask a follow-up, laugh, disagree, interrupt briefly, drop a short affirmation (“yep,” “oh my lord,” “heck yeah,” “no way”), or relate a similar experience.
+- Prefer many short/medium exchanges over one host speaking for long stretches. Avoid polished symmetrical essay-dialogue where both hosts take neat equal-length turns — that sounds fake.
+- Uneven turn lengths are good: one host can riff for a beat while the other fires short reactions, then they flip.
 - Include at least one natural callback later in the episode to an earlier anecdote or detail.
 - Do not make every anecdote neatly resolve into a scripted lesson.
 - Avoid repeating the same experiences, jokes, family details, or sentence patterns across episodes; invent fresh specifics each time.
 - Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, URLs, or offerings. Use only approved sources and verified Florida Buzz tools.
 - When no factual park notes are available, use timeless composite experiences rather than claiming something happened on a specific date.
 - Always spell Gena (never Gina). Do not write phonetic pronunciations in dialogue.
-- Mention the unofficial-fan affiliation disclosure once near the open.
+- Mention the unofficial-fan affiliation disclosure once near the open — AFTER the warm friend banter and topic hook is fine.
 - Do not claim a live studio audience, callers, or TV panel format — keep it two hosts talking parks.
 
 Florida Buzz listener guidance (helpful, not ad-read):
@@ -152,7 +161,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Do not return a short teaser or partial cold open. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Open with 30–90 seconds of warm friend hello/life or park banter before the topic hook — do not return a short teaser or a cold topic open. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
@@ -178,9 +187,9 @@ async function generateConversation({ aiText, show, episode, outline, sources })
       await aiText.generateText(
         `You continue an unfinished Florida Buzz: Disney podcast script.
 Keep the exact "Gena:" / "Diane:" line format.
-Do not restart the episode or repeat the cold open.
+Do not restart the episode or repeat the warm open / hello banter.
 Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
-Preserve host bible tone and Florida Buzz source accuracy rules.`,
+Preserve host bible aftershow energy (short punchy turns, reactions) and Florida Buzz source accuracy rules.`,
         `Spoken words so far: ${words}. Need at least ${CONVERSATION_MIN_WORDS}.
 Continue this script:\n\n${script.slice(-12000)}`,
         CONVERSATION_MAX_OUTPUT_TOKENS,
