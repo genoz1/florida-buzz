@@ -28,10 +28,13 @@ async function notifyDraftReady({
   const list = Array.isArray(episodes) && episodes.length ? episodes : episode ? [episode] : [];
   const primary = list[0] || episode;
   const adminUrl = `${site}/admin/podcasts/episodes/${primary.id}`;
-  const subject =
-    list.length > 1
-      ? `[Florida Buzz Podcast] ${list.length} standalone drafts ready — week ${run.week_key}`
-      : `[Florida Buzz Podcast] Draft ready for review — ${primary.title}`;
+  const releaseLabel =
+    primary?.outline_json?.release_label ||
+    (primary?.intended_publish_weekday != null
+      ? WEEKDAY_NAMES[Number(primary.intended_publish_weekday)]
+      : null) ||
+    'standalone';
+  const subject = `[Florida Buzz Podcast] ${releaseLabel} draft ready — ${primary.title}`;
   const episodeRows = list
     .map((ep) => {
       const day =
@@ -43,15 +46,15 @@ async function notifyDraftReady({
     })
     .join('');
   const html = `
-    <p>Standalone <strong>Florida Buzz: Disney</strong> podcast draft(s) are ready for review (not Part 1/Part 2 of one show).</p>
+    <p>A standalone <strong>Florida Buzz: Disney</strong> podcast draft is ready for review (one episode per run — not Part 1/Part 2).</p>
     <ul>
       <li><strong>Week:</strong> ${escape(run.week_key)}</li>
       <li><strong>Attempt:</strong> ${Number(run.attempt) || 1}</li>
-      <li><strong>Episodes:</strong> ${list.length} (intended Tuesday + Friday; auto-publish off)</li>
+      <li><strong>Slot:</strong> ${escape(releaseLabel)} (auto-publish off)</li>
     </ul>
     <ul>${episodeRows}</ul>
     <p><a href="${adminUrl}">Review in podcast admin</a></p>
-    <p>Nothing was published to the website or RSS feed. Generate fal TTS per episode when ready.</p>
+    <p>Nothing was published to the website or RSS feed. Generate fal TTS when ready. Tuesday and Friday each get their own separate run.</p>
   `;
 
   await sendEmail({

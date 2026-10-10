@@ -40,8 +40,11 @@ async function main() {
       weekly_draft_enabled: settings.weekly_draft_enabled,
       generate_weekday: settings.generate_weekday,
       generate_hour: settings.generate_hour,
+      generate_weekday_b: settings.generate_weekday_b,
+      generate_hour_b: settings.generate_hour_b,
       generation: cfg.generation,
       force,
+      note: 'each matching window creates exactly one episode',
     });
     return;
   }

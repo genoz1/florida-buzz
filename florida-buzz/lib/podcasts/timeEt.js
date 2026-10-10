@@ -44,13 +44,85 @@ function windowStartIso(daysBack, date = new Date()) {
   return new Date(date.getTime() - daysBack * 86400000).toISOString();
 }
 
-function matchesGenerateSlot(settings, date = new Date()) {
-  const p = partsInTimezone(date, settings.timezone || TIMEZONE);
-  if (p.weekday !== Number(settings.generate_weekday)) return false;
-  if (p.hour !== Number(settings.generate_hour)) return false;
-  const minute = Number(settings.generate_minute) || 0;
+/**
+ * Two generate windows per week (default Tue + Fri). Falls back to intended
+ * publish weekday B when generate_*_b columns are not in the live DB yet.
+ */
+function generateSlotsFromSettings(settings = {}) {
+  const hour = Number(settings.generate_hour ?? 7);
+  const minute = Number(settings.generate_minute ?? 0);
+  return [
+    {
+      key: 'gen-a',
+      index: 0,
+      weekday: Number(settings.generate_weekday ?? 2),
+      hour,
+      minute,
+    },
+    {
+      key: 'gen-b',
+      index: 1,
+      weekday: Number(
+        settings.generate_weekday_b ?? settings.intended_publish_weekday_b ?? 5
+      ),
+      hour: Number(settings.generate_hour_b ?? hour),
+      minute: Number(settings.generate_minute_b ?? minute),
+    },
+  ];
+}
+
+function slotMatchesClock(slot, parts) {
+  if (parts.weekday !== Number(slot.weekday)) return false;
+  if (parts.hour !== Number(slot.hour)) return false;
+  const minute = Number(slot.minute) || 0;
   // 15-minute cron ticks: match within the configured minute window.
-  return p.minute >= minute && p.minute < minute + 15;
+  return parts.minute >= minute && parts.minute < minute + 15;
+}
+
+/** Returns the matching generate slot, or null if outside both windows. */
+function matchingGenerateSlot(settings, date = new Date()) {
+  const p = partsInTimezone(date, settings.timezone || TIMEZONE);
+  for (const slot of generateSlotsFromSettings(settings)) {
+    if (slotMatchesClock(slot, p)) return slot;
+  }
+  return null;
+}
+
+function matchesGenerateSlot(settings, date = new Date()) {
+  return matchingGenerateSlot(settings, date) != null;
+}
+
+/** Calendar Date (local interpretation via UTC noon trick) for weekday delta days ahead. */
+function datePlusEtDays(date, days, timeZone = TIMEZONE) {
+  const p = partsInTimezone(date, timeZone);
+  const utcNoon = new Date(Date.UTC(p.year, p.month - 1, p.day, 12));
+  utcNoon.setUTCDate(utcNoon.getUTCDate() + days);
+  return utcNoon;
+}
+
+function daysUntilWeekday(fromWeekday, targetWeekday) {
+  return (Number(targetWeekday) - Number(fromWeekday) + 7) % 7;
+}
+
+/**
+ * Next upcoming release/generate weekday from `date` (skips today — use a today
+ * match first). Returns { weekday, deltaDays, targetDate }.
+ */
+function nextUpcomingWeekday(date, weekdays, timeZone = TIMEZONE) {
+  const p = partsInTimezone(date, timeZone);
+  let best = null;
+  for (const weekday of weekdays) {
+    let delta = daysUntilWeekday(p.weekday, weekday);
+    if (delta === 0) delta = 7;
+    if (!best || delta < best.deltaDays) {
+      best = {
+        weekday: Number(weekday),
+        deltaDays: delta,
+        targetDate: datePlusEtDays(date, delta, timeZone),
+      };
+    }
+  }
+  return best;
 }
 
 function formatClockLabel(weekday, hour, minute) {
@@ -63,12 +135,11 @@ function formatClockLabel(weekday, hour, minute) {
 }
 
 function describeSchedule(settings) {
-  const day = WEEKDAY_NAMES[Number(settings.generate_weekday)] || 'Thursday';
-  const hour = Number(settings.generate_hour);
-  const minute = String(Number(settings.generate_minute) || 0).padStart(2, '0');
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const h12 = ((hour + 11) % 12) + 1;
   const tz = settings.timezone || TIMEZONE;
+  const genSlots = generateSlotsFromSettings(settings);
+  const generateLabel = genSlots
+    .map((s) => formatClockLabel(s.weekday, s.hour, s.minute))
+    .join(' and ');
   const slotA = formatClockLabel(
     settings.intended_publish_weekday ?? 2,
     settings.intended_publish_hour ?? 6,
@@ -80,10 +151,12 @@ function describeSchedule(settings) {
     settings.intended_publish_minute_b ?? 0
   );
   return {
-    generateLabel: `${day} ${h12}:${minute} ${ampm} ${tz}`,
-    publishLabel: `${slotA} and ${slotB} ${tz} (two standalone episodes; manual / not auto)`,
+    generateLabel: `${generateLabel} ${tz} (one episode per run)`,
+    publishLabel: `${slotA} and ${slotB} ${tz} (manual / not auto; separate Tue + Fri runs)`,
     publishSlotALabel: `${slotA} ${tz}`,
     publishSlotBLabel: `${slotB} ${tz}`,
+    generateSlotALabel: `${formatClockLabel(genSlots[0].weekday, genSlots[0].hour, genSlots[0].minute)} ${tz}`,
+    generateSlotBLabel: `${formatClockLabel(genSlots[1].weekday, genSlots[1].hour, genSlots[1].minute)} ${tz}`,
   };
 }
 
@@ -93,6 +166,11 @@ module.exports = {
   partsInTimezone,
   weekKeyEt,
   windowStartIso,
+  generateSlotsFromSettings,
+  matchingGenerateSlot,
   matchesGenerateSlot,
+  datePlusEtDays,
+  daysUntilWeekday,
+  nextUpcomingWeekday,
   describeSchedule,
 };

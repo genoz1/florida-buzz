@@ -220,9 +220,15 @@ function createSupabaseStore(client) {
           client.from('podcast_schedule_settings').select('*').eq('show_slug', showSlug).maybeSingle()
         )) || null;
       if (!row) return null;
-      // Older DBs may lack *_b columns until release-slots migration is applied.
+      // Older DBs may lack *_b columns until release-slots / generate-slots migrations apply.
       return {
         ...row,
+        generate_weekday: row.generate_weekday ?? 2,
+        generate_hour: row.generate_hour ?? 7,
+        generate_minute: row.generate_minute ?? 0,
+        generate_weekday_b: row.generate_weekday_b ?? row.intended_publish_weekday_b ?? 5,
+        generate_hour_b: row.generate_hour_b ?? row.generate_hour ?? 7,
+        generate_minute_b: row.generate_minute_b ?? row.generate_minute ?? 0,
         intended_publish_weekday: row.intended_publish_weekday ?? 2,
         intended_publish_hour: row.intended_publish_hour ?? 6,
         intended_publish_minute: row.intended_publish_minute ?? 0,

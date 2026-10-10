@@ -21,7 +21,6 @@ PODCASTS_AUDIO_BUCKET=podcast-audio
 PODCASTS_ARTWORK_BUCKET=podcast-artwork
 PODCASTS_MAX_UPLOAD_MB=80
 # Full ~30 minute script generation (defaults are safe for a full episode)
-PODCASTS_EPISODES_PER_WEEK=2
 PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=16000
 PODCASTS_SCRIPT_MIN_WORDS=3000
 PODCASTS_SCRIPT_TARGET_MAX_WORDS=3800
@@ -33,7 +32,7 @@ PODCASTS_FAL_POLL_INTERVAL_MS=2000
 PODCASTS_FAL_SECTION_RETRIES=2
 ```
 
-Weekly draft creates **2 standalone ~20–25 minute episodes** for different release days (Tuesday and Friday) — not Part 1/Part 2 of one show (override count with `PODCASTS_EPISODES_PER_WEEK`). Each has its own title, description, slug, and intended publish day. Each script requires at least ~3,000 spoken words, continues if the first pass is short, and fails loudly instead of accepting a teaser-length draft. Generate fal TTS separately on each episode.
+Each weekly draft run creates **exactly one** standalone ~20–25 minute episode for the current slot (Tuesday run → Tuesday episode, Friday run → Friday episode). Never two episodes in one run, and never Part 1/Part 2 of one show. Each has its own title, description, slug, and intended publish day. Each script requires at least ~3,000 spoken words, continues if the first pass is short, and fails loudly instead of accepting a teaser-length draft. Generate fal TTS separately on that episode.
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `FAL_KEY` when generation is later enabled.
 
@@ -77,7 +76,7 @@ FAL_KEY=<set securely in DO; never commit>
 ## Manual setup checklist
 
 1. Apply `supabase/migrations/20261010040000_podcasts.sql` only on the Florida Buzz Supabase project.
-1b. **Required for twice-weekly drafts:** apply `supabase/migrations/20261010223000_podcast_episode_release_slots.sql` in the Florida Buzz Supabase SQL editor (`tcrfirzjcjvfmiepgbjh`). Without it, weekly draft used to crash with `Could not find the 'intended_publish_hour' column of 'podcast_episodes' in the schema cache`. App code now degrades gracefully (stores Tuesday/Friday intent in `outline_json` and omits missing columns), but applying the migration is still recommended so columns persist.
+1b. **Required for twice-weekly drafts:** apply `supabase/migrations/20261010223000_podcast_episode_release_slots.sql` and `supabase/migrations/20261010230000_podcast_dual_generate_slots.sql` in the Florida Buzz Supabase SQL editor (`tcrfirzjcjvfmiepgbjh`). Without the release-slots migration, weekly draft used to crash with `Could not find the 'intended_publish_hour' column of 'podcast_episodes' in the schema cache`. App code now degrades gracefully (stores Tuesday/Friday intent in `outline_json` and omits missing columns; Friday generate falls back to intended publish weekday B if `generate_*_b` is missing), but applying both migrations is still recommended.
 2. Public buckets: `podcast-audio`, `podcast-artwork`.
 3. Upload approved trailer/cover bytes as-is; do not re-encode the trailer.
 4. Public routes mount unless `PODCASTS_ENABLED=false`.
@@ -88,24 +87,26 @@ FAL_KEY=<set securely in DO; never commit>
 
 ## Weekly draft schedule (America/New_York)
 
-Default target: **Thursday 7:00 PM Eastern** create **two standalone review drafts** for the week:
+Default: **two generate windows**, each creating **one** standalone review draft:
 
-- Episode A — intended public release **Tuesday 6:00 AM Eastern**
-- Episode B — intended public release **Friday 6:00 AM Eastern**
+- **Tuesday 7:00 AM Eastern** → create the Tuesday episode (intended publish **Tuesday 6:00 AM ET**)
+- **Friday 7:00 AM Eastern** → create the Friday episode (intended publish **Friday 6:00 AM ET**)
 
-Each episode has its own title, sources focus, and slug (e.g. `…-tue` / `…-fri`). They are not halves of one topic. Publication stays manual after approval; auto-publish stays off.
+Force-run creates exactly one episode: today’s slot if it is Tuesday or Friday, otherwise the next upcoming slot. Never both in one click.
+
+Each episode has its own title, sources, and slug (e.g. `…-tue` / `…-fri`). They are not halves of one topic. Publication stays manual after approval; auto-publish stays off.
 
 Admin controls (`/admin/podcasts`):
 
 - Enable/disable weekly draft generation (DB setting; defaults **off**)
-- Change generation weekday/time
+- Change both generation weekdays/times (Tue slot + Fri slot)
 - Review/remove sources; add guide, Buzz Board question, evergreen, or custom topic
 - Preview/download audio; edit title/description/show notes
 - Approve & publish, reject & regenerate, schedule an approved episode
 - View failures and retry
 - See each episode’s intended Tuesday/Friday release day
 
-Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. A run only proceeds when weekly drafts are enabled **and** the Eastern clock matches the configured slot. Drafts are never auto-published. `auto_publish_enabled` stays false (Tuesday/Friday 6am are documented intent only).
+Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. A run only proceeds when weekly drafts are enabled **and** the Eastern clock matches one of the two configured generate windows. Drafts are never auto-published. `auto_publish_enabled` stays false (Tuesday/Friday 6am are documented intent only).
 
 Content priority for every weekly episode (always produces a draft):
 

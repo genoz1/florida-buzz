@@ -23,7 +23,7 @@
   <p class="notice">
     Audio generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>
     (<code>PODCASTS_GENERATION_ENABLED</code>).
-    Weekly drafts create <strong>two standalone episodes</strong> (Tuesday + Friday topics) — never Part 1/Part 2 of one show. Drafts never auto-publish. Intended release stays manual after approval.
+    Each scheduled run creates <strong>exactly one</strong> standalone ~20–25 min episode — Tuesday run → Tuesday show, Friday run → Friday show. Never two at once, never Part 1/Part 2. Drafts never auto-publish.
   </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (typeof error !== 'undefined' && error) { %><p class="error"><%= error %></p><% } %>
@@ -36,16 +36,17 @@
 
     <section class="card">
       <h3>Weekly draft schedule (America/New_York)</h3>
-      <p class="muted">Default: Thursday 7:00 PM ET draft generation builds two independent ~20–25 min shows. Publication stays manual.</p>
-      <p><strong>Current:</strong> <%= scheduleLabels.generateLabel %> —
+      <p class="muted">Default: generate on <strong>Tuesday 7:00 AM ET</strong> (Tuesday episode) and <strong>Friday 7:00 AM ET</strong> (Friday episode). Separate runs — one episode each. Publication stays manual.</p>
+      <p><strong>Current generate windows:</strong> <%= scheduleLabels.generateLabel %> —
         weekly drafts <strong><%= schedule.weekly_draft_enabled ? 'ENABLED' : 'DISABLED' %></strong></p>
-      <p class="muted">Intended publish targets: <%= scheduleLabels.publishLabel %></p>
-      <p class="muted">Episode A → <%= scheduleLabels.publishSlotALabel || 'Tuesday 6:00 AM' %> · Episode B → <%= scheduleLabels.publishSlotBLabel || 'Friday 6:00 AM' %></p>
+      <p class="muted">Intended publish targets (manual): <%= scheduleLabels.publishLabel %></p>
+      <p class="muted">Tue slot → <%= scheduleLabels.publishSlotALabel || 'Tuesday 6:00 AM' %> · Fri slot → <%= scheduleLabels.publishSlotBLabel || 'Friday 6:00 AM' %></p>
       <form method="post" action="/admin/podcasts/schedule">
         <input type="hidden" name="csrf" value="<%= scheduleCsrf %>">
         <label><input type="checkbox" name="weekly_draft_enabled" value="true" <%= schedule.weekly_draft_enabled ? 'checked' : '' %>> Enable weekly draft generation</label>
+        <h4 style="margin:16px 0 8px;font-size:1rem">Generate slot A (Tuesday episode)</h4>
         <div class="grid">
-          <label>Generation day
+          <label>Day
             <select name="generate_weekday">
               <% weekdayNames.forEach((name, idx) => { %>
                 <option value="<%= idx %>" <%= Number(schedule.generate_weekday) === idx ? 'selected' : '' %>><%= name %></option>
@@ -58,6 +59,22 @@
           <label>Minute (0–59)
             <input name="generate_minute" type="number" min="0" max="59" value="<%= schedule.generate_minute %>">
           </label>
+        </div>
+        <h4 style="margin:16px 0 8px;font-size:1rem">Generate slot B (Friday episode)</h4>
+        <div class="grid">
+          <label>Day
+            <select name="generate_weekday_b">
+              <% weekdayNames.forEach((name, idx) => { %>
+                <option value="<%= idx %>" <%= Number(schedule.generate_weekday_b != null ? schedule.generate_weekday_b : 5) === idx ? 'selected' : '' %>><%= name %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label>Hour (0–23 ET)
+            <input name="generate_hour_b" type="number" min="0" max="23" value="<%= schedule.generate_hour_b != null ? schedule.generate_hour_b : schedule.generate_hour %>">
+          </label>
+          <label>Minute (0–59)
+            <input name="generate_minute_b" type="number" min="0" max="59" value="<%= schedule.generate_minute_b != null ? schedule.generate_minute_b : schedule.generate_minute %>">
+          </label>
           <label>Notify email (optional; else ALERT_EMAIL_TO)
             <input name="notify_email" type="email" value="<%= schedule.notify_email || '' %>" placeholder="you@example.com">
           </label>
@@ -69,7 +86,7 @@
         <input type="hidden" name="csrf" value="<%= runCsrf %>">
         <button class="btn btn-secondary" type="submit">Run weekly draft now (force)</button>
       </form>
-      <p class="muted">Force-run builds sources + <strong>2 standalone (~20–25 min) episode scripts</strong> (Tuesday episode + Friday episode — separate titles, not parts). It will not start fal TTS. Open each draft and click Generate private preview when ready. Do not click force-run twice.</p>
+      <p class="muted">Force-run creates <strong>exactly one</strong> ~20–25 min episode for today’s slot if it is Tuesday or Friday; otherwise the next upcoming slot (never two at once). It will not start fal TTS. Open the draft and click Generate private preview when ready. Do not click force-run twice.</p>
     </section>
 
     <section class="card">

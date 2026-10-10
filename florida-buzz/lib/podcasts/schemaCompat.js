@@ -64,7 +64,7 @@ function rememberMissing(table, column) {
   if (!warned.has(key)) {
     warned.add(key);
     console.warn(
-      `[podcasts] DB missing column ${table}.${column} — omitting from writes until migration 20261010223000_podcast_episode_release_slots.sql is applied`
+      `[podcasts] DB missing column ${table}.${column} — omitting from writes until podcast release/generate-slot migrations are applied (20261010223000 / 20261010230000)`
     );
   }
 }
@@ -98,6 +98,9 @@ async function withMissingColumnRetry(table, patch, run) {
           'intended_publish_weekday_b',
           'intended_publish_hour_b',
           'intended_publish_minute_b',
+          'generate_weekday_b',
+          'generate_hour_b',
+          'generate_minute_b',
         ];
         let dropped = false;
         for (const key of optional) {

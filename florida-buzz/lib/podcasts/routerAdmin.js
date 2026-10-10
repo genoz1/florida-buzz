@@ -114,16 +114,26 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       const weekday = Number(req.body.generate_weekday);
       const hour = Number(req.body.generate_hour);
       const minute = Number(req.body.generate_minute || 0);
-      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw new Error('Invalid generation weekday');
-      if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error('Invalid generation hour');
-      if (!Number.isInteger(minute) || minute < 0 || minute > 59) throw new Error('Invalid generation minute');
+      const weekdayB = Number(req.body.generate_weekday_b);
+      const hourB = Number(req.body.generate_hour_b);
+      const minuteB = Number(req.body.generate_minute_b || 0);
+      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw new Error('Invalid Tuesday generation weekday');
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error('Invalid Tuesday generation hour');
+      if (!Number.isInteger(minute) || minute < 0 || minute > 59) throw new Error('Invalid Tuesday generation minute');
+      if (!Number.isInteger(weekdayB) || weekdayB < 0 || weekdayB > 6) throw new Error('Invalid Friday generation weekday');
+      if (!Number.isInteger(hourB) || hourB < 0 || hourB > 23) throw new Error('Invalid Friday generation hour');
+      if (!Number.isInteger(minuteB) || minuteB < 0 || minuteB > 59) throw new Error('Invalid Friday generation minute');
       await store.upsertScheduleSettings(DISNEY_SHOW_SLUG, {
         weekly_draft_enabled: req.body.weekly_draft_enabled === 'true' || req.body.weekly_draft_enabled === 'on',
         timezone: 'America/New_York',
+        // Separate generate windows — each run creates exactly one episode.
         generate_weekday: weekday,
         generate_hour: hour,
         generate_minute: minute,
-        // Two standalone weekly shows — intent only; auto-publish stays off.
+        generate_weekday_b: weekdayB,
+        generate_hour_b: hourB,
+        generate_minute_b: minuteB,
+        // Intended publish targets — intent only; auto-publish stays off.
         intended_publish_weekday: 2,
         intended_publish_hour: 6,
         intended_publish_minute: 0,
@@ -181,11 +191,11 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
             : `Weekly draft skipped: ${result.reason}`;
         return res.redirect(303, `/admin/podcasts?notice=${encodeURIComponent(detail)}`);
       }
-      const epCount = Array.isArray(result.episodes) ? result.episodes.length : 1;
+      const slotLabel = result.releaseSlot?.label || result.episode?.outline_json?.release_label || 'standalone';
       res.redirect(
         303,
         `/admin/podcasts/episodes/${result.episode.id}?notice=${encodeURIComponent(
-          `weekly-draft-ready — created ${epCount} standalone episodes (Tuesday + Friday). Open each and Generate private preview.`
+          `weekly-draft-ready — created 1 ${slotLabel} episode (never two at once). Generate private preview when ready.`
         )}`
       );
     })
@@ -635,6 +645,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         force: true,
         weekKey: episode.week_key || null,
         rejectEpisodeId: episode.id,
+        releaseSlotKey: episode.outline_json?.release_slot || null,
       });
       if (result.skipped) throw new Error(`Regenerate skipped: ${result.reason}`);
       res.redirect(303, `/admin/podcasts/episodes/${result.episode.id}?notice=regenerated`);
@@ -669,6 +680,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         force: true,
         weekKey: run.week_key,
         rejectEpisodeId: run.episode_id || null,
+        releaseSlotKey: run.payload?.release_slot || null,
       });
       if (result.skipped) {
         return res.redirect(303, `/admin/podcasts?error=${encodeURIComponent(result.reason)}`);
