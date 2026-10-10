@@ -17,10 +17,12 @@ const { createAdminRouter } = require('../lib/podcasts/routerAdmin');
 const { createFalTts } = require('../lib/podcasts/falTts');
 const { createAudioPipeline } = require('../lib/podcasts/audioPipeline');
 
-test('podcast feature flags default off', () => {
+test('podcast public routes default on; generation stays off', () => {
   const cfg = config({});
-  assert.equal(cfg.enabled, false);
+  assert.equal(cfg.enabled, true);
   assert.equal(cfg.generation, false);
+  assert.equal(config({ PODCASTS_ENABLED: 'false' }).enabled, false);
+  assert.equal(config({ PODCASTS_ENABLED: 'true' }).enabled, true);
   assert.equal(cfg.falEndpoint, DEFAULT_FAL_TTS_ENDPOINT);
   assert.equal(cfg.falModel, DEFAULT_FAL_TTS_MODEL);
   assert.equal(cfg.ginaVoice, 'Aoede');

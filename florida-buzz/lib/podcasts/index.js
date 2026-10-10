@@ -44,7 +44,7 @@ function production(env = process.env) {
 function mount(app, env = process.env) {
   const cfg = config(env);
   if (!cfg.enabled) {
-    console.log('[podcasts disabled] set PODCASTS_ENABLED=true to mount public/admin podcast routes');
+    console.log('[podcasts disabled] PODCASTS_ENABLED=false — public/admin podcast routes not mounted');
     return { cfg, mounted: false };
   }
 

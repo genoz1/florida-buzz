@@ -25,7 +25,9 @@ function config(env = process.env) {
   const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 3500);
   const maxUploadMb = Number(env.PODCASTS_MAX_UPLOAD_MB || 80);
   return Object.freeze({
-    enabled: env.PODCASTS_ENABLED === 'true',
+    // Public directory/show/episode/RSS are on unless explicitly disabled.
+    // Paid fal TTS stays hard-off until PODCASTS_GENERATION_ENABLED=true.
+    enabled: env.PODCASTS_ENABLED !== 'false',
     generation: env.PODCASTS_GENERATION_ENABLED === 'true',
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     falKey: env.FAL_KEY || null,

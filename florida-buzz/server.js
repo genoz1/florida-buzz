@@ -80,7 +80,7 @@ app.use((req, res, next) => {
 
 // Independent additive feature; disabled by default, with no social publishing.
 require('./lib/reels').mount(app);
-// Independent additive podcast feature; disabled by default (PODCASTS_ENABLED).
+// Independent additive podcast feature (public on; generation off unless flagged).
 require('./lib/podcasts').mount(app);
 app.use('/', require('./routes/main'));
 

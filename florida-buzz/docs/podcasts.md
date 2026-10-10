@@ -1,13 +1,15 @@
 # Florida Buzz Podcasts
 
-Isolated podcast publishing for The Florida Buzz. Disabled by default.
+Isolated podcast publishing for The Florida Buzz. Public pages are on by default; paid generation stays off.
 
 ## Flags (additive — do not change unrelated existing env vars)
 
 ```
-PODCASTS_ENABLED=false
+PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=false
 ```
+
+Set `PODCASTS_ENABLED=false` to unmount public/admin podcast routes.
 
 Optional overrides:
 
@@ -41,7 +43,7 @@ If your fal account’s approved trailer uses a different endpoint alias, set `P
 
 1. Review and apply `supabase/migrations/20261010040000_podcasts.sql` only when you explicitly approve a production migration.
 2. Create public Supabase Storage buckets `podcast-audio` and `podcast-artwork` (or the names you set in env).
-3. Set `PODCASTS_ENABLED=true` in the app environment when you want routes live.
+3. Public routes mount unless `PODCASTS_ENABLED=false`.
 4. Keep `PODCASTS_GENERATION_ENABLED=false` until you explicitly approve paid fal TTS usage.
 5. Do not submit the RSS feed to Apple/Spotify until you approve.
 6. Optional intro/outro audio fields exist on `podcast_shows`; supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
