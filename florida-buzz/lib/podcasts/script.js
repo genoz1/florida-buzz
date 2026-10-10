@@ -9,10 +9,11 @@ const { verifiedToolsBlock } = require('./siteResources');
 // Back-compat export name used by older imports/tests.
 const DISCLOSURE = AFFILIATION_DISCLOSURE;
 
-// ~150 spoken words/minute × 30 minutes ≈ 4500 words.
-// Output-token headroom must be well above that so Responses API does not truncate.
-const CONVERSATION_MAX_OUTPUT_TOKENS = Number(process.env.PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS || 24000);
-const CONVERSATION_MIN_WORDS = Number(process.env.PODCASTS_SCRIPT_MIN_WORDS || 4000);
+// Target ~20–25 minutes per episode for twice-weekly publishing (~150 wpm → ~3,000–3,800 words).
+// Output-token headroom must stay above that so Responses API does not truncate.
+const CONVERSATION_MAX_OUTPUT_TOKENS = Number(process.env.PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS || 16000);
+const CONVERSATION_MIN_WORDS = Number(process.env.PODCASTS_SCRIPT_MIN_WORDS || 3000);
+const CONVERSATION_TARGET_MAX_WORDS = Number(process.env.PODCASTS_SCRIPT_TARGET_MAX_WORDS || 3800);
 const CONVERSATION_REQUEST_TIMEOUT_MS = Number(process.env.PODCASTS_SCRIPT_TIMEOUT_MS || 420000);
 const CONVERSATION_CONTINUE_ATTEMPTS = Number(process.env.PODCASTS_SCRIPT_CONTINUE_ATTEMPTS || 2);
 
@@ -82,7 +83,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 30 minute conversation (~4,000–5,000 spoken words when scripted) with 2–3 topic-linked personal anecdote beats, 3–5 Florida Buzz resource beats, and at least one callback note.`,
+Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted) with 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note.`,
   };
 }
 
@@ -100,7 +101,7 @@ Diane: ...
 ${HOST_BIBLE}
 
 Conversation requirements:
-- Target roughly 30 minutes of natural dialogue (~4,000–5,000 spoken words; substantive, not rushed; not padded filler).
+- Target roughly 20–25 minutes of natural dialogue (~3,000–3,800 spoken words; substantive, not rushed; not padded filler).
 - Write a FULL episode script in one pass when possible — do not stop after a short cold open or a few topics.
 - Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles.
 - Lean into lively aftershow/reaction energy: shorter turns, frequent reactions, excited bounce between hosts.
@@ -123,7 +124,7 @@ Conversation requirements:
 
 Florida Buzz listener guidance (helpful, not ad-read):
 - Naturally reference relevant Florida Buzz content/tools throughout: the specific articles being discussed, planning guides, the dining guide, wait times, the day planner, Buzz Board discussions, and any other verified Florida Buzz resource tied to the topic.
-- About 3–5 natural Florida Buzz references in a 25–35 minute episode.
+- About 2–4 natural Florida Buzz references in a 20–25 minute episode.
 - At least one useful recommendation near the beginning, one or more during the main discussion, and a brief call to action near the end.
 - When an article or resource’s information is discussed, name that Florida Buzz piece and briefly explain how it helps the listener — not a bare “go check our site.”
 - Vary the wording so references do not sound like repeated advertisements.
@@ -147,7 +148,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~30 minute episode script of about ${CONVERSATION_MIN_WORDS}–5000 spoken words (Gena/Diane dialogue only). Do not return a short teaser or partial cold open.`,
+Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Do not return a short teaser or partial cold open.`,
   };
 }
 
@@ -174,7 +175,7 @@ async function generateConversation({ aiText, show, episode, outline, sources })
         `You continue an unfinished Florida Buzz: Disney podcast script.
 Keep the exact "Gena:" / "Diane:" line format.
 Do not restart the episode or repeat the cold open.
-Continue naturally from the last lines until the full episode reaches about 30 minutes (~4000–5000 spoken words).
+Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
 Preserve host bible tone and Florida Buzz source accuracy rules.`,
         `Spoken words so far: ${words}. Need at least ${CONVERSATION_MIN_WORDS}.
 Continue this script:\n\n${script.slice(-12000)}`,
@@ -191,7 +192,7 @@ Continue this script:\n\n${script.slice(-12000)}`,
   const words = countScriptWords(script);
   if (words < CONVERSATION_MIN_WORDS) {
     throw new Error(
-      `Generated script is too short for a ~30 minute episode (${words} words; need at least ${CONVERSATION_MIN_WORDS}). Increase PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS or retry.`
+      `Generated script is too short for a ~20–25 minute episode (${words} words; need at least ${CONVERSATION_MIN_WORDS}). Increase PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS or retry.`
     );
   }
   return script;
@@ -236,6 +237,7 @@ module.exports = {
   HOST_BIBLE,
   CONVERSATION_MAX_OUTPUT_TOKENS,
   CONVERSATION_MIN_WORDS,
+  CONVERSATION_TARGET_MAX_WORDS,
   CONVERSATION_REQUEST_TIMEOUT_MS,
   countScriptWords,
   appendContinuation,

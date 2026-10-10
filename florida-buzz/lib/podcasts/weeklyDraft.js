@@ -73,19 +73,62 @@ function escape(value) {
     .replace(/"/g, '&quot;');
 }
 
-async function buildEpisodeCopy({ aiText, weekKey, collection }) {
+function episodesPerWeek(env = process.env) {
+  const n = Number(env.PODCASTS_EPISODES_PER_WEEK || 2);
+  return Number.isInteger(n) && n >= 1 && n <= 4 ? n : 2;
+}
+
+/** Split weekly sources across N focused ~20–25 minute episodes. */
+function splitSourcesForEpisodes(sources, partCount) {
+  const list = Array.isArray(sources) ? sources.slice() : [];
+  const articles = list.filter((s) => s.source_kind === 'article');
+  const guides = list.filter((s) => s.source_kind === 'guide');
+  const buzz = list.filter((s) => s.source_kind === 'buzz_board');
+  const evergreen = list.filter((s) => s.source_kind === 'evergreen_topic');
+  const other = list.filter(
+    (s) => !['article', 'guide', 'buzz_board', 'evergreen_topic'].includes(s.source_kind)
+  );
+  const parts = Array.from({ length: partCount }, () => []);
+
+  const distribute = (items) => {
+    items.forEach((item, index) => {
+      parts[index % partCount].push(item);
+    });
+  };
+  distribute(articles);
+  distribute(guides);
+  distribute(buzz);
+  // Give each episode at least one evergreen angle when available.
+  if (evergreen.length) {
+    for (let i = 0; i < partCount; i += 1) {
+      parts[i].push(evergreen[i % evergreen.length]);
+    }
+  }
+  distribute(other);
+
+  // Avoid empty parts — borrow from the fullest part.
+  for (let i = 0; i < partCount; i += 1) {
+    if (parts[i].length) continue;
+    const donor = parts.reduce((best, cur) => (cur.length > best.length ? cur : best), parts[0]);
+    if (donor.length > 1) parts[i].push(donor.pop());
+  }
+  return parts;
+}
+
+async function buildEpisodeCopy({ aiText, weekKey, collection, partIndex = 0, partCount = 1 }) {
   const articleTitles = collection.sources
     .filter((s) => s.source_kind === 'article')
     .map((s) => s.title)
     .slice(0, 6);
+  const partLabel = partCount > 1 ? ` (Part ${partIndex + 1})` : '';
   const fallbackTitle = articleTitles.length
-    ? `Florida Buzz: Disney — Week of park news & planning`
-    : `Florida Buzz: Disney — Planning talk & park opinions`;
+    ? `Florida Buzz: Disney — ${articleTitles[0].slice(0, 48)}${partLabel}`
+    : `Florida Buzz: Disney — Planning talk & park opinions${partLabel}`;
   const fallbackDescription =
     'Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Visit https://thefloridabuzz.com. Unofficial fan podcast.';
 
   if (!aiText) {
-    return { title: fallbackTitle, description: fallbackDescription };
+    return { title: fallbackTitle.slice(0, 200), description: fallbackDescription };
   }
 
   const prompt = {
@@ -93,10 +136,11 @@ async function buildEpisodeCopy({ aiText, weekKey, collection }) {
 Return plain text with two lines only:
 TITLE: ...
 DESCRIPTION: ...
-Rules: title under 80 chars; description under 320 chars; spell Gena not Gina; no Disney affiliation claims; do not invent news facts.`,
+Rules: title under 80 chars; description under 320 chars; spell Gena not Gina; no Disney affiliation claims; do not invent news facts.
+This is a focused ~20–25 minute episode${partCount > 1 ? ` (part ${partIndex + 1} of ${partCount} this week)` : ''}.`,
     user: `Week key: ${weekKey}
-Article count: ${collection.counts.articles}
-Sample article titles: ${articleTitles.join(' | ') || '(none — evergreen/Buzz Board heavy week)'}
+Episode part: ${partIndex + 1} of ${partCount}
+Focus source titles: ${articleTitles.join(' | ') || '(none — evergreen/Buzz Board heavy week)'}
 Buzz Board topics: ${collection.sources
       .filter((s) => s.source_kind === 'buzz_board')
       .map((s) => s.title)
@@ -112,7 +156,7 @@ Evergreen topic: ${collection.sources.find((s) => s.source_kind === 'evergreen_t
     return { title: title.slice(0, 200), description: description.slice(0, 4000) };
   } catch (err) {
     console.warn('[podcasts] packaging AI failed, using fallback:', err.message);
-    return { title: fallbackTitle, description: fallbackDescription };
+    return { title: fallbackTitle.slice(0, 200), description: fallbackDescription };
   }
 }
 
@@ -239,118 +283,145 @@ async function createWeeklyDraft({
 
   try {
     const collection = await collectWeeklySources(supabase, { weekKey, env, now });
-    const copy = await buildEpisodeCopy({ aiText, weekKey, collection });
-    const slugBase = slugify(`weekly-${weekKey}-a${attempt}`);
-    const episode = await store.createEpisode(show.id, {
-      title: copy.title,
-      description: copy.description,
-      slug: slugBase,
-      show_notes_html: '',
-      episode_number: null,
-      artwork_alt: show.cover_alt || show.title,
-    });
-    const showNotes = buildShowNotesHtml({
-      episodeTitle: copy.title,
-      sources: collection.sources,
-      site: collection.site,
-      episode: { slug: slugBase, week_key: weekKey },
-    });
-    await store.updateEpisode(episode.id, {
-      week_key: weekKey,
-      generation_run_id: run.id,
-      artwork_url: show.cover_url,
-      artwork_alt: show.cover_alt || show.title,
-      show_notes_html: showNotes,
-    });
+    const partCount = episodesPerWeek(env);
+    const sourceParts = splitSourcesForEpisodes(collection.sources, partCount);
+    const created = [];
+    let anyFallback = false;
 
-    for (const source of collection.sources) {
-      await store.addSource(episode.id, source);
-    }
-
-    const sources = await store.listSources(episode.id);
-    let outline = '';
-    let script = '';
-    let usedFallbackScript = false;
-    let scriptAiError = null;
-    if (!aiText) {
-      scriptAiError = 'AI text module unavailable — full 25–35 minute script was not generated';
-    } else {
-      try {
-        outline = await generateOutline({ aiText, show, episode: { ...episode, ...copy }, sources });
-        await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey });
-        await store.updateEpisode(episode.id, { outline_json: { text: outline, week_key: weekKey } });
-        script = await generateConversation({
-          aiText,
-          show,
-          episode: { ...episode, ...copy },
-          outline,
-          sources,
-        });
-        await store.saveScript(episode.id, 'conversation', script, { week_key: weekKey, target_minutes: '25-35' });
-        await store.updateEpisode(episode.id, { script_text: script, last_error: null });
-        await store.setStatus(episode.id, 'script_ready');
-      } catch (err) {
-        scriptAiError = `Script AI unavailable: ${String(err.message || err).slice(0, 500)}`;
-        console.warn('[podcasts] outline/script generation failed; keeping draft for manual script:', err.message);
-        await store.updateEpisode(episode.id, { last_error: scriptAiError });
-      }
-    }
-    if (!script) {
-      // Short source-grounded scaffold for debugging only — NOT a publishable episode.
-      // Do not run fal TTS on this scaffold (avoids confusing ~2 minute "previews").
-      usedFallbackScript = true;
-      outline = buildFallbackOutline({ weekKey, sources, copy });
-      script = buildFallbackScript({ weekKey, sources, copy });
-      await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey, fallback: true });
+    for (let partIndex = 0; partIndex < partCount; partIndex += 1) {
+      const partSources = sourceParts[partIndex];
+      const copy = await buildEpisodeCopy({
+        aiText,
+        weekKey,
+        collection: { ...collection, sources: partSources },
+        partIndex,
+        partCount,
+      });
+      const slugBase = slugify(`weekly-${weekKey}-a${attempt}-p${partIndex + 1}`);
+      const episode = await store.createEpisode(show.id, {
+        title: copy.title,
+        description: copy.description,
+        slug: slugBase,
+        show_notes_html: '',
+        episode_number: null,
+        artwork_alt: show.cover_alt || show.title,
+      });
+      const showNotes = buildShowNotesHtml({
+        episodeTitle: copy.title,
+        sources: partSources,
+        site: collection.site,
+        episode: { slug: slugBase, week_key: weekKey },
+      });
       await store.updateEpisode(episode.id, {
-        outline_json: { text: outline, week_key: weekKey, fallback: true },
-        script_text: script,
-        last_error:
-          scriptAiError ||
-          'Full AI conversation script was not generated. This draft is only a short scaffold — do not publish. Clear the script box and click Save / generate script, then Generate private preview.',
-      });
-      await store.saveScript(episode.id, 'conversation', script, {
         week_key: weekKey,
-        target_minutes: 'scaffold-only',
-        fallback: true,
+        generation_run_id: run.id,
+        artwork_url: show.cover_url,
+        artwork_alt: show.cover_alt || show.title,
+        show_notes_html: showNotes,
       });
-      const current = await store.getEpisodeById(episode.id);
-      if (current.status === 'draft') {
-        // Stay in draft/script_ready without wiping last_error via setStatus side effects.
-        await store.updateEpisode(episode.id, { status: 'script_ready' });
+
+      for (const source of partSources) {
+        await store.addSource(episode.id, source);
       }
+
+      const sources = await store.listSources(episode.id);
+      let outline = '';
+      let script = '';
+      let usedFallbackScript = false;
+      let scriptAiError = null;
+      if (!aiText) {
+        scriptAiError = 'AI text module unavailable — full 20–25 minute script was not generated';
+      } else {
+        try {
+          outline = await generateOutline({ aiText, show, episode: { ...episode, ...copy }, sources });
+          await store.saveScript(episode.id, 'outline', outline, {
+            week_key: weekKey,
+            part: partIndex + 1,
+            parts: partCount,
+          });
+          await store.updateEpisode(episode.id, {
+            outline_json: { text: outline, week_key: weekKey, part: partIndex + 1, parts: partCount },
+          });
+          script = await generateConversation({
+            aiText,
+            show,
+            episode: { ...episode, ...copy },
+            outline,
+            sources,
+          });
+          await store.saveScript(episode.id, 'conversation', script, {
+            week_key: weekKey,
+            target_minutes: '20-25',
+            part: partIndex + 1,
+            parts: partCount,
+          });
+          await store.updateEpisode(episode.id, { script_text: script, last_error: null });
+          await store.setStatus(episode.id, 'script_ready');
+        } catch (err) {
+          scriptAiError = `Script AI unavailable: ${String(err.message || err).slice(0, 500)}`;
+          console.warn('[podcasts] outline/script generation failed; keeping draft for manual script:', err.message);
+          await store.updateEpisode(episode.id, { last_error: scriptAiError });
+        }
+      }
+      if (!script) {
+        // Short source-grounded scaffold for debugging only — NOT a publishable episode.
+        usedFallbackScript = true;
+        anyFallback = true;
+        outline = buildFallbackOutline({ weekKey, sources, copy });
+        script = buildFallbackScript({ weekKey, sources, copy });
+        await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey, fallback: true });
+        await store.updateEpisode(episode.id, {
+          outline_json: { text: outline, week_key: weekKey, fallback: true, part: partIndex + 1, parts: partCount },
+          script_text: script,
+          last_error:
+            scriptAiError ||
+            'Full AI conversation script was not generated. This draft is only a short scaffold — do not publish. Clear the script box and click Save / generate script, then Generate private preview.',
+        });
+        await store.saveScript(episode.id, 'conversation', script, {
+          week_key: weekKey,
+          target_minutes: 'scaffold-only',
+          fallback: true,
+        });
+        const current = await store.getEpisodeById(episode.id);
+        if (current.status === 'draft') {
+          await store.updateEpisode(episode.id, { status: 'script_ready' });
+        }
+      }
+
+      const freshPart = await store.getEpisodeById(episode.id);
+      if (['published', 'scheduled', 'approved'].includes(freshPart.status)) {
+        throw new Error('Safety abort: weekly draft must not reach publish statuses automatically');
+      }
+      created.push(freshPart);
     }
 
-    // Mark the run ready as soon as the script exists. Do NOT run fal TTS inside this
-    // HTTP request — a ~30 minute episode needs many TTS sections and will exceed the
-    // platform gateway timeout, leaving orphan "running" / "generating_audio" rows.
-    const freshAfterScript = await store.getEpisodeById(episode.id);
-    if (['published', 'scheduled', 'approved'].includes(freshAfterScript.status)) {
-      throw new Error('Safety abort: weekly draft must not reach publish statuses automatically');
-    }
-
+    // Mark the run ready once scripts exist. Do NOT run fal TTS inside this HTTP request.
     await store.updateGenerationRun(run.id, {
       status: 'draft_ready',
-      episode_id: episode.id,
+      episode_id: created[0]?.id || null,
       payload: {
         counts: collection.counts,
         audio_generated: false,
         generation_enabled: !!cfg.generation,
-        used_fallback_script: usedFallbackScript,
-        next_step: usedFallbackScript
-          ? 'Clear scaffold script and use Save / generate script'
-          : 'Open episode and click Generate private preview (fal TTS)',
+        used_fallback_script: anyFallback,
+        episodes_per_week: partCount,
+        episode_ids: created.map((e) => e.id),
+        next_step: anyFallback
+          ? 'Clear scaffold script and use Save / generate script on each episode'
+          : `Open each of the ${partCount} draft episodes and click Generate private preview (fal TTS)`,
       },
       error_detail: null,
     });
 
-    if (usedFallbackScript && cfg.generation) {
+    if (anyFallback && cfg.generation) {
       console.warn('[podcasts] skipping fal TTS for fallback scaffold script');
-    } else if (cfg.generation && !usedFallbackScript) {
-      console.info('[podcasts] weekly draft script ready — fal TTS left for manual Generate private preview');
+    } else if (cfg.generation && !anyFallback) {
+      console.info(
+        `[podcasts] weekly draft ready — ${partCount} episode script(s); fal TTS left for manual Generate private preview`
+      );
     }
 
-    const fresh = await store.getEpisodeById(episode.id);
+    const fresh = created[0];
     const audioGenerated = false;
 
     const notify = await notifyDraftReady({
@@ -370,9 +441,11 @@ async function createWeeklyDraft({
       weekKey,
       attempt,
       episode: fresh,
+      episodes: created,
       runId: run.id,
       counts: collection.counts,
       audioGenerated,
+      episodesPerWeek: partCount,
       notified: notify,
     };
   } catch (err) {
@@ -394,6 +467,8 @@ module.exports = {
   buildEpisodeCopy,
   buildFallbackOutline,
   buildFallbackScript,
+  splitSourcesForEpisodes,
+  episodesPerWeek,
   createWeeklyDraft,
   tickWeeklyDraft,
 };

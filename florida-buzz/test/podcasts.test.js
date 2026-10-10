@@ -248,7 +248,7 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.user, /not affiliated with/i);
   assert.match(conversation.system, /taking turns reading article summaries/i);
   assert.match(conversation.system, /The Florida Buzz dot com/i);
-  assert.match(conversation.system, /3–5 natural Florida Buzz references/);
+  assert.match(conversation.system, /2–4 natural Florida Buzz references/);
   assert.match(conversation.system, /never read long URLs/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
@@ -256,16 +256,17 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.user, /\/dining/);
 });
 
-test('conversation token budget supports a ~30 minute script', () => {
-  assert.ok(CONVERSATION_MAX_OUTPUT_TOKENS >= 20000);
-  assert.ok(CONVERSATION_MIN_WORDS >= 3500);
+test('conversation token budget supports a ~20–25 minute script', () => {
+  assert.ok(CONVERSATION_MAX_OUTPUT_TOKENS >= 12000);
+  assert.ok(CONVERSATION_MIN_WORDS >= 2500);
+  assert.ok(CONVERSATION_MIN_WORDS <= 3500);
   const conversation = buildConversationPrompt({
     show: { title: 'Florida Buzz: Disney' },
     episode: { title: 'Test', description: 'Desc' },
     outline: '1. Open',
     sources: [],
   });
-  assert.match(conversation.system, /4,000–5,000 spoken words/i);
+  assert.match(conversation.system, /3,000–3,800 spoken words/i);
   assert.match(conversation.user, /Length requirement/i);
 });
 
@@ -299,7 +300,7 @@ test('short AI scripts are rejected and continuations can append', async () => {
         outline: '1. Open',
         sources: [],
       }),
-    /too short for a ~30 minute episode/i
+    /too short for a ~20–25 minute episode/i
   );
   assert.ok(calls >= 2);
 });

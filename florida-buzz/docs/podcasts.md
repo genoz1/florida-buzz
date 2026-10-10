@@ -21,8 +21,10 @@ PODCASTS_AUDIO_BUCKET=podcast-audio
 PODCASTS_ARTWORK_BUCKET=podcast-artwork
 PODCASTS_MAX_UPLOAD_MB=80
 # Full ~30 minute script generation (defaults are safe for a full episode)
-PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=24000
-PODCASTS_SCRIPT_MIN_WORDS=4000
+PODCASTS_EPISODES_PER_WEEK=2
+PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=16000
+PODCASTS_SCRIPT_MIN_WORDS=3000
+PODCASTS_SCRIPT_TARGET_MAX_WORDS=3800
 PODCASTS_SCRIPT_TIMEOUT_MS=420000
 PODCASTS_SCRIPT_CONTINUE_ATTEMPTS=2
 PODCASTS_TTS_SECTION_CHARS=2800
@@ -31,7 +33,7 @@ PODCASTS_FAL_POLL_INTERVAL_MS=2000
 PODCASTS_FAL_SECTION_RETRIES=2
 ```
 
-Script generation requests up to 24k output tokens (was 12k), requires at least ~4,000 spoken words (~30 minutes at ~150 wpm), continues the script if the first pass is short, and fails loudly instead of accepting a teaser-length draft.
+Weekly draft creates **2 focused ~20–25 minute episode scripts** (override with `PODCASTS_EPISODES_PER_WEEK`). Each script requires at least ~3,000 spoken words, continues if the first pass is short, and fails loudly instead of accepting a teaser-length draft. Generate fal TTS separately on each episode.
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `FAL_KEY` when generation is later enabled.
 

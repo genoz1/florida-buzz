@@ -129,9 +129,29 @@ test('weekly draft stays disabled by default and never auto-publishes', async ()
   });
   assert.equal(result.skipped, false);
   assert.ok(result.episode);
+  assert.ok(Array.isArray(result.episodes));
+  assert.equal(result.episodes.length, 2);
+  assert.equal(result.episodesPerWeek, 2);
   assert.notEqual(result.episode.status, 'published');
   assert.notEqual(result.episode.status, 'scheduled');
   assert.equal(result.audioGenerated, false);
   const sources = await store.listSources(result.episode.id);
   assert.ok(sources.some((s) => s.source_kind === 'evergreen_topic'));
+});
+
+test('splitSourcesForEpisodes spreads articles across parts', () => {
+  const { splitSourcesForEpisodes } = require('../lib/podcasts/weeklyDraft');
+  const sources = [
+    { source_kind: 'article', title: 'A1' },
+    { source_kind: 'article', title: 'A2' },
+    { source_kind: 'article', title: 'A3' },
+    { source_kind: 'buzz_board', title: 'B1' },
+    { source_kind: 'evergreen_topic', title: 'E1' },
+  ];
+  const parts = splitSourcesForEpisodes(sources, 2);
+  assert.equal(parts.length, 2);
+  assert.ok(parts[0].length >= 1);
+  assert.ok(parts[1].length >= 1);
+  assert.ok(parts[0].some((s) => s.source_kind === 'evergreen_topic'));
+  assert.ok(parts[1].some((s) => s.source_kind === 'evergreen_topic'));
 });

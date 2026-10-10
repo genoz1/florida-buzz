@@ -177,7 +177,13 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
             : `Weekly draft skipped: ${result.reason}`;
         return res.redirect(303, `/admin/podcasts?notice=${encodeURIComponent(detail)}`);
       }
-      res.redirect(303, `/admin/podcasts/episodes/${result.episode.id}?notice=weekly-draft-ready`);
+      const epCount = Array.isArray(result.episodes) ? result.episodes.length : 1;
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${result.episode.id}?notice=${encodeURIComponent(
+          `weekly-draft-ready — created ${epCount} shorter episode draft(s). Generate private preview on each.`
+        )}`
+      );
     })
   );
 
