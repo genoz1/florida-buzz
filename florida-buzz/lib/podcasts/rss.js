@@ -47,7 +47,7 @@ function buildRss({ site, show, episodes }) {
       <description>${description}</description>
       <itunes:summary>${description}</itunes:summary>
       <itunes:title>${title}</itunes:title>
-      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:episodeType>${episode.slug === 'trailer' ? 'trailer' : 'full'}</itunes:episodeType>
       ${episode.episode_number ? `<itunes:episode>${Number(episode.episode_number)}</itunes:episode>` : ''}
       <itunes:duration>${duration}</itunes:duration>
       <itunes:explicit>${explicit}</itunes:explicit>
