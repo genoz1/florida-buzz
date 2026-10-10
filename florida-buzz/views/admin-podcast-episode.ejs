@@ -137,7 +137,14 @@
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn" type="submit" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (fal TTS)</button>
     </form>
-    <p>Keep <code>PODCASTS_GENERATION_ENABLED=false</code> until the weekly workflow is tested. Enabling it can incur fal.ai charges.</p>
+    <% if (episode.status === 'generating_audio' || episode.status === 'failed') { %>
+      <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reset-stuck-audio" style="margin-top:8px">
+        <input type="hidden" name="csrf" value="<%= csrf %>">
+        <button class="btn btn-secondary" type="submit">Reset stuck audio → script_ready</button>
+      </form>
+      <p class="notice">If status stays <code>generating_audio</code> for more than ~15 minutes with no audio player, the web request likely timed out. Reset, then generate preview again.</p>
+    <% } %>
+    <p>Weekly draft no longer auto-runs fal TTS (avoids gateway timeouts). Generate preview from this page after the full script is ready. Enabling <code>PODCASTS_GENERATION_ENABLED</code> incurs fal.ai charges.</p>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-audio" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <label>Upload replacement MP3 <input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>

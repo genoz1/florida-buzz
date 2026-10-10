@@ -45,6 +45,51 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(cfg.falConfigVerifiedInRepo, false);
 });
 
+test('stuck generating_audio can return to script_ready for TTS retry', () => {
+  const { assertTransition } = require('../lib/podcasts/validation');
+  assert.equal(assertTransition('generating_audio', 'script_ready'), 'script_ready');
+});
+
+test('recoverStuckPodcastWork clears stale running runs and generating_audio episodes', async () => {
+  const { recoverStuckPodcastWork } = require('../lib/podcasts/recoverStuck');
+  const { createMemoryStore } = require('../lib/podcasts/memoryStore');
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const old = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  const run = await store.createGenerationRun({
+    show_slug: 'florida-buzz-disney',
+    week_key: '2026-W99',
+    status: 'running',
+    attempt: 1,
+    payload: {},
+  });
+  // Memory store refreshs updated_at on patch — mutate timestamps directly for the stale check.
+  run.created_at = old;
+  run.updated_at = old;
+  const episode = await store.createEpisode(show.id, {
+    title: 'Stuck audio',
+    description: 'Test',
+    slug: 'stuck-audio',
+    show_notes_html: '',
+  });
+  await store.updateEpisode(episode.id, {
+    status: 'generating_audio',
+    generation_run_id: run.id,
+    script_text: 'Gena: Hello there friends.\n\nDiane: Hi back at you.',
+  });
+  episode.updated_at = old;
+
+  const recovered = await recoverStuckPodcastWork(store, {
+    showSlug: 'florida-buzz-disney',
+    now: new Date(),
+    staleMs: 15 * 60 * 1000,
+  });
+  assert.ok(recovered.runs >= 1);
+  assert.ok(recovered.episodes >= 1);
+  const freshEp = await store.getEpisodeById(episode.id);
+  assert.equal(freshEp.status, 'script_ready');
+});
+
 test('status transitions block illegal publish paths', () => {
   assert.equal(assertTransition('draft', 'script_ready'), 'script_ready');
   assert.throws(() => assertTransition('draft', 'published'));

@@ -321,17 +321,11 @@ async function createWeeklyDraft({
       }
     }
 
-    let audioGenerated = false;
-    if (cfg.generation && pipeline && script && !usedFallbackScript) {
-      await pipeline.generatePreview({ ...episode, script_text: script }, script);
-      audioGenerated = true;
-    } else if (usedFallbackScript && cfg.generation) {
-      console.warn('[podcasts] skipping fal TTS for fallback scaffold script');
-    }
-
-    const fresh = await store.getEpisodeById(episode.id);
-    // Never auto-publish. Stay in script_ready / preview_ready.
-    if (['published', 'scheduled', 'approved'].includes(fresh.status)) {
+    // Mark the run ready as soon as the script exists. Do NOT run fal TTS inside this
+    // HTTP request — a ~30 minute episode needs many TTS sections and will exceed the
+    // platform gateway timeout, leaving orphan "running" / "generating_audio" rows.
+    const freshAfterScript = await store.getEpisodeById(episode.id);
+    if (['published', 'scheduled', 'approved'].includes(freshAfterScript.status)) {
       throw new Error('Safety abort: weekly draft must not reach publish statuses automatically');
     }
 
@@ -340,11 +334,24 @@ async function createWeeklyDraft({
       episode_id: episode.id,
       payload: {
         counts: collection.counts,
-        audio_generated: audioGenerated,
+        audio_generated: false,
         generation_enabled: !!cfg.generation,
+        used_fallback_script: usedFallbackScript,
+        next_step: usedFallbackScript
+          ? 'Clear scaffold script and use Save / generate script'
+          : 'Open episode and click Generate private preview (fal TTS)',
       },
       error_detail: null,
     });
+
+    if (usedFallbackScript && cfg.generation) {
+      console.warn('[podcasts] skipping fal TTS for fallback scaffold script');
+    } else if (cfg.generation && !usedFallbackScript) {
+      console.info('[podcasts] weekly draft script ready — fal TTS left for manual Generate private preview');
+    }
+
+    const fresh = await store.getEpisodeById(episode.id);
+    const audioGenerated = false;
 
     const notify = await notifyDraftReady({
       episode: fresh,

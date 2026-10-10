@@ -17,6 +17,7 @@ const { DISNEY_SHOW_SLUG } = require('./config');
 const { defaultSettings, createWeeklyDraft } = require('./weeklyDraft');
 const { describeSchedule, WEEKDAY_NAMES } = require('./timeEt');
 const { EVERGREEN_TOPICS } = require('./evergreenTopics');
+const { recoverStuckPodcastWork } = require('./recoverStuck');
 
 function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, sendEmail = null, env = process.env }) {
   const router = express.Router();
@@ -65,6 +66,15 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
     '/',
     handle(async (req, res) => {
       const show = await defaultShow();
+      let recoverNotice = null;
+      try {
+        const recovered = await recoverStuckPodcastWork(store, { showSlug: DISNEY_SHOW_SLUG });
+        if (recovered.runs || recovered.episodes) {
+          recoverNotice = `Recovered stuck work: ${recovered.runs} generation run(s), ${recovered.episodes} episode(s). Open a script_ready episode and click Generate private preview.`;
+        }
+      } catch (err) {
+        console.warn('[podcasts] stuck-work recovery skipped:', err.message);
+      }
       const episodes = show ? await store.listEpisodes(show.id) : [];
       const platformLinks = show ? await store.listPlatformLinks(show.id) : [];
       let schedule = defaultSettings();
@@ -90,7 +100,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         createCsrf: csrf('create'),
         scheduleCsrf: csrf('schedule'),
         runCsrf: csrf('run'),
-        notice: req.query.notice || null,
+        notice: req.query.notice || recoverNotice,
         error: req.query.error || null,
       });
     })
@@ -386,10 +396,54 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       if (!script) {
         return res.redirect(303, `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Script required')}`);
       }
-      // Intentionally not awaited in background for v1 clarity: admin waits / retries.
-      // Still never publishes.
-      await pipeline.generatePreview(episode, script);
+      if (/scaffold for review|not for publication until approved/i.test(script)) {
+        return res.redirect(
+          303,
+          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Refusing fal TTS on scaffold script. Generate a full AI script first.')}`
+        );
+      }
+      // Still synchronous for v1 clarity — never publishes. Prefer generating from this
+      // page (not weekly draft) so a gateway timeout does not orphan the weekly run.
+      try {
+        await pipeline.generatePreview(episode, script);
+      } catch (err) {
+        await store.updateEpisode(episode.id, {
+          last_error: `Audio generation failed: ${String(err.message || err).slice(0, 500)}`,
+        });
+        throw err;
+      }
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=preview-ready`);
+    })
+  );
+
+  router.post(
+    '/episodes/:id/reset-stuck-audio',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!['generating_audio', 'failed'].includes(episode.status)) {
+        return res.redirect(
+          303,
+          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Reset is only for generating_audio or failed episodes')}`
+        );
+      }
+      try {
+        await store.setStatus(episode.id, 'script_ready');
+      } catch {
+        await store.updateEpisode(episode.id, { status: 'script_ready' });
+      }
+      await store.updateEpisode(episode.id, { last_error: null });
+      if (episode.generation_run_id) {
+        await store
+          .updateGenerationRun(episode.generation_run_id, {
+            status: 'draft_ready',
+            episode_id: episode.id,
+            error_detail: null,
+          })
+          .catch(() => {});
+      }
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=reset-to-script-ready`);
     })
   );
 

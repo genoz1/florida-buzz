@@ -61,7 +61,8 @@ function assertTransition(from, to) {
   const allowed = {
     draft: ['draft', 'script_ready', 'failed'],
     script_ready: ['script_ready', 'generating_audio', 'draft', 'failed'],
-    generating_audio: ['preview_ready', 'failed', 'generating_audio'],
+    // script_ready allowed so gateway-timeout recoveries can retry fal TTS.
+    generating_audio: ['preview_ready', 'failed', 'generating_audio', 'script_ready'],
     preview_ready: ['preview_ready', 'approved', 'generating_audio', 'script_ready', 'failed'],
     approved: ['approved', 'published', 'scheduled', 'preview_ready', 'failed'],
     scheduled: ['scheduled', 'published', 'approved', 'failed'],
