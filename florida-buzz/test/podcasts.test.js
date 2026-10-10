@@ -25,7 +25,7 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(config({ PODCASTS_ENABLED: 'true' }).enabled, true);
   assert.equal(cfg.falEndpoint, DEFAULT_FAL_TTS_ENDPOINT);
   assert.equal(cfg.falModel, DEFAULT_FAL_TTS_MODEL);
-  assert.equal(cfg.ginaVoice, 'Aoede');
+  assert.equal(cfg.genaVoice, 'Aoede');
   assert.equal(cfg.dianeVoice, 'Zephyr');
   assert.equal(cfg.falConfigVerifiedInRepo, false);
 });
@@ -49,12 +49,12 @@ test('show notes sanitizer strips scripts and unsafe urls', () => {
 test('script sections split for long episodes and keep dialogue prefixes', () => {
   const lines = [];
   for (let i = 0; i < 40; i += 1) {
-    lines.push(`Gina: Point number ${i} with enough text to force multiple sections eventually.`);
+    lines.push(`Gena: Point number ${i} with enough text to force multiple sections eventually.`);
     lines.push(`Diane: Short reaction ${i}.`);
   }
   const sections = splitScriptIntoSections(lines.join('\n'), 400);
   assert.ok(sections.length > 1);
-  assert.match(formatScriptForTts(sections[0]), /^Gina:/m);
+  assert.match(formatScriptForTts(sections[0]), /^Gena:/m);
 });
 
 test('RSS omits draft audio and includes published enclosure fields', async () => {
@@ -145,7 +145,7 @@ test('fal TTS submit refuses when generation disabled', async () => {
   const fal = createFalTts(cfg, async () => {
     throw new Error('network should not be called');
   });
-  await assert.rejects(() => fal.submit('Gina: hi\nDiane: hello'), /disabled/i);
+  await assert.rejects(() => fal.submit('Gena: hi\nDiane: hello'), /disabled/i);
 });
 
 test('audio pipeline refuses paid generation when flag off', async () => {
@@ -167,7 +167,7 @@ test('audio pipeline refuses paid generation when flag off', async () => {
     ffmpegPath: 'ffmpeg',
   });
   await assert.rejects(
-    () => pipeline.generatePreview(episode, 'Gina: Hello\nDiane: Hi there'),
+    () => pipeline.generatePreview(episode, 'Gena: Hello\nDiane: Hi there'),
     /PODCASTS_GENERATION_ENABLED/
   );
 });

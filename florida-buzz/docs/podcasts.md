@@ -24,29 +24,51 @@ PODCASTS_MAX_UPLOAD_MB=80
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `FAL_KEY` when generation is later enabled.
 
-## fal.ai Pro TTS configuration status
+## Approved trailer and cover (do not regenerate)
 
-**Not verified against an in-repo approved trailer.** The Florida Buzz repository does not contain a locked “approved trailer” Pro-model record for Gemini TTS.
+The finished trailer master and cover art are supplied as approved assets:
+
+- Trailer MP3 is fully assembled (approved intro + Gena/Diane dialogue). **Do not** regenerate with fal.ai, concatenate, trim, or otherwise modify it.
+- Cover PNG/JPG is the main show artwork and trailer episode artwork.
+
+Upload those bytes as-is to Florida Buzz Supabase storage (`podcast-audio` / `podcast-artwork`). Keep `PODCASTS_GENERATION_ENABLED=false` in production so fal cannot run until a future episode is manually approved.
+
+## fal.ai Pro TTS configuration status (future episodes only)
+
+**Not for the approved trailer.** Future episode generation (when explicitly enabled and approved) uses public fal Gemini TTS defaults:
 
 Defaults come from **public fal.ai documentation** for:
 
 - Endpoint: `fal-ai/gemini-tts`
 - Model: `gemini-2.5-pro-tts`
-- Voices: Gina=`Aoede`, Diane=`Zephyr`
+- Voices: Gena=`Aoede`, Diane=`Zephyr`
 - Language: `English (US)`
 - Output: `mp3`
 - Temperature: `0.85`
 
 If your fal account’s approved trailer uses a different endpoint alias, set `PODCASTS_FAL_TTS_ENDPOINT` / `PODCASTS_FAL_TTS_MODEL` explicitly. Do not invent private IDs.
 
-## Manual setup still required (not done by this change)
+## Production env (Florida Buzz DigitalOcean app only)
 
-1. Review and apply `supabase/migrations/20261010040000_podcasts.sql` only when you explicitly approve a production migration.
-2. Create public Supabase Storage buckets `podcast-audio` and `podcast-artwork` (or the names you set in env).
-3. Public routes mount unless `PODCASTS_ENABLED=false`.
-4. Keep `PODCASTS_GENERATION_ENABLED=false` until you explicitly approve paid fal TTS usage.
-5. Do not submit the RSS feed to Apple/Spotify until you approve.
-6. Optional intro/outro audio fields exist on `podcast_shows`; supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
+Confirm the DigitalOcean app and Supabase project are **Florida Buzz** (`tcrfirzjcjvfmiepgbjh` / thefloridabuzz.com), never ROOK.
+
+```
+PODCASTS_ENABLED=true
+PODCASTS_GENERATION_ENABLED=false
+FAL_KEY=<set securely in DO; never commit>
+```
+
+`FAL_KEY` is for future manually approved episode generation only. With generation false, fal is never called. Do not use it to regenerate the approved trailer.
+
+## Manual setup checklist
+
+1. Apply `supabase/migrations/20261010040000_podcasts.sql` only on the Florida Buzz Supabase project.
+2. Public buckets: `podcast-audio`, `podcast-artwork`.
+3. Upload approved trailer/cover bytes as-is; do not re-encode the trailer.
+4. Public routes mount unless `PODCASTS_ENABLED=false`.
+5. Keep `PODCASTS_GENERATION_ENABLED=false` until a future episode is explicitly approved for generation.
+6. Do not submit the RSS feed to Apple/Spotify until approved.
+7. Optional intro/outro audio fields exist on `podcast_shows`; supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
 
 ## Admin
 

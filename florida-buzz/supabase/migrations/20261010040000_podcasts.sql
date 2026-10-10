@@ -149,14 +149,14 @@ insert into public.podcast_shows (
   'florida-buzz-disney',
   'Florida Buzz: Disney',
   'The Florida Buzz',
-  'Gina and Diane are Disney-loving Central Florida moms who visit the parks frequently and discuss park news, attractions, food, resorts, events, planning advice, and their personal experiences.',
-  '[{"name":"Gina","role":"host"},{"name":"Diane","role":"host"}]'::jsonb,
+  'Gena and Diane are Disney-loving Central Florida moms who visit the parks frequently and discuss park news, attractions, food, resorts, events, planning advice, and their personal experiences.',
+  '[{"name":"Gena","role":"host"},{"name":"Diane","role":"host"}]'::jsonb,
   'This is an unofficial fan podcast and is not affiliated with, endorsed by, or sponsored by The Walt Disney Company.',
   'en-us',
   'Leisure',
   'Travel',
   false,
-  '/img/podcasts/florida-buzz-disney-cover.svg',
+  '/img/podcasts/florida-buzz-disney-cover.jpg',
   'Florida Buzz: Disney podcast cover — original Florida Buzz artwork, not affiliated with Disney'
 ) on conflict (slug) do nothing;
 

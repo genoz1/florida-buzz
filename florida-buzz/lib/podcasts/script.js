@@ -10,7 +10,7 @@ function buildOutlinePrompt({ show, episode, sources }) {
     .join('\n');
   return {
     system: `You outline episodes for "${show.title}" from The Florida Buzz.
-Hosts: Gina (guides the episode) and Diane (equal cohost).
+Hosts: Gena (guides the episode) and Diane (equal cohost).
 Rules:
 - Summarize source stories in original language; never copy large article passages.
 - Separate verified facts from host opinions.
@@ -34,7 +34,7 @@ function buildConversationPrompt({ show, episode, outline, sources }) {
   return {
     system: `You write natural podcast scripts for "${show.title}".
 Format every spoken line as:
-Gina: ...
+Gena: ...
 Diane: ...
 
 Style:
@@ -44,7 +44,7 @@ Style:
 - Natural transitions; limited subtle interruptions as brief overlapping reactions in text only
 - No forced comedy, no constant agreement, no exaggerated/childish voices, no heavy accents
 - No unsupported claims; no Disney affiliation or inside access
-- Gina generally guides; Diane reacts, adds context, sometimes disagrees
+- Gena generally guides; Diane reacts, adds context, sometimes disagrees
 - Mention the unofficial-fan disclosure once near the open
 - End with a light sign-off pointing listeners to TheFloridaBuzz.com
 
@@ -79,8 +79,8 @@ async function generateConversation({ aiText, show, episode, outline, sources })
     maxOutputTokens: 4000,
   });
   const script = String(text || '').trim();
-  if (!/^Gina:/m.test(script) || !/^Diane:/m.test(script)) {
-    throw new Error('Generated script must include Gina: and Diane: dialogue lines');
+  if (!/^Gena:/m.test(script) || !/^Diane:/m.test(script)) {
+    throw new Error('Generated script must include Gena: and Diane: dialogue lines');
   }
   return script;
 }

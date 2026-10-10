@@ -72,7 +72,7 @@
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/script">
     <h2>Conversation script</h2>
     <input type="hidden" name="csrf" value="<%= csrf %>">
-    <label>Script (Gina:/Diane: lines; leave blank to generate)
+    <label>Script (Gena:/Diane: lines; leave blank to generate)
       <textarea name="script_text" rows="16"><%= conversation ? conversation.content_text : (episode.script_text || '') %></textarea>
     </label>
     <button class="btn" type="submit">Save / generate script</button>

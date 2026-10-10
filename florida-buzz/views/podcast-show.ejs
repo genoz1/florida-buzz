@@ -5,7 +5,7 @@
 <main class="wrap podcast-page">
   <article class="podcast-show">
     <div class="podcast-show-head">
-      <img class="podcast-cover" src="<%= show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= show.cover_alt || (show.title + ' cover art') %>" width="320" height="320">
+      <img class="podcast-cover" src="<%= show.cover_url || '/img/podcasts/florida-buzz-disney-cover.jpg' %>" alt="<%= show.cover_alt || (show.title + ' cover art') %>" width="320" height="320">
       <div>
         <p class="podcast-eyebrow"><%= show.publisher %></p>
         <h1><%= show.title %></h1>
@@ -49,7 +49,7 @@
           <% episodes.forEach(ep => { %>
             <li class="podcast-episode-row">
               <div class="podcast-episode-row-art">
-                <img src="<%= ep.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= ep.artwork_alt || ep.title %>" width="96" height="96" loading="lazy">
+                <img src="<%= ep.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.jpg' %>" alt="<%= ep.artwork_alt || ep.title %>" width="96" height="96" loading="lazy">
               </div>
               <div class="podcast-episode-row-body">
                 <h3><a href="/podcasts/<%= show.slug %>/<%= ep.slug %>"><%= ep.title %></a></h3>

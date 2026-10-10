@@ -15,7 +15,7 @@
       <% cards.forEach(card => { %>
         <article class="podcast-card">
           <a class="podcast-card-art" href="/podcasts/<%= card.show.slug %>">
-            <img src="<%= card.show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= card.show.cover_alt || (card.show.title + ' cover art') %>" width="400" height="400" loading="lazy">
+            <img src="<%= card.show.cover_url || '/img/podcasts/florida-buzz-disney-cover.jpg' %>" alt="<%= card.show.cover_alt || (card.show.title + ' cover art') %>" width="400" height="400" loading="lazy">
           </a>
           <div class="podcast-card-body">
             <h2><a href="/podcasts/<%= card.show.slug %>"><%= card.show.title %></a></h2>

@@ -46,7 +46,7 @@ function createFalTts(cfg, fetcher = fetch) {
       style_instructions:
         'Warm, natural US English conversation between two adult friends. No cartoon voices, no heavy accents, no announcer cadence.',
       speakers: [
-        { speaker_id: 'Gina', voice: cfg.ginaVoice },
+        { speaker_id: 'Gena', voice: cfg.genaVoice },
         { speaker_id: 'Diane', voice: cfg.dianeVoice },
       ],
     };

@@ -11,7 +11,7 @@
       <% if (episode.duration_seconds) { %> · <%= Math.round(episode.duration_seconds / 60) %> min<% } %>
     </p>
 
-    <img class="podcast-episode-art" src="<%= episode.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= episode.artwork_alt || episode.title %>" width="480" height="480">
+    <img class="podcast-episode-art" src="<%= episode.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.jpg' %>" alt="<%= episode.artwork_alt || episode.title %>" width="480" height="480">
 
     <%- include('partials/podcast-player', { audioUrl: episode.audio_url }) %>
 

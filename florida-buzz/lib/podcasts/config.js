@@ -36,7 +36,7 @@ function config(env = process.env) {
     temperature: Number.isFinite(temperature) ? temperature : 0.85,
     languageCode: 'English (US)',
     outputFormat: 'mp3',
-    ginaVoice: 'Aoede',
+    genaVoice: 'Aoede',
     dianeVoice: 'Zephyr',
     sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 3500,
     maxUploadBytes: (Number.isFinite(maxUploadMb) && maxUploadMb > 0 ? maxUploadMb : 80) * 1024 * 1024,
