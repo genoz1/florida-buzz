@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= episode.title %> — Podcast admin</title>
+  <style>
+    body{max-width:980px;margin:40px auto;padding:20px;font:16px system-ui;color:#182a34}
+    a{color:#00697b}.notice{padding:14px;background:#eef5f6;margin:12px 0}.error{padding:14px;background:#fde8e4;margin:12px 0}
+    .btn{display:inline-block;background:#0e3b43;color:#fff;padding:10px 14px;text-decoration:none;border:0;cursor:pointer;margin:4px 4px 4px 0}
+    .btn-secondary{background:#4a5350}
+    label{display:block;margin:10px 0 4px} input,textarea{width:100%;padding:8px;box-sizing:border-box}
+    form.card,section.card{border:1px solid #ddd;padding:16px;margin:20px 0}
+    .status{font-weight:700;text-transform:uppercase}
+    audio{width:100%;margin-top:8px}
+    ul.jobs{font-size:14px}
+  </style>
+</head>
+<body>
+  <p><a href="/admin/podcasts">&larr; All episodes</a></p>
+  <h1><%= episode.title %></h1>
+  <p>Status: <span class="status"><%= episode.status %></span></p>
+  <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
+  <% if (error) { %><p class="error"><%= error %></p><% } %>
+  <p class="notice"><%= show.disclosure %></p>
+
+  <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>">
+    <h2>Episode details</h2>
+    <input type="hidden" name="csrf" value="<%= csrf %>">
+    <label>Title <input name="title" value="<%= episode.title %>" required></label>
+    <label>Slug <input name="slug" value="<%= episode.slug %>"></label>
+    <label>Episode number <input name="episode_number" type="number" min="1" value="<%= episode.episode_number || '' %>"></label>
+    <label>Description <textarea name="description" rows="3" required><%= episode.description %></textarea></label>
+    <label>Show notes (HTML) <textarea name="show_notes_html" rows="8"><%= episode.show_notes_html || '' %></textarea></label>
+    <label>Artwork alt text <input name="artwork_alt" value="<%= episode.artwork_alt || '' %>"></label>
+    <button class="btn" type="submit">Save draft fields</button>
+  </form>
+
+  <section class="card">
+    <h2>Sources</h2>
+    <ul>
+      <% sources.forEach(src => { %>
+        <li>
+          <strong><%= src.title %></strong> — <a href="<%= src.url %>" target="_blank" rel="noopener"><%= src.url %></a>
+          <% if (!src.included) { %> (excluded)<% } %>
+          <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/sources/<%= src.id %>/toggle" style="display:inline">
+            <input type="hidden" name="csrf" value="<%= csrf %>">
+            <input type="hidden" name="included" value="<%= src.included ? 'false' : 'true' %>">
+            <button class="btn btn-secondary" type="submit"><%= src.included ? 'Exclude' : 'Include' %></button>
+          </form>
+        </li>
+      <% }) %>
+    </ul>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/sources">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <label>Source title <input name="title" required></label>
+      <label>Source URL <input name="url" type="url" required></label>
+      <label>Summary <textarea name="summary" rows="2"></textarea></label>
+      <button class="btn" type="submit">Add source</button>
+    </form>
+  </section>
+
+  <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/outline">
+    <h2>Outline</h2>
+    <input type="hidden" name="csrf" value="<%= csrf %>">
+    <label>Outline text (leave blank to generate with AI text service)
+      <textarea name="outline_text" rows="8"><%= outline ? outline.content_text : (episode.outline_json && episode.outline_json.text) || '' %></textarea>
+    </label>
+    <button class="btn" type="submit">Save / generate outline</button>
+  </form>
+
+  <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/script">
+    <h2>Conversation script</h2>
+    <input type="hidden" name="csrf" value="<%= csrf %>">
+    <label>Script (Gina:/Diane: lines; leave blank to generate)
+      <textarea name="script_text" rows="16"><%= conversation ? conversation.content_text : (episode.script_text || '') %></textarea>
+    </label>
+    <button class="btn" type="submit">Save / generate script</button>
+  </form>
+
+  <section class="card">
+    <h2>Audio</h2>
+    <% if (episode.audio_url) { %>
+      <p>Current master (permanent URL preferred):</p>
+      <audio controls preload="metadata" src="<%= episode.audio_url %>"></audio>
+    <% } else { %>
+      <p>No master audio yet.</p>
+    <% } %>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/generate-audio">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn" type="submit" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (fal TTS)</button>
+    </form>
+    <p>Generation disabled by default. Enabling <code>PODCASTS_GENERATION_ENABLED=true</code> can incur fal.ai charges.</p>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-audio" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <label>Upload replacement MP3 <input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>
+      <button class="btn btn-secondary" type="submit">Upload audio</button>
+    </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-artwork" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <label>Upload episode artwork <input type="file" name="artwork" accept="image/jpeg,image/png,image/webp" required></label>
+      <button class="btn btn-secondary" type="submit">Upload artwork</button>
+    </form>
+    <h3>Generation jobs</h3>
+    <ul class="jobs">
+      <% if (!jobs.length) { %><li>No jobs yet.</li><% } %>
+      <% jobs.forEach(job => { %>
+        <li>#<%= job.attempt %> <%= job.status %> section <%= job.section_index + 1 %>/<%= job.section_count %><% if (job.error_detail) { %> — <%= job.error_detail %><% } %></li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Approval &amp; publishing</h2>
+    <p>Nothing publishes automatically. Approve finished audio, then Publish.</p>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/approve" style="display:inline">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Approve audio</button>
+    </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/schedule" style="display:inline-block">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <label>Schedule for <input type="datetime-local" name="scheduled_for" required></label>
+      <button class="btn btn-secondary" type="submit">Mark scheduled</button>
+    </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/publish" style="display:inline">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Publish now</button>
+    </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/unpublish" style="display:inline">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn btn-secondary" type="submit">Unpublish</button>
+    </form>
+  </section>
+</body>
+</html>

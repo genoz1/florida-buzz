@@ -81,6 +81,7 @@
       <div class="nav-links">
         <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
         <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
+        <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
         <a href="/wait-times">Wait Times</a>
         <a href="/planner">Day Planner</a>
         <a href="/dining">Dining</a>
@@ -101,6 +102,7 @@
     <div class="mobile-menu" id="mobileMenu">
       <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
       <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
+      <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
       <a href="/wait-times">Wait Times</a>
       <a href="/planner">Day Planner</a>
       <a href="/dining">Dining</a>

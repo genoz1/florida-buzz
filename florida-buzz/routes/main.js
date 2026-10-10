@@ -634,7 +634,15 @@ router.get('/sitemap.xml', async (req, res) => {
       priority: '0.6',
     }));
 
-  const allUrls = [...staticUrls, ...articleUrls];
+  // Additive podcast URLs (isolated module). Safe when podcasts are disabled.
+  let podcastUrls = [];
+  try {
+    podcastUrls = await require('../lib/podcasts').sitemapEntries(process.env);
+  } catch (err) {
+    console.error('[sitemap] podcast entries skipped:', err.message);
+  }
+
+  const allUrls = [...staticUrls, ...articleUrls, ...podcastUrls];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

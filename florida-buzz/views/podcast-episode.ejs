@@ -1,0 +1,69 @@
+<%- include('partials/header', { pageTitle, pageDescription: episode.description, category: null, tickerItems: [], canonicalPath: '/podcasts/' + show.slug + '/' + episode.slug, isPodcastsPage: true, pageImage }) %>
+<link rel="stylesheet" href="/css/podcasts.css">
+
+<main class="wrap podcast-page">
+  <article class="podcast-episode">
+    <p class="podcast-eyebrow"><a href="/podcasts/<%= show.slug %>"><%= show.title %></a></p>
+    <h1><%= episode.title %></h1>
+    <p class="podcast-meta">
+      <% if (episode.episode_number) { %>Episode <%= episode.episode_number %> · <% } %>
+      <%= episode.published_at ? new Date(episode.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' %>
+      <% if (episode.duration_seconds) { %> · <%= Math.round(episode.duration_seconds / 60) %> min<% } %>
+    </p>
+
+    <img class="podcast-episode-art" src="<%= episode.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= episode.artwork_alt || episode.title %>" width="480" height="480">
+
+    <%- include('partials/podcast-player', { audioUrl: episode.audio_url }) %>
+
+    <p class="podcast-disclosure"><%= show.disclosure %></p>
+
+    <section class="podcast-notes">
+      <h2>About this episode</h2>
+      <p><%= episode.description %></p>
+      <% if (episode.show_notes_html) { %>
+        <div class="article-body"><%- episode.show_notes_html %></div>
+      <% } %>
+    </section>
+
+    <% if (sources && sources.length) { %>
+      <section class="podcast-sources">
+        <h2>Sources discussed</h2>
+        <ul>
+          <% sources.forEach(src => { %>
+            <li>
+              <a href="<%= src.url %>" rel="noopener noreferrer" target="_blank"><%= src.title %></a>
+              <% if (src.summary) { %><span> — <%= src.summary %></span><% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <nav class="podcast-adjacent" aria-label="Adjacent episodes">
+      <% if (older) { %>
+        <a href="/podcasts/<%= show.slug %>/<%= older.slug %>">&larr; Previous: <%= older.title %></a>
+      <% } %>
+      <% if (newer) { %>
+        <a href="/podcasts/<%= show.slug %>/<%= newer.slug %>">Next: <%= newer.title %> &rarr;</a>
+      <% } %>
+    </nav>
+  </article>
+</main>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "PodcastEpisode",
+  "name": <%- JSON.stringify(episode.title) %>,
+  "description": <%- JSON.stringify(episode.description) %>,
+  "datePublished": <%- JSON.stringify(episode.published_at || '') %>,
+  "url": <%- JSON.stringify(siteUrl + '/podcasts/' + show.slug + '/' + episode.slug) %>,
+  "partOfSeries": {
+    "@type": "PodcastSeries",
+    "name": <%- JSON.stringify(show.title) %>,
+    "url": <%- JSON.stringify(siteUrl + '/podcasts/' + show.slug) %>
+  }
+}
+</script>
+
+<%- include('partials/footer') %>

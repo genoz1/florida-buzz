@@ -1,0 +1,11 @@
+<% const src = typeof audioUrl !== 'undefined' ? audioUrl : null; %>
+<% if (src) { %>
+<div class="podcast-player">
+  <audio controls preload="metadata" src="<%= src %>">
+    Your browser does not support the audio element.
+    <a href="<%= src %>">Download episode audio</a>
+  </audio>
+</div>
+<% } else { %>
+<p class="podcast-empty">Audio is not available for this episode yet.</p>
+<% } %>

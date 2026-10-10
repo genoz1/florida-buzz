@@ -1,0 +1,72 @@
+<%- include('partials/header', { pageTitle, pageDescription: show.description, category: null, tickerItems: [], canonicalPath: '/podcasts/' + show.slug, isPodcastsPage: true, pageImage }) %>
+<link rel="stylesheet" href="/css/podcasts.css">
+<link rel="alternate" type="application/rss+xml" title="<%= show.title %>" href="<%= rssPath %>">
+
+<main class="wrap podcast-page">
+  <article class="podcast-show">
+    <div class="podcast-show-head">
+      <img class="podcast-cover" src="<%= show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= show.cover_alt || (show.title + ' cover art') %>" width="320" height="320">
+      <div>
+        <p class="podcast-eyebrow"><%= show.publisher %></p>
+        <h1><%= show.title %></h1>
+        <p class="podcast-hosts">Hosts: <%= (show.hosts || []).map(h => h.name).join(' & ') %></p>
+        <p><%= show.description %></p>
+        <p class="podcast-disclosure"><%= show.disclosure %></p>
+        <p class="podcast-links">
+          <a class="btn btn-outline" href="<%= rssPath %>">RSS feed</a>
+          <a class="btn btn-outline" href="/podcasts">All podcasts</a>
+        </p>
+        <% if (links && links.length) { %>
+          <p class="podcast-follow">Follow:
+            <% links.forEach((link, i) => { %>
+              <a href="<%= link.url %>" rel="noopener noreferrer" target="_blank"><%= link.platform %></a><%= i < links.length - 1 ? ' · ' : '' %>
+            <% }) %>
+          </p>
+        <% } else { %>
+          <p class="podcast-follow">Follow / subscribe links will appear here when platform listings go live.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (latest && latest.audio_url) { %>
+      <section class="podcast-latest">
+        <h2>Latest episode</h2>
+        <h3><a href="/podcasts/<%= show.slug %>/<%= latest.slug %>"><%= latest.title %></a></h3>
+        <p class="podcast-meta">
+          <%= latest.published_at ? new Date(latest.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' %>
+          <% if (latest.duration_seconds) { %> · <%= Math.round(latest.duration_seconds / 60) %> min<% } %>
+        </p>
+        <%- include('partials/podcast-player', { audioUrl: latest.audio_url }) %>
+      </section>
+    <% } %>
+
+    <section class="podcast-episode-list">
+      <h2>Episodes</h2>
+      <% if (!episodes || !episodes.length) { %>
+        <p class="podcast-empty">No published episodes yet.</p>
+      <% } else { %>
+        <ul>
+          <% episodes.forEach(ep => { %>
+            <li class="podcast-episode-row">
+              <div class="podcast-episode-row-art">
+                <img src="<%= ep.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= ep.artwork_alt || ep.title %>" width="96" height="96" loading="lazy">
+              </div>
+              <div class="podcast-episode-row-body">
+                <h3><a href="/podcasts/<%= show.slug %>/<%= ep.slug %>"><%= ep.title %></a></h3>
+                <p class="podcast-meta">
+                  <% if (ep.episode_number) { %>Episode <%= ep.episode_number %> · <% } %>
+                  <%= ep.published_at ? new Date(ep.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' %>
+                  <% if (ep.duration_seconds) { %> · <%= Math.round(ep.duration_seconds / 60) %> min<% } %>
+                </p>
+                <p><%= ep.description %></p>
+                <%- include('partials/podcast-player', { audioUrl: ep.audio_url }) %>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+  </article>
+</main>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Florida Buzz Podcast admin</title>
+  <style>
+    body{max-width:980px;margin:40px auto;padding:20px;font:16px system-ui;color:#182a34}
+    table{border-collapse:collapse;width:100%}td,th{padding:12px;text-align:left;border-bottom:1px solid #ddd}
+    a{color:#00697b}.notice{padding:14px;background:#eef5f6;margin-bottom:18px}
+    .btn{display:inline-block;background:#0e3b43;color:#fff;padding:10px 14px;text-decoration:none;border:0;cursor:pointer}
+    label{display:block;margin:10px 0 4px} input,textarea{width:100%;padding:8px;box-sizing:border-box}
+    form.card{border:1px solid #ddd;padding:16px;margin:20px 0}
+  </style>
+</head>
+<body>
+  <h1>Florida Buzz Podcast admin</h1>
+  <p class="notice">Generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>. Publishing is always manual. Audio generation never auto-publishes.</p>
+  <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
+  <% if (!show) { %>
+    <p>Show seed missing. Apply the podcasts migration before using this dashboard.</p>
+  <% } else { %>
+    <h2><%= show.title %></h2>
+    <p><%= show.disclosure %></p>
+    <table>
+      <thead><tr><th>Episode</th><th>Status</th><th>Updated</th></tr></thead>
+      <tbody>
+        <% if (!episodes.length) { %><tr><td colspan="3">No episodes yet.</td></tr><% } %>
+        <% episodes.forEach(ep => { %>
+          <tr>
+            <td><a href="/admin/podcasts/episodes/<%= ep.id %>"><%= ep.title %></a></td>
+            <td><%= ep.status %></td>
+            <td><%= ep.updated_at %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <form class="card" method="post" action="/admin/podcasts/episodes">
+      <h3>Create episode</h3>
+      <input type="hidden" name="csrf" value="<%= createCsrf %>">
+      <label>Title <input name="title" required></label>
+      <label>Description <textarea name="description" rows="3" required></textarea></label>
+      <label>Episode number <input name="episode_number" type="number" min="1"></label>
+      <button class="btn" type="submit">Create draft</button>
+    </form>
+  <% } %>
+  <p><a href="/podcasts">Public podcast directory</a></p>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<%- include('partials/header', { pageTitle: typeof pageTitle !== 'undefined' ? pageTitle : 'Podcasts — The Florida Buzz', category: null, tickerItems: [], canonicalPath: '/podcasts', isPodcastsPage: true }) %>
+<link rel="stylesheet" href="/css/podcasts.css">
+
+<main class="wrap podcast-page">
+  <header class="podcast-hero">
+    <p class="podcast-eyebrow">The Florida Buzz Podcasts</p>
+    <h1>Listen in</h1>
+    <p class="podcast-lede">Conversations from Florida moms who cover the parks, beaches, and everyday Sunshine State life — original Florida Buzz audio, separate from our written guides.</p>
+  </header>
+
+  <% if (!cards || !cards.length) { %>
+    <p class="podcast-empty">No podcasts are listed yet. Check back soon.</p>
+  <% } else { %>
+    <div class="podcast-directory">
+      <% cards.forEach(card => { %>
+        <article class="podcast-card">
+          <a class="podcast-card-art" href="/podcasts/<%= card.show.slug %>">
+            <img src="<%= card.show.cover_url || '/img/podcasts/florida-buzz-disney-cover.svg' %>" alt="<%= card.show.cover_alt || (card.show.title + ' cover art') %>" width="400" height="400" loading="lazy">
+          </a>
+          <div class="podcast-card-body">
+            <h2><a href="/podcasts/<%= card.show.slug %>"><%= card.show.title %></a></h2>
+            <p class="podcast-hosts">
+              Hosts:
+              <%= (card.show.hosts || []).map(h => h.name).join(' & ') || 'TBA' %>
+            </p>
+            <p><%= card.show.description %></p>
+            <p class="podcast-disclosure"><%= card.show.disclosure %></p>
+            <% if (card.latest && card.latest.audio_url) { %>
+              <p class="podcast-latest-label">Listen to the latest episode</p>
+              <p class="podcast-latest-title"><a href="/podcasts/<%= card.show.slug %>/<%= card.latest.slug %>"><%= card.latest.title %></a></p>
+              <%- include('partials/podcast-player', { audioUrl: card.latest.audio_url }) %>
+            <% } else { %>
+              <p class="podcast-empty">No published episodes yet.</p>
+            <% } %>
+            <p class="podcast-links">
+              <a class="btn" href="/podcasts/<%= card.show.slug %>">Show page</a>
+              <a class="btn btn-outline" href="/podcasts/<%= card.show.slug %>/rss.xml">RSS feed</a>
+            </p>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <section class="podcast-future">
+    <h2>More Florida Buzz shows</h2>
+    <p>This directory has room for additional Florida Buzz podcasts as they launch. Florida Buzz: Disney is the first show.</p>
+  </section>
+</main>
+
+<%- include('partials/footer') %>

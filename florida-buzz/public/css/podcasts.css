@@ -1,0 +1,150 @@
+/* Florida Buzz podcasts — scoped styles using existing site tokens from style.css */
+
+.podcast-page {
+  padding: 28px 0 48px;
+}
+
+.podcast-eyebrow {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--teal-700, #15525c);
+  margin: 0 0 8px;
+}
+
+.podcast-hero h1,
+.podcast-show h1,
+.podcast-episode h1 {
+  font-family: var(--font-display, Georgia, serif);
+  color: var(--ink-900, #1f2421);
+  margin: 0 0 12px;
+  line-height: 1.15;
+}
+
+.podcast-lede,
+.podcast-card-body p,
+.podcast-show p,
+.podcast-episode p {
+  color: var(--ink-600, #4a5350);
+}
+
+.podcast-disclosure {
+  border-left: 3px solid var(--coral-500, #ff6452);
+  padding: 8px 12px;
+  background: rgba(255, 100, 82, 0.08);
+  color: var(--ink-900, #1f2421);
+  font-size: 0.95rem;
+}
+
+.podcast-directory {
+  display: grid;
+  gap: 28px;
+}
+
+.podcast-card {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  background: #fff;
+  border: 1px solid var(--line, rgba(14, 59, 67, 0.14));
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.podcast-card-art img,
+.podcast-cover,
+.podcast-episode-art,
+.podcast-episode-row-art img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  background: var(--sand-50, #f8f3e8);
+}
+
+.podcast-hosts {
+  font-weight: 600;
+  color: var(--ink-900, #1f2421);
+}
+
+.podcast-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.podcast-links .btn-outline,
+.podcast-page .btn-outline {
+  background: transparent;
+  color: var(--teal-900, #0e3b43);
+  border: 2px solid var(--teal-900, #0e3b43);
+}
+
+.podcast-player audio {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.podcast-empty {
+  color: var(--ink-600, #4a5350);
+  font-style: italic;
+}
+
+.podcast-future {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line, rgba(14, 59, 67, 0.14));
+}
+
+.podcast-show-head {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 28px;
+  margin-bottom: 32px;
+}
+
+.podcast-episode-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.podcast-episode-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line, rgba(14, 59, 67, 0.14));
+}
+
+.podcast-meta {
+  font-size: 0.92rem;
+  color: var(--ink-600, #4a5350);
+}
+
+.podcast-adjacent {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.podcast-sources ul {
+  padding-left: 1.2rem;
+}
+
+.podcast-episode-art {
+  max-width: 320px;
+  margin: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .podcast-card,
+  .podcast-show-head,
+  .podcast-episode-row {
+    grid-template-columns: 1fr;
+  }
+}
