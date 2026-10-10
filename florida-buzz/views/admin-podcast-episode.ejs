@@ -115,8 +115,7 @@
     <label>Script (Gena:/Diane: lines; leave blank to generate the full ~30 minute conversation)
       <textarea name="script_text" rows="16"><%= isScaffold ? '' : scriptShown %></textarea>
       <small>
-        <% if (isScaffold) { %>Scaffold text was cleared above so Generate will create a real full script. <% } %>
-        <% else if (scriptShown) { %>Script loaded (<%= String(scriptShown).trim().split(/\s+/).filter(Boolean).length %> words). <% } %>
+        <% if (isScaffold) { %>Scaffold text was cleared above so Generate will create a real full script. <% } else if (scriptShown) { %>Script loaded (<%= String(scriptShown).trim().split(/\s+/).filter(Boolean).length %> words). <% } %>
         Full episodes: lively Gena/Diane conversation with park anecdotes. Wait for the page to finish — script generation is slow.
       </small>
     </label>
