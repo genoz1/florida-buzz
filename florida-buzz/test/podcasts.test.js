@@ -19,6 +19,7 @@ const {
 } = require('../lib/podcasts/script');
 const {
   HOST_BIBLE,
+  HOST_STYLE,
   ensureShowNotesDisclosures,
 } = require('../lib/podcasts/hosts');
 const { createPublicRouter } = require('../lib/podcasts/routerPublic');
@@ -63,9 +64,11 @@ test('show notes always receive unofficial affiliation disclosure', () => {
 });
 
 test('full-episode prompts keep host bible and anecdote rules', () => {
+  assert.equal(HOST_STYLE, 'aftershow_energy');
   assert.match(HOST_BIBLE, /Geno/);
   assert.match(HOST_BIBLE, /Michael/);
   assert.match(HOST_BIBLE, /mid-thirties/i);
+  assert.match(HOST_BIBLE, /aftershow|reaction/i);
   const show = { title: 'Florida Buzz: Disney' };
   const episode = { title: 'Week in the parks', description: 'News and tips' };
   const sources = [

@@ -68,13 +68,15 @@ ${HOST_BIBLE}
 Conversation requirements:
 - Target roughly 25–35 minutes of natural dialogue (substantive, not rushed; not padded filler).
 - Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles.
+- Lean into lively aftershow/reaction energy: shorter turns, frequent reactions, excited bounce between hosts.
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
 - Confirm time-sensitive details against approved source notes before stating them as fact; if unsure, speak generally or as opinion.
 - When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer differing host opinions, and invite listeners to visit the Buzz Board.
 - Include two or three brief recent-park-experience stories connected directly to the episode topics.
 - Make stories specific and conversational with small believable details; keep each anecdote concise.
-- The other host must react: ask a follow-up, laugh, disagree, interrupt briefly, or relate a similar experience.
+- The other host must react quickly: ask a follow-up, laugh, disagree, interrupt briefly, drop a short affirmation, or relate a similar experience.
+- Prefer many medium/short exchanges over one host speaking for long stretches.
 - Include at least one natural callback later in the episode to an earlier anecdote or detail.
 - Do not make every anecdote neatly resolve into a scripted lesson.
 - Avoid repeating the same experiences, jokes, family details, or sentence patterns across episodes; invent fresh specifics each time.
@@ -82,7 +84,7 @@ Conversation requirements:
 - When no factual park notes are available, use timeless composite experiences rather than claiming something happened on a specific date.
 - Always spell Gena (never Gina). Do not write phonetic pronunciations in dialogue.
 - Mention the unofficial-fan affiliation disclosure once near the open.
-- Do not read the AI/anecdote show-notes disclosure aloud unless a host naturally jokes that stories can be a little dramatized — optional, rare, never formal.
+- Do not claim a live studio audience, callers, or TV panel format — keep it two hosts talking parks.
 
 Florida Buzz listener guidance (helpful, not ad-read):
 - Naturally reference relevant Florida Buzz content/tools throughout: the specific articles being discussed, planning guides, the dining guide, wait times, the day planner, Buzz Board discussions, and any other verified Florida Buzz resource tied to the topic.

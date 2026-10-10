@@ -139,10 +139,8 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   const evergreen = sources.find((s) => s.source_kind === 'evergreen_topic' && s.included !== false);
   const turns = [];
   turns.push(`Gena: Hey Diane — welcome back to Florida Buzz: Disney. This week’s draft is ${copy.title}.`);
-  turns.push(
-    'Diane: And quick reminder for anyone new — we are an unofficial fan podcast and not affiliated with Disney.'
-  );
-  turns.push('Gena: Exact facts come from The Florida Buzz — articles, guides, and the Buzz Board.');
+  turns.push('Diane: Heck yeah — let’s get into it. Quick reminder though: unofficial fan podcast, not affiliated with Disney.');
+  turns.push('Gena: Exact facts still come from The Florida Buzz — articles, guides, and the Buzz Board.');
   articles.forEach((s, i) => {
     turns.push(
       i % 2 === 0
