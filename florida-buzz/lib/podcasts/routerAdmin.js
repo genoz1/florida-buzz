@@ -160,10 +160,11 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         force: true,
       });
       if (result.skipped) {
-        return res.redirect(
-          303,
-          `/admin/podcasts?notice=${encodeURIComponent(`Weekly draft skipped: ${result.reason}`)}`
-        );
+        const detail =
+          result.reason === 'already_running'
+            ? 'Weekly draft already running for this week — wait for it to finish (full script can take several minutes), then click Open on the draft_ready row. Do not click Run again.'
+            : `Weekly draft skipped: ${result.reason}`;
+        return res.redirect(303, `/admin/podcasts?notice=${encodeURIComponent(detail)}`);
       }
       res.redirect(303, `/admin/podcasts/episodes/${result.episode.id}?notice=weekly-draft-ready`);
     })
