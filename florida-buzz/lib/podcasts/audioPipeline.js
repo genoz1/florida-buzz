@@ -43,6 +43,37 @@ async function concatMp3Buffers(buffers, ffmpegPath) {
   }
 }
 
+/**
+ * Re-encode masters for storage. Long ~30–45 minute episodes at 192kbps exceed
+ * Supabase Free global upload limit (50MB). Voice podcasts are fine at 96k mono.
+ */
+async function encodePodcastMaster(buffer, ffmpegPath, { bitrate = '96k', channels = 1 } = {}) {
+  if (!buffer?.length) throw new Error('Episode audio is empty');
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-encode-'));
+  try {
+    const inPath = path.join(dir, 'in.mp3');
+    const outPath = path.join(dir, 'out.mp3');
+    await fsp.writeFile(inPath, buffer);
+    await runFfmpeg(ffmpegPath, [
+      '-y',
+      '-i',
+      inPath,
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      bitrate,
+      '-ac',
+      String(channels),
+      '-ar',
+      '44100',
+      outPath,
+    ]);
+    return fsp.readFile(outPath);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 /** Re-encode concat so intro + fal TTS sections can have different encodings. */
 async function prependAudioBuffer(introBuffer, bodyBuffer, ffmpegPath) {
   if (!introBuffer?.length) return bodyBuffer;
@@ -67,7 +98,11 @@ async function prependAudioBuffer(introBuffer, bodyBuffer, ffmpegPath) {
       '-codec:a',
       'libmp3lame',
       '-b:a',
-      '192k',
+      '96k',
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
       outPath,
     ]);
     return fsp.readFile(outPath);
@@ -101,11 +136,31 @@ async function loadIntroBuffer({ show, cfg, fetcher = fetch }) {
 
 function createAudioPipeline({ cfg, store, fal, ffmpegPath }) {
   async function persistMaster(episode, buffer, meta = {}) {
+    const maxBytes = Number(process.env.PODCASTS_MAX_AUDIO_UPLOAD_BYTES || 48 * 1024 * 1024);
+    if (buffer.length > maxBytes) {
+      throw new Error(
+        `Master audio is too large to upload (${Math.round(buffer.length / (1024 * 1024))}MB). ` +
+          `Raise Supabase Storage global file size limit above 50MB, or keep episodes shorter. ` +
+          `Original error risk: object exceeded maximum allowed size.`
+      );
+    }
     const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
     const storagePath = `${episode.show_id}/${episode.id}/master-${checksum.slice(0, 12)}.mp3`;
     let publicUrl = `memory://${storagePath}`;
     if (typeof store.uploadBytes === 'function') {
-      publicUrl = await store.uploadBytes(cfg.audioBucket, storagePath, buffer, 'audio/mpeg');
+      try {
+        publicUrl = await store.uploadBytes(cfg.audioBucket, storagePath, buffer, 'audio/mpeg');
+      } catch (err) {
+        const msg = String(err.message || err);
+        if (/maximum allowed size|413|Payload too large/i.test(msg)) {
+          throw new Error(
+            `Supabase Storage rejected the master MP3 (${Math.round(buffer.length / (1024 * 1024))}MB): ${msg}. ` +
+              `In Supabase → Storage → Settings, raise Global file size limit (Free max is 50MB). ` +
+              `Also set podcast-audio bucket limit to 50MB. Then Reset stuck audio and Generate preview again.`
+          );
+        }
+        throw err;
+      }
     }
     const asset = await store.createAsset({
       kind: 'audio',
@@ -205,6 +260,13 @@ function createAudioPipeline({ cfg, store, fal, ffmpegPath }) {
 
       let master = await concatMp3Buffers(buffers, ffmpegPath);
       let introAttached = false;
+      jobResult = {
+        ...jobResult,
+        heartbeat_at: new Date().toISOString(),
+        phase: 'assemble',
+        section: sections.length,
+      };
+      await store.updateJob(job.id, { result: jobResult, section_index: sections.length - 1 });
       try {
         const show =
           (typeof store.getShowById === 'function' && episode.show_id
@@ -215,15 +277,33 @@ function createAudioPipeline({ cfg, store, fal, ffmpegPath }) {
         if (intro?.length) {
           master = await prependAudioBuffer(intro, master, ffmpegPath);
           introAttached = true;
+        } else {
+          // Still recompress — fal section concat can exceed Supabase's 50MB free upload cap.
+          master = await encodePodcastMaster(master, ffmpegPath);
         }
       } catch (introErr) {
         console.warn('[podcasts] intro prepend skipped:', introErr.message);
+        master = await encodePodcastMaster(master, ffmpegPath);
       }
+      jobResult = {
+        ...jobResult,
+        heartbeat_at: new Date().toISOString(),
+        phase: 'upload',
+        master_bytes: master.length,
+        intro_attached: introAttached,
+      };
+      await store.updateJob(job.id, { result: jobResult });
       const saved = await persistMaster(episode, master);
       await store.updateJob(job.id, {
         status: 'complete',
         section_index: sections.length - 1,
-        result: { sections: sections.length, asset_id: saved.asset.id, intro_attached: introAttached },
+        result: {
+          ...jobResult,
+          sections: sections.length,
+          asset_id: saved.asset.id,
+          intro_attached: introAttached,
+          master_bytes: saved.buffer.length,
+        },
       });
       await store.setStatus(episode.id, 'preview_ready');
       return saved;
@@ -251,12 +331,20 @@ function createAudioPipeline({ cfg, store, fal, ffmpegPath }) {
     return saved;
   }
 
-  return { generatePreview, attachUploadedAudio, persistMaster, concatMp3Buffers, prependAudioBuffer };
+  return {
+    generatePreview,
+    attachUploadedAudio,
+    persistMaster,
+    concatMp3Buffers,
+    prependAudioBuffer,
+    encodePodcastMaster,
+  };
 }
 
 module.exports = {
   createAudioPipeline,
   concatMp3Buffers,
   prependAudioBuffer,
+  encodePodcastMaster,
   loadIntroBuffer,
 };

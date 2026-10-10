@@ -45,6 +45,36 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(cfg.falConfigVerifiedInRepo, false);
 });
 
+test('encodePodcastMaster recompresses audio under a smaller bitrate', async () => {
+  const { encodePodcastMaster } = require('../lib/podcasts/audioPipeline');
+  const ffmpegPath = (() => {
+    try {
+      return require('ffmpeg-static');
+    } catch {
+      return 'ffmpeg';
+    }
+  })();
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-encode-test-'));
+  try {
+    const src = path.join(dir, 'src.mp3');
+    const mk = spawnSync(
+      ffmpegPath,
+      ['-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-codec:a', 'libmp3lame', '-b:a', '192k', src],
+      { encoding: 'utf8' }
+    );
+    if (mk.status !== 0) return;
+    const out = await encodePodcastMaster(await fsp.readFile(src), ffmpegPath);
+    assert.ok(out.length > 500);
+    assert.ok(out.length < (await fsp.stat(src)).size);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 test('describeAudioProgress distinguishes LIVE heartbeats from DEAD running jobs', () => {
   const { describeAudioProgress } = require('../lib/podcasts/audioStatus');
   const now = Date.parse('2026-10-10T21:30:00.000Z');
