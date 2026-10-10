@@ -3,9 +3,6 @@
 const AFFILIATION_DISCLOSURE =
   'This is an unofficial fan podcast and is not affiliated with, endorsed by, or sponsored by The Walt Disney Company.';
 
-const AI_ANECDOTE_DISCLOSURE =
-  'Florida Buzz uses AI-generated hosts. Personal anecdotes may be dramatized or composite experiences created for entertainment.';
-
 /** Stable host bible for script/outline generation. Preserve across episodes. */
 const HOST_BIBLE = `
 Hosts (always spell Gena; pronounced like Gina / JEEN-uh — never write phonetic respellings in scripts):
@@ -36,19 +33,14 @@ Shared world
 function ensureShowNotesDisclosures(html) {
   let out = String(html || '').trim();
   const needsAffiliation = !/not affiliated with,\s*endorsed by,\s*or sponsored by The Walt Disney Company/i.test(out);
-  const needsAi = !/AI-generated hosts/i.test(out);
   if (needsAffiliation) {
     out = `${out}${out ? '\n' : ''}<p>${AFFILIATION_DISCLOSURE}</p>`;
-  }
-  if (needsAi) {
-    out = `${out}\n<p>${AI_ANECDOTE_DISCLOSURE}</p>`;
   }
   return out;
 }
 
 module.exports = {
   AFFILIATION_DISCLOSURE,
-  AI_ANECDOTE_DISCLOSURE,
   HOST_BIBLE,
   ensureShowNotesDisclosures,
 };

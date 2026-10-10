@@ -19,7 +19,6 @@ const {
 } = require('../lib/podcasts/script');
 const {
   HOST_BIBLE,
-  AI_ANECDOTE_DISCLOSURE,
   ensureShowNotesDisclosures,
 } = require('../lib/podcasts/hosts');
 const { createPublicRouter } = require('../lib/podcasts/routerPublic');
@@ -56,13 +55,11 @@ test('show notes sanitizer strips scripts and unsafe urls', () => {
   assert.match(clean, /https:\/\/example\.com/);
 });
 
-test('show notes always receive AI anecdote disclosure', () => {
-  const withBoth = ensureShowNotesDisclosures('<p>Episode notes</p>');
-  assert.match(withBoth, /AI-generated hosts/);
-  assert.match(withBoth, /dramatized or composite/);
-  assert.match(withBoth, /not affiliated with/i);
-  assert.equal(ensureShowNotesDisclosures(withBoth), withBoth);
-  assert.match(AI_ANECDOTE_DISCLOSURE, /AI-generated hosts/);
+test('show notes always receive unofficial affiliation disclosure', () => {
+  const withAffiliation = ensureShowNotesDisclosures('<p>Episode notes</p>');
+  assert.match(withAffiliation, /not affiliated with/i);
+  assert.doesNotMatch(withAffiliation, /AI-generated hosts/i);
+  assert.equal(ensureShowNotesDisclosures(withAffiliation), withAffiliation);
 });
 
 test('full-episode prompts keep host bible and anecdote rules', () => {
@@ -93,7 +90,8 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /not presenters summarizing articles/i);
   assert.match(conversation.system, /callback/i);
   assert.match(conversation.system, /timeless composite/i);
-  assert.match(conversation.user, /AI-generated hosts/);
+  assert.doesNotMatch(conversation.user, /AI-generated hosts/i);
+  assert.match(conversation.user, /not affiliated with/i);
   assert.match(conversation.system, /taking turns reading article summaries/i);
   assert.match(conversation.system, /The Florida Buzz dot com/i);
   assert.match(conversation.system, /3–5 natural Florida Buzz references/);
@@ -161,7 +159,7 @@ test('RSS omits draft audio and includes published enclosure fields', async () =
   assert.doesNotMatch(xml, /Draft Only/);
   assert.doesNotMatch(xml, /secret\.mp3/);
   assert.match(xml, /unofficial fan podcast/i);
-  assert.match(xml, /AI-generated hosts/);
+  assert.doesNotMatch(xml, /AI-generated hosts/i);
   assert.match(xml, /podcast@thefloridabuzz\.com/);
 });
 

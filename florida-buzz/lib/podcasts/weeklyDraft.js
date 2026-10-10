@@ -4,7 +4,7 @@ const { DISNEY_SHOW_SLUG } = require('./config');
 const { weekKeyEt, matchesGenerateSlot } = require('./timeEt');
 const { collectWeeklySources } = require('./sourceCollector');
 const { generateOutline, generateConversation } = require('./script');
-const { ensureShowNotesDisclosures, AFFILIATION_DISCLOSURE, AI_ANECDOTE_DISCLOSURE } = require('./hosts');
+const { ensureShowNotesDisclosures, AFFILIATION_DISCLOSURE } = require('./hosts');
 const { buildResourcesMentionedHtml, trackedSiteUrl } = require('./siteResources');
 const { notifyDraftReady } = require('./notify');
 const { slugify } = require('./validation');
@@ -47,7 +47,7 @@ function buildShowNotesHtml({ episodeTitle, sources, site, episode = {} }) {
 
   const html = `
 <p>${escape(episodeTitle)} — a Florida Buzz: Disney conversation with Gena and Diane.</p>
-<p>Facts about prices, policies, hours, attraction status, and wait times are drawn only from the approved Florida Buzz sources linked below. Personal stories may be dramatized or composite.</p>
+<p>Facts about prices, policies, hours, attraction status, and wait times are drawn only from the approved Florida Buzz sources linked below.</p>
 <h2>Florida Buzz Resources Mentioned</h2>
 <p>Direct links to every article, guide, tool, and Buzz Board discussion referenced for this episode (with podcast tracking parameters):</p>
 ${resourcesHtml}
@@ -61,7 +61,6 @@ ${linkList(buzz)}
 <h2>Evergreen discussion</h2>
 ${linkList(evergreen)}
 <p>${AFFILIATION_DISCLOSURE}</p>
-<p>${AI_ANECDOTE_DISCLOSURE}</p>
 `.trim();
   return ensureShowNotesDisclosures(html);
 }
@@ -141,7 +140,7 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   const turns = [];
   turns.push(`Gena: Hey Diane — welcome back to Florida Buzz: Disney. This week’s draft is ${copy.title}.`);
   turns.push(
-    'Diane: And quick reminder for anyone new — we are an unofficial fan podcast, not affiliated with Disney. Also, we are AI-generated hosts, and personal stories may be dramatized or composite.'
+    'Diane: And quick reminder for anyone new — we are an unofficial fan podcast and not affiliated with Disney.'
   );
   turns.push('Gena: Exact facts come from The Florida Buzz — articles, guides, and the Buzz Board.');
   articles.forEach((s, i) => {

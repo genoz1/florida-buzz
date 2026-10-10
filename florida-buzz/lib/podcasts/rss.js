@@ -1,7 +1,6 @@
 'use strict';
 
 const { escapeHtml, plainTextFromHtml } = require('./sanitize');
-const { AI_ANECDOTE_DISCLOSURE } = require('./hosts');
 
 const DEFAULT_OWNER_EMAIL = 'podcast@thefloridabuzz.com';
 
@@ -27,10 +26,7 @@ function absoluteUrl(site, maybeUrl) {
 }
 
 function channelDescriptionText(show) {
-  const parts = [show.description, show.disclosure].filter(Boolean);
-  const joined = parts.join(' ');
-  if (!/AI-generated hosts/i.test(joined)) parts.push(AI_ANECDOTE_DISCLOSURE);
-  return parts.filter(Boolean).join(' ');
+  return [show.description, show.disclosure].filter(Boolean).join(' ');
 }
 
 function buildRss({ site, show, episodes, ownerEmail = DEFAULT_OWNER_EMAIL }) {

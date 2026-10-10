@@ -2,7 +2,6 @@
 
 const {
   AFFILIATION_DISCLOSURE,
-  AI_ANECDOTE_DISCLOSURE,
   HOST_BIBLE,
 } = require('./hosts');
 const { verifiedToolsBlock } = require('./siteResources');
@@ -101,7 +100,6 @@ Return ONLY the dialogue script.`,
     user: `Episode: ${episode.title}
 Description: ${episode.description}
 Affiliation disclosure to include once near the open: ${AFFILIATION_DISCLOSURE}
-Show-notes AI disclosure (do not read verbatim unless a rare natural aside fits): ${AI_ANECDOTE_DISCLOSURE}
 
 Outline:
 ${outline}
@@ -174,7 +172,6 @@ function formatScriptForTts(sectionText) {
 module.exports = {
   DISCLOSURE,
   AFFILIATION_DISCLOSURE,
-  AI_ANECDOTE_DISCLOSURE,
   HOST_BIBLE,
   buildOutlinePrompt,
   buildConversationPrompt,

@@ -66,7 +66,8 @@ test('show notes include resources section with tracking params', () => {
     ],
   });
   assert.match(html, /Florida Buzz Resources Mentioned/);
-  assert.match(html, /AI-generated hosts/);
+  assert.doesNotMatch(html, /AI-generated hosts/);
+  assert.match(html, /not affiliated with/i);
   assert.match(html, /Buzz Board/);
   assert.match(html, /utm_source=florida_buzz_podcast/);
   assert.match(html, /utm_campaign=florida_buzz_disney/);

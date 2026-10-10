@@ -51,7 +51,7 @@ async function validateLiveRss() {
   need('enclosure_mpeg', /type="audio\/mpeg"/.test(xml));
   need('enclosure_length', /length="2748716"/.test(xml));
   need('unofficial_disclosure', /not affiliated with/i.test(xml));
-  need('ai_disclosure_in_live_feed', /AI-generated hosts/i.test(xml), 'channel description must disclose AI hosts');
+  need('no_ai_disclosure_in_live_feed', !/AI-generated hosts/i.test(xml), 'AI disclosure must not appear in public RSS');
   need('owner_email_present', /itunes:email>[^<]+@[^<]+<\/itunes:email>/.test(xml));
   const emailMatch = xml.match(/<itunes:email>([^<]+)<\/itunes:email>/);
   const ownerEmail = emailMatch ? emailMatch[1] : null;
@@ -100,7 +100,7 @@ async function testPublishOnceSemantics() {
     published_at_unchanged: again.published_at === firstPublishedAt,
     published_count: published.filter((p) => p.slug === 'publish-once-test').length,
     rss_guid_once: guidCount === 1,
-    ai_in_rss: /AI-generated hosts/i.test(xml),
+    no_ai_in_rss: !/AI-generated hosts/i.test(xml),
     owner_email: /podcast@thefloridabuzz\.com/.test(xml),
   };
 }
@@ -205,7 +205,7 @@ async function main() {
     week_key: withAudio.week_key,
     title: withAudio.title,
     has_description: Boolean(withAudio.description),
-    has_show_notes: /Florida Buzz Resources Mentioned|AI-generated hosts/i.test(withAudio.show_notes_html || ''),
+    has_show_notes: /Florida Buzz Resources Mentioned|not affiliated with/i.test(withAudio.show_notes_html || ''),
     has_script: Boolean(scriptText),
     script_mentions_gena: /\bGena:/i.test(scriptText),
     script_mentions_diane: /\bDiane:/i.test(scriptText),

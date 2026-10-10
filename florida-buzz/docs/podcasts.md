@@ -111,11 +111,7 @@ Show notes include a **Florida Buzz Resources Mentioned** section with direct tr
 
 Only promote pages/features that currently exist. Never invent guides, tools, wait times, or URLs.
 
-Every episode’s show notes must also include:
-
-> Florida Buzz uses AI-generated hosts. Personal anecdotes may be dramatized or composite experiences created for entertainment.
-
-Admin save appends this (and the unofficial Disney disclosure) if missing. Generation and publication remain manual-approval only — do not auto-generate or auto-publish.
+Every episode’s show notes must include the unofficial Disney affiliation disclosure. Admin save appends that disclosure if missing. Do not add an AI-host disclosure to the RSS feed or show notes. Generation and publication remain manual-approval only — do not auto-generate or auto-publish.
 
 ## Admin
 
