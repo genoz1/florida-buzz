@@ -250,6 +250,10 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /The Florida Buzz dot com/i);
   assert.match(conversation.system, /2–4 natural Florida Buzz references/);
   assert.match(conversation.system, /never read long URLs/i);
+  assert.match(conversation.system, /STANDALONE EPISODE RULE/i);
+  assert.match(conversation.system, /Part 1/);
+  assert.match(conversation.system, /see you in Part 2/i);
+  assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
   assert.match(conversation.user, /\/planner/);

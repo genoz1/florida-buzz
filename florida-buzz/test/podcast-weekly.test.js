@@ -139,8 +139,8 @@ test('weekly draft stays disabled by default and never auto-publishes', async ()
   assert.ok(sources.some((s) => s.source_kind === 'evergreen_topic'));
 });
 
-test('splitSourcesForEpisodes spreads articles across parts', () => {
-  const { splitSourcesForEpisodes } = require('../lib/podcasts/weeklyDraft');
+test('splitSourcesForEpisodes spreads articles across standalone episodes', () => {
+  const { splitSourcesForEpisodes, releaseSlotsFromSettings, defaultSettings } = require('../lib/podcasts/weeklyDraft');
   const sources = [
     { source_kind: 'article', title: 'A1' },
     { source_kind: 'article', title: 'A2' },
@@ -148,10 +148,43 @@ test('splitSourcesForEpisodes spreads articles across parts', () => {
     { source_kind: 'buzz_board', title: 'B1' },
     { source_kind: 'evergreen_topic', title: 'E1' },
   ];
-  const parts = splitSourcesForEpisodes(sources, 2);
-  assert.equal(parts.length, 2);
-  assert.ok(parts[0].length >= 1);
-  assert.ok(parts[1].length >= 1);
-  assert.ok(parts[0].some((s) => s.source_kind === 'evergreen_topic'));
-  assert.ok(parts[1].some((s) => s.source_kind === 'evergreen_topic'));
+  const buckets = splitSourcesForEpisodes(sources, 2);
+  assert.equal(buckets.length, 2);
+  assert.ok(buckets[0].length >= 1);
+  assert.ok(buckets[1].length >= 1);
+  assert.ok(buckets[0].some((s) => s.source_kind === 'evergreen_topic'));
+  assert.ok(buckets[1].some((s) => s.source_kind === 'evergreen_topic'));
+
+  const slots = releaseSlotsFromSettings(defaultSettings(), { PODCASTS_EPISODES_PER_WEEK: '2' });
+  assert.deepEqual(
+    slots.map((s) => s.key),
+    ['tue', 'fri']
+  );
+  assert.equal(slots[0].label, 'Tuesday');
+  assert.equal(slots[1].label, 'Friday');
+});
+
+test('buildEpisodeCopy fallback never labels Part 1/Part 2', async () => {
+  const { buildEpisodeCopy, releaseSlotsFromSettings, defaultSettings } = require('../lib/podcasts/weeklyDraft');
+  const [tue, fri] = releaseSlotsFromSettings(defaultSettings(), { PODCASTS_EPISODES_PER_WEEK: '2' });
+  const tueCopy = await buildEpisodeCopy({
+    aiText: null,
+    weekKey: '2026-W15',
+    collection: { sources: [{ source_kind: 'article', title: 'Rock n Roller puzzle clue' }] },
+    releaseSlot: tue,
+  });
+  const friCopy = await buildEpisodeCopy({
+    aiText: null,
+    weekKey: '2026-W15',
+    collection: { sources: [{ source_kind: 'article', title: 'Art of Animation renovation' }] },
+    releaseSlot: fri,
+  });
+  assert.match(tueCopy.description, /Tuesday/i);
+  assert.match(friCopy.description, /Friday/i);
+  assert.doesNotMatch(tueCopy.title, /Part\s*1/i);
+  assert.doesNotMatch(friCopy.title, /Part\s*2/i);
+  assert.doesNotMatch(tueCopy.description, /Part\s*[12]/i);
+  assert.doesNotMatch(friCopy.description, /Part\s*[12]/i);
+  assert.equal(tueCopy.release_slot, 'tue');
+  assert.equal(friCopy.release_slot, 'fri');
 });

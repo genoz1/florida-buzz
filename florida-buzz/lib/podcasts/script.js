@@ -74,16 +74,18 @@ Outline rules:
 - No Disney affiliation or inside-access claims.
 - No forced comedy or presenter/host-read tone.
 - Do not recycle the same experiences, jokes, family details, or sentence patterns from a generic template; invent fresh specifics for this episode.
+- This is ONE standalone episode. Never outline “Part 1”, “Part 2”, “to be continued”, or a tease for another half of the same show.
 Return plain text outline with numbered segments.`,
     user: `Episode title: ${episode.title}
 Episode description: ${episode.description}
+Release framing: ${episode.release_label || 'standalone'} — this is a complete episode, not a multi-part show.
 Included sources (approved weekly material — factual base only):
 ${sourceBlock || '(none yet — use timeless composite experiences only; invent no dated news facts)'}
 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted) with 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note.`,
+Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted) with 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. End with a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -132,11 +134,13 @@ Florida Buzz listener guidance (helpful, not ad-read):
 - Say “The Florida Buzz dot com” when speaking; never read long URLs aloud.
 - Do not interrupt an emotional, humorous, or personal moment with a promotion.
 - Closing must include a concise conversational reminder that listeners can find the articles, guides, dining information, wait times, day planner, and community discussions at The Florida Buzz dot com.
+- STANDALONE EPISODE RULE (critical): Never say “Part 1”, “Part 2”, “part one”, “part two”, “before we wrap Part 1”, “we have more in Part 2”, “see you in Part 2”, “to be continued”, or any multi-part tease. Close as a complete show with a normal goodbye. Another episode later in the week is a separate show with its own topics — do not reference it as a continuation.
 - No forced comedy, no constant agreement, no exaggerated/childish voices, no heavy accents, no announcer cadence.
 
 Return ONLY the dialogue script.`,
     user: `Episode: ${episode.title}
 Description: ${episode.description}
+Release framing: ${episode.release_label || 'standalone'} episode — complete on its own (not Part 1 or Part 2 of a larger show).
 Affiliation disclosure to include once near the open: ${AFFILIATION_DISCLOSURE}
 
 Outline:
@@ -148,7 +152,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Do not return a short teaser or partial cold open.`,
+Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Do not return a short teaser or partial cold open. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 

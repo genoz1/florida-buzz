@@ -23,7 +23,7 @@
   <p class="notice">
     Audio generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>
     (<code>PODCASTS_GENERATION_ENABLED</code>).
-    Weekly drafts never auto-publish. Intended release target remains Friday 6:00 AM Eastern after manual approval — auto-publish stays off.
+    Weekly drafts create <strong>two standalone episodes</strong> (Tuesday + Friday topics) — never Part 1/Part 2 of one show. Drafts never auto-publish. Intended release stays manual after approval.
   </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (typeof error !== 'undefined' && error) { %><p class="error"><%= error %></p><% } %>

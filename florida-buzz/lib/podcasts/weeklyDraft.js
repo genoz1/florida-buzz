@@ -1,13 +1,19 @@
 'use strict';
 
 const { DISNEY_SHOW_SLUG } = require('./config');
-const { weekKeyEt, matchesGenerateSlot } = require('./timeEt');
+const { weekKeyEt, matchesGenerateSlot, WEEKDAY_NAMES } = require('./timeEt');
 const { collectWeeklySources } = require('./sourceCollector');
 const { generateOutline, generateConversation } = require('./script');
 const { ensureShowNotesDisclosures, AFFILIATION_DISCLOSURE } = require('./hosts');
 const { buildResourcesMentionedHtml, trackedSiteUrl } = require('./siteResources');
 const { notifyDraftReady } = require('./notify');
 const { slugify } = require('./validation');
+
+/** Standalone weekly shows — not halves of one episode. Default: Tuesday + Friday 6:00 AM ET. */
+const DEFAULT_RELEASE_SLOTS = [
+  { key: 'tue', weekday: 2, hour: 6, minute: 0, label: 'Tuesday' },
+  { key: 'fri', weekday: 5, hour: 6, minute: 0, label: 'Friday' },
+];
 
 function defaultSettings(showSlug = DISNEY_SHOW_SLUG) {
   return {
@@ -17,12 +23,47 @@ function defaultSettings(showSlug = DISNEY_SHOW_SLUG) {
     generate_weekday: 4,
     generate_hour: 19,
     generate_minute: 0,
-    intended_publish_weekday: 5,
+    // Episode A (Tuesday) / Episode B (Friday) — intent only; auto_publish stays off.
+    intended_publish_weekday: 2,
     intended_publish_hour: 6,
     intended_publish_minute: 0,
+    intended_publish_weekday_b: 5,
+    intended_publish_hour_b: 6,
+    intended_publish_minute_b: 0,
     auto_publish_enabled: false,
     notify_email: null,
   };
+}
+
+function releaseSlotsFromSettings(settings = {}, env = process.env) {
+  const count = episodesPerWeek(env);
+  const a = {
+    key: 'tue',
+    weekday: Number(settings.intended_publish_weekday ?? DEFAULT_RELEASE_SLOTS[0].weekday),
+    hour: Number(settings.intended_publish_hour ?? DEFAULT_RELEASE_SLOTS[0].hour),
+    minute: Number(settings.intended_publish_minute ?? DEFAULT_RELEASE_SLOTS[0].minute),
+  };
+  const b = {
+    key: 'fri',
+    weekday: Number(settings.intended_publish_weekday_b ?? DEFAULT_RELEASE_SLOTS[1].weekday),
+    hour: Number(settings.intended_publish_hour_b ?? DEFAULT_RELEASE_SLOTS[1].hour),
+    minute: Number(settings.intended_publish_minute_b ?? DEFAULT_RELEASE_SLOTS[1].minute),
+  };
+  const base = [a, b].map((slot) => ({
+    ...slot,
+    label: WEEKDAY_NAMES[slot.weekday] || 'Release day',
+  }));
+  const slots = [];
+  for (let i = 0; i < count; i += 1) {
+    const template = base[i % base.length];
+    const suffix = i >= base.length ? `-${i + 1}` : '';
+    slots.push({
+      ...template,
+      key: `${template.key}${suffix}`,
+      index: i,
+    });
+  }
+  return slots;
 }
 
 function buildShowNotesHtml({ episodeTitle, sources, site, episode = {} }) {
@@ -78,8 +119,8 @@ function episodesPerWeek(env = process.env) {
   return Number.isInteger(n) && n >= 1 && n <= 4 ? n : 2;
 }
 
-/** Split weekly sources across N focused ~20–25 minute episodes. */
-function splitSourcesForEpisodes(sources, partCount) {
+/** Split weekly sources across N independent ~20–25 minute episodes (different release days). */
+function splitSourcesForEpisodes(sources, episodeCount) {
   const list = Array.isArray(sources) ? sources.slice() : [];
   const articles = list.filter((s) => s.source_kind === 'article');
   const guides = list.filter((s) => s.source_kind === 'guide');
@@ -88,11 +129,11 @@ function splitSourcesForEpisodes(sources, partCount) {
   const other = list.filter(
     (s) => !['article', 'guide', 'buzz_board', 'evergreen_topic'].includes(s.source_kind)
   );
-  const parts = Array.from({ length: partCount }, () => []);
+  const buckets = Array.from({ length: episodeCount }, () => []);
 
   const distribute = (items) => {
     items.forEach((item, index) => {
-      parts[index % partCount].push(item);
+      buckets[index % episodeCount].push(item);
     });
   };
   distribute(articles);
@@ -100,35 +141,46 @@ function splitSourcesForEpisodes(sources, partCount) {
   distribute(buzz);
   // Give each episode at least one evergreen angle when available.
   if (evergreen.length) {
-    for (let i = 0; i < partCount; i += 1) {
-      parts[i].push(evergreen[i % evergreen.length]);
+    for (let i = 0; i < episodeCount; i += 1) {
+      buckets[i].push(evergreen[i % evergreen.length]);
     }
   }
   distribute(other);
 
-  // Avoid empty parts — borrow from the fullest part.
-  for (let i = 0; i < partCount; i += 1) {
-    if (parts[i].length) continue;
-    const donor = parts.reduce((best, cur) => (cur.length > best.length ? cur : best), parts[0]);
-    if (donor.length > 1) parts[i].push(donor.pop());
+  // Avoid empty episodes — borrow from the fullest bucket.
+  for (let i = 0; i < episodeCount; i += 1) {
+    if (buckets[i].length) continue;
+    const donor = buckets.reduce((best, cur) => (cur.length > best.length ? cur : best), buckets[0]);
+    if (donor.length > 1) buckets[i].push(donor.pop());
   }
-  return parts;
+  return buckets;
 }
 
-async function buildEpisodeCopy({ aiText, weekKey, collection, partIndex = 0, partCount = 1 }) {
+function stripPartLabels(text) {
+  return String(text || '')
+    .replace(/\s*[\(\[]?\s*part\s*\d+\s*(?:of\s*\d+)?[\)\]]?/gi, '')
+    .replace(/\bpart\s*(?:one|two|three|four)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
+  const slot = releaseSlot || DEFAULT_RELEASE_SLOTS[0];
   const articleTitles = collection.sources
     .filter((s) => s.source_kind === 'article')
     .map((s) => s.title)
     .slice(0, 6);
-  const partLabel = partCount > 1 ? ` (Part ${partIndex + 1})` : '';
-  const fallbackTitle = articleTitles.length
-    ? `Florida Buzz: Disney — ${articleTitles[0].slice(0, 48)}${partLabel}`
-    : `Florida Buzz: Disney — Planning talk & park opinions${partLabel}`;
-  const fallbackDescription =
-    'Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Visit https://thefloridabuzz.com. Unofficial fan podcast.';
+  const focusHint = articleTitles[0] ? articleTitles[0].slice(0, 48) : 'Planning talk & park opinions';
+  const fallbackTitle = `Florida Buzz: Disney — ${focusHint}`;
+  const fallbackDescription = `Standalone ${slot.label} episode: Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Visit https://thefloridabuzz.com. Unofficial fan podcast.`;
 
   if (!aiText) {
-    return { title: fallbackTitle.slice(0, 200), description: fallbackDescription };
+    return {
+      title: stripPartLabels(fallbackTitle).slice(0, 200),
+      description: stripPartLabels(fallbackDescription).slice(0, 4000),
+      release_slot: slot.key,
+      release_label: slot.label,
+    };
   }
 
   const prompt = {
@@ -137,10 +189,12 @@ Return plain text with two lines only:
 TITLE: ...
 DESCRIPTION: ...
 Rules: title under 80 chars; description under 320 chars; spell Gena not Gina; no Disney affiliation claims; do not invent news facts.
-This is a focused ~20–25 minute episode${partCount > 1 ? ` (part ${partIndex + 1} of ${partCount} this week)` : ''}.`,
+This is a standalone ~20–25 minute weekly episode intended for ${slot.label} release — not "Part 1/Part 2" of another show.
+Never use the words "Part 1", "Part 2", "part of", or similar multi-part episode language in the title or description.
+Give this episode its own distinct title based on its focus sources (different from other episodes this week).`,
     user: `Week key: ${weekKey}
-Episode part: ${partIndex + 1} of ${partCount}
-Focus source titles: ${articleTitles.join(' | ') || '(none — evergreen/Buzz Board heavy week)'}
+Intended publish day: ${slot.label}
+Focus source titles for THIS episode only: ${articleTitles.join(' | ') || '(none — evergreen/Buzz Board heavy episode)'}
 Buzz Board topics: ${collection.sources
       .filter((s) => s.source_kind === 'buzz_board')
       .map((s) => s.title)
@@ -151,12 +205,24 @@ Evergreen topic: ${collection.sources.find((s) => s.source_kind === 'evergreen_t
   try {
     // Florida Buzz aiText.generateText(system, user, maxTokens) — positional args only.
     const text = String(await aiText.generateText(prompt.system, prompt.user, 300));
-    const title = (text.match(/TITLE:\s*(.+)/i) || [])[1]?.trim() || fallbackTitle;
-    const description = (text.match(/DESCRIPTION:\s*(.+)/i) || [])[1]?.trim() || fallbackDescription;
-    return { title: title.slice(0, 200), description: description.slice(0, 4000) };
+    const title = stripPartLabels((text.match(/TITLE:\s*(.+)/i) || [])[1]?.trim() || fallbackTitle);
+    const description = stripPartLabels(
+      (text.match(/DESCRIPTION:\s*(.+)/i) || [])[1]?.trim() || fallbackDescription
+    );
+    return {
+      title: title.slice(0, 200),
+      description: description.slice(0, 4000),
+      release_slot: slot.key,
+      release_label: slot.label,
+    };
   } catch (err) {
     console.warn('[podcasts] packaging AI failed, using fallback:', err.message);
-    return { title: fallbackTitle.slice(0, 200), description: fallbackDescription };
+    return {
+      title: stripPartLabels(fallbackTitle).slice(0, 200),
+      description: stripPartLabels(fallbackDescription).slice(0, 4000),
+      release_slot: slot.key,
+      release_label: slot.label,
+    };
   }
 }
 
@@ -283,21 +349,22 @@ async function createWeeklyDraft({
 
   try {
     const collection = await collectWeeklySources(supabase, { weekKey, env, now });
-    const partCount = episodesPerWeek(env);
-    const sourceParts = splitSourcesForEpisodes(collection.sources, partCount);
+    const slots = releaseSlotsFromSettings(settings, env);
+    const episodeCount = slots.length;
+    const sourceBuckets = splitSourcesForEpisodes(collection.sources, episodeCount);
     const created = [];
     let anyFallback = false;
 
-    for (let partIndex = 0; partIndex < partCount; partIndex += 1) {
-      const partSources = sourceParts[partIndex];
+    for (let episodeIndex = 0; episodeIndex < episodeCount; episodeIndex += 1) {
+      const slot = slots[episodeIndex];
+      const episodeSources = sourceBuckets[episodeIndex];
       const copy = await buildEpisodeCopy({
         aiText,
         weekKey,
-        collection: { ...collection, sources: partSources },
-        partIndex,
-        partCount,
+        collection: { ...collection, sources: episodeSources },
+        releaseSlot: slot,
       });
-      const slugBase = slugify(`weekly-${weekKey}-a${attempt}-p${partIndex + 1}`);
+      const slugBase = slugify(`weekly-${weekKey}-a${attempt}-${slot.key}`);
       const episode = await store.createEpisode(show.id, {
         title: copy.title,
         description: copy.description,
@@ -308,7 +375,7 @@ async function createWeeklyDraft({
       });
       const showNotes = buildShowNotesHtml({
         episodeTitle: copy.title,
-        sources: partSources,
+        sources: episodeSources,
         site: collection.site,
         episode: { slug: slugBase, week_key: weekKey },
       });
@@ -318,42 +385,63 @@ async function createWeeklyDraft({
         artwork_url: show.cover_url,
         artwork_alt: show.cover_alt || show.title,
         show_notes_html: showNotes,
+        intended_publish_weekday: slot.weekday,
+        intended_publish_hour: slot.hour,
+        intended_publish_minute: slot.minute,
       });
 
-      for (const source of partSources) {
+      for (const source of episodeSources) {
         await store.addSource(episode.id, source);
       }
 
       const sources = await store.listSources(episode.id);
+      const episodeMeta = {
+        ...episode,
+        ...copy,
+        release_slot: slot.key,
+        release_label: slot.label,
+        intended_publish_weekday: slot.weekday,
+        standalone: true,
+      };
       let outline = '';
       let script = '';
-      let usedFallbackScript = false;
       let scriptAiError = null;
       if (!aiText) {
         scriptAiError = 'AI text module unavailable — full 20–25 minute script was not generated';
       } else {
         try {
-          outline = await generateOutline({ aiText, show, episode: { ...episode, ...copy }, sources });
+          outline = await generateOutline({ aiText, show, episode: episodeMeta, sources });
           await store.saveScript(episode.id, 'outline', outline, {
             week_key: weekKey,
-            part: partIndex + 1,
-            parts: partCount,
+            release_slot: slot.key,
+            release_label: slot.label,
+            intended_publish_weekday: slot.weekday,
+            standalone: true,
           });
           await store.updateEpisode(episode.id, {
-            outline_json: { text: outline, week_key: weekKey, part: partIndex + 1, parts: partCount },
+            outline_json: {
+              text: outline,
+              week_key: weekKey,
+              release_slot: slot.key,
+              release_label: slot.label,
+              intended_publish_weekday: slot.weekday,
+              standalone: true,
+            },
           });
           script = await generateConversation({
             aiText,
             show,
-            episode: { ...episode, ...copy },
+            episode: episodeMeta,
             outline,
             sources,
           });
           await store.saveScript(episode.id, 'conversation', script, {
             week_key: weekKey,
             target_minutes: '20-25',
-            part: partIndex + 1,
-            parts: partCount,
+            release_slot: slot.key,
+            release_label: slot.label,
+            intended_publish_weekday: slot.weekday,
+            standalone: true,
           });
           await store.updateEpisode(episode.id, { script_text: script, last_error: null });
           await store.setStatus(episode.id, 'script_ready');
@@ -365,13 +453,25 @@ async function createWeeklyDraft({
       }
       if (!script) {
         // Short source-grounded scaffold for debugging only — NOT a publishable episode.
-        usedFallbackScript = true;
         anyFallback = true;
         outline = buildFallbackOutline({ weekKey, sources, copy });
         script = buildFallbackScript({ weekKey, sources, copy });
-        await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey, fallback: true });
+        await store.saveScript(episode.id, 'outline', outline, {
+          week_key: weekKey,
+          fallback: true,
+          release_slot: slot.key,
+          release_label: slot.label,
+        });
         await store.updateEpisode(episode.id, {
-          outline_json: { text: outline, week_key: weekKey, fallback: true, part: partIndex + 1, parts: partCount },
+          outline_json: {
+            text: outline,
+            week_key: weekKey,
+            fallback: true,
+            release_slot: slot.key,
+            release_label: slot.label,
+            intended_publish_weekday: slot.weekday,
+            standalone: true,
+          },
           script_text: script,
           last_error:
             scriptAiError ||
@@ -381,6 +481,8 @@ async function createWeeklyDraft({
           week_key: weekKey,
           target_minutes: 'scaffold-only',
           fallback: true,
+          release_slot: slot.key,
+          release_label: slot.label,
         });
         const current = await store.getEpisodeById(episode.id);
         if (current.status === 'draft') {
@@ -388,11 +490,11 @@ async function createWeeklyDraft({
         }
       }
 
-      const freshPart = await store.getEpisodeById(episode.id);
-      if (['published', 'scheduled', 'approved'].includes(freshPart.status)) {
+      const freshEpisode = await store.getEpisodeById(episode.id);
+      if (['published', 'scheduled', 'approved'].includes(freshEpisode.status)) {
         throw new Error('Safety abort: weekly draft must not reach publish statuses automatically');
       }
-      created.push(freshPart);
+      created.push(freshEpisode);
     }
 
     // Mark the run ready once scripts exist. Do NOT run fal TTS inside this HTTP request.
@@ -404,11 +506,17 @@ async function createWeeklyDraft({
         audio_generated: false,
         generation_enabled: !!cfg.generation,
         used_fallback_script: anyFallback,
-        episodes_per_week: partCount,
+        episodes_per_week: episodeCount,
+        release_slots: slots.map((s) => ({
+          key: s.key,
+          label: s.label,
+          weekday: s.weekday,
+          episode_id: created[s.index]?.id || null,
+        })),
         episode_ids: created.map((e) => e.id),
         next_step: anyFallback
-          ? 'Clear scaffold script and use Save / generate script on each episode'
-          : `Open each of the ${partCount} draft episodes and click Generate private preview (fal TTS)`,
+          ? 'Clear scaffold script and use Save / generate script on each standalone episode'
+          : `Open each standalone draft (intended ${slots.map((s) => s.label).join(' + ')}) and click Generate private preview (fal TTS)`,
       },
       error_detail: null,
     });
@@ -417,7 +525,9 @@ async function createWeeklyDraft({
       console.warn('[podcasts] skipping fal TTS for fallback scaffold script');
     } else if (cfg.generation && !anyFallback) {
       console.info(
-        `[podcasts] weekly draft ready — ${partCount} episode script(s); fal TTS left for manual Generate private preview`
+        `[podcasts] weekly draft ready — ${episodeCount} standalone episode script(s) (${slots
+          .map((s) => s.label)
+          .join(' + ')}); fal TTS left for manual Generate private preview`
       );
     }
 
@@ -426,6 +536,7 @@ async function createWeeklyDraft({
 
     const notify = await notifyDraftReady({
       episode: fresh,
+      episodes: created,
       run: { ...run, week_key: weekKey, attempt },
       settings,
       cfg,
@@ -442,10 +553,11 @@ async function createWeeklyDraft({
       attempt,
       episode: fresh,
       episodes: created,
+      releaseSlots: slots,
       runId: run.id,
       counts: collection.counts,
       audioGenerated,
-      episodesPerWeek: partCount,
+      episodesPerWeek: episodeCount,
       notified: notify,
     };
   } catch (err) {
@@ -463,6 +575,9 @@ async function tickWeeklyDraft(deps) {
 
 module.exports = {
   defaultSettings,
+  DEFAULT_RELEASE_SLOTS,
+  releaseSlotsFromSettings,
+  stripPartLabels,
   buildShowNotesHtml,
   buildEpisodeCopy,
   buildFallbackOutline,
