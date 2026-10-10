@@ -82,7 +82,7 @@ async function buildEpisodeCopy({ aiText, weekKey, collection }) {
     ? `Florida Buzz: Disney — Week of park news & planning`
     : `Florida Buzz: Disney — Planning talk & park opinions`;
   const fallbackDescription =
-    'Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Unofficial fan podcast.';
+    'Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Visit https://thefloridabuzz.com. Unofficial fan podcast.';
 
   if (!aiText) {
     return { title: fallbackTitle, description: fallbackDescription };
