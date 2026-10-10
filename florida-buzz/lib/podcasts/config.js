@@ -32,6 +32,8 @@ function config(env = process.env) {
     // Hourly tick may run; actual weekly drafts still require admin schedule enable.
     weeklyCron: env.PODCASTS_WEEKLY_CRON_ENABLED !== 'false',
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
+    // Dedicated podcast-owner inbox for Apple/Spotify verification (not a private personal address).
+    ownerEmail: env.PODCASTS_OWNER_EMAIL || 'podcast@thefloridabuzz.com',
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,
     falModel: env.PODCASTS_FAL_TTS_MODEL || DEFAULT_FAL_TTS_MODEL,

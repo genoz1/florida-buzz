@@ -122,6 +122,54 @@ Evergreen topic: ${collection.sources.find((s) => s.source_kind === 'evergreen_t
   }
 }
 
+function buildFallbackOutline({ weekKey, sources, copy }) {
+  const lines = [`Week ${weekKey}: ${copy.title}`, 'Segments:'];
+  const byKind = (kind) => sources.filter((s) => s.source_kind === kind && s.included !== false);
+  byKind('article').slice(0, 5).forEach((s, i) => lines.push(`${i + 1}. Article — ${s.title}`));
+  byKind('guide').slice(0, 3).forEach((s) => lines.push(`Guide — ${s.title}`));
+  byKind('buzz_board').slice(0, 3).forEach((s) => lines.push(`Buzz Board — ${s.title}`));
+  byKind('evergreen_topic').slice(0, 1).forEach((s) => lines.push(`Evergreen — ${s.title}`));
+  lines.push('Close with Florida Buzz site CTAs (dining guide, wait times, day planner, Buzz Board).');
+  return lines.join('\n');
+}
+
+function buildFallbackScript({ weekKey, sources, copy }) {
+  const articles = sources.filter((s) => s.source_kind === 'article' && s.included !== false).slice(0, 4);
+  const guides = sources.filter((s) => s.source_kind === 'guide' && s.included !== false).slice(0, 2);
+  const buzz = sources.filter((s) => s.source_kind === 'buzz_board' && s.included !== false).slice(0, 2);
+  const evergreen = sources.find((s) => s.source_kind === 'evergreen_topic' && s.included !== false);
+  const turns = [];
+  turns.push(`Gena: Hey Diane — welcome back to Florida Buzz: Disney. This week’s draft is ${copy.title}.`);
+  turns.push(
+    'Diane: And quick reminder for anyone new — we are an unofficial fan podcast, not affiliated with Disney. Also, we are AI-generated hosts, and personal stories may be dramatized or composite.'
+  );
+  turns.push('Gena: Exact facts come from The Florida Buzz — articles, guides, and the Buzz Board.');
+  articles.forEach((s, i) => {
+    turns.push(
+      i % 2 === 0
+        ? `Gena: So The Florida Buzz covered “${s.title}.” I’m curious what stood out to you from that reporting.`
+        : `Diane: Yeah, “${s.title}” was on my mind too — especially for planning our next park day.`
+    );
+  });
+  guides.forEach((s) => {
+    turns.push(`Diane: And for planning, I’d point people to the Florida Buzz guide on “${s.title}.”`);
+    turns.push('Gena: Same — that’s the kind of thing we actually use before we leave the house.');
+  });
+  buzz.forEach((s) => {
+    turns.push(`Gena: Over on the Buzz Board, people were talking about “${s.title}.”`);
+    turns.push('Diane: I have thoughts — but I’d also tell listeners to add their answer on The Florida Buzz dot com.');
+  });
+  if (evergreen) {
+    turns.push(`Gena: Before we wrap, evergreen chat: ${evergreen.title}.`);
+    turns.push('Diane: Always relevant. Okay — dining guide, wait times, day planner, Buzz Board. Go use them.');
+  }
+  turns.push(
+    'Gena: That’s our week-of scaffold for review. Once AI packaging is available we’ll expand this into the full conversational cut.'
+  );
+  turns.push(`Diane: Draft week key ${weekKey} — not for publication until approved.`);
+  return turns.join('\n\n');
+}
+
 async function createWeeklyDraft({
   store,
   supabase,
@@ -209,19 +257,46 @@ async function createWeeklyDraft({
     let outline = '';
     let script = '';
     if (aiText) {
-      outline = await generateOutline({ aiText, show, episode: { ...episode, ...copy }, sources });
-      await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey });
-      await store.updateEpisode(episode.id, { outline_json: { text: outline, week_key: weekKey } });
-      script = await generateConversation({
-        aiText,
-        show,
-        episode: { ...episode, ...copy },
-        outline,
-        sources,
+      try {
+        outline = await generateOutline({ aiText, show, episode: { ...episode, ...copy }, sources });
+        await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey });
+        await store.updateEpisode(episode.id, { outline_json: { text: outline, week_key: weekKey } });
+        script = await generateConversation({
+          aiText,
+          show,
+          episode: { ...episode, ...copy },
+          outline,
+          sources,
+        });
+        await store.saveScript(episode.id, 'conversation', script, { week_key: weekKey, target_minutes: '25-35' });
+        await store.updateEpisode(episode.id, { script_text: script });
+        await store.setStatus(episode.id, 'script_ready');
+      } catch (err) {
+        console.warn('[podcasts] outline/script generation failed; keeping draft for manual script:', err.message);
+        await store.updateEpisode(episode.id, {
+          last_error: `Script AI unavailable: ${String(err.message || err).slice(0, 500)}`,
+        });
+      }
+    }
+    if (!script) {
+      // Deterministic source-grounded scaffold so drafts always carry a reviewable script
+      // when OpenAI is unavailable. Replace via regenerate once AI keys are configured.
+      outline = buildFallbackOutline({ weekKey, sources, copy });
+      script = buildFallbackScript({ weekKey, sources, copy });
+      await store.saveScript(episode.id, 'outline', outline, { week_key: weekKey, fallback: true });
+      await store.updateEpisode(episode.id, {
+        outline_json: { text: outline, week_key: weekKey, fallback: true },
+        script_text: script,
       });
-      await store.saveScript(episode.id, 'conversation', script, { week_key: weekKey, target_minutes: '25-35' });
-      await store.updateEpisode(episode.id, { script_text: script });
-      await store.setStatus(episode.id, 'script_ready');
+      await store.saveScript(episode.id, 'conversation', script, {
+        week_key: weekKey,
+        target_minutes: '25-35',
+        fallback: true,
+      });
+      const current = await store.getEpisodeById(episode.id);
+      if (current.status === 'draft') {
+        await store.setStatus(episode.id, 'script_ready');
+      }
     }
 
     let audioGenerated = false;
@@ -286,6 +361,8 @@ module.exports = {
   defaultSettings,
   buildShowNotesHtml,
   buildEpisodeCopy,
+  buildFallbackOutline,
+  buildFallbackScript,
   createWeeklyDraft,
   tickWeeklyDraft,
 };

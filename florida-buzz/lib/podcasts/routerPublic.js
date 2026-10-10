@@ -35,7 +35,7 @@ function createPublicRouter({ store, cfg }) {
       const show = await store.getShow(req.params.showSlug);
       if (!show) return res.status(404).render('404');
       const episodes = await store.listPublishedEpisodes(show.id);
-      const xml = buildRss({ site: cfg.site, show, episodes });
+      const xml = buildRss({ site: cfg.site, show, episodes, ownerEmail: cfg.ownerEmail });
       res.set('Content-Type', 'application/rss+xml; charset=utf-8');
       res.set('Cache-Control', 'public, max-age=300');
       res.send(xml);

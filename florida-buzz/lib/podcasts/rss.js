@@ -1,6 +1,9 @@
 'use strict';
 
 const { escapeHtml, plainTextFromHtml } = require('./sanitize');
+const { AI_ANECDOTE_DISCLOSURE } = require('./hosts');
+
+const DEFAULT_OWNER_EMAIL = 'podcast@thefloridabuzz.com';
 
 function rfc2822(dateValue) {
   const d = new Date(dateValue);
@@ -23,13 +26,21 @@ function absoluteUrl(site, maybeUrl) {
   return `${site}${maybeUrl.startsWith('/') ? '' : '/'}${maybeUrl}`;
 }
 
-function buildRss({ site, show, episodes }) {
+function channelDescriptionText(show) {
+  const parts = [show.description, show.disclosure].filter(Boolean);
+  const joined = parts.join(' ');
+  if (!/AI-generated hosts/i.test(joined)) parts.push(AI_ANECDOTE_DISCLOSURE);
+  return parts.filter(Boolean).join(' ');
+}
+
+function buildRss({ site, show, episodes, ownerEmail = DEFAULT_OWNER_EMAIL }) {
   const showUrl = `${site}/podcasts/${show.slug}`;
   const feedUrl = `${showUrl}/rss.xml`;
   const cover = absoluteUrl(site, show.cover_url);
   const author = (show.hosts || []).map((h) => h.name).filter(Boolean).join(' & ') || show.publisher;
   const explicit = show.explicit ? 'true' : 'false';
-  const channelDescription = [show.description, show.disclosure].filter(Boolean).join(' ');
+  const channelDescription = channelDescriptionText(show);
+  const owner = String(ownerEmail || DEFAULT_OWNER_EMAIL).trim() || DEFAULT_OWNER_EMAIL;
 
   const items = (episodes || [])
     .filter((e) => e.status === 'published' && e.audio_url)
@@ -72,13 +83,13 @@ function buildRss({ site, show, episodes }) {
     <description>${escapeHtml(channelDescription)}</description>
     <language>${escapeHtml(show.language || 'en-us')}</language>
     <copyright>${escapeHtml(show.publisher)}</copyright>
-    <managingEditor>floridabuzzonline@gmail.com (${escapeHtml(author)})</managingEditor>
+    <managingEditor>${escapeHtml(owner)} (${escapeHtml(author)})</managingEditor>
     <itunes:author>${escapeHtml(author)}</itunes:author>
     <itunes:summary>${escapeHtml(channelDescription)}</itunes:summary>
     <itunes:explicit>${explicit}</itunes:explicit>
     <itunes:owner>
       <itunes:name>${escapeHtml(show.publisher)}</itunes:name>
-      <itunes:email>floridabuzzonline@gmail.com</itunes:email>
+      <itunes:email>${escapeHtml(owner)}</itunes:email>
     </itunes:owner>
     <itunes:image href="${escapeHtml(cover)}" />
     <itunes:category text="${escapeHtml(show.category || 'Leisure')}">
@@ -91,4 +102,11 @@ ${items}
 `;
 }
 
-module.exports = { buildRss, formatDuration, absoluteUrl, rfc2822 };
+module.exports = {
+  buildRss,
+  formatDuration,
+  absoluteUrl,
+  rfc2822,
+  channelDescriptionText,
+  DEFAULT_OWNER_EMAIL,
+};

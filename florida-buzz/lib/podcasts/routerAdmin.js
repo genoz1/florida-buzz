@@ -66,6 +66,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
     handle(async (req, res) => {
       const show = await defaultShow();
       const episodes = show ? await store.listEpisodes(show.id) : [];
+      const platformLinks = show ? await store.listPlatformLinks(show.id) : [];
       let schedule = defaultSettings();
       let failures = [];
       let runs = [];
@@ -79,6 +80,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       res.render('admin-podcasts', {
         show,
         episodes,
+        platformLinks,
         cfg,
         schedule,
         scheduleLabels: describeSchedule(schedule),
@@ -118,6 +120,28 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         notify_email: String(req.body.notify_email || '').trim() || null,
       });
       res.redirect(303, '/admin/podcasts?notice=schedule-saved');
+    })
+  );
+
+  router.post(
+    '/platform-links',
+    handle(async (req, res) => {
+      if (!checkCsrf('schedule', req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      const show = await defaultShow();
+      if (!show) return res.status(503).send('Podcast show not seeded');
+      const apple = String(req.body.apple_url || '').trim();
+      const spotify = String(req.body.spotify_url || '').trim();
+      if (apple) {
+        const url = new URL(apple);
+        if (!/^https?:$/.test(url.protocol)) throw new Error('Apple URL must be http(s)');
+        await store.upsertPlatformLink(show.id, 'Apple Podcasts', url.toString(), 1);
+      }
+      if (spotify) {
+        const url = new URL(spotify);
+        if (!/^https?:$/.test(url.protocol)) throw new Error('Spotify URL must be http(s)');
+        await store.upsertPlatformLink(show.id, 'Spotify', url.toString(), 2);
+      }
+      res.redirect(303, '/admin/podcasts?notice=platform-links-saved');
     })
   );
 

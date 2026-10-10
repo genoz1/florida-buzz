@@ -86,6 +86,17 @@ function createMemoryStore() {
     async listPlatformLinks(showId) {
       return state.platformLinks.filter((l) => l.show_id === showId).sort((a, b) => a.sort_order - b.sort_order);
     },
+    async upsertPlatformLink(showId, platform, url, sortOrder = 0) {
+      let row = state.platformLinks.find((l) => l.show_id === showId && l.platform === platform);
+      if (row) {
+        row.url = url;
+        row.sort_order = sortOrder;
+        return row;
+      }
+      row = { id: id(), show_id: showId, platform, url, sort_order: sortOrder, created_at: now() };
+      state.platformLinks.push(row);
+      return row;
+    },
     async listPublishedEpisodes(showId) {
       return state.episodes
         .filter((e) => e.show_id === showId && e.status === 'published')

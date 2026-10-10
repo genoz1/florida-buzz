@@ -27,6 +27,33 @@ function createSupabaseStore(client) {
         client.from('podcast_platform_links').select('*').eq('show_id', showId).order('sort_order')
       );
     },
+    async upsertPlatformLink(showId, platform, url, sortOrder = 0) {
+      const existing = await checked(
+        client
+          .from('podcast_platform_links')
+          .select('*')
+          .eq('show_id', showId)
+          .eq('platform', platform)
+          .maybeSingle()
+      );
+      if (existing) {
+        return checked(
+          client
+            .from('podcast_platform_links')
+            .update({ url, sort_order: sortOrder })
+            .eq('id', existing.id)
+            .select('*')
+            .single()
+        );
+      }
+      return checked(
+        client
+          .from('podcast_platform_links')
+          .insert({ show_id: showId, platform, url, sort_order: sortOrder })
+          .select('*')
+          .single()
+      );
+    },
     async listPublishedEpisodes(showId) {
       return checked(
         client

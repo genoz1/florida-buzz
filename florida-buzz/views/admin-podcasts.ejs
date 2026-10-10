@@ -71,6 +71,24 @@
     </section>
 
     <section class="card">
+      <h3>Directory listings (Apple &amp; Spotify)</h3>
+      <p class="muted">
+        Florida Buzz remains the host. Submit the same public RSS feed to both directories, then paste the resulting show links here.
+        RSS: <a href="https://thefloridabuzz.com/podcasts/florida-buzz-disney/rss.xml" target="_blank" rel="noopener">florida-buzz-disney/rss.xml</a>
+      </p>
+      <form method="post" action="/admin/podcasts/platform-links">
+        <input type="hidden" name="csrf" value="<%= scheduleCsrf %>">
+        <label>Apple Podcasts show URL
+          <input name="apple_url" type="url" placeholder="https://podcasts.apple.com/..." value="<%= (platformLinks.find(l => /apple/i.test(l.platform)) || {}).url || '' %>">
+        </label>
+        <label>Spotify show URL
+          <input name="spotify_url" type="url" placeholder="https://open.spotify.com/show/..." value="<%= (platformLinks.find(l => /spotify/i.test(l.platform)) || {}).url || '' %>">
+        </label>
+        <button class="btn" type="submit">Save platform links</button>
+      </form>
+    </section>
+
+    <section class="card">
       <h3>Generation failures</h3>
       <% if (!failures.length) { %>
         <p class="muted">No failed weekly runs.</p>
