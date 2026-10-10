@@ -43,7 +43,11 @@ function config(env = process.env) {
     outputFormat: 'mp3',
     genaVoice: 'Aoede',
     dianeVoice: 'Zephyr',
-    sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 3500,
+    sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 2800,
+    // fal Pro multi-speaker chunks can take several minutes; 90×2s was too short.
+    falPollAttempts: Number(env.PODCASTS_FAL_POLL_ATTEMPTS || 180),
+    falPollIntervalMs: Number(env.PODCASTS_FAL_POLL_INTERVAL_MS || 2000),
+    falSectionRetries: Number(env.PODCASTS_FAL_SECTION_RETRIES || 2),
     maxUploadBytes: (Number.isFinite(maxUploadMb) && maxUploadMb > 0 ? maxUploadMb : 80) * 1024 * 1024,
     audioBucket: env.PODCASTS_AUDIO_BUCKET || 'podcast-audio',
     artworkBucket: env.PODCASTS_ARTWORK_BUCKET || 'podcast-artwork',
