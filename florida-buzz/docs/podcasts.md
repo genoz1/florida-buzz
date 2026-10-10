@@ -55,6 +55,7 @@ Defaults come from **public fal.ai documentation** for:
 - Model: `gemini-2.5-pro-tts`
 - Voices: Gena=`Aoede`, Diane=`Zephyr`
 - Spelling vs pronunciation: always spell **Gena**; pronounce like **Gina** (JEEN-uh) in TTS
+- Park names: **EPCOT** → EP-cot (two syllables, stress on first) via shared `lib/podcasts/pronunciation.js` in fal `style_instructions` (advisory; fal may still misread)
 - Language: `English (US)`
 - Output: `mp3`
 - Temperature: `0.85`

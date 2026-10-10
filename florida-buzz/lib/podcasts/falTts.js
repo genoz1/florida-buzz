@@ -4,6 +4,8 @@
 // Never call when PODCASTS_GENERATION_ENABLED is not true.
 // Does not share request allowlists with lib/reels/fal.js.
 
+const { pronunciationStyleInstructions } = require('./pronunciation');
+
 function queueUrl(raw) {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || url.hostname !== 'queue.fal.run' || url.username || url.password) {
@@ -43,8 +45,10 @@ function createFalTts(cfg, fetcher = fetch) {
       language_code: cfg.languageCode,
       temperature: cfg.temperature,
       output_format: cfg.outputFormat,
-      style_instructions:
-        'Lively, warm US English conversation between two Central Florida moms who are longtime friends — aftershow/reaction energy, not stiff radio presenters. Upbeat pacing, short reactive turns, soft laughs, brief overlaps and excited affirmations OK. Sound engaged and fun, not chaotic or shouty. No cartoon voices, no heavy accents, no announcer cadence. The host name Gena is spelled G-E-N-A but must be pronounced like Gina (JEEN-uh), never Jenna or Gee-nuh.',
+      style_instructions: [
+        'Lively, warm US English conversation between two Central Florida moms who are longtime friends — aftershow/reaction energy, not stiff radio presenters. Upbeat pacing, short reactive turns, soft laughs, brief overlaps and excited affirmations OK. Sound engaged and fun, not chaotic or shouty. No cartoon voices, no heavy accents, no announcer cadence.',
+        pronunciationStyleInstructions(),
+      ].join(' '),
       speakers: [
         { speaker_id: 'Gena', voice: cfg.genaVoice },
         { speaker_id: 'Diane', voice: cfg.dianeVoice },

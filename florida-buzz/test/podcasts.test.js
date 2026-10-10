@@ -452,6 +452,20 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   assert.match(input.style_instructions, /JEEN-uh/);
 });
 
+test('fal TTS style_instructions include EPCOT as EP-cot (shared pronunciation map)', () => {
+  const { PRONUNCIATION_MAP, pronunciationStyleInstructions } = require('../lib/podcasts/pronunciation');
+  const { HOST_BIBLE } = require('../lib/podcasts/hosts');
+  assert.ok(PRONUNCIATION_MAP.some((e) => e.term === 'EPCOT'));
+  assert.match(pronunciationStyleInstructions(), /EP-cot/);
+  assert.match(pronunciationStyleInstructions(), /never.*letter-by-letter/i);
+  const cfg = config({ PODCASTS_GENERATION_ENABLED: 'true', FAL_KEY: 'test-key' });
+  const fal = createFalTts(cfg);
+  const input = fal.buildInput('Gena: We hit EPCOT early.\nDiane: Same.');
+  assert.match(input.style_instructions, /EPCOT is two syllables, EP-cot/i);
+  assert.match(input.style_instructions, /pronounced like Gina/i);
+  assert.match(HOST_BIBLE, /EPCOT is pronounced EP-cot/i);
+});
+
 test('audio pipeline refuses paid generation when flag off', async () => {
   const store = createMemoryStore();
   const show = await store.getShow('florida-buzz-disney');

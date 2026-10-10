@@ -1,5 +1,7 @@
 'use strict';
 
+const { pronunciationHostBibleNote } = require('./pronunciation');
+
 const AFFILIATION_DISCLOSURE =
   'This is an unofficial fan podcast and is not affiliated with, endorsed by, or sponsored by The Walt Disney Company.';
 
@@ -14,6 +16,7 @@ const HOST_STYLE = 'aftershow_energy';
 /** Stable host bible for script/outline generation. Preserve across episodes. */
 const HOST_BIBLE = `
 Hosts (always spell Gena; pronounced like Gina / JEEN-uh — never write phonetic respellings in scripts):
+${pronunciationHostBibleNote()}
 
 Gena
 - Mid-thirties Disney-loving mom living in Central Florida
