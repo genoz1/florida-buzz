@@ -205,6 +205,28 @@ async function createWeeklyDraft({
     return { skipped: true, reason: 'already_have_run', run: existingReady };
   }
 
+  // Never stack concurrent weekly drafts for the same week — force still honors this.
+  // Long script generation can take several minutes; a second click left orphan "running" rows.
+  const alreadyRunning = await store.findGenerationRun(DISNEY_SHOW_SLUG, weekKey, ['running']);
+  if (alreadyRunning && !rejectEpisodeId) {
+    const startedMs = Date.parse(alreadyRunning.updated_at || alreadyRunning.created_at || '') || 0;
+    const ageMs = startedMs ? Date.now() - startedMs : 0;
+    const staleMs = Number(env.PODCASTS_RUNNING_STALE_MS || 15 * 60 * 1000);
+    if (ageMs > 0 && ageMs < staleMs) {
+      return {
+        skipped: true,
+        reason: 'already_running',
+        run: alreadyRunning,
+      };
+    }
+    if (alreadyRunning.id) {
+      await store.updateGenerationRun(alreadyRunning.id, {
+        status: 'failed',
+        error_detail: 'Marked failed: previous weekly draft was still running too long (likely gateway timeout). Open an existing draft episode and use Save / generate script.',
+      });
+    }
+  }
+
   const priorAttempts = await store.listGenerationRuns(DISNEY_SHOW_SLUG, weekKey);
   const attempt = (priorAttempts[0]?.attempt || 0) + 1;
   const run = await store.createGenerationRun({
