@@ -147,7 +147,7 @@ test('RSS omits draft audio and includes published enclosure fields', async () =
   const xml = buildRss({
     site: 'https://thefloridabuzz.com',
     show,
-    ownerEmail: 'podcast@thefloridabuzz.com',
+    ownerEmail: 'floridabuzzonline@gmail.com',
     episodes: await store.listEpisodes(show.id),
   });
   assert.match(xml, /<title>Florida Buzz: Disney<\/title>/);
@@ -160,7 +160,7 @@ test('RSS omits draft audio and includes published enclosure fields', async () =
   assert.doesNotMatch(xml, /secret\.mp3/);
   assert.match(xml, /unofficial fan podcast/i);
   assert.doesNotMatch(xml, /AI-generated hosts/i);
-  assert.match(xml, /podcast@thefloridabuzz\.com/);
+  assert.match(xml, /floridabuzzonline@gmail\.com/);
 });
 
 test('episode ordering is newest published first', async () => {

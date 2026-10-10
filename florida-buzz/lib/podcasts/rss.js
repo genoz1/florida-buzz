@@ -2,7 +2,7 @@
 
 const { escapeHtml, plainTextFromHtml } = require('./sanitize');
 
-const DEFAULT_OWNER_EMAIL = 'podcast@thefloridabuzz.com';
+const DEFAULT_OWNER_EMAIL = 'floridabuzzonline@gmail.com';
 
 function rfc2822(dateValue) {
   const d = new Date(dateValue);

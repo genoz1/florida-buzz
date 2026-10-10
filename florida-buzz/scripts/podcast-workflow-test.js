@@ -56,8 +56,8 @@ async function validateLiveRss() {
   const emailMatch = xml.match(/<itunes:email>([^<]+)<\/itunes:email>/);
   const ownerEmail = emailMatch ? emailMatch[1] : null;
   need(
-    'owner_email_dedicated',
-    ownerEmail === 'podcast@thefloridabuzz.com',
+    'owner_email_accessible',
+    ownerEmail === 'floridabuzzonline@gmail.com',
     ownerEmail || 'missing — deploy RSS owner-email update'
   );
   need('pubDate_present', /<pubDate>/.test(xml));
