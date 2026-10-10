@@ -101,7 +101,7 @@ async function testPublishOnceSemantics() {
     published_count: published.filter((p) => p.slug === 'publish-once-test').length,
     rss_guid_once: guidCount === 1,
     no_ai_in_rss: !/AI-generated hosts/i.test(xml),
-    owner_email: /podcast@thefloridabuzz\.com/.test(xml),
+    owner_email: /floridabuzzonline@gmail\.com/.test(xml),
   };
 }
 
