@@ -36,10 +36,11 @@
 
     <section class="card">
       <h3>Weekly draft schedule (America/New_York)</h3>
-      <p class="muted">Default: Thursday 7:00 PM ET draft generation. Publication stays manual.</p>
+      <p class="muted">Default: Thursday 7:00 PM ET draft generation builds two independent ~20–25 min shows. Publication stays manual.</p>
       <p><strong>Current:</strong> <%= scheduleLabels.generateLabel %> —
         weekly drafts <strong><%= schedule.weekly_draft_enabled ? 'ENABLED' : 'DISABLED' %></strong></p>
-      <p class="muted">Intended publish target: <%= scheduleLabels.publishLabel %></p>
+      <p class="muted">Intended publish targets: <%= scheduleLabels.publishLabel %></p>
+      <p class="muted">Episode A → <%= scheduleLabels.publishSlotALabel || 'Tuesday 6:00 AM' %> · Episode B → <%= scheduleLabels.publishSlotBLabel || 'Friday 6:00 AM' %></p>
       <form method="post" action="/admin/podcasts/schedule">
         <input type="hidden" name="csrf" value="<%= scheduleCsrf %>">
         <label><input type="checkbox" name="weekly_draft_enabled" value="true" <%= schedule.weekly_draft_enabled ? 'checked' : '' %>> Enable weekly draft generation</label>
@@ -61,14 +62,14 @@
             <input name="notify_email" type="email" value="<%= schedule.notify_email || '' %>" placeholder="you@example.com">
           </label>
         </div>
-        <p class="muted">Auto-publish is intentionally locked off in code until you ask to enable Friday publishing.</p>
+        <p class="muted">Auto-publish is intentionally locked off in code until you ask to enable Tuesday/Friday publishing.</p>
         <button class="btn" type="submit">Save schedule</button>
       </form>
       <form method="post" action="/admin/podcasts/run-weekly-draft" style="margin-top:12px">
         <input type="hidden" name="csrf" value="<%= runCsrf %>">
         <button class="btn btn-secondary" type="submit">Run weekly draft now (force)</button>
       </form>
-      <p class="muted">Force-run builds sources + <strong>2 shorter (~20–25 min) episode scripts</strong> for the week. It will not start fal TTS. Open each draft and click Generate private preview when ready. Do not click force-run twice.</p>
+      <p class="muted">Force-run builds sources + <strong>2 standalone (~20–25 min) episode scripts</strong> (Tuesday episode + Friday episode — separate titles, not parts). It will not start fal TTS. Open each draft and click Generate private preview when ready. Do not click force-run twice.</p>
     </section>
 
     <section class="card">
@@ -136,14 +137,16 @@
 
     <h3>Episodes</h3>
     <table>
-      <thead><tr><th>Episode</th><th>Status</th><th>Week</th><th>Updated</th></tr></thead>
+      <thead><tr><th>Episode</th><th>Status</th><th>Week</th><th>Intended</th><th>Updated</th></tr></thead>
       <tbody>
-        <% if (!episodes.length) { %><tr><td colspan="4">No episodes yet.</td></tr><% } %>
+        <% if (!episodes.length) { %><tr><td colspan="5">No episodes yet.</td></tr><% } %>
+        <% const dayNames = typeof weekdayNames !== 'undefined' ? weekdayNames : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; %>
         <% episodes.forEach(ep => { %>
           <tr>
             <td><a href="/admin/podcasts/episodes/<%= ep.id %>"><%= ep.title %></a></td>
             <td><%= ep.status %></td>
             <td><%= ep.week_key || '—' %></td>
+            <td><%= ep.intended_publish_weekday != null ? dayNames[ep.intended_publish_weekday] : (ep.outline_json && ep.outline_json.release_label) || '—' %></td>
             <td><%= ep.updated_at %></td>
           </tr>
         <% }) %>

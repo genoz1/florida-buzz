@@ -123,9 +123,13 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         generate_weekday: weekday,
         generate_hour: hour,
         generate_minute: minute,
-        intended_publish_weekday: 5,
+        // Two standalone weekly shows — intent only; auto-publish stays off.
+        intended_publish_weekday: 2,
         intended_publish_hour: 6,
         intended_publish_minute: 0,
+        intended_publish_weekday_b: 5,
+        intended_publish_hour_b: 6,
+        intended_publish_minute_b: 0,
         // Never allow enabling auto-publish from admin until explicitly built/tested.
         auto_publish_enabled: false,
         notify_email: String(req.body.notify_email || '').trim() || null,
@@ -181,7 +185,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       res.redirect(
         303,
         `/admin/podcasts/episodes/${result.episode.id}?notice=${encodeURIComponent(
-          `weekly-draft-ready — created ${epCount} shorter episode draft(s). Generate private preview on each.`
+          `weekly-draft-ready — created ${epCount} standalone episodes (Tuesday + Friday). Open each and Generate private preview.`
         )}`
       );
     })

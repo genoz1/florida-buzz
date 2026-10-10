@@ -53,20 +53,37 @@ function matchesGenerateSlot(settings, date = new Date()) {
   return p.minute >= minute && p.minute < minute + 15;
 }
 
+function formatClockLabel(weekday, hour, minute) {
+  const day = WEEKDAY_NAMES[Number(weekday)] || 'Release day';
+  const h = Number(hour);
+  const m = String(Number(minute) || 0).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = ((h + 11) % 12) + 1;
+  return `${day} ${h12}:${m} ${ampm}`;
+}
+
 function describeSchedule(settings) {
   const day = WEEKDAY_NAMES[Number(settings.generate_weekday)] || 'Thursday';
   const hour = Number(settings.generate_hour);
   const minute = String(Number(settings.generate_minute) || 0).padStart(2, '0');
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const h12 = ((hour + 11) % 12) + 1;
-  const pubDay = WEEKDAY_NAMES[Number(settings.intended_publish_weekday)] || 'Friday';
-  const pubHour = Number(settings.intended_publish_hour);
-  const pubMinute = String(Number(settings.intended_publish_minute) || 0).padStart(2, '0');
-  const pubAmpm = pubHour >= 12 ? 'PM' : 'AM';
-  const pubH12 = ((pubHour + 11) % 12) + 1;
+  const tz = settings.timezone || TIMEZONE;
+  const slotA = formatClockLabel(
+    settings.intended_publish_weekday ?? 2,
+    settings.intended_publish_hour ?? 6,
+    settings.intended_publish_minute ?? 0
+  );
+  const slotB = formatClockLabel(
+    settings.intended_publish_weekday_b ?? 5,
+    settings.intended_publish_hour_b ?? 6,
+    settings.intended_publish_minute_b ?? 0
+  );
   return {
-    generateLabel: `${day} ${h12}:${minute} ${ampm} ${settings.timezone || TIMEZONE}`,
-    publishLabel: `${pubDay} ${pubH12}:${pubMinute} ${pubAmpm} ${settings.timezone || TIMEZONE} (manual / not auto)`,
+    generateLabel: `${day} ${h12}:${minute} ${ampm} ${tz}`,
+    publishLabel: `${slotA} and ${slotB} ${tz} (two standalone episodes; manual / not auto)`,
+    publishSlotALabel: `${slotA} ${tz}`,
+    publishSlotBLabel: `${slotB} ${tz}`,
   };
 }
 

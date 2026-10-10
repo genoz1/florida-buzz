@@ -1,7 +1,10 @@
 'use strict';
 
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 async function notifyDraftReady({
   episode,
+  episodes,
   run,
   settings,
   cfg,
@@ -22,19 +25,33 @@ async function notifyDraftReady({
   }
 
   const site = (cfg.site || 'https://thefloridabuzz.com').replace(/\/$/, '');
-  const adminUrl = `${site}/admin/podcasts/episodes/${episode.id}`;
-  const subject = `[Florida Buzz Podcast] Draft ready for review — ${episode.title}`;
+  const list = Array.isArray(episodes) && episodes.length ? episodes : episode ? [episode] : [];
+  const primary = list[0] || episode;
+  const adminUrl = `${site}/admin/podcasts/episodes/${primary.id}`;
+  const subject =
+    list.length > 1
+      ? `[Florida Buzz Podcast] ${list.length} standalone drafts ready — week ${run.week_key}`
+      : `[Florida Buzz Podcast] Draft ready for review — ${primary.title}`;
+  const episodeRows = list
+    .map((ep) => {
+      const day =
+        ep.intended_publish_weekday != null
+          ? WEEKDAY_NAMES[Number(ep.intended_publish_weekday)] || 'Release day'
+          : ep.outline_json?.release_label || '—';
+      const epUrl = `${site}/admin/podcasts/episodes/${ep.id}`;
+      return `<li><strong>${escape(ep.title)}</strong> — intended ${escape(day)} · <a href="${epUrl}">Open</a></li>`;
+    })
+    .join('');
   const html = `
-    <p>A weekly <strong>Florida Buzz: Disney</strong> podcast draft is ready for your review.</p>
+    <p>Standalone <strong>Florida Buzz: Disney</strong> podcast draft(s) are ready for review (not Part 1/Part 2 of one show).</p>
     <ul>
-      <li><strong>Title:</strong> ${escape(episode.title)}</li>
-      <li><strong>Status:</strong> ${escape(episode.status)} (not published)</li>
       <li><strong>Week:</strong> ${escape(run.week_key)}</li>
       <li><strong>Attempt:</strong> ${Number(run.attempt) || 1}</li>
-      <li><strong>Audio:</strong> ${episode.audio_url ? 'attached (preview)' : 'not generated yet — generation flag may be off'}</li>
+      <li><strong>Episodes:</strong> ${list.length} (intended Tuesday + Friday; auto-publish off)</li>
     </ul>
+    <ul>${episodeRows}</ul>
     <p><a href="${adminUrl}">Review in podcast admin</a></p>
-    <p>Nothing was published to the website or RSS feed.</p>
+    <p>Nothing was published to the website or RSS feed. Generate fal TTS per episode when ready.</p>
   `;
 
   await sendEmail({
