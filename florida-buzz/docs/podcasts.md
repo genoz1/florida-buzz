@@ -77,6 +77,7 @@ FAL_KEY=<set securely in DO; never commit>
 ## Manual setup checklist
 
 1. Apply `supabase/migrations/20261010040000_podcasts.sql` only on the Florida Buzz Supabase project.
+1b. **Required for twice-weekly drafts:** apply `supabase/migrations/20261010223000_podcast_episode_release_slots.sql` in the Florida Buzz Supabase SQL editor (`tcrfirzjcjvfmiepgbjh`). Without it, weekly draft used to crash with `Could not find the 'intended_publish_hour' column of 'podcast_episodes' in the schema cache`. App code now degrades gracefully (stores Tuesday/Friday intent in `outline_json` and omits missing columns), but applying the migration is still recommended so columns persist.
 2. Public buckets: `podcast-audio`, `podcast-artwork`.
 3. Upload approved trailer/cover bytes as-is; do not re-encode the trailer.
 4. Public routes mount unless `PODCASTS_ENABLED=false`.

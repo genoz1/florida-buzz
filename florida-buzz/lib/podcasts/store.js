@@ -4,11 +4,29 @@ const crypto = require('node:crypto');
 const { DISNEY_SHOW_SLUG } = require('./config');
 const { assertTransition } = require('./validation');
 const { createMemoryStore } = require('./memoryStore');
+const { withMissingColumnRetry, mergeOmitted } = require('./schemaCompat');
 
 async function checked(promise) {
   const { data, error } = await promise;
   if (error) throw new Error(error.message);
   return data;
+}
+
+/** When release-slot columns are not migrated, recover intent from outline_json. */
+function enrichEpisodeReleaseSlots(episode) {
+  if (!episode) return episode;
+  const outline = episode.outline_json && typeof episode.outline_json === 'object' ? episode.outline_json : {};
+  const next = { ...episode };
+  if (next.intended_publish_weekday == null && outline.intended_publish_weekday != null) {
+    next.intended_publish_weekday = outline.intended_publish_weekday;
+  }
+  if (next.intended_publish_hour == null && outline.intended_publish_hour != null) {
+    next.intended_publish_hour = outline.intended_publish_hour;
+  }
+  if (next.intended_publish_minute == null && outline.intended_publish_minute != null) {
+    next.intended_publish_minute = outline.intended_publish_minute;
+  }
+  return next;
 }
 
 function createSupabaseStore(client) {
@@ -80,18 +98,19 @@ function createSupabaseStore(client) {
       );
     },
     async listEpisodes(showId) {
-      return checked(
+      const rows = await checked(
         client
           .from('podcast_episodes')
           .select('*')
           .eq('show_id', showId)
           .order('updated_at', { ascending: false })
       );
+      return (rows || []).map(enrichEpisodeReleaseSlots);
     },
     async getEpisode(showSlug, episodeSlug) {
       const show = await this.getShow(showSlug);
       if (!show) return null;
-      return (
+      const row =
         (await checked(
           client
             .from('podcast_episodes')
@@ -99,13 +118,13 @@ function createSupabaseStore(client) {
             .eq('show_id', show.id)
             .eq('slug', episodeSlug)
             .maybeSingle()
-        )) || null
-      );
+        )) || null;
+      return enrichEpisodeReleaseSlots(row);
     },
     async getEpisodeById(episodeId) {
-      return (
-        (await checked(client.from('podcast_episodes').select('*').eq('id', episodeId).maybeSingle())) || null
-      );
+      const row =
+        (await checked(client.from('podcast_episodes').select('*').eq('id', episodeId).maybeSingle())) || null;
+      return enrichEpisodeReleaseSlots(row);
     },
     async getPublishedNeighbors(showId, publishedAt) {
       const published = await this.listPublishedEpisodes(showId);
@@ -135,14 +154,14 @@ function createSupabaseStore(client) {
       );
     },
     async updateEpisode(episodeId, patch) {
-      return checked(
-        client
-          .from('podcast_episodes')
-          .update({ ...patch, updated_at: new Date().toISOString() })
-          .eq('id', episodeId)
-          .select('*')
-          .single()
+      const stamped = { ...patch, updated_at: new Date().toISOString() };
+      const { row, omitted } = await withMissingColumnRetry('podcast_episodes', stamped, (safePatch) =>
+        checked(
+          client.from('podcast_episodes').update(safePatch).eq('id', episodeId).select('*').single()
+        )
       );
+      // Keep intended-publish fields visible to callers even when DB columns are not migrated yet.
+      return enrichEpisodeReleaseSlots(mergeOmitted(row, omitted));
     },
     async setStatus(episodeId, status) {
       const episode = await this.getEpisodeById(episodeId);
@@ -196,31 +215,50 @@ function createSupabaseStore(client) {
       return checked(client.from('podcast_episode_sources').delete().eq('id', sourceId).select('*').single());
     },
     async getScheduleSettings(showSlug = DISNEY_SHOW_SLUG) {
-      return (
+      const row =
         (await checked(
           client.from('podcast_schedule_settings').select('*').eq('show_slug', showSlug).maybeSingle()
-        )) || null
-      );
+        )) || null;
+      if (!row) return null;
+      // Older DBs may lack *_b columns until release-slots migration is applied.
+      return {
+        ...row,
+        intended_publish_weekday: row.intended_publish_weekday ?? 2,
+        intended_publish_hour: row.intended_publish_hour ?? 6,
+        intended_publish_minute: row.intended_publish_minute ?? 0,
+        intended_publish_weekday_b: row.intended_publish_weekday_b ?? 5,
+        intended_publish_hour_b: row.intended_publish_hour_b ?? 6,
+        intended_publish_minute_b: row.intended_publish_minute_b ?? 0,
+        auto_publish_enabled: false,
+      };
     },
     async upsertScheduleSettings(showSlug, patch) {
       const existing = await this.getScheduleSettings(showSlug);
+      const stamped = { ...patch, updated_at: new Date().toISOString() };
       if (!existing) {
-        return checked(
-          client
-            .from('podcast_schedule_settings')
-            .insert({ show_slug: showSlug, ...patch, updated_at: new Date().toISOString() })
-            .select('*')
-            .single()
+        const insertPatch = { show_slug: showSlug, ...stamped };
+        const { row, omitted } = await withMissingColumnRetry(
+          'podcast_schedule_settings',
+          insertPatch,
+          (safePatch) =>
+            checked(client.from('podcast_schedule_settings').insert(safePatch).select('*').single())
         );
+        return mergeOmitted(row, omitted);
       }
-      return checked(
-        client
-          .from('podcast_schedule_settings')
-          .update({ ...patch, updated_at: new Date().toISOString() })
-          .eq('show_slug', showSlug)
-          .select('*')
-          .single()
+      const { row, omitted } = await withMissingColumnRetry(
+        'podcast_schedule_settings',
+        stamped,
+        (safePatch) =>
+          checked(
+            client
+              .from('podcast_schedule_settings')
+              .update(safePatch)
+              .eq('show_slug', showSlug)
+              .select('*')
+              .single()
+          )
       );
+      return mergeOmitted(row, omitted);
     },
     async createGenerationRun(fields) {
       return checked(
@@ -391,4 +429,4 @@ function createStore(client) {
   return createSupabaseStore(client);
 }
 
-module.exports = { createStore, createSupabaseStore, createMemoryStore };
+module.exports = { createStore, createSupabaseStore, createMemoryStore, enrichEpisodeReleaseSlots };

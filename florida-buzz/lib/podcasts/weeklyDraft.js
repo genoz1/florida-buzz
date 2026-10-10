@@ -381,6 +381,8 @@ async function createWeeklyDraft({
         site: collection.site,
         episode: { slug: slugBase, week_key: weekKey },
       });
+      // Persist release-slot intent on columns when migrated; always mirror into outline_json
+      // so admin/notify still show Tuesday/Friday if the live DB is missing those columns.
       await store.updateEpisode(episode.id, {
         week_key: weekKey,
         generation_run_id: run.id,
@@ -390,6 +392,15 @@ async function createWeeklyDraft({
         intended_publish_weekday: slot.weekday,
         intended_publish_hour: slot.hour,
         intended_publish_minute: slot.minute,
+        outline_json: {
+          week_key: weekKey,
+          release_slot: slot.key,
+          release_label: slot.label,
+          intended_publish_weekday: slot.weekday,
+          intended_publish_hour: slot.hour,
+          intended_publish_minute: slot.minute,
+          standalone: true,
+        },
       });
 
       for (const source of episodeSources) {
@@ -427,6 +438,8 @@ async function createWeeklyDraft({
               release_slot: slot.key,
               release_label: slot.label,
               intended_publish_weekday: slot.weekday,
+              intended_publish_hour: slot.hour,
+              intended_publish_minute: slot.minute,
               standalone: true,
             },
           });
@@ -472,6 +485,8 @@ async function createWeeklyDraft({
             release_slot: slot.key,
             release_label: slot.label,
             intended_publish_weekday: slot.weekday,
+            intended_publish_hour: slot.hour,
+            intended_publish_minute: slot.minute,
             standalone: true,
           },
           script_text: script,
