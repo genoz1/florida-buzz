@@ -111,7 +111,15 @@ function classifyHttpError(status, body) {
   });
 }
 
-async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch, maxSearches, outputSchema = null }) {
+async function openAIRequest({
+  systemPrompt,
+  userPrompt,
+  maxTokens,
+  withResearch,
+  maxSearches,
+  outputSchema = null,
+  requestTimeoutMs = null,
+}) {
   if (!process.env.OPENAI_API_KEY) {
     throw new AIProviderError('OPENAI_API_KEY is not configured.', {
       code: 'authentication_error', retryable: false,
@@ -119,7 +127,11 @@ async function openAIRequest({ systemPrompt, userPrompt, maxTokens, withResearch
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs());
+  const effectiveTimeout =
+    Number.isFinite(Number(requestTimeoutMs)) && Number(requestTimeoutMs) > 0
+      ? Number(requestTimeoutMs)
+      : timeoutMs();
+  const timer = setTimeout(() => controller.abort(), effectiveTimeout);
   const researchInstruction = withResearch
     ? `\n\nUse live web search before answering. Prefer current primary or official sources. Use no more than ${maxSearches} search actions unless a fact cannot otherwise be verified.`
     : '';
@@ -233,8 +245,16 @@ async function requestWithRetry(options) {
   throw lastError;
 }
 
-async function generateText(systemPrompt, userPrompt, maxTokens = 1500) {
-  const result = await requestWithRetry({ systemPrompt, userPrompt, maxTokens, withResearch: false, maxSearches: 0, outputSchema: null });
+async function generateText(systemPrompt, userPrompt, maxTokens = 1500, requestTimeoutMs = null) {
+  const result = await requestWithRetry({
+    systemPrompt,
+    userPrompt,
+    maxTokens,
+    withResearch: false,
+    maxSearches: 0,
+    outputSchema: null,
+    requestTimeoutMs,
+  });
   return result.text;
 }
 

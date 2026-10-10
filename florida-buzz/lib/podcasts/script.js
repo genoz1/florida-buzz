@@ -9,6 +9,40 @@ const { verifiedToolsBlock } = require('./siteResources');
 // Back-compat export name used by older imports/tests.
 const DISCLOSURE = AFFILIATION_DISCLOSURE;
 
+// ~150 spoken words/minute × 30 minutes ≈ 4500 words.
+// Output-token headroom must be well above that so Responses API does not truncate.
+const CONVERSATION_MAX_OUTPUT_TOKENS = Number(process.env.PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS || 24000);
+const CONVERSATION_MIN_WORDS = Number(process.env.PODCASTS_SCRIPT_MIN_WORDS || 4000);
+const CONVERSATION_REQUEST_TIMEOUT_MS = Number(process.env.PODCASTS_SCRIPT_TIMEOUT_MS || 420000);
+const CONVERSATION_CONTINUE_ATTEMPTS = Number(process.env.PODCASTS_SCRIPT_CONTINUE_ATTEMPTS || 2);
+
+function countScriptWords(scriptText) {
+  return String(scriptText || '')
+    .replace(/^Gena:\s*/gim, ' ')
+    .replace(/^Diane:\s*/gim, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+function appendContinuation(existing, continuation) {
+  const base = String(existing || '').trim();
+  let next = String(continuation || '').trim();
+  if (!next) return base;
+  // Drop accidental full restarts that repeat the cold open.
+  if (/^Gena:\s*Hey Diane/i.test(next) && /welcome back to Florida Buzz/i.test(next)) {
+    const lines = next.split(/\n+/).filter((line) => line.trim());
+    // Keep from first line that isn't an exact duplicate of an early base line.
+    const baseHead = base.slice(0, 400);
+    while (lines.length && baseHead.includes(lines[0].trim().slice(0, 40))) {
+      lines.shift();
+    }
+    next = lines.join('\n\n').trim();
+  }
+  if (!next) return base;
+  return `${base}\n\n${next}`;
+}
+
 function sourceBlockFor(sources) {
   return (sources || [])
     .filter((s) => s.included)
@@ -48,7 +82,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 25–35 minute conversation with 2–3 topic-linked personal anecdote beats, 3–5 Florida Buzz resource beats, and at least one callback note.`,
+Write a segment outline for an approximately 30 minute conversation (~4,000–5,000 spoken words when scripted) with 2–3 topic-linked personal anecdote beats, 3–5 Florida Buzz resource beats, and at least one callback note.`,
   };
 }
 
@@ -66,7 +100,8 @@ Diane: ...
 ${HOST_BIBLE}
 
 Conversation requirements:
-- Target roughly 25–35 minutes of natural dialogue (substantive, not rushed; not padded filler).
+- Target roughly 30 minutes of natural dialogue (~4,000–5,000 spoken words; substantive, not rushed; not padded filler).
+- Write a FULL episode script in one pass when possible — do not stop after a short cold open or a few topics.
 - Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles.
 - Lean into lively aftershow/reaction energy: shorter turns, frequent reactions, excited bounce between hosts.
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
@@ -110,24 +145,54 @@ Approved sources (summarize in original language; do not invent news facts beyon
 ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
-${verifiedToolsBlock()}`,
+${verifiedToolsBlock()}
+
+Length requirement: produce a full ~30 minute episode script of about ${CONVERSATION_MIN_WORDS}–5000 spoken words (Gena/Diane dialogue only). Do not return a short teaser or partial cold open.`,
   };
 }
 
 async function generateOutline({ aiText, show, episode, sources }) {
   const prompt = buildOutlinePrompt({ show, episode, sources });
-  // Florida Buzz aiText.generateText(system, user, maxTokens) — positional args only.
-  const text = await aiText.generateText(prompt.system, prompt.user, 1400);
+  // Florida Buzz aiText.generateText(system, user, maxTokens[, timeoutMs]) — positional args only.
+  const text = await aiText.generateText(prompt.system, prompt.user, 2000, CONVERSATION_REQUEST_TIMEOUT_MS);
   return String(text || '').trim();
 }
 
 async function generateConversation({ aiText, show, episode, outline, sources }) {
   const prompt = buildConversationPrompt({ show, episode, outline, sources });
-  // Florida Buzz aiText.generateText(system, user, maxTokens) — positional args only.
-  const text = await aiText.generateText(prompt.system, prompt.user, 12000);
-  const script = String(text || '').trim();
+  // Florida Buzz aiText.generateText(system, user, maxTokens[, timeoutMs]) — positional args only.
+  let script = String(
+    await aiText.generateText(prompt.system, prompt.user, CONVERSATION_MAX_OUTPUT_TOKENS, CONVERSATION_REQUEST_TIMEOUT_MS)
+  ).trim();
+
+  let continueAttempt = 0;
+  while (countScriptWords(script) < CONVERSATION_MIN_WORDS && continueAttempt < CONVERSATION_CONTINUE_ATTEMPTS) {
+    continueAttempt += 1;
+    const words = countScriptWords(script);
+    const continuation = String(
+      await aiText.generateText(
+        `You continue an unfinished Florida Buzz: Disney podcast script.
+Keep the exact "Gena:" / "Diane:" line format.
+Do not restart the episode or repeat the cold open.
+Continue naturally from the last lines until the full episode reaches about 30 minutes (~4000–5000 spoken words).
+Preserve host bible tone and Florida Buzz source accuracy rules.`,
+        `Spoken words so far: ${words}. Need at least ${CONVERSATION_MIN_WORDS}.
+Continue this script:\n\n${script.slice(-12000)}`,
+        CONVERSATION_MAX_OUTPUT_TOKENS,
+        CONVERSATION_REQUEST_TIMEOUT_MS
+      )
+    ).trim();
+    script = appendContinuation(script, continuation);
+  }
+
   if (!/^Gena:/m.test(script) || !/^Diane:/m.test(script)) {
     throw new Error('Generated script must include Gena: and Diane: dialogue lines');
+  }
+  const words = countScriptWords(script);
+  if (words < CONVERSATION_MIN_WORDS) {
+    throw new Error(
+      `Generated script is too short for a ~30 minute episode (${words} words; need at least ${CONVERSATION_MIN_WORDS}). Increase PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS or retry.`
+    );
   }
   return script;
 }
@@ -169,6 +234,11 @@ module.exports = {
   DISCLOSURE,
   AFFILIATION_DISCLOSURE,
   HOST_BIBLE,
+  CONVERSATION_MAX_OUTPUT_TOKENS,
+  CONVERSATION_MIN_WORDS,
+  CONVERSATION_REQUEST_TIMEOUT_MS,
+  countScriptWords,
+  appendContinuation,
   buildOutlinePrompt,
   buildConversationPrompt,
   generateOutline,

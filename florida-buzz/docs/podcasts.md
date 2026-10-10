@@ -20,7 +20,14 @@ PODCASTS_TTS_TEMPERATURE=0.85
 PODCASTS_AUDIO_BUCKET=podcast-audio
 PODCASTS_ARTWORK_BUCKET=podcast-artwork
 PODCASTS_MAX_UPLOAD_MB=80
+# Full ~30 minute script generation (defaults are safe for a full episode)
+PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=24000
+PODCASTS_SCRIPT_MIN_WORDS=4000
+PODCASTS_SCRIPT_TIMEOUT_MS=420000
+PODCASTS_SCRIPT_CONTINUE_ATTEMPTS=2
 ```
+
+Script generation requests up to 24k output tokens (was 12k), requires at least ~4,000 spoken words (~30 minutes at ~150 wpm), continues the script if the first pass is short, and fails loudly instead of accepting a teaser-length draft.
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `OPENAI_API_KEY`, and `FAL_KEY` when generation is later enabled.
 

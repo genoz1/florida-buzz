@@ -16,6 +16,11 @@ const {
   formatScriptForTts,
   buildOutlinePrompt,
   buildConversationPrompt,
+  countScriptWords,
+  appendContinuation,
+  generateConversation,
+  CONVERSATION_MAX_OUTPUT_TOKENS,
+  CONVERSATION_MIN_WORDS,
 } = require('../lib/podcasts/script');
 const {
   HOST_BIBLE,
@@ -103,6 +108,83 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.user, /\/wait-times/);
   assert.match(conversation.user, /\/planner/);
   assert.match(conversation.user, /\/dining/);
+});
+
+test('conversation token budget supports a ~30 minute script', () => {
+  assert.ok(CONVERSATION_MAX_OUTPUT_TOKENS >= 20000);
+  assert.ok(CONVERSATION_MIN_WORDS >= 3500);
+  const conversation = buildConversationPrompt({
+    show: { title: 'Florida Buzz: Disney' },
+    episode: { title: 'Test', description: 'Desc' },
+    outline: '1. Open',
+    sources: [],
+  });
+  assert.match(conversation.system, /4,000–5,000 spoken words/i);
+  assert.match(conversation.user, /Length requirement/i);
+});
+
+test('short AI scripts are rejected and continuations can append', async () => {
+  assert.equal(countScriptWords('Gena: Hello there.\n\nDiane: Hi back.'), 4);
+  const merged = appendContinuation(
+    'Gena: We start here.\n\nDiane: Yes.',
+    'Gena: And then we keep going about Magic Kingdom crowds.'
+  );
+  assert.match(merged, /We start here/);
+  assert.match(merged, /Magic Kingdom crowds/);
+
+  let calls = 0;
+  const aiText = {
+    async generateText(system, user, maxTokens) {
+      calls += 1;
+      assert.ok(maxTokens >= 20000);
+      if (calls === 1) {
+        return 'Gena: Short open.\n\nDiane: Short reply only.';
+      }
+      // Still short on purpose so generateConversation throws after continue attempts.
+      return 'Gena: A little more.\n\nDiane: Still not enough words overall.';
+    },
+  };
+  await assert.rejects(
+    () =>
+      generateConversation({
+        aiText,
+        show: { title: 'Florida Buzz: Disney' },
+        episode: { title: 'Test', description: 'Test' },
+        outline: '1. Open',
+        sources: [],
+      }),
+    /too short for a ~30 minute episode/i
+  );
+  assert.ok(calls >= 2);
+});
+
+test('continuation recovers a full-length script after a short first pass', async () => {
+  const pad = (label, n) => {
+    const words = [];
+    for (let i = 0; i < n; i += 1) words.push(`word${i}`);
+    return `${label}: ${words.join(' ')}`;
+  };
+  let calls = 0;
+  const aiText = {
+    async generateText(_system, _user, maxTokens) {
+      calls += 1;
+      assert.ok(maxTokens >= 20000);
+      if (calls === 1) {
+        return `${pad('Gena', 40)}\n\n${pad('Diane', 40)}`;
+      }
+      // Second pass supplies enough spoken words to clear the 30-minute floor.
+      return `${pad('Gena', 2200)}\n\n${pad('Diane', 2200)}`;
+    },
+  };
+  const script = await generateConversation({
+    aiText,
+    show: { title: 'Florida Buzz: Disney' },
+    episode: { title: 'Test', description: 'Test' },
+    outline: '1. Open',
+    sources: [],
+  });
+  assert.ok(countScriptWords(script) >= CONVERSATION_MIN_WORDS);
+  assert.equal(calls, 2);
 });
 
 test('script sections split for long episodes and keep dialogue prefixes', () => {
