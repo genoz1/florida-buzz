@@ -48,6 +48,24 @@ function createMemoryStore() {
     sources: [],
     scripts: [],
     jobs: [],
+    scheduleSettings: [
+      {
+        id: id(),
+        show_slug: DISNEY_SHOW_SLUG,
+        weekly_draft_enabled: false,
+        timezone: 'America/New_York',
+        generate_weekday: 4,
+        generate_hour: 19,
+        generate_minute: 0,
+        intended_publish_weekday: 5,
+        intended_publish_hour: 6,
+        intended_publish_minute: 0,
+        auto_publish_enabled: false,
+        notify_email: null,
+        updated_at: now(),
+      },
+    ],
+    generationRuns: [],
   };
 
   function showBySlug(slug) {
@@ -154,6 +172,9 @@ function createMemoryStore() {
         summary: source.summary,
         included: source.included !== false,
         sort_order: source.sort_order || state.sources.filter((s) => s.episode_id === episodeId).length,
+        source_kind: source.source_kind || 'custom',
+        external_ref: source.external_ref || null,
+        meta: source.meta || {},
         created_at: now(),
       };
       state.sources.push(row);
@@ -164,6 +185,68 @@ function createMemoryStore() {
       if (!row) throw new Error('Source not found');
       row.included = !!included;
       return row;
+    },
+    async deleteSource(sourceId) {
+      const idx = state.sources.findIndex((s) => s.id === sourceId);
+      if (idx < 0) throw new Error('Source not found');
+      const [row] = state.sources.splice(idx, 1);
+      return row;
+    },
+    async getScheduleSettings(showSlug = DISNEY_SHOW_SLUG) {
+      return state.scheduleSettings.find((s) => s.show_slug === showSlug) || null;
+    },
+    async upsertScheduleSettings(showSlug, patch) {
+      let row = state.scheduleSettings.find((s) => s.show_slug === showSlug);
+      if (!row) {
+        row = { id: id(), show_slug: showSlug, ...patch, updated_at: now() };
+        state.scheduleSettings.push(row);
+        return row;
+      }
+      Object.assign(row, patch, { updated_at: now() });
+      return row;
+    },
+    async createGenerationRun(fields) {
+      const row = {
+        id: id(),
+        show_slug: fields.show_slug,
+        week_key: fields.week_key,
+        status: fields.status || 'queued',
+        attempt: fields.attempt || 1,
+        episode_id: fields.episode_id || null,
+        error_detail: fields.error_detail || null,
+        payload: fields.payload || {},
+        notified_at: null,
+        created_at: now(),
+        updated_at: now(),
+      };
+      state.generationRuns.push(row);
+      return row;
+    },
+    async updateGenerationRun(runId, patch) {
+      const row = state.generationRuns.find((r) => r.id === runId);
+      if (!row) throw new Error('Generation run not found');
+      Object.assign(row, patch, { updated_at: now() });
+      return row;
+    },
+    async findGenerationRun(showSlug, weekKey, statuses = []) {
+      return (
+        state.generationRuns
+          .filter((r) => r.show_slug === showSlug && r.week_key === weekKey)
+          .filter((r) => !statuses.length || statuses.includes(r.status))
+          .sort((a, b) => b.attempt - a.attempt)[0] || null
+      );
+    },
+    async listGenerationRuns(showSlug, weekKey = null, limit = 20) {
+      return state.generationRuns
+        .filter((r) => r.show_slug === showSlug && (!weekKey || r.week_key === weekKey))
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+        .slice(0, limit);
+    },
+    async listFailedGenerationRuns(showSlug, limit = 20) {
+      return state.generationRuns
+        .filter((r) => r.show_slug === showSlug && r.status === 'failed')
+        .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+        .slice(0, limit);
     },
     async saveScript(episodeId, kind, contentText, contentJson = null) {
       const versions = state.scripts.filter((s) => s.episode_id === episodeId && s.kind === kind);

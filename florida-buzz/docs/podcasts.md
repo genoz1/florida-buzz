@@ -71,6 +71,30 @@ FAL_KEY=<set securely in DO; never commit>
 6. Do not submit the RSS feed to Apple/Spotify until approved.
 7. Optional intro/outro audio fields exist on `podcast_shows`; supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
 
+## Weekly draft schedule (America/New_York)
+
+Default target: **Thursday 7:00 PM Eastern** create a review draft; intended public release **Friday 6:00 AM Eastern** after manual approval.
+
+Admin controls (`/admin/podcasts`):
+
+- Enable/disable weekly draft generation (DB setting; defaults **off**)
+- Change generation weekday/time
+- Review/remove sources; add guide, Buzz Board question, evergreen, or custom topic
+- Preview/download audio; edit title/description/show notes
+- Approve & publish, reject & regenerate, schedule an approved episode
+- View failures and retry
+
+Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. A run only proceeds when weekly drafts are enabled **and** the Eastern clock matches the configured slot. Drafts are never auto-published. `auto_publish_enabled` stays false (Friday 6am is documented intent only).
+
+Content priority for every weekly episode (always produces a draft):
+
+1. Approved Florida Buzz Disney articles from the prior 7 days  
+2. Relevant evergreen Florida Buzz guides  
+3. Two or three public Buzz Board Disney questions (paraphrased; no invented community data)  
+4. One evergreen opinion/planning topic  
+
+Keep `PODCASTS_GENERATION_ENABLED=false` until this workflow is tested. Without it, drafts still collect sources and can generate scripts via the text AI service, but fal audio is skipped.
+
 ## Host voices (full episodes)
 
 Gena and Diane are longtime friends — Disney-loving Central Florida moms in their mid-thirties. Geno (Gena) and Michael (Diane) may appear in family/park stories. Scripts must feel like friends exchanging stories and opinions, not presenters summarizing articles.

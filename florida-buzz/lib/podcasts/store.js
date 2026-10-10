@@ -132,6 +132,9 @@ function createSupabaseStore(client) {
             summary: source.summary,
             included: source.included !== false,
             sort_order: source.sort_order ?? existing.length,
+            source_kind: source.source_kind || 'custom',
+            external_ref: source.external_ref || null,
+            meta: source.meta || {},
           })
           .select('*')
           .single()
@@ -145,6 +148,96 @@ function createSupabaseStore(client) {
           .eq('id', sourceId)
           .select('*')
           .single()
+      );
+    },
+    async deleteSource(sourceId) {
+      return checked(client.from('podcast_episode_sources').delete().eq('id', sourceId).select('*').single());
+    },
+    async getScheduleSettings(showSlug = DISNEY_SHOW_SLUG) {
+      return (
+        (await checked(
+          client.from('podcast_schedule_settings').select('*').eq('show_slug', showSlug).maybeSingle()
+        )) || null
+      );
+    },
+    async upsertScheduleSettings(showSlug, patch) {
+      const existing = await this.getScheduleSettings(showSlug);
+      if (!existing) {
+        return checked(
+          client
+            .from('podcast_schedule_settings')
+            .insert({ show_slug: showSlug, ...patch, updated_at: new Date().toISOString() })
+            .select('*')
+            .single()
+        );
+      }
+      return checked(
+        client
+          .from('podcast_schedule_settings')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('show_slug', showSlug)
+          .select('*')
+          .single()
+      );
+    },
+    async createGenerationRun(fields) {
+      return checked(
+        client
+          .from('podcast_generation_runs')
+          .insert({
+            show_slug: fields.show_slug,
+            week_key: fields.week_key,
+            status: fields.status || 'queued',
+            attempt: fields.attempt || 1,
+            episode_id: fields.episode_id || null,
+            payload: fields.payload || {},
+            error_detail: fields.error_detail || null,
+          })
+          .select('*')
+          .single()
+      );
+    },
+    async updateGenerationRun(runId, patch) {
+      return checked(
+        client
+          .from('podcast_generation_runs')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('id', runId)
+          .select('*')
+          .single()
+      );
+    },
+    async findGenerationRun(showSlug, weekKey, statuses = []) {
+      let query = client
+        .from('podcast_generation_runs')
+        .select('*')
+        .eq('show_slug', showSlug)
+        .eq('week_key', weekKey)
+        .order('attempt', { ascending: false })
+        .limit(1);
+      if (statuses.length) query = query.in('status', statuses);
+      const rows = await checked(query);
+      return rows[0] || null;
+    },
+    async listGenerationRuns(showSlug, weekKey = null, limit = 20) {
+      let query = client
+        .from('podcast_generation_runs')
+        .select('*')
+        .eq('show_slug', showSlug)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (weekKey) query = query.eq('week_key', weekKey);
+      return checked(query);
+    },
+    async listFailedGenerationRuns(showSlug, limit = 20) {
+      return checked(
+        client
+          .from('podcast_generation_runs')
+          .select('*')
+          .eq('show_slug', showSlug)
+          .eq('status', 'failed')
+          .order('updated_at', { ascending: false })
+          .limit(limit)
       );
     },
     async saveScript(episodeId, kind, contentText, contentJson = null) {

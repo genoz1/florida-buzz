@@ -38,7 +38,7 @@ function production(env = process.env) {
     fal,
     ffmpegPath: resolveFfmpegPath(env),
   });
-  return { cfg, store, fal, pipeline, aiText };
+  return { cfg, store, fal, pipeline, aiText, supabase };
 }
 
 function mount(app, env = process.env) {
@@ -49,6 +49,12 @@ function mount(app, env = process.env) {
   }
 
   const runtime = production(env);
+  let sendEmail = null;
+  try {
+    sendEmail = require('../resend').sendEmail;
+  } catch {
+    sendEmail = null;
+  }
   app.use('/podcasts', createPublicRouter({ store: runtime.store, cfg: runtime.cfg }));
   try {
     app.use(
@@ -58,6 +64,8 @@ function mount(app, env = process.env) {
         cfg: runtime.cfg,
         pipeline: runtime.pipeline,
         aiText: runtime.aiText,
+        supabase: runtime.supabase,
+        sendEmail,
         env,
       })
     );
@@ -65,9 +73,9 @@ function mount(app, env = process.env) {
     console.error('[podcasts] admin router not mounted:', err.message);
   }
   console.log(
-    `[podcasts] mounted (generation=${runtime.cfg.generation ? 'ON' : 'OFF'}; fal endpoint=${runtime.cfg.falEndpoint}; model=${runtime.cfg.falModel})`
+    `[podcasts] mounted (generation=${runtime.cfg.generation ? 'ON' : 'OFF'}; weeklyCron=${runtime.cfg.weeklyCron ? 'ON' : 'OFF'}; fal endpoint=${runtime.cfg.falEndpoint}; model=${runtime.cfg.falModel})`
   );
-  return { ...runtime, mounted: true };
+  return { ...runtime, sendEmail, mounted: true };
 }
 
 async function sitemapEntries(env = process.env) {
@@ -99,4 +107,6 @@ module.exports = {
   createAudioPipeline,
   createPublicRouter,
   createAdminRouter,
+  createWeeklyDraft: (...args) => require('./weeklyDraft').createWeeklyDraft(...args),
+  tickWeeklyDraft: (...args) => require('./weeklyDraft').tickWeeklyDraft(...args),
 };

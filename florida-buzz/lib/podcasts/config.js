@@ -29,6 +29,8 @@ function config(env = process.env) {
     // Paid fal TTS stays hard-off until PODCASTS_GENERATION_ENABLED=true.
     enabled: env.PODCASTS_ENABLED !== 'false',
     generation: env.PODCASTS_GENERATION_ENABLED === 'true',
+    // Hourly tick may run; actual weekly drafts still require admin schedule enable.
+    weeklyCron: env.PODCASTS_WEEKLY_CRON_ENABLED !== 'false',
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,

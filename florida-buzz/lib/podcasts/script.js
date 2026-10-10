@@ -42,7 +42,7 @@ Episode description: ${episode.description}
 Included sources (approved weekly material — factual base only):
 ${sourceBlock || '(none yet — use timeless composite experiences only; invent no dated news facts)'}
 
-Write a concise segment outline for a 10–20 minute conversation with 2–3 topic-linked personal anecdote beats and at least one callback note.`,
+Write a segment outline for an approximately 25–35 minute conversation with 2–3 topic-linked personal anecdote beats and at least one callback note.`,
   };
 }
 
@@ -60,8 +60,11 @@ Diane: ...
 ${HOST_BIBLE}
 
 Conversation requirements:
+- Target roughly 25–35 minutes of natural dialogue (substantive, not rushed; not padded filler).
 - Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles.
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
+- Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved sources.
+- When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer differing host opinions, and invite listeners to visit the Buzz Board.
 - Include two or three brief recent-park-experience stories connected directly to the episode topics.
 - Make stories specific and conversational with small believable details; keep each anecdote concise.
 - The other host must react: ask a follow-up, laugh, disagree, interrupt briefly, or relate a similar experience.

@@ -9,7 +9,7 @@
     a{color:#00697b}.notice{padding:14px;background:#eef5f6;margin:12px 0}.error{padding:14px;background:#fde8e4;margin:12px 0}
     .btn{display:inline-block;background:#0e3b43;color:#fff;padding:10px 14px;text-decoration:none;border:0;cursor:pointer;margin:4px 4px 4px 0}
     .btn-secondary{background:#4a5350}
-    label{display:block;margin:10px 0 4px} input,textarea{width:100%;padding:8px;box-sizing:border-box}
+    label{display:block;margin:10px 0 4px} input,textarea,select{width:100%;padding:8px;box-sizing:border-box}
     form.card,section.card{border:1px solid #ddd;padding:16px;margin:20px 0}
     .status{font-weight:700;text-transform:uppercase}
     audio{width:100%;margin-top:8px}
@@ -19,10 +19,13 @@
 <body>
   <p><a href="/admin/podcasts">&larr; All episodes</a></p>
   <h1><%= episode.title %></h1>
-  <p>Status: <span class="status"><%= episode.status %></span></p>
+  <p>Status: <span class="status"><%= episode.status %></span>
+    <% if (episode.week_key) { %> · Week <code><%= episode.week_key %></code><% } %>
+  </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (error) { %><p class="error"><%= error %></p><% } %>
   <p class="notice"><%= show.disclosure %></p>
+  <p class="notice">Drafts are not on the public site or RSS until you Approve → Publish (or schedule then publish). Friday 6:00 AM ET is the intended release target only — auto-publish is off.</p>
 
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>">
     <h2>Episode details</h2>
@@ -41,24 +44,45 @@
 
   <section class="card">
     <h2>Sources</h2>
+    <p>Review weekly articles, guides, Buzz Board questions, and evergreen topics. Exclude or remove before regenerating the script.</p>
     <ul>
       <% sources.forEach(src => { %>
         <li>
-          <strong><%= src.title %></strong> — <a href="<%= src.url %>" target="_blank" rel="noopener"><%= src.url %></a>
+          <span class="status" style="font-size:12px"><%= src.source_kind || 'custom' %></span>
+          <strong><%= src.title %></strong> —
+          <a href="<%= src.url %>" target="_blank" rel="noopener"><%= src.url %></a>
           <% if (!src.included) { %> (excluded)<% } %>
           <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/sources/<%= src.id %>/toggle" style="display:inline">
             <input type="hidden" name="csrf" value="<%= csrf %>">
             <input type="hidden" name="included" value="<%= src.included ? 'false' : 'true' %>">
             <button class="btn btn-secondary" type="submit"><%= src.included ? 'Exclude' : 'Include' %></button>
           </form>
+          <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/sources/<%= src.id %>/delete" style="display:inline">
+            <input type="hidden" name="csrf" value="<%= csrf %>">
+            <button class="btn btn-secondary" type="submit">Remove</button>
+          </form>
         </li>
       <% }) %>
     </ul>
-    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/sources">
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/sources/custom">
+      <h3>Add guide, Buzz Board question, evergreen topic, or custom source</h3>
       <input type="hidden" name="csrf" value="<%= csrf %>">
-      <label>Source title <input name="title" required></label>
-      <label>Source URL <input name="url" type="url" required></label>
+      <label>Kind
+        <select name="source_kind">
+          <option value="guide">Guide</option>
+          <option value="buzz_board">Buzz Board question</option>
+          <option value="evergreen_topic">Evergreen topic</option>
+          <option value="article">Article</option>
+          <option value="custom">Custom topic</option>
+        </select>
+      </label>
+      <label>Title <input name="title" required placeholder="Paraphrased Buzz Board question or topic title"></label>
+      <label>URL <input name="url" type="url" required placeholder="https://thefloridabuzz.com/..."></label>
       <label>Summary <textarea name="summary" rows="2"></textarea></label>
+      <label>External ref (optional) <input name="external_ref" placeholder="article id, buzz slug, topic slug"></label>
+      <p>Suggested evergreen topics:
+        <% evergreenTopics.forEach((t, i) => { %><code><%= t.slug %></code><%= i < evergreenTopics.length - 1 ? ', ' : '' %><% }) %>
+      </p>
       <button class="btn" type="submit">Add source</button>
     </form>
   </section>
@@ -87,14 +111,17 @@
     <% if (episode.audio_url) { %>
       <p>Current master (permanent URL preferred):</p>
       <audio controls preload="metadata" src="<%= episode.audio_url %>"></audio>
+      <p>
+        <a class="btn btn-secondary" href="/admin/podcasts/episodes/<%= episode.id %>/audio" target="_blank" rel="noopener">Preview / download audio</a>
+      </p>
     <% } else { %>
-      <p>No master audio yet.</p>
+      <p>No master audio yet. With <code>PODCASTS_GENERATION_ENABLED=false</code>, weekly drafts stop at script/show notes until you generate or upload audio.</p>
     <% } %>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/generate-audio">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn" type="submit" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (fal TTS)</button>
     </form>
-    <p>Generation disabled by default. Enabling <code>PODCASTS_GENERATION_ENABLED=true</code> can incur fal.ai charges.</p>
+    <p>Keep <code>PODCASTS_GENERATION_ENABLED=false</code> until the weekly workflow is tested. Enabling it can incur fal.ai charges.</p>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-audio" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <label>Upload replacement MP3 <input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>
@@ -116,14 +143,14 @@
 
   <section class="card">
     <h2>Approval &amp; publishing</h2>
-    <p>Nothing publishes automatically. Approve finished audio, then Publish.</p>
+    <p>Nothing publishes automatically. Approve finished audio, optionally schedule, then Publish to the website and RSS.</p>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/approve" style="display:inline">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn" type="submit">Approve audio</button>
     </form>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/schedule" style="display:inline-block">
       <input type="hidden" name="csrf" value="<%= csrf %>">
-      <label>Schedule for <input type="datetime-local" name="scheduled_for" required></label>
+      <label>Schedule approved episode for <input type="datetime-local" name="scheduled_for" required></label>
       <button class="btn btn-secondary" type="submit">Mark scheduled</button>
     </form>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/publish" style="display:inline">
@@ -133,6 +160,10 @@
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/unpublish" style="display:inline">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn btn-secondary" type="submit">Unpublish</button>
+    </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reject-regenerate" style="margin-top:16px" onsubmit="return confirm('Reject this draft and generate a new weekly attempt?');">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn btn-secondary" type="submit">Reject and regenerate draft</button>
     </form>
   </section>
 </body>

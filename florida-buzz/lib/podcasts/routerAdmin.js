@@ -14,8 +14,11 @@ const { sanitizeShowNotesHtml } = require('./sanitize');
 const { ensureShowNotesDisclosures } = require('./hosts');
 const { generateOutline, generateConversation } = require('./script');
 const { DISNEY_SHOW_SLUG } = require('./config');
+const { defaultSettings, createWeeklyDraft } = require('./weeklyDraft');
+const { describeSchedule, WEEKDAY_NAMES } = require('./timeEt');
+const { EVERGREEN_TOPICS } = require('./evergreenTopics');
 
-function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) {
+function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, sendEmail = null, env = process.env }) {
   const router = express.Router();
   const secret = env.ADMIN_PASSWORD;
   if (!secret || secret.length < 12) {
@@ -63,13 +66,82 @@ function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) 
     handle(async (req, res) => {
       const show = await defaultShow();
       const episodes = show ? await store.listEpisodes(show.id) : [];
+      let schedule = defaultSettings();
+      let failures = [];
+      let runs = [];
+      try {
+        schedule = (await store.getScheduleSettings(DISNEY_SHOW_SLUG)) || defaultSettings();
+        failures = await store.listFailedGenerationRuns(DISNEY_SHOW_SLUG, 10);
+        runs = await store.listGenerationRuns(DISNEY_SHOW_SLUG, null, 12);
+      } catch (err) {
+        console.warn('[podcasts] schedule tables unavailable — apply weekly schedule migration:', err.message);
+      }
       res.render('admin-podcasts', {
         show,
         episodes,
         cfg,
+        schedule,
+        scheduleLabels: describeSchedule(schedule),
+        weekdayNames: WEEKDAY_NAMES,
+        failures,
+        runs,
         createCsrf: csrf('create'),
+        scheduleCsrf: csrf('schedule'),
+        runCsrf: csrf('run'),
         notice: req.query.notice || null,
+        error: req.query.error || null,
       });
+    })
+  );
+
+  router.post(
+    '/schedule',
+    handle(async (req, res) => {
+      if (!checkCsrf('schedule', req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      const weekday = Number(req.body.generate_weekday);
+      const hour = Number(req.body.generate_hour);
+      const minute = Number(req.body.generate_minute || 0);
+      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw new Error('Invalid generation weekday');
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error('Invalid generation hour');
+      if (!Number.isInteger(minute) || minute < 0 || minute > 59) throw new Error('Invalid generation minute');
+      await store.upsertScheduleSettings(DISNEY_SHOW_SLUG, {
+        weekly_draft_enabled: req.body.weekly_draft_enabled === 'true' || req.body.weekly_draft_enabled === 'on',
+        timezone: 'America/New_York',
+        generate_weekday: weekday,
+        generate_hour: hour,
+        generate_minute: minute,
+        intended_publish_weekday: 5,
+        intended_publish_hour: 6,
+        intended_publish_minute: 0,
+        // Never allow enabling auto-publish from admin until explicitly built/tested.
+        auto_publish_enabled: false,
+        notify_email: String(req.body.notify_email || '').trim() || null,
+      });
+      res.redirect(303, '/admin/podcasts?notice=schedule-saved');
+    })
+  );
+
+  router.post(
+    '/run-weekly-draft',
+    handle(async (req, res) => {
+      if (!checkCsrf('run', req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      const result = await createWeeklyDraft({
+        store,
+        supabase,
+        cfg,
+        aiText,
+        pipeline,
+        sendEmail,
+        env,
+        force: true,
+      });
+      if (result.skipped) {
+        return res.redirect(
+          303,
+          `/admin/podcasts?notice=${encodeURIComponent(`Weekly draft skipped: ${result.reason}`)}`
+        );
+      }
+      res.redirect(303, `/admin/podcasts/episodes/${result.episode.id}?notice=weekly-draft-ready`);
     })
   );
 
@@ -105,6 +177,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) 
         outline,
         conversation,
         cfg,
+        evergreenTopics: EVERGREEN_TOPICS,
         csrf: csrf(episode.id),
         createCsrf: csrf('create'),
         notice: req.query.notice || null,
@@ -152,6 +225,38 @@ function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) 
       if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       await store.setSourceIncluded(req.params.sourceId, req.body.included !== 'false');
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=source-updated`);
+    })
+  );
+
+  router.post(
+    '/episodes/:id/sources/:sourceId/delete',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      await store.deleteSource(req.params.sourceId);
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=source-removed`);
+    })
+  );
+
+  router.post(
+    '/episodes/:id/sources/custom',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      const kind = String(req.body.source_kind || 'custom');
+      if (!['guide', 'buzz_board', 'evergreen_topic', 'custom', 'article'].includes(kind)) {
+        throw new Error('Invalid source kind');
+      }
+      const source = validateSourceInput(req.body);
+      await store.addSource(episode.id, {
+        ...source,
+        source_kind: kind,
+        external_ref: String(req.body.external_ref || '').trim() || null,
+        meta: { added_via: 'admin' },
+      });
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=source-added`);
     })
   );
 
@@ -319,6 +424,66 @@ function createAdminRouter({ store, cfg, pipeline, aiText, env = process.env }) 
       if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       await store.updateEpisode(episode.id, { status: 'approved', published_at: null });
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=unpublished`);
+    })
+  );
+
+  router.post(
+    '/episodes/:id/reject-regenerate',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (episode.status === 'published') throw new Error('Cannot regenerate a published episode');
+      const result = await createWeeklyDraft({
+        store,
+        supabase,
+        cfg,
+        aiText,
+        pipeline,
+        sendEmail,
+        env,
+        force: true,
+        weekKey: episode.week_key || null,
+        rejectEpisodeId: episode.id,
+      });
+      if (result.skipped) throw new Error(`Regenerate skipped: ${result.reason}`);
+      res.redirect(303, `/admin/podcasts/episodes/${result.episode.id}?notice=regenerated`);
+    })
+  );
+
+  router.get(
+    '/episodes/:id/audio',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!episode.audio_url) return res.status(404).send('No audio yet');
+      res.redirect(302, episode.audio_url);
+    })
+  );
+
+  router.post(
+    '/runs/:runId/retry',
+    handle(async (req, res) => {
+      if (!checkCsrf('run', req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      const runs = await store.listGenerationRuns(DISNEY_SHOW_SLUG, null, 50);
+      const run = runs.find((r) => r.id === req.params.runId);
+      if (!run) return res.status(404).send('Run not found');
+      const result = await createWeeklyDraft({
+        store,
+        supabase,
+        cfg,
+        aiText,
+        pipeline,
+        sendEmail,
+        env,
+        force: true,
+        weekKey: run.week_key,
+        rejectEpisodeId: run.episode_id || null,
+      });
+      if (result.skipped) {
+        return res.redirect(303, `/admin/podcasts?error=${encodeURIComponent(result.reason)}`);
+      }
+      res.redirect(303, `/admin/podcasts/episodes/${result.episode.id}?notice=retry-complete`);
     })
   );
 

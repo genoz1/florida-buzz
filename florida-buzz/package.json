@@ -28,7 +28,10 @@
     "repair-article-images": "node scripts/repair-article-images.js",
     "crop-image": "node scripts/crop-existing-image.js",
     "city-roundup": "node scripts/city-roundup.js",
-    "city-roundup:dry": "DRY_RUN=true node scripts/city-roundup.js"
+    "city-roundup:dry": "DRY_RUN=true node scripts/city-roundup.js",
+    "podcast:weekly": "node scripts/podcast-weekly-draft.js",
+    "podcast:weekly:force": "FORCE=true node scripts/podcast-weekly-draft.js",
+    "podcast:weekly:dry": "DRY_RUN=true node scripts/podcast-weekly-draft.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

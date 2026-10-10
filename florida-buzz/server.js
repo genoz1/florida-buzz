@@ -341,3 +341,24 @@ if (scheduleFlags.featurePromoCaptions) {
 } else {
   console.log('Feature promo posts NOT scheduled — AI_CONTENT_SCHEDULES_ENABLED must be true and the OpenAI/Facebook variables must be set.');
 }
+
+// Florida Buzz Disney podcast weekly draft tick (America/New_York).
+// Creates review drafts only — never publishes. Actual runs require the admin
+// "Enable weekly draft generation" toggle. Audio still requires
+// PODCASTS_GENERATION_ENABLED=true (keep false until tested).
+const podcastsCfg = require('./lib/podcasts').config(process.env);
+if (podcastsCfg.enabled && podcastsCfg.weeklyCron) {
+  cron.schedule(
+    '*/15 * * * *',
+    () => {
+      console.log('Checking Florida Buzz podcast weekly draft schedule...');
+      runScheduledCommand('podcast weekly draft', 'node scripts/podcast-weekly-draft.js');
+    },
+    { timezone: 'America/New_York' }
+  );
+  console.log(
+    'Podcast weekly draft checker scheduled every 15 minutes ET (runs only when admin weekly drafts are enabled; no auto-publish).'
+  );
+} else {
+  console.log('Podcast weekly draft checker NOT scheduled — podcasts disabled or PODCASTS_WEEKLY_CRON_ENABLED=false.');
+}

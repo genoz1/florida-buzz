@@ -8,28 +8,123 @@
     body{max-width:980px;margin:40px auto;padding:20px;font:16px system-ui;color:#182a34}
     table{border-collapse:collapse;width:100%}td,th{padding:12px;text-align:left;border-bottom:1px solid #ddd}
     a{color:#00697b}.notice{padding:14px;background:#eef5f6;margin-bottom:18px}
+    .error{padding:14px;background:#fdeeee;margin-bottom:18px;color:#7a1f1f}
     .btn{display:inline-block;background:#0e3b43;color:#fff;padding:10px 14px;text-decoration:none;border:0;cursor:pointer}
-    label{display:block;margin:10px 0 4px} input,textarea{width:100%;padding:8px;box-sizing:border-box}
-    form.card{border:1px solid #ddd;padding:16px;margin:20px 0}
+    .btn-secondary{background:#5b6b73}
+    label{display:block;margin:10px 0 4px} input,textarea,select{width:100%;padding:8px;box-sizing:border-box}
+    form.card,section.card{border:1px solid #ddd;padding:16px;margin:20px 0}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:700px){.grid{grid-template-columns:1fr}}
+    .muted{color:#5b6b73;font-size:0.95rem}
   </style>
 </head>
 <body>
   <h1>Florida Buzz Podcast admin</h1>
-  <p class="notice">Generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>. Publishing is always manual. Audio generation never auto-publishes.</p>
+  <p class="notice">
+    Audio generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>
+    (<code>PODCASTS_GENERATION_ENABLED</code>).
+    Weekly drafts never auto-publish. Intended release target remains Friday 6:00 AM Eastern after manual approval — auto-publish stays off.
+  </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
+  <% if (typeof error !== 'undefined' && error) { %><p class="error"><%= error %></p><% } %>
+
   <% if (!show) { %>
-    <p>Show seed missing. Apply the podcasts migration before using this dashboard.</p>
+    <p>Show seed missing. Apply the podcasts migrations before using this dashboard.</p>
   <% } else { %>
     <h2><%= show.title %></h2>
     <p><%= show.disclosure %></p>
+
+    <section class="card">
+      <h3>Weekly draft schedule (America/New_York)</h3>
+      <p class="muted">Default: Thursday 7:00 PM ET draft generation. Publication stays manual.</p>
+      <p><strong>Current:</strong> <%= scheduleLabels.generateLabel %> —
+        weekly drafts <strong><%= schedule.weekly_draft_enabled ? 'ENABLED' : 'DISABLED' %></strong></p>
+      <p class="muted">Intended publish target: <%= scheduleLabels.publishLabel %></p>
+      <form method="post" action="/admin/podcasts/schedule">
+        <input type="hidden" name="csrf" value="<%= scheduleCsrf %>">
+        <label><input type="checkbox" name="weekly_draft_enabled" value="true" <%= schedule.weekly_draft_enabled ? 'checked' : '' %>> Enable weekly draft generation</label>
+        <div class="grid">
+          <label>Generation day
+            <select name="generate_weekday">
+              <% weekdayNames.forEach((name, idx) => { %>
+                <option value="<%= idx %>" <%= Number(schedule.generate_weekday) === idx ? 'selected' : '' %>><%= name %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label>Hour (0–23 ET)
+            <input name="generate_hour" type="number" min="0" max="23" value="<%= schedule.generate_hour %>">
+          </label>
+          <label>Minute (0–59)
+            <input name="generate_minute" type="number" min="0" max="59" value="<%= schedule.generate_minute %>">
+          </label>
+          <label>Notify email (optional; else ALERT_EMAIL_TO)
+            <input name="notify_email" type="email" value="<%= schedule.notify_email || '' %>" placeholder="you@example.com">
+          </label>
+        </div>
+        <p class="muted">Auto-publish is intentionally locked off in code until you ask to enable Friday publishing.</p>
+        <button class="btn" type="submit">Save schedule</button>
+      </form>
+      <form method="post" action="/admin/podcasts/run-weekly-draft" style="margin-top:12px">
+        <input type="hidden" name="csrf" value="<%= runCsrf %>">
+        <button class="btn btn-secondary" type="submit">Run weekly draft now (force)</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h3>Generation failures</h3>
+      <% if (!failures.length) { %>
+        <p class="muted">No failed weekly runs.</p>
+      <% } else { %>
+        <table>
+          <thead><tr><th>Week</th><th>Attempt</th><th>Error</th><th>Retry</th></tr></thead>
+          <tbody>
+            <% failures.forEach(run => { %>
+              <tr>
+                <td><%= run.week_key %></td>
+                <td><%= run.attempt %></td>
+                <td><%= run.error_detail || '—' %></td>
+                <td>
+                  <form method="post" action="/admin/podcasts/runs/<%= run.id %>/retry">
+                    <input type="hidden" name="csrf" value="<%= runCsrf %>">
+                    <button class="btn btn-secondary" type="submit">Retry</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </section>
+
+    <section class="card">
+      <h3>Recent generation runs</h3>
+      <table>
+        <thead><tr><th>Week</th><th>Status</th><th>Attempt</th><th>Episode</th><th>Updated</th></tr></thead>
+        <tbody>
+          <% if (!runs.length) { %><tr><td colspan="5">No runs yet.</td></tr><% } %>
+          <% runs.forEach(run => { %>
+            <tr>
+              <td><%= run.week_key %></td>
+              <td><%= run.status %></td>
+              <td><%= run.attempt %></td>
+              <td><% if (run.episode_id) { %><a href="/admin/podcasts/episodes/<%= run.episode_id %>">Open</a><% } else { %>—<% } %></td>
+              <td><%= run.updated_at %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+
+    <h3>Episodes</h3>
     <table>
-      <thead><tr><th>Episode</th><th>Status</th><th>Updated</th></tr></thead>
+      <thead><tr><th>Episode</th><th>Status</th><th>Week</th><th>Updated</th></tr></thead>
       <tbody>
-        <% if (!episodes.length) { %><tr><td colspan="3">No episodes yet.</td></tr><% } %>
+        <% if (!episodes.length) { %><tr><td colspan="4">No episodes yet.</td></tr><% } %>
         <% episodes.forEach(ep => { %>
           <tr>
             <td><a href="/admin/podcasts/episodes/<%= ep.id %>"><%= ep.title %></a></td>
             <td><%= ep.status %></td>
+            <td><%= ep.week_key || '—' %></td>
             <td><%= ep.updated_at %></td>
           </tr>
         <% }) %>
@@ -37,7 +132,7 @@
     </table>
 
     <form class="card" method="post" action="/admin/podcasts/episodes">
-      <h3>Create episode</h3>
+      <h3>Create episode manually</h3>
       <input type="hidden" name="csrf" value="<%= createCsrf %>">
       <label>Title <input name="title" required></label>
       <label>Description <textarea name="description" rows="3" required></textarea></label>
