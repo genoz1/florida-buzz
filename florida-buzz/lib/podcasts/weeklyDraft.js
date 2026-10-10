@@ -5,6 +5,7 @@ const { weekKeyEt, matchesGenerateSlot } = require('./timeEt');
 const { collectWeeklySources } = require('./sourceCollector');
 const { generateOutline, generateConversation } = require('./script');
 const { ensureShowNotesDisclosures, AFFILIATION_DISCLOSURE, AI_ANECDOTE_DISCLOSURE } = require('./hosts');
+const { buildResourcesMentionedHtml, trackedSiteUrl } = require('./siteResources');
 const { notifyDraftReady } = require('./notify');
 const { slugify } = require('./validation');
 
@@ -24,27 +25,39 @@ function defaultSettings(showSlug = DISNEY_SHOW_SLUG) {
   };
 }
 
-function buildShowNotesHtml({ episodeTitle, sources, site }) {
+function buildShowNotesHtml({ episodeTitle, sources, site, episode = {} }) {
   const articles = sources.filter((s) => s.source_kind === 'article' && s.included !== false);
   const guides = sources.filter((s) => s.source_kind === 'guide' && s.included !== false);
   const buzz = sources.filter((s) => s.source_kind === 'buzz_board' && s.included !== false);
   const evergreen = sources.filter((s) => s.source_kind === 'evergreen_topic' && s.included !== false);
+  const epMeta = { slug: episode.slug, week_key: episode.week_key };
 
   const linkList = (items) =>
     items.length
-      ? `<ul>${items.map((s) => `<li><a href="${s.url}">${escape(s.title)}</a></li>`).join('')}</ul>`
+      ? `<ul>${items
+          .map((s) => {
+            const href = trackedSiteUrl(s.url, site, epMeta);
+            return `<li><a href="${escape(href)}">${escape(s.title)}</a></li>`;
+          })
+          .join('')}</ul>`
       : '<p>None selected for this draft.</p>';
+
+  const resourcesHtml = buildResourcesMentionedHtml({ sources, site, episode: epMeta });
+  const buzzHome = trackedSiteUrl('/buzz', site, epMeta);
 
   const html = `
 <p>${escape(episodeTitle)} — a Florida Buzz: Disney conversation with Gena and Diane.</p>
 <p>Facts about prices, policies, hours, attraction status, and wait times are drawn only from the approved Florida Buzz sources linked below. Personal stories may be dramatized or composite.</p>
+<h2>Florida Buzz Resources Mentioned</h2>
+<p>Direct links to every article, guide, tool, and Buzz Board discussion referenced for this episode (with podcast tracking parameters):</p>
+${resourcesHtml}
 <h2>This week’s Florida Buzz articles</h2>
 ${linkList(articles)}
 <h2>Guides &amp; planning references</h2>
 ${linkList(guides)}
 <h2>Buzz Board questions we discuss</h2>
 ${linkList(buzz)}
-<p>Have a take? Visit the <a href="${site}/buzz">Buzz Board</a> and add your answer.</p>
+<p>Have a take? Visit the <a href="${escape(buzzHome)}">Buzz Board</a> and add your answer.</p>
 <h2>Evergreen discussion</h2>
 ${linkList(evergreen)}
 <p>${AFFILIATION_DISCLOSURE}</p>
@@ -166,25 +179,26 @@ async function createWeeklyDraft({
     const collection = await collectWeeklySources(supabase, { weekKey, env, now });
     const copy = await buildEpisodeCopy({ aiText, weekKey, collection });
     const slugBase = slugify(`weekly-${weekKey}-a${attempt}`);
-    const showNotes = buildShowNotesHtml({
-      episodeTitle: copy.title,
-      sources: collection.sources,
-      site: collection.site,
-    });
-
     const episode = await store.createEpisode(show.id, {
       title: copy.title,
       description: copy.description,
       slug: slugBase,
-      show_notes_html: showNotes,
+      show_notes_html: '',
       episode_number: null,
       artwork_alt: show.cover_alt || show.title,
+    });
+    const showNotes = buildShowNotesHtml({
+      episodeTitle: copy.title,
+      sources: collection.sources,
+      site: collection.site,
+      episode: { slug: slugBase, week_key: weekKey },
     });
     await store.updateEpisode(episode.id, {
       week_key: weekKey,
       generation_run_id: run.id,
       artwork_url: show.cover_url,
       artwork_alt: show.cover_alt || show.title,
+      show_notes_html: showNotes,
     });
 
     for (const source of collection.sources) {

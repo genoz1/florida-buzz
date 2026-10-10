@@ -95,6 +95,13 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /timeless composite/i);
   assert.match(conversation.user, /AI-generated hosts/);
   assert.match(conversation.system, /taking turns reading article summaries/i);
+  assert.match(conversation.system, /The Florida Buzz dot com/i);
+  assert.match(conversation.system, /3–5 natural Florida Buzz references/);
+  assert.match(conversation.system, /never read long URLs/i);
+  assert.match(outline.system, /Resource:/);
+  assert.match(conversation.user, /\/wait-times/);
+  assert.match(conversation.user, /\/planner/);
+  assert.match(conversation.user, /\/dining/);
 });
 
 test('script sections split for long episodes and keep dialogue prefixes', () => {

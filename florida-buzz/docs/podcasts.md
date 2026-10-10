@@ -101,7 +101,17 @@ Gena and Diane are longtime friends — Disney-loving Central Florida moms in th
 
 Every full episode outline/script should include 2–3 brief topic-linked park anecdotes with reactions/callbacks. Never invent dated news facts, wait times, closures, prices, or policies outside approved weekly sources; use timeless composites when needed.
 
-Every episode’s show notes must include:
+### Drive listeners to TheFloridaBuzz.com
+
+Hosts should naturally reference verified Florida Buzz resources (about 3–5 times per 25–35 minute episode): articles under discussion, `/guides`, `/guide/disney-world-planning`, `/dining`, `/wait-times`, `/planner`, and `/buzz`. Say “The Florida Buzz dot com” aloud — never long URLs. Explain briefly how each resource helps; vary wording; let the other host react; avoid interrupting personal/funny moments with a promo. Close with a concise reminder that articles, guides, dining, wait times, day planner, and Buzz Board live at The Florida Buzz dot com.
+
+Show notes include a **Florida Buzz Resources Mentioned** section with direct tracked links:
+
+`utm_source=florida_buzz_podcast&utm_medium=podcast&utm_campaign=florida_buzz_disney&utm_content=<episode-slug>`
+
+Only promote pages/features that currently exist. Never invent guides, tools, wait times, or URLs.
+
+Every episode’s show notes must also include:
 
 > Florida Buzz uses AI-generated hosts. Personal anecdotes may be dramatized or composite experiences created for entertainment.
 

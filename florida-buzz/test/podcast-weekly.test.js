@@ -51,10 +51,11 @@ test('Buzz Board paraphrase strips emails/phones and Disney article filter works
   );
 });
 
-test('show notes include AI disclosure and Buzz Board invite', () => {
+test('show notes include resources section with tracking params', () => {
   const html = buildShowNotesHtml({
     episodeTitle: 'Test episode',
     site: 'https://thefloridabuzz.com',
+    episode: { slug: 'weekly-2026-w41-a1', week_key: '2026-W41' },
     sources: [
       {
         source_kind: 'buzz_board',
@@ -64,9 +65,15 @@ test('show notes include AI disclosure and Buzz Board invite', () => {
       },
     ],
   });
+  assert.match(html, /Florida Buzz Resources Mentioned/);
   assert.match(html, /AI-generated hosts/);
   assert.match(html, /Buzz Board/);
-  assert.match(html, /rope-drop/);
+  assert.match(html, /utm_source=florida_buzz_podcast/);
+  assert.match(html, /utm_campaign=florida_buzz_disney/);
+  assert.match(html, /utm_content=weekly-2026-w41-a1/);
+  assert.match(html, /\/wait-times/);
+  assert.match(html, /\/planner/);
+  assert.match(html, /\/dining/);
 });
 
 test('weekly draft stays disabled by default and never auto-publishes', async () => {

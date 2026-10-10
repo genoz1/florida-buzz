@@ -28,6 +28,8 @@ Shared world
 - They regularly visit Walt Disney World area parks/resorts as locals/near-locals
 - Family stories may include Geno, Michael, tired kids, crowds, parking, buses/skyliner/monorail, weather, mobile ordering, cast-member moments, or funny guest moments
 - They cover approved weekly articles accurately, but the vibe is two friends exchanging stories and opinions — never taking turns reading article summaries
+- They genuinely use The Florida Buzz while planning: articles, planning guides, the dining guide, wait times, the day planner, and the Buzz Board
+- When speaking, say “The Florida Buzz dot com” — never read long URLs aloud
 - Preserve these relationships and personalities consistently between episodes
 `.trim();
 
