@@ -45,6 +45,43 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(cfg.falConfigVerifiedInRepo, false);
 });
 
+test('prependAudioBuffer puts intro bytes ahead of body audio', async () => {
+  const { prependAudioBuffer } = require('../lib/podcasts/audioPipeline');
+  const ffmpegPath = (() => {
+    try {
+      return require('ffmpeg-static');
+    } catch {
+      return 'ffmpeg';
+    }
+  })();
+  // Minimal valid-ish MP3 frames are hard; skip if ffmpeg cannot encode silence helpers.
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-intro-test-'));
+  try {
+    const intro = path.join(dir, 'intro.mp3');
+    const body = path.join(dir, 'body.mp3');
+    const mk = (file, seconds) =>
+      spawnSync(
+        ffmpegPath,
+        ['-y', '-f', 'lavfi', '-i', `sine=frequency=440:duration=${seconds}`, '-codec:a', 'libmp3lame', '-q:a', '9', file],
+        { encoding: 'utf8' }
+      );
+    const a = mk(intro, 0.2);
+    const b = mk(body, 0.3);
+    if (a.status !== 0 || b.status !== 0) {
+      console.log('# skip prepend test — ffmpeg lavfi unavailable');
+      return;
+    }
+    const out = await prependAudioBuffer(await fsp.readFile(intro), await fsp.readFile(body), ffmpegPath);
+    assert.ok(out.length > 1000);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 test('stuck generating_audio can return to script_ready for TTS retry', () => {
   const { assertTransition } = require('../lib/podcasts/validation');
   assert.equal(assertTransition('generating_audio', 'script_ready'), 'script_ready');

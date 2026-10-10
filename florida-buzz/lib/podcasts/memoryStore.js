@@ -83,6 +83,15 @@ function createMemoryStore() {
     async getShow(slug) {
       return showBySlug(slug);
     },
+    async getShowById(showId) {
+      return state.shows.find((s) => s.id === showId) || null;
+    },
+    async updateShow(showId, patch) {
+      const show = state.shows.find((s) => s.id === showId);
+      if (!show) throw new Error('Show not found');
+      Object.assign(show, patch, { updated_at: now() });
+      return show;
+    },
     async listPlatformLinks(showId) {
       return state.platformLinks.filter((l) => l.show_id === showId).sort((a, b) => a.sort_order - b.sort_order);
     },

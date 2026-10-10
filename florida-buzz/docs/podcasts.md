@@ -76,7 +76,7 @@ FAL_KEY=<set securely in DO; never commit>
 4. Public routes mount unless `PODCASTS_ENABLED=false`.
 5. Keep `PODCASTS_GENERATION_ENABLED=false` until a future episode is explicitly approved for generation.
 6. Do not submit the RSS feed to Apple/Spotify until approved.
-7. Optional intro/outro audio fields exist on `podcast_shows`; supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
+7. Show intro: approved `florida-buzz-park-intro-trimmed-v6.mp3` is stored on `podcast_shows.intro_audio_url`. Episode **Generate private preview** prepends that intro before the fal dialogue (trailer episode stays untouched). Supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
 
 ## Weekly draft schedule (America/New_York)
 

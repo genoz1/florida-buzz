@@ -22,6 +22,21 @@ function createSupabaseStore(client) {
       const rows = await checked(client.from('podcast_shows').select('*').eq('slug', slug).maybeSingle());
       return rows || null;
     },
+    async getShowById(showId) {
+      return (
+        (await checked(client.from('podcast_shows').select('*').eq('id', showId).maybeSingle())) || null
+      );
+    },
+    async updateShow(showId, patch) {
+      return checked(
+        client
+          .from('podcast_shows')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('id', showId)
+          .select('*')
+          .single()
+      );
+    },
     async listPlatformLinks(showId) {
       return checked(
         client.from('podcast_platform_links').select('*').eq('show_id', showId).order('sort_order')
