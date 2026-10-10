@@ -45,6 +45,40 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(cfg.falConfigVerifiedInRepo, false);
 });
 
+test('describeAudioProgress distinguishes LIVE heartbeats from DEAD running jobs', () => {
+  const { describeAudioProgress } = require('../lib/podcasts/audioStatus');
+  const now = Date.parse('2026-10-10T21:30:00.000Z');
+  const live = describeAudioProgress({
+    episode: { status: 'generating_audio', audio_url: null },
+    jobs: [
+      {
+        status: 'running',
+        section_index: 4,
+        section_count: 9,
+        updated_at: '2026-10-10T21:29:40.000Z',
+      },
+    ],
+    now,
+  });
+  assert.equal(live.state, 'live');
+  assert.match(live.sectionLabel, /5\/9/);
+
+  const dead = describeAudioProgress({
+    episode: { status: 'generating_audio', audio_url: null },
+    jobs: [
+      {
+        status: 'running',
+        section_index: 4,
+        section_count: 9,
+        updated_at: '2026-10-10T21:20:00.000Z',
+      },
+    ],
+    now,
+  });
+  assert.equal(dead.state, 'stalled');
+  assert.match(dead.label, /DEAD/i);
+});
+
 test('prependAudioBuffer puts intro bytes ahead of body audio', async () => {
   const { prependAudioBuffer } = require('../lib/podcasts/audioPipeline');
   const ffmpegPath = (() => {

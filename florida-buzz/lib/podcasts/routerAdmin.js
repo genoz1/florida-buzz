@@ -18,6 +18,7 @@ const { defaultSettings, createWeeklyDraft } = require('./weeklyDraft');
 const { describeSchedule, WEEKDAY_NAMES } = require('./timeEt');
 const { EVERGREEN_TOPICS } = require('./evergreenTopics');
 const { recoverStuckPodcastWork } = require('./recoverStuck');
+const { describeAudioProgress } = require('./audioStatus');
 
 function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, sendEmail = null, env = process.env }) {
   const router = express.Router();
@@ -204,6 +205,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       const jobs = await store.listJobs(episode.id);
       const outline = await store.latestScript(episode.id, 'outline');
       const conversation = await store.latestScript(episode.id, 'conversation');
+      const audioProgress = describeAudioProgress({ episode, jobs });
       res.render('admin-podcast-episode', {
         show,
         episode,
@@ -211,12 +213,40 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
         jobs,
         outline,
         conversation,
+        audioProgress,
         cfg,
         evergreenTopics: EVERGREEN_TOPICS,
         csrf: csrf(episode.id),
         createCsrf: csrf('create'),
         notice: req.query.notice || null,
         error: req.query.error || null,
+      });
+    })
+  );
+
+  router.get(
+    '/episodes/:id/audio-status',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).json({ error: 'Episode not found' });
+      const jobs = await store.listJobs(episode.id);
+      const progress = describeAudioProgress({ episode, jobs });
+      res.json({
+        episode_id: episode.id,
+        episode_status: episode.status,
+        audio_url: episode.audio_url || null,
+        last_error: episode.last_error || null,
+        progress,
+        jobs: jobs.slice(0, 5).map((job) => ({
+          id: job.id,
+          status: job.status,
+          section_index: job.section_index,
+          section_count: job.section_count,
+          updated_at: job.updated_at,
+          error_detail: job.error_detail,
+          heartbeat_at: job.result?.heartbeat_at || null,
+          phase: job.result?.phase || null,
+        })),
       });
     })
   );
@@ -402,17 +432,43 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
           `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Refusing fal TTS on scaffold script. Generate a full AI script first.')}`
         );
       }
-      // Still synchronous for v1 clarity — never publishes. Prefer generating from this
-      // page (not weekly draft) so a gateway timeout does not orphan the weekly run.
-      try {
-        await pipeline.generatePreview(episode, script);
-      } catch (err) {
-        await store.updateEpisode(episode.id, {
-          last_error: `Audio generation failed: ${String(err.message || err).slice(0, 500)}`,
-        });
-        throw err;
+      const existingJobs = await store.listJobs(episode.id);
+      const current = describeAudioProgress({ episode, jobs: existingJobs });
+      if (current.state === 'live') {
+        return res.redirect(
+          303,
+          `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('Audio generation is already LIVE — wait for it to finish. Do not start another.')}`
+        );
       }
-      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=preview-ready`);
+      for (const job of existingJobs) {
+        if (job.status === 'running' || job.status === 'queued') {
+          await store.updateJob(job.id, {
+            status: 'failed',
+            error_detail: 'Marked failed: superseded or no longer heartbeating before a new generate request',
+          });
+        }
+      }
+      // Respond immediately so the platform gateway cannot 503 a 20+ minute fal run.
+      // Work continues in-process; the audio-status poller reports LIVE via heartbeats.
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('audio-started — watch the LIVE/DEAD status panel (not the old timer).')}`
+      );
+      setImmediate(() => {
+        Promise.resolve()
+          .then(() => pipeline.generatePreview(episode, script))
+          .catch(async (err) => {
+            console.error('[podcasts] background preview failed:', err.message);
+            try {
+              await store.updateEpisode(episode.id, {
+                status: 'failed',
+                last_error: `Audio generation failed: ${String(err.message || err).slice(0, 500)}`,
+              });
+            } catch (updateErr) {
+              console.error('[podcasts] failed to persist preview error:', updateErr.message);
+            }
+          });
+      });
     })
   );
 
@@ -427,6 +483,15 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
           303,
           `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Reset is only for generating_audio or failed episodes')}`
         );
+      }
+      const jobs = await store.listJobs(episode.id);
+      for (const job of jobs) {
+        if (job.status === 'running' || job.status === 'queued') {
+          await store.updateJob(job.id, {
+            status: 'failed',
+            error_detail: 'Marked failed by Reset stuck audio',
+          });
+        }
       }
       try {
         await store.setStatus(episode.id, 'script_ready');

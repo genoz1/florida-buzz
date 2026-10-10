@@ -14,35 +14,16 @@
     .status{font-weight:700;text-transform:uppercase}
     audio{width:100%;margin-top:8px}
     ul.jobs{font-size:14px}
-    .working-banner{
-      position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
-      background:rgba(24,42,52,.72);color:#fff;padding:24px;text-align:center
-    }
-    .working-banner.on{display:flex}
-    .working-card{background:#0e3b43;max-width:460px;padding:28px 24px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
-    .working-card strong{display:block;font-size:1.25rem;margin-bottom:10px}
-    .working-card .elapsed{font-variant-numeric:tabular-nums;font-size:1.1rem;margin:12px 0}
+    .audio-live{background:#e7f7ee;border:1px solid #9dceb0}
+    .audio-stalled,.audio-failed{background:#fde8e4;border:1px solid #e2a59a}
+    .audio-done{background:#eef5f6;border:1px solid #b7c9cd}
+    .audio-uncertain,.audio-idle{background:#fff8e8;border:1px solid #e2d2a8}
+    #audioStatusPanel{padding:14px;margin:12px 0}
+    #audioStatusPanel strong{display:block;margin-bottom:6px}
     .btn[disabled]{opacity:.65;cursor:wait}
   </style>
 </head>
 <body>
-  <div id="workingBanner" class="working-banner<%= episode.status === 'generating_audio' ? ' on' : '' %>" role="status" aria-live="polite">
-    <div class="working-card">
-      <strong id="workingTitle"><%= episode.status === 'generating_audio' ? 'Audio generation may still be running' : 'Working…' %></strong>
-      <p id="workingDetail">
-        <% if (episode.status === 'generating_audio') { %>
-          Status is <code>generating_audio</code>. Refresh this page in another tab to check for an audio player or updated generation jobs. If nothing changes for ~15 minutes, close this overlay and use Reset stuck audio.
-        <% } else { %>
-          Keep this tab open. Full script/audio jobs can take many minutes with no other page change until they finish.
-        <% } %>
-      </p>
-      <p class="elapsed">Elapsed: <span id="workingElapsed">0:00</span></p>
-      <p style="margin:0;font-size:0.95rem;opacity:.9">Do not click Generate again. Do not redeploy.</p>
-      <% if (episode.status === 'generating_audio') { %>
-        <p style="margin-top:16px"><button type="button" class="btn btn-secondary" id="dismissWorking">Hide this message</button></p>
-      <% } %>
-    </div>
-  </div>
   <p><a href="/admin/podcasts">&larr; All episodes</a></p>
   <h1><%= episode.title %></h1>
   <p>Status: <span class="status"><%= episode.status %></span>
@@ -150,28 +131,35 @@
 
   <section class="card">
     <h2>Audio</h2>
+    <% const ap = typeof audioProgress !== 'undefined' && audioProgress ? audioProgress : { state: 'idle', label: 'No audio generation in progress', detail: '', sectionLabel: null }; %>
+    <div id="audioStatusPanel" class="audio-<%= ap.state %>" data-episode-id="<%= episode.id %>">
+      <strong id="audioStatusLabel"><%= ap.label %></strong>
+      <p id="audioStatusDetail" style="margin:0 0 8px"><%= ap.detail %></p>
+      <p id="audioStatusMeta" style="margin:0;color:#5b6b73;font-size:0.95rem">
+        Episode status: <code id="audioEpisodeStatus"><%= episode.status %></code>
+        · <span id="audioSectionLabel"><%= ap.sectionLabel || 'no active section' %></span>
+        · heartbeat age: <span id="audioHeartbeatAge"><%= ap.ageMs == null ? 'n/a' : Math.round(ap.ageMs / 1000) + 's' %></span>
+      </p>
+    </div>
     <% if (episode.audio_url) { %>
       <p>Current master (permanent URL preferred):</p>
-      <audio controls preload="metadata" src="<%= episode.audio_url %>"></audio>
+      <audio id="episodeAudio" controls preload="metadata" src="<%= episode.audio_url %>"></audio>
       <p>
         <a class="btn btn-secondary" href="/admin/podcasts/episodes/<%= episode.id %>/audio" target="_blank" rel="noopener">Preview / download audio</a>
       </p>
     <% } else { %>
-      <p>No master audio yet. With <code>PODCASTS_GENERATION_ENABLED=false</code>, weekly drafts stop at script/show notes until you generate or upload audio.</p>
+      <p id="noAudioYet">No master audio yet.</p>
     <% } %>
-    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/generate-audio" data-long-job="audio">
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/generate-audio" id="generateAudioForm">
       <input type="hidden" name="csrf" value="<%= csrf %>">
-      <button class="btn" type="submit" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (fal TTS)</button>
+      <button class="btn" type="submit" id="generateAudioBtn" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (fal TTS)</button>
     </form>
-    <p class="muted" id="audioJobHint" style="color:#5b6b73">After you click Generate, a full-screen “Working…” timer appears. The page will not update until fal finishes or errors.</p>
-    <% if (episode.status === 'generating_audio' || episode.status === 'failed') { %>
-      <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reset-stuck-audio" style="margin-top:8px">
-        <input type="hidden" name="csrf" value="<%= csrf %>">
-        <button class="btn btn-secondary" type="submit">Reset stuck audio → script_ready</button>
-      </form>
-      <p class="notice">If status stays <code>generating_audio</code> for more than ~15 minutes with no audio player, the web request likely timed out. Reset, then generate preview again.</p>
-    <% } %>
-    <p>Weekly draft no longer auto-runs fal TTS (avoids gateway timeouts). Generate preview from this page after the full script is ready. Enabling <code>PODCASTS_GENERATION_ENABLED</code> incurs fal.ai charges.</p>
+    <p style="color:#5b6b73">This page polls the server every 5s. <strong>LIVE</strong> means heartbeats are fresh. <strong>DEAD</strong> means the process stopped (503/redeploy) even if an old job line still says running.</p>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reset-stuck-audio" style="margin-top:8px" id="resetAudioForm">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn btn-secondary" type="submit" id="resetAudioBtn">Reset stuck audio → script_ready</button>
+    </form>
+    <p>Weekly draft no longer auto-runs fal TTS. Generate preview from this page after the full script is ready. Enabling <code>PODCASTS_GENERATION_ENABLED</code> incurs fal.ai charges.</p>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-audio" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <label>Upload replacement MP3 <input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>
@@ -218,56 +206,55 @@
   </section>
   <script>
     (function () {
-      var banner = document.getElementById('workingBanner');
-      var title = document.getElementById('workingTitle');
-      var detail = document.getElementById('workingDetail');
-      var elapsedEl = document.getElementById('workingElapsed');
-      var dismiss = document.getElementById('dismissWorking');
-      var started = Date.now();
-      var timer = null;
+      var panel = document.getElementById('audioStatusPanel');
+      if (!panel) return;
+      var episodeId = panel.getAttribute('data-episode-id');
+      var labelEl = document.getElementById('audioStatusLabel');
+      var detailEl = document.getElementById('audioStatusDetail');
+      var statusEl = document.getElementById('audioEpisodeStatus');
+      var sectionEl = document.getElementById('audioSectionLabel');
+      var ageEl = document.getElementById('audioHeartbeatAge');
+      var genBtn = document.getElementById('generateAudioBtn');
+      var states = ['live', 'stalled', 'failed', 'done', 'uncertain', 'idle'];
 
-      function fmt(ms) {
-        var s = Math.floor(ms / 1000);
-        var m = Math.floor(s / 60);
-        s = s % 60;
-        return m + ':' + String(s).padStart(2, '0');
-      }
-
-      function tick() {
-        if (elapsedEl) elapsedEl.textContent = fmt(Date.now() - started);
-      }
-
-      function showWorking(kind) {
-        started = Date.now();
-        if (title) title.textContent = kind === 'script' ? 'Generating full script…' : 'Generating private preview audio…';
-        if (detail) {
-          detail.textContent = kind === 'script'
-            ? 'OpenAI is writing the full episode. This can take several minutes. Keep this tab open.'
-            : 'fal TTS is building the episode (and intro). This often takes 10–30+ minutes for a full show. Keep this tab open.';
+      function apply(data) {
+        var p = data.progress || {};
+        states.forEach(function (s) { panel.classList.remove('audio-' + s); });
+        panel.classList.add('audio-' + (p.state || 'idle'));
+        if (labelEl) labelEl.textContent = p.label || 'Status unknown';
+        if (detailEl) detailEl.textContent = p.detail || '';
+        if (statusEl) statusEl.textContent = data.episode_status || '';
+        if (sectionEl) sectionEl.textContent = p.sectionLabel || 'no active section';
+        if (ageEl) {
+          ageEl.textContent = p.ageMs == null ? 'n/a' : Math.round(p.ageMs / 1000) + 's';
         }
-        if (banner) banner.classList.add('on');
-        document.querySelectorAll('button, input[type=submit]').forEach(function (el) {
-          el.disabled = true;
-        });
-        tick();
-        if (timer) clearInterval(timer);
-        timer = setInterval(tick, 1000);
+        if (genBtn) {
+          genBtn.disabled = p.state === 'live' || <%= cfg.generation ? 'false' : 'true' %>;
+        }
+        if (p.state === 'done' && data.audio_url && !document.getElementById('episodeAudio')) {
+          window.location.reload();
+        }
       }
 
-      document.querySelectorAll('form[data-long-job]').forEach(function (form) {
-        form.addEventListener('submit', function () {
-          showWorking(form.getAttribute('data-long-job') || 'job');
-        });
-      });
-
-      if (banner && banner.classList.contains('on')) {
-        tick();
-        timer = setInterval(tick, 1000);
+      async function poll() {
+        try {
+          var res = await fetch('/admin/podcasts/episodes/' + episodeId + '/audio-status', {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!res.ok) return;
+          apply(await res.json());
+        } catch (e) { /* keep last known status */ }
       }
-      if (dismiss) {
-        dismiss.addEventListener('click', function () {
-          banner.classList.remove('on');
-          if (timer) clearInterval(timer);
+
+      poll();
+      setInterval(poll, 5000);
+
+      var scriptForm = document.querySelector('form[data-long-job="script"]');
+      if (scriptForm) {
+        scriptForm.addEventListener('submit', function () {
+          if (detailEl) detailEl.textContent = 'Generating full script with OpenAI — keep this tab open…';
         });
       }
     })();
