@@ -22,7 +22,7 @@ function seedShow() {
     title: 'Florida Buzz: Disney',
     publisher: 'The Florida Buzz',
     description:
-      'Gena and Diane are Disney-loving Central Florida moms who visit the parks frequently and discuss park news, attractions, food, resorts, events, planning advice, and their personal experiences. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.',
+      'Gena and Diane are Disney-loving Central Florida moms who visit Walt Disney World frequently and talk through park news, attractions, food, resorts, events, and Disney World vacation planning. They cover Magic Kingdom, EPCOT, Disney’s Animal Kingdom, Hollywood Studios, wait times, dining, and practical trip tips. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.',
     hosts: [{ name: 'Gena', role: 'host' }, { name: 'Diane', role: 'host' }],
     disclosure: DEFAULT_DISCLOSURE,
     language: 'en-us',
