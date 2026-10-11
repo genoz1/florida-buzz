@@ -4,7 +4,7 @@ const { renderBuzzSocialImage } = require('./buzzSocialImage');
 
 const IMAGE_BUCKET = 'article-images';
 // Versioned card filenames so older photorealistic Buzz photos are not reused.
-const CARD_VERSION = 'qotd-v3';
+const CARD_VERSION = 'qotd-v4';
 
 // Facebook-only presentation copy. The underlying Buzz Board questions and
 // records remain untouched; this is the shorter, feed-native framing used by

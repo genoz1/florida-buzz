@@ -46,13 +46,13 @@ test('Facebook keeps its clean Florida Buzz redirect and uses a discussion-speci
   );
   assert.equal(
     facebookImageFilename('what-universal-does-better-than-disney'),
-    'facebook-buzz-qotd-v3-what-universal-does-better-than-disney.png'
+    'facebook-buzz-qotd-v4-what-universal-does-better-than-disney.png'
   );
 });
 
 test('Instagram keeps its square discussion card and honest short discussion path', () => {
   const slug = 'what-universal-does-better-than-disney';
-  assert.equal(instagramImageFilename(slug), `instagram-buzz-qotd-v3-${slug}.png`);
+  assert.equal(instagramImageFilename(slug), `instagram-buzz-qotd-v4-${slug}.png`);
   assert.equal(
     buildInstagramShortTrackingUrl(slug),
     `https://thefloridabuzz.com/go/ig/${slug}`
@@ -111,15 +111,15 @@ test('Instagram Buzz Board creative mirrors the Facebook QOTD card square', asyn
   const client = { storage: { from: () => bucket } };
   const url = await ensureInstagramBuzzImage({ slug: 'rope-drop-or-slow-disney-morning' }, {
     client,
-    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-qotd-v3-rope-drop-or-slow-disney-morning.png',
+    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-qotd-v4-rope-drop-or-slow-disney-morning.png',
     store: async (buffer, filename, contentType) => {
       stored = { buffer, filename, contentType };
       return `https://storage.example/${filename}`;
     },
   });
-  assert.equal(url, 'https://storage.example/instagram-buzz-qotd-v3-rope-drop-or-slow-disney-morning.png');
+  assert.equal(url, 'https://storage.example/instagram-buzz-qotd-v4-rope-drop-or-slow-disney-morning.png');
   assert.equal(stored.contentType, 'image/png');
-  assert.equal(stored.filename, 'instagram-buzz-qotd-v3-rope-drop-or-slow-disney-morning.png');
+  assert.equal(stored.filename, 'instagram-buzz-qotd-v4-rope-drop-or-slow-disney-morning.png');
   assert.deepEqual(imageSize(stored.buffer), { height: 1080, type: 'png', width: 1080 });
 });
 

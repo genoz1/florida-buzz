@@ -12,26 +12,24 @@ const {
 
 const WIDTH = 1080;
 const HEIGHT = 1080;
-const QUESTION_WIDTH = 820;
-const QUESTION_HEIGHT = 400;
+const QUESTION_WIDTH = 760;
+const QUESTION_HEIGHT = 420;
 
-// Florida Buzz brand colors — theme-park energy without Disney trademark art
+// Florida Buzz brand colors — premium QOTD card, no Disney trademark art
 // (no Mickey, no official castle, no Disney wordmark/font).
 const COLORS = {
-  cream: 0xf8f3e8ff,
-  paper: 0xfffcf5ff,
-  night: 0x081c28ff,
   teal: 0x0e3b43ff,
-  tealSoft: 0x15525cff,
+  tealMid: 0x15525cff,
+  tealDeep: 0x0a2d33ff,
   coral: 0xff6452ff,
   coralDeep: 0xe8492fff,
   gold: 0xc9a227ff,
-  goldSoft: 0xe7bf55ff,
-  sand: 0xf2e8d5ff,
-  ink: 0x1f2421ff,
-  muted: 0x4a5350ff,
+  sand: 0xf5efe3ff,
+  paper: 0xfffcf7ff,
+  ink: 0x1a2220ff,
+  muted: 0x5a6562ff,
   white: 0xffffffff,
-  sky: 0x12364aff,
+  shadow: 0x061a20aa,
 };
 
 const CATEGORY_ACCENTS = {
@@ -89,111 +87,80 @@ function rectangle(width, height, color) {
   return new Jimp({ width, height, color });
 }
 
-function paintSparkle(image, x, y, size, color) {
-  const half = Math.max(2, Math.floor(size / 2));
-  image.composite(rectangle(size, Math.max(2, Math.floor(size / 4)), color), x, y + half - 1);
-  image.composite(rectangle(Math.max(2, Math.floor(size / 4)), size, color), x + half - 1, y);
-}
-
-function paintFirework(image, cx, cy, color, radius = 36) {
-  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 10) {
-    for (let r = 10; r <= radius; r += 7) {
-      const x = Math.round(cx + Math.cos(angle) * r - 2);
-      const y = Math.round(cy + Math.sin(angle) * r - 2);
-      image.composite(rectangle(4, 4, color), x, y);
+/** Soft rounded panel via concentric inset rectangles (Jimp has no path API). */
+function paintRoundedPanel(image, x, y, w, h, color, radius = 28) {
+  const r = Math.min(radius, Math.floor(Math.min(w, h) / 2));
+  image.composite(rectangle(w - r * 2, h, color), x + r, y);
+  image.composite(rectangle(w, h - r * 2, color), x, y + r);
+  // Corner fills as stepped blocks for a soft radius read at social scale.
+  for (let i = 0; i < r; i += 1) {
+    const inset = Math.round(r - Math.sqrt(Math.max(0, r * r - (r - i) * (r - i))));
+    const span = w - inset * 2;
+    if (span > 0) {
+      image.composite(rectangle(span, 1, color), x + inset, y + i);
+      image.composite(rectangle(span, 1, color), x + inset, y + h - 1 - i);
     }
   }
-  image.composite(rectangle(8, 8, COLORS.goldSoft), cx - 4, cy - 4);
 }
 
-function paintPalm(image, baseX, baseY, color = COLORS.tealSoft) {
-  // Simple geometric Florida palm — not a character or trademark.
-  image.composite(rectangle(10, 90, color), baseX, baseY);
-  image.composite(rectangle(54, 10, color), baseX - 22, baseY + 8);
-  image.composite(rectangle(48, 10, color), baseX - 18, baseY + 22);
-  image.composite(rectangle(40, 10, color), baseX - 14, baseY + 36);
-}
-
-function paintSpeechBubble(image, x, y) {
-  image.composite(rectangle(120, 78, COLORS.coral), x, y);
-  image.composite(rectangle(96, 54, COLORS.white), x + 12, y + 12);
-  image.composite(rectangle(14, 14, COLORS.muted), x + 28, y + 32);
-  image.composite(rectangle(14, 14, COLORS.muted), x + 52, y + 32);
-  image.composite(rectangle(14, 14, COLORS.muted), x + 76, y + 32);
-  image.composite(rectangle(28, 18, COLORS.coral), x + 28, y + 70);
-}
-
-function paintNightSky(image) {
-  // Banded night sky behind the card for Disney-topic energy.
-  image.composite(rectangle(WIDTH, HEIGHT, COLORS.night), 0, 0);
-  for (let i = 0; i < 10; i += 1) {
-    const y = 40 + i * 18;
-    const alphaBand = rectangle(WIDTH, 16, COLORS.sky);
-    image.composite(alphaBand, 0, y);
+function paintSpeechBubble(image, x, y, w, h) {
+  // Soft drop shadow
+  paintRoundedPanel(image, x + 8, y + 12, w, h, COLORS.shadow, 36);
+  // Cream paper bubble
+  paintRoundedPanel(image, x, y, w, h, COLORS.paper, 36);
+  // Coral accent bar along the top edge of the bubble
+  image.composite(rectangle(w - 72, 8, COLORS.coral), x + 36, y);
+  // Smooth-ish speech-bubble tail (fine stepped wedges read as a triangle at 1080)
+  const tailX = x + 88;
+  const tailY = y + h - 4;
+  for (let i = 0; i < 56; i += 1) {
+    const progress = i / 55;
+    const half = Math.max(2, Math.round(34 * (1 - progress)));
+    image.composite(rectangle(half * 2, 1, COLORS.paper), tailX + 34 - half, tailY + i);
   }
-  paintFirework(image, 160, 120, COLORS.coral, 42);
-  paintFirework(image, 920, 140, COLORS.gold, 38);
-  paintFirework(image, 780, 90, COLORS.coralDeep, 28);
-  paintSparkle(image, 260, 70, 18, COLORS.goldSoft);
-  paintSparkle(image, 540, 50, 14, COLORS.white);
-  paintSparkle(image, 680, 110, 16, COLORS.coral);
-  paintPalm(image, 100, 760, 0x0a2e38ff);
-  paintPalm(image, 960, 770, 0x0a2e38ff);
+}
+
+function paintAtmosphere(image) {
+  // Polished brand field: deep teal wash — no fireworks/palms/clipart.
+  image.composite(rectangle(WIDTH, HEIGHT, COLORS.teal), 0, 0);
+  // Soft vertical depth via overlapping mid/deep bands (subtle, not striped)
+  image.composite(rectangle(WIDTH, 180, COLORS.tealMid), 0, 0);
+  image.composite(rectangle(WIDTH, 220, COLORS.tealDeep), 0, HEIGHT - 220);
+  // Thin coral hairlines for a premium editorial frame
+  image.composite(rectangle(WIDTH - 96, 3, COLORS.coral), 48, 48);
+  image.composite(rectangle(WIDTH - 96, 3, COLORS.coral), 48, HEIGHT - 51);
 }
 
 async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
   const normalizedQuestion = normalizeForBitmap(question);
   if (!normalizedQuestion) throw new Error('A complete discussion question is required.');
 
-  const isDisney = category === 'disney';
   const fonts = await loadBuzzFonts();
-  const image = rectangle(WIDTH, HEIGHT, isDisney ? COLORS.night : COLORS.cream);
+  const image = rectangle(WIDTH, HEIGHT, COLORS.tealDeep);
+  paintAtmosphere(image);
 
-  if (isDisney) {
-    paintNightSky(image);
-  }
-
-  // Soft paper field — inset enough that the night-sky / fireworks frame stays visible
-  const paperX = isDisney ? 90 : 60;
-  const paperY = isDisney ? 110 : 70;
-  const paperW = isDisney ? 900 : 960;
-  const paperH = isDisney ? 780 : 860;
-  image.composite(rectangle(paperW, paperH, COLORS.paper), paperX, paperY);
-  image.composite(rectangle(paperW, 10, COLORS.coral), paperX, paperY);
-
-  // Keep fireworks on top of the night frame so they aren't covered by the paper.
-  if (isDisney) {
-    paintFirework(image, 150, 70, COLORS.coral, 34);
-    paintFirework(image, 930, 78, COLORS.gold, 32);
-    paintFirework(image, 540, 48, COLORS.coralDeep, 22);
-    paintPalm(image, 70, 820, 0x0a2e38ff);
-    paintPalm(image, 990, 830, 0x0a2e38ff);
-  }
-
-  // Brand header
-  const headerX = paperX;
-  const headerY = paperY + 10;
-  image.composite(rectangle(paperW, 110, COLORS.teal), headerX, headerY);
-  image.print({ font: fonts.white64, x: headerX + 32, y: headerY + 22, text: 'FLORIDA BUZZ' });
+  // Brand lockup
   image.print({
-    font: fonts.white32,
-    x: headerX + 36,
-    y: headerY + 78,
-    text: isDisney ? 'DISNEY PARK TALK' : 'BUZZ BOARD',
+    font: fonts.white64,
+    x: 0,
+    y: 78,
+    text: {
+      text: 'FLORIDA BUZZ',
+      alignmentX: HorizontalAlign.CENTER,
+    },
+    maxWidth: WIDTH,
   });
 
-  // Ribbon / QOTD banner
-  const bannerText = normalizeForBitmap(
-    eyebrow || (isDisney ? 'DISNEY QUESTION OF THE DAY' : 'QUESTION OF THE DAY')
-  ).toUpperCase();
-  const bannerWidth = Math.min(paperW - 40, Math.max(520, measureText(fonts.white32, bannerText) + 80));
+  // QOTD eyebrow banner
+  const bannerText = normalizeForBitmap(eyebrow || 'QUESTION OF THE DAY').toUpperCase();
+  const bannerWidth = Math.min(920, Math.max(480, measureText(fonts.white32, bannerText) + 72));
   const bannerX = Math.round((WIDTH - bannerWidth) / 2);
-  const bannerY = headerY + 130;
-  image.composite(rectangle(bannerWidth, 70, COLORS.coralDeep), bannerX, bannerY);
+  const bannerY = 168;
+  paintRoundedPanel(image, bannerX, bannerY, bannerWidth, 56, COLORS.coralDeep, 18);
   image.print({
     font: fonts.white32,
     x: bannerX,
-    y: bannerY + 18,
+    y: bannerY + 12,
     text: {
       text: bannerText,
       alignmentX: HorizontalAlign.CENTER,
@@ -204,14 +171,14 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
   // Category chip
   const label = categoryLabel(category);
   const accent = CATEGORY_ACCENTS[category] || COLORS.gold;
-  const chipWidth = Math.max(200, measureText(fonts.white32, label) + 48);
+  const chipWidth = Math.max(180, measureText(fonts.white32, label) + 40);
   const chipX = Math.round((WIDTH - chipWidth) / 2);
-  const chipY = bannerY + 90;
-  image.composite(rectangle(chipWidth, 48, accent), chipX, chipY);
+  const chipY = bannerY + 72;
+  paintRoundedPanel(image, chipX, chipY, chipWidth, 44, accent, 14);
   image.print({
     font: fonts.white32,
     x: chipX,
-    y: chipY + 8,
+    y: chipY + 6,
     text: {
       text: label,
       alignmentX: HorizontalAlign.CENTER,
@@ -219,33 +186,23 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
     maxWidth: chipWidth,
   });
 
-  // Decorative dividers + sparkles / mini fireworks near the question
-  const dividerY = chipY + 70;
-  image.composite(rectangle(240, 4, COLORS.coral), 250, dividerY);
-  image.composite(rectangle(240, 4, COLORS.coral), 590, dividerY);
-  paintSparkle(image, 520, dividerY - 12, 28, COLORS.gold);
-  if (isDisney) {
-    paintFirework(image, paperX + 50, dividerY + 90, COLORS.coral, 20);
-    paintFirework(image, paperX + paperW - 50, dividerY + 110, COLORS.gold, 18);
-  } else {
-    paintSparkle(image, 140, 280, 22, COLORS.coral);
-    paintSparkle(image, 900, 280, 22, COLORS.tealSoft);
-  }
-  paintSparkle(image, paperX + 40, paperY + paperH - 120, 20, COLORS.gold);
-  paintSparkle(image, paperX + paperW - 60, paperY + paperH - 150, 24, COLORS.coral);
+  // Speech-bubble question panel
+  const bubbleX = 90;
+  const bubbleY = 320;
+  const bubbleW = 900;
+  const bubbleH = 520;
+  paintSpeechBubble(image, bubbleX, bubbleY, bubbleW, bubbleH);
 
-  // Question
   const questionHeight = measureTextHeight(fonts.black64, normalizedQuestion, QUESTION_WIDTH);
   if (questionHeight > QUESTION_HEIGHT) {
     throw new Error(
       `Discussion question is too long for the social template (${normalizedQuestion.length} characters).`
     );
   }
-  const questionY = dividerY + 30;
   image.print({
     font: fonts.black64,
-    x: 130,
-    y: questionY,
+    x: bubbleX + 70,
+    y: bubbleY + 48,
     text: {
       text: normalizedQuestion,
       alignmentX: HorizontalAlign.CENTER,
@@ -255,29 +212,28 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
     maxHeight: QUESTION_HEIGHT,
   });
 
-  // Conversation cue
-  const cueY = paperY + paperH - 100;
-  paintSpeechBubble(image, paperX + paperW - 150, cueY - 20);
-  image.print({
-    font: fonts.black32,
-    x: paperX + 40,
-    y: cueY + 10,
-    text: 'Tap the link and leave your answer',
-  });
-
-  // Footer CTA
-  image.composite(rectangle(paperW, 100, COLORS.teal), paperX, 960);
-  image.composite(rectangle(180, 10, COLORS.gold), paperX + 32, 980);
-  image.print({ font: fonts.white32, x: paperX + 32, y: 1000, text: 'JOIN THE BUZZ BOARD' });
+  // Conversation cue under the bubble (not a doodle icon)
   image.print({
     font: fonts.white32,
-    x: paperX + 300,
-    y: 1000,
+    x: 0,
+    y: 920,
+    text: {
+      text: 'Drop your answer in the comments',
+      alignmentX: HorizontalAlign.CENTER,
+    },
+    maxWidth: WIDTH,
+  });
+
+  // Footer brand + URL
+  image.print({
+    font: fonts.white32,
+    x: 0,
+    y: 980,
     text: {
       text: 'thefloridabuzz.com/buzz',
-      alignmentX: HorizontalAlign.RIGHT,
+      alignmentX: HorizontalAlign.CENTER,
     },
-    maxWidth: paperW - 340,
+    maxWidth: WIDTH,
   });
 
   return image.getBuffer('image/png');
