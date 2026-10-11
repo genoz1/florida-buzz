@@ -18,6 +18,8 @@
     "sample:ai-reenactment": "node scripts/ai-story-reenactment.js",
     "facebook:park-reel": "node scripts/facebook-park-reel.js",
     "facebook:park-reel:dry": "DRY_RUN=true node scripts/facebook-park-reel.js",
+    "facebook:feed-drain": "node scripts/facebook-feed-drain.js",
+    "facebook:feed-drain:dry": "DRY_RUN=true node scripts/facebook-feed-drain.js",
     "buzz-facebook-sync": "node scripts/sync-facebook-buzz-comments.js",
     "build:launch-inventory": "node scripts/build-buzz-board-launch.js --write",
     "start": "node server.js",

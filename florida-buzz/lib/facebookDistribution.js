@@ -12,7 +12,7 @@
  * Env overrides (all optional):
  *   FB_TOPIC_FILTER_ENABLED=false     disable topic filter (not recommended)
  *   FB_ALLOWED_CATEGORIES=theme-parks,cruises
- *   FB_MIN_HOURS_BETWEEN_POSTS=3      default 3 (spread posts through the day)
+ *   FB_MIN_HOURS_BETWEEN_POSTS=1.5    default 1.5 (~90 min; full day volume can clear)
  *   FB_MAX_POSTS_PER_DAY=0            default 0 = no daily hard cap (queue/spacing only)
  *   FB_MAX_POSTS_PER_RUN=1            default 1 (extras stay queued for later runs)
  *   FB_POST_DELAY_MINUTES=60          within-run wait after an FB post (default 60)
@@ -20,7 +20,11 @@
  *
  * Cadence never permanently drops park/cruise articles or guides. When spacing
  * (or max-per-run) blocks a post, articles.fb_posted stays false and a later
- * automate/guide run posts it. Only non-park topics are skipped for Facebook.
+ * automate/guide/drain run posts it. Only non-park topics are skipped for Facebook.
+ *
+ * Throughput math (defaults): gap 1.5h × drain ~every 90 min ≈ up to ~10–12 FB
+ * park/cruise posts in a waking day. “1 per run” does NOT mean “only 1/day” —
+ * it means one per drain/automate/guide tick; more ticks = more posts same day.
  */
 
 const DEFAULT_ALLOWED_CATEGORIES = ['theme-parks', 'cruises'];
@@ -101,15 +105,15 @@ function skipNonParkFeedPosts(env = process.env) {
 
 function getFacebookCadenceConfig(env = process.env) {
   return {
-    // Prefer hours-apart spacing over a tight daily cap so every park/cruise
-    // article and guide still reaches Facebook — just not in a burst.
-    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 3),
+    // ~90 minutes: far better than a 48-minute burst, still fast enough that
+    // 8+ park/cruise posts can all leave the queue the same day when the
+    // facebook-feed-drain cron runs about every 90 minutes.
+    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 1.5),
     // 0 = unlimited (default). A positive value is a soft ceiling for the day;
     // blocked park/cruise items remain queued (fb_posted=false) for later runs.
     maxPostsPerDay: positiveInt(env.FB_MAX_POSTS_PER_DAY, 0),
     maxPostsPerRun: positiveInt(env.FB_MAX_POSTS_PER_RUN, 1),
-    // Raised from the old automate.js default of 10 minutes — only used when
-    // more than one Facebook post is allowed in a single run.
+    // Only used when more than one Facebook post is allowed in a single run.
     postDelayMinutes: positiveInt(env.FB_POST_DELAY_MINUTES, 60),
   };
 }
