@@ -102,11 +102,13 @@ adds source/campaign/topic UTM tags, and records per-platform success in
 ## Visual news shorts (no fal.ai)
 
 Vertical 9:16 news clips use **ElevenLabs `eleven_v4` directly** (`ELEVENLABS_API_KEY`)
-and **local ffmpeg** (`ffmpeg-static`) — not fal. See [docs/visual-news.md](docs/visual-news.md).
+and **local ffmpeg** (`ffmpeg-static`) — not fal. Default voice is **Geno**
+(`bg7PC2IzyIDwYgytMiW1`). See [docs/visual-news.md](docs/visual-news.md).
 
 ```bash
 ELEVENLABS_API_KEY=sk_... npm run sample:visual-news-ll
 # → /opt/cursor/artifacts/florida-buzz-visual-news-ll.mp4
+# verification frames: florida-buzz-visual-news-ll-t{2,4,10,12,17}.jpg
 ```
 
 ## Monetization — recommended order
