@@ -153,17 +153,32 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
     paintNightSky(image);
   }
 
-  // Soft paper field
-  image.composite(rectangle(960, 860, COLORS.paper), 60, 70);
-  image.composite(rectangle(960, 10, COLORS.coral), 60, 70);
+  // Soft paper field — inset enough that the night-sky / fireworks frame stays visible
+  const paperX = isDisney ? 90 : 60;
+  const paperY = isDisney ? 110 : 70;
+  const paperW = isDisney ? 900 : 960;
+  const paperH = isDisney ? 780 : 860;
+  image.composite(rectangle(paperW, paperH, COLORS.paper), paperX, paperY);
+  image.composite(rectangle(paperW, 10, COLORS.coral), paperX, paperY);
+
+  // Keep fireworks on top of the night frame so they aren't covered by the paper.
+  if (isDisney) {
+    paintFirework(image, 150, 70, COLORS.coral, 34);
+    paintFirework(image, 930, 78, COLORS.gold, 32);
+    paintFirework(image, 540, 48, COLORS.coralDeep, 22);
+    paintPalm(image, 70, 820, 0x0a2e38ff);
+    paintPalm(image, 990, 830, 0x0a2e38ff);
+  }
 
   // Brand header
-  image.composite(rectangle(960, 120, COLORS.teal), 60, 80);
-  image.print({ font: fonts.white64, x: 92, y: 108, text: 'FLORIDA BUZZ' });
+  const headerX = paperX;
+  const headerY = paperY + 10;
+  image.composite(rectangle(paperW, 110, COLORS.teal), headerX, headerY);
+  image.print({ font: fonts.white64, x: headerX + 32, y: headerY + 22, text: 'FLORIDA BUZZ' });
   image.print({
     font: fonts.white32,
-    x: 96,
-    y: 168,
+    x: headerX + 36,
+    y: headerY + 78,
     text: isDisney ? 'DISNEY PARK TALK' : 'BUZZ BOARD',
   });
 
@@ -171,13 +186,14 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
   const bannerText = normalizeForBitmap(
     eyebrow || (isDisney ? 'DISNEY QUESTION OF THE DAY' : 'QUESTION OF THE DAY')
   ).toUpperCase();
-  const bannerWidth = Math.min(920, Math.max(520, measureText(fonts.white32, bannerText) + 80));
+  const bannerWidth = Math.min(paperW - 40, Math.max(520, measureText(fonts.white32, bannerText) + 80));
   const bannerX = Math.round((WIDTH - bannerWidth) / 2);
-  image.composite(rectangle(bannerWidth, 70, COLORS.coralDeep), bannerX, 230);
+  const bannerY = headerY + 130;
+  image.composite(rectangle(bannerWidth, 70, COLORS.coralDeep), bannerX, bannerY);
   image.print({
     font: fonts.white32,
     x: bannerX,
-    y: 248,
+    y: bannerY + 18,
     text: {
       text: bannerText,
       alignmentX: HorizontalAlign.CENTER,
@@ -190,11 +206,12 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
   const accent = CATEGORY_ACCENTS[category] || COLORS.gold;
   const chipWidth = Math.max(200, measureText(fonts.white32, label) + 48);
   const chipX = Math.round((WIDTH - chipWidth) / 2);
-  image.composite(rectangle(chipWidth, 48, accent), chipX, 326);
+  const chipY = bannerY + 90;
+  image.composite(rectangle(chipWidth, 48, accent), chipX, chipY);
   image.print({
     font: fonts.white32,
     x: chipX,
-    y: 334,
+    y: chipY + 8,
     text: {
       text: label,
       alignmentX: HorizontalAlign.CENTER,
@@ -203,18 +220,19 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
   });
 
   // Decorative dividers + sparkles / mini fireworks near the question
-  image.composite(rectangle(260, 4, COLORS.coral), 230, 402);
-  image.composite(rectangle(260, 4, COLORS.coral), 590, 402);
-  paintSparkle(image, 520, 388, 28, COLORS.gold);
+  const dividerY = chipY + 70;
+  image.composite(rectangle(240, 4, COLORS.coral), 250, dividerY);
+  image.composite(rectangle(240, 4, COLORS.coral), 590, dividerY);
+  paintSparkle(image, 520, dividerY - 12, 28, COLORS.gold);
   if (isDisney) {
-    paintFirework(image, 150, 480, COLORS.coral, 22);
-    paintFirework(image, 930, 500, COLORS.gold, 20);
+    paintFirework(image, paperX + 50, dividerY + 90, COLORS.coral, 20);
+    paintFirework(image, paperX + paperW - 50, dividerY + 110, COLORS.gold, 18);
   } else {
     paintSparkle(image, 140, 280, 22, COLORS.coral);
     paintSparkle(image, 900, 280, 22, COLORS.tealSoft);
   }
-  paintSparkle(image, 180, 760, 20, COLORS.gold);
-  paintSparkle(image, 860, 720, 24, COLORS.coral);
+  paintSparkle(image, paperX + 40, paperY + paperH - 120, 20, COLORS.gold);
+  paintSparkle(image, paperX + paperW - 60, paperY + paperH - 150, 24, COLORS.coral);
 
   // Question
   const questionHeight = measureTextHeight(fonts.black64, normalizedQuestion, QUESTION_WIDTH);
@@ -223,10 +241,11 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
       `Discussion question is too long for the social template (${normalizedQuestion.length} characters).`
     );
   }
+  const questionY = dividerY + 30;
   image.print({
     font: fonts.black64,
     x: 130,
-    y: 430,
+    y: questionY,
     text: {
       text: normalizedQuestion,
       alignmentX: HorizontalAlign.CENTER,
@@ -237,27 +256,28 @@ async function renderBuzzSocialImage({ question, category, eyebrow } = {}) {
   });
 
   // Conversation cue
-  paintSpeechBubble(image, 820, 780);
+  const cueY = paperY + paperH - 100;
+  paintSpeechBubble(image, paperX + paperW - 150, cueY - 20);
   image.print({
     font: fonts.black32,
-    x: 130,
-    y: 820,
+    x: paperX + 40,
+    y: cueY + 10,
     text: 'Tap the link and leave your answer',
   });
 
   // Footer CTA
-  image.composite(rectangle(960, 110, COLORS.teal), 60, 900);
-  image.composite(rectangle(180, 10, COLORS.gold), 92, 924);
-  image.print({ font: fonts.white32, x: 92, y: 946, text: 'JOIN THE BUZZ BOARD' });
+  image.composite(rectangle(paperW, 100, COLORS.teal), paperX, 960);
+  image.composite(rectangle(180, 10, COLORS.gold), paperX + 32, 980);
+  image.print({ font: fonts.white32, x: paperX + 32, y: 1000, text: 'JOIN THE BUZZ BOARD' });
   image.print({
     font: fonts.white32,
-    x: 420,
-    y: 946,
+    x: paperX + 300,
+    y: 1000,
     text: {
       text: 'thefloridabuzz.com/buzz',
       alignmentX: HorizontalAlign.RIGHT,
     },
-    maxWidth: 560,
+    maxWidth: paperW - 340,
   });
 
   return image.getBuffer('image/png');
