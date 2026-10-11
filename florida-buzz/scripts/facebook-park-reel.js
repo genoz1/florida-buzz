@@ -4,7 +4,7 @@
 /**
  * One Disney/theme-park (or cruise) Reel for Facebook discovery.
  *
- * Cheap path: article still → Ken Burns + kinetic text → optional Page video post.
+ * Cheap path: article still → slow zoom/pan + big on-screen text → optional Page video.
  * Does NOT use fal Seedance / guide-reels / AI presenters.
  *
  * Usage:
@@ -13,6 +13,9 @@
  *
  * Publish requires the rendered MP4 to be reachable at SITE_URL/reels/daily/...
  * (files are written under public/reels/daily/).
+ *
+ * Daily schedule (server.js): set FB_PARK_REEL_ENABLED=true plus FB + Supabase
+ * credentials. Live posting also needs FB_PARK_REEL_PUBLISH=true.
  */
 
 require('dotenv').config();

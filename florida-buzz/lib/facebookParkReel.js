@@ -3,14 +3,16 @@
 /**
  * Inexpensive Disney / theme-park Reel path for Facebook discovery.
  *
- * NOT the fal Seedance guide-reels pipeline. Uses Ken Burns + kinetic text
- * from an existing article image (optional ElevenLabs VO if a key is present).
+ * NOT the fal Seedance guide-reels pipeline. Uses article/park still photos
+ * with a slow zoom/pan plus big on-screen text (optional ElevenLabs VO if a
+ * key is present and FB_PARK_REEL_WITH_VOICE=true).
  *
- * Status: opt-in. Render works locally; publishing requires a publicly
- * reachable HTTPS MP4 URL (Meta file_url) plus FB credentials.
+ * Status: daily cron is wired in server.js when FB_PARK_REEL_ENABLED=true
+ * (plus FB + Supabase credentials). Actual Meta posting also needs
+ * FB_PARK_REEL_PUBLISH=true and a publicly reachable HTTPS MP4 URL.
  *
  * Env:
- *   FB_PARK_REEL_ENABLED=true          allow scheduled runner (server.js)
+ *   FB_PARK_REEL_ENABLED=true          schedule daily 10:15am ET runner
  *   FB_PARK_REEL_PUBLISH=true          actually call Facebook video API
  *   FB_PARK_REEL_WITH_VOICE=true       use ElevenLabs when key is set (default off)
  *   ELEVENLABS_API_KEY                 optional VO
@@ -80,8 +82,8 @@ WrapStyle: 0
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,46,&H00FFFFFF,&H00FFFFFF,&H00101010,&H8C000000,-1,0,0,0,100,100,0,0,1,3,1,2,40,40,220,1
-Style: Brand,DejaVu Sans,26,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,28,28,42,1
+Style: Caption,DejaVu Sans,54,&H00FFFFFF,&H00FFFFFF,&H00101010,&H8C000000,-1,0,0,0,100,100,0,0,1,3,1,2,36,36,240,1
+Style: Brand,DejaVu Sans,28,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,28,28,42,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
@@ -95,22 +97,34 @@ Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
   fs.writeFileSync(outPath, ass);
 }
 
-async function downloadImage(url, destPath) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Could not download article image (${res.status})`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  fs.writeFileSync(destPath, buf);
-  return destPath;
+async function resolveStillImage(source, destPath) {
+  if (!source) throw new Error('Article image is required for park Reel render');
+  if (fs.existsSync(source)) {
+    fs.copyFileSync(source, destPath);
+    return destPath;
+  }
+  if (/^https?:\/\//i.test(source)) {
+    const res = await fetch(source);
+    if (!res.ok) throw new Error(`Could not download article image (${res.status})`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(destPath, buf);
+    return destPath;
+  }
+  throw new Error(`Article image not found: ${source}`);
 }
 
-function kenBurnsStill(input, output, frames, zoomEnd = 1.12) {
+/** Slow zoom + slight pan on a still photo (vertical 720x1280). */
+function slowZoomPanStill(input, output, frames, { zoomEnd = 1.12, pan = 'up' } = {}) {
   const fps = 30;
+  const panExpr = pan === 'down'
+    ? `y='ih/2-(ih/zoom/2)+0.18*on'`
+    : `y='ih/2-(ih/zoom/2)-0.18*on'`;
   runFfmpeg([
     '-y',
     '-loop', '1',
     '-i', input,
     '-vf',
-    `scale=900:1600,zoompan=z='min(1+0.0012*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=720x1280:fps=${fps},format=yuv420p`,
+    `scale=900:1600,zoompan=z='min(1+0.0012*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':${panExpr}:d=1:s=720x1280:fps=${fps},format=yuv420p`,
     '-frames:v', String(frames),
     '-an',
     '-c:v', 'libx264',
@@ -181,27 +195,59 @@ async function renderParkReelFromArticle(article, {
   tmpDir = process.env.FB_PARK_REEL_TMP_DIR || '/tmp/fb-park-reel',
   durationSec = 12,
   siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com',
+  /** Optional local file paths (skip network). When 2+ stills, each gets a slow zoom/pan. */
+  imagePaths = null,
+  masterFileName = null,
+  captions = null,
 } = {}) {
-  if (!article?.image_url) throw new Error('Article image_url is required for park Reel render');
+  const sources = Array.isArray(imagePaths) && imagePaths.length
+    ? imagePaths
+    : [article?.localImagePath || article?.image_url].filter(Boolean);
+  if (!sources.length) throw new Error('Article image_url (or imagePaths) is required for park Reel render');
+
   fs.mkdirSync(outDir, { recursive: true });
   fs.mkdirSync(tmpDir, { recursive: true });
 
   const slugSafe = String(article.slug || 'park-tip').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 80);
-  const stillPath = path.join(tmpDir, `${slugSafe}-still.jpg`);
   const assPath = path.join(tmpDir, `${slugSafe}.ass`);
   const videoOnly = path.join(tmpDir, `${slugSafe}-video.mp4`);
-  const masterName = `${slugSafe}-${Date.now().toString(36)}.mp4`;
+  const masterName = masterFileName || `${slugSafe}-${Date.now().toString(36)}.mp4`;
   const masterPath = path.join(outDir, masterName);
 
-  await downloadImage(article.image_url, stillPath);
-
   const duration = Math.min(Math.max(Number(durationSec) || 12, 8), 20);
-  const beats = captionBeatsFromArticle(article, duration);
+  const beats = captions || captionBeatsFromArticle(article, duration);
   writeAss(beats, duration, assPath);
 
   const fps = 30;
-  const frames = Math.round(duration * fps);
-  kenBurnsStill(stillPath, videoOnly, frames, 1.13);
+  const totalFrames = Math.round(duration * fps);
+  const baseFrames = Math.floor(totalFrames / sources.length);
+  const clipPaths = [];
+  let assigned = 0;
+  for (let i = 0; i < sources.length; i += 1) {
+    const stillPath = path.join(tmpDir, `${slugSafe}-still-${i}.jpg`);
+    await resolveStillImage(sources[i], stillPath);
+    const frames = i === sources.length - 1 ? totalFrames - assigned : baseFrames;
+    assigned += frames;
+    clipPaths.push({ stillPath, frames, index: i });
+  }
+
+  const renderedClips = [];
+  for (const clip of clipPaths) {
+    const clipOut = path.join(tmpDir, `${slugSafe}-clip-${clip.index}.mp4`);
+    slowZoomPanStill(clip.stillPath, clipOut, clip.frames, {
+      zoomEnd: clip.index % 2 === 0 ? 1.14 : 1.11,
+      pan: clip.index % 2 === 0 ? 'up' : 'down',
+    });
+    renderedClips.push(clipOut);
+  }
+
+  if (renderedClips.length === 1) {
+    fs.copyFileSync(renderedClips[0], videoOnly);
+  } else {
+    const concatList = path.join(tmpDir, `${slugSafe}-concat.txt`);
+    fs.writeFileSync(concatList, renderedClips.map((p) => `file '${p}'`).join('\n'));
+    runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', concatList, '-c', 'copy', videoOnly]);
+  }
 
   const assEscaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
   runFfmpeg([
@@ -321,5 +367,7 @@ module.exports = {
   pickParkCruiseArticle,
   publishParkReel,
   renderParkReelFromArticle,
+  resolveStillImage,
   runParkReelJob,
+  slowZoomPanStill,
 };

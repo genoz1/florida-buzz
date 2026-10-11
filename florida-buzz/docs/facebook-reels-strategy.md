@@ -19,7 +19,7 @@ They are just **spaced about 90 minutes apart** so the Page does not dump five p
 4. **Frequent drain** — dedicated `facebook-feed-drain` cron ~every 90 minutes Eastern so same-day volume clears  
 5. **Non-park feed jobs skipped** — promo / engagement / city roundup / feature-promo Facebook posts off by default  
 6. **Feed packaging** — stronger comment CTAs; link stays in first comment  
-7. **Park Reel path (opt-in)** — Ken Burns + kinetic text from an article still; not fal/guide-reels  
+7. **Park Reel path** — article/park still photos with a slow zoom/pan + big on-screen text; not fal/guide-reels  
 
 ## Topic filter
 
@@ -72,22 +72,36 @@ FB_SKIP_NON_PARK_FEED=false
 
 No hashtag dumps on Facebook.
 
-## Park Reel path (opt-in — not live until you flip flags)
+## Daily park Reel (turn this on in production)
 
 | Piece | Path |
 |-------|------|
-| Picker + Ken Burns render + optional publish | `lib/facebookParkReel.js` |
+| Picker + slow zoom/pan render + optional publish | `lib/facebookParkReel.js` |
 | CLI | `npm run facebook:park-reel` / `npm run facebook:park-reel:dry` |
+| Sample (Lightning Lane, for Gene to watch) | `npm run sample:facebook-park-reel` |
 | Schedule | `server.js` at **10:15am ET** when enabled |
 
-**Does use:** existing article image, ffmpeg Ken Burns, kinetic ASS captions, Page `/videos` upload helper.  
+**What each Reel looks like:** park article photo(s), camera slowly zooms/pans, big white text on screen, Florida Buzz brand label. Silent/text-only by default (no AI host, no green screen, no wallet stickers).
+
+**Does use:** existing article image, ffmpeg slow zoom/pan, big ASS captions, Page `/videos` upload helper.  
 **Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
 
-### Turn on in production (Gene)
+### Code vs production secrets
 
-1. Deploy this branch (includes the `fb_posted` backfill migration so old articles are not re-queued).  
-2. Confirm article automate + guides still write to the site (no env change required for the filter — it is on by default).  
-3. **After deploy, Facebook feed drain turns on automatically** when `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SERVICE_KEY` are already set (same credentials you already use). No new secrets. Optional cadence tweaks:
+| Already in code | Needs Gene in DigitalOcean / host env |
+|-----------------|----------------------------------------|
+| Cron slot `15 10 * * *` America/New_York | `FB_PARK_REEL_ENABLED=true` |
+| Render → `public/reels/daily/*.mp4` | `FB_PARK_REEL_PUBLISH=true` (after one good manual post) |
+| Topic picker for park/cruise articles | Existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
+| Public URL shape `SITE_URL/reels/daily/<file>.mp4` | Confirm `SITE_URL=https://thefloridabuzz.com` and that `/reels/daily/` is served |
+
+Code **cannot** flip DigitalOcean secrets by itself. Until those two Reel flags are set in the host, the daily Reel cron stays off (or only renders if enabled without publish).
+
+### Turn on in production (Gene) — exact steps
+
+1. Deploy this branch.  
+2. Confirm article automate + guides still write to the site (no env change required for the park/cruise Facebook filter — it is on by default).  
+3. **Facebook feed drain** already turns on automatically when `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SERVICE_KEY` are set. Optional cadence tweaks:
 
 ```bash
 # Defaults are already good for “all park posts, ~90 min apart.”
@@ -104,17 +118,17 @@ DRY_RUN=true npm run facebook:park-reel
 
 5. Confirm the MP4 is under `public/reels/daily/` and reachable at  
    `https://thefloridabuzz.com/reels/daily/<file>.mp4` after deploy/sync.  
-6. **Publish one Reel**:
+6. **Publish one Reel by hand**:
 
 ```bash
 FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
 ```
 
-7. **Schedule daily render/publish** (host env):
+7. **Turn on the daily schedule + live posting** — add these to production secrets, then restart/redeploy:
 
 ```bash
 FB_PARK_REEL_ENABLED=true
-FB_PARK_REEL_PUBLISH=true   # only after a successful manual publish
+FB_PARK_REEL_PUBLISH=true
 ```
 
 Until step 7, the daily Reel cron is off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render.
@@ -128,14 +142,14 @@ Meta still receives a **Page video** via `/{page-id}/videos` (same helper as bef
 - Cheap wallet / money sticker overlay dumps  
 - Turning guide-reels schedules on for Facebook growth  
 
-## Manual sample path (still valid)
+## Manual sample path
 
 ```bash
-ELEVENLABS_API_KEY=… npm run sample:disney-story
+npm run sample:facebook-park-reel
 ```
 
-Upload the MP4 manually to Facebook Reels if you want a human QA pass before enabling `FB_PARK_REEL_PUBLISH`.
+Writes `florida-buzz-park-reel-sample.mp4` (and frames) under `/opt/cursor/artifacts/`. Same look as the daily path: Magic Kingdom stills, slow zoom/pan, big text about Lightning Lane — no voiceover required.
 
 ## Recommendation summary
 
-Ship the ChatGPT plan with codebase reality: **park/cruise-only Facebook**, **every park/cruise article & guide still posts the same day**, **~90 minutes apart via queue + drain cron**, **cheap stills→video Reel opt-in**, prove reach, then keep or kill based on plays / follows — not post count.
+Ship the ChatGPT plan with codebase reality: **park/cruise-only Facebook**, **every park/cruise article & guide still posts the same day**, **~90 minutes apart via queue + drain cron**, **cheap stills→video Reel daily once Gene sets the two env flags**, prove reach, then keep or kill based on plays / follows — not post count.

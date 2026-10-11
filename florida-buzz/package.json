@@ -16,6 +16,7 @@
     "sample:host-overlay": "node scripts/host-overlay-sample.js",
     "sample:reaction-narrator": "node scripts/reaction-narrator-sample.js",
     "sample:ai-reenactment": "node scripts/ai-story-reenactment.js",
+    "sample:facebook-park-reel": "node scripts/facebook-park-reel-sample.js",
     "facebook:park-reel": "node scripts/facebook-park-reel.js",
     "facebook:park-reel:dry": "DRY_RUN=true node scripts/facebook-park-reel.js",
     "facebook:feed-drain": "node scripts/facebook-feed-drain.js",

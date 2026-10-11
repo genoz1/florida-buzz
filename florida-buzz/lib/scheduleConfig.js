@@ -39,8 +39,9 @@ function getScheduleFlags(env = process.env) {
     facebookBuzzCommentSync: env.FACEBOOK_BUZZ_COMMENT_SYNC_ENABLED === 'true'
       && env.BUZZ_BOARD_ENABLED === 'true'
       && hasRequiredConfig(env, ['FB_PAGE_ACCESS_TOKEN']),
-    // Opt-in: 1 inexpensive park/cruise Reel per day (Ken Burns + kinetic text).
-    // Off until FB_PARK_REEL_ENABLED=true. Publishing still needs FB_PARK_REEL_PUBLISH=true.
+    // Daily park/cruise Reel (article stills + slow zoom/pan + big on-screen text).
+    // Cron on when FB_PARK_REEL_ENABLED=true + FB/Supabase credentials.
+    // Live Meta posting still needs FB_PARK_REEL_PUBLISH=true (public MP4 URL).
     facebookParkReel: env.FB_PARK_REEL_ENABLED === 'true'
       && hasRequiredConfig(env, ['FB_PAGE_ID', 'FB_PAGE_ACCESS_TOKEN', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY']),
     // Drain queued park/cruise Facebook posts on a tight grid (no AI needed).
