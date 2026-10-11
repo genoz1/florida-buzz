@@ -43,7 +43,7 @@
        fallback keeps fonts working correctly with JS disabled. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/style.css?v=20261004-instagram-buzz-cta-1">
+  <link rel="stylesheet" href="/css/style.css?v=20261011-nav-brand-1">
 
   <script type="application/ld+json">
   {
@@ -75,37 +75,49 @@
     </div>
   </div>
 
-  <nav class="nav">
-    <div class="wrap">
-      <a href="/" class="logo">Florida <em>Buzz</em><span class="tm">™</span></a>
-      <div class="nav-links">
-        <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
+  <nav class="nav" aria-label="Primary">
+    <div class="wrap nav-primary">
+      <%# ™ is correct while the federal registration is pending. Do not use ® until the mark is registered. %>
+      <a href="/" class="logo" title="Florida Buzz trademark" aria-label="Florida Buzz home">
+        Florida <em>Buzz</em><span class="tm" aria-hidden="true">™</span>
+      </a>
+      <div class="nav-links nav-links-primary">
         <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
         <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
         <a href="/wait-times">Wait Times</a>
         <a href="/planner">Day Planner</a>
         <a href="/dining">Dining</a>
-        <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
-        <a href="/category/space" class="<%= category === 'space' ? 'active' : '' %>">Space</a>
-        <a href="/category/beaches" class="<%= category === 'beaches' ? 'active' : '' %>">Beaches</a>
-        <a href="/category/florida-living" class="<%= category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
-        <a href="/category/wildlife" class="<%= category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
-        <a href="/category/cruises" class="<%= category === 'cruises' ? 'active' : '' %>">Cruises</a>
-        <a href="/category/food" class="<%= category === 'food' ? 'active' : '' %>">Food</a>
-        <a href="/category/events" class="<%= category === 'events' ? 'active' : '' %>">Events</a>
-        <a href="/category/travel-deals" class="<%= category === 'travel-deals' ? 'active' : '' %>">Travel Deals</a>
+        <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
       </div>
       <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <span></span><span></span><span></span>
       </button>
     </div>
+    <div class="nav-topics" aria-label="News topics">
+      <div class="wrap">
+        <span class="nav-topics-label">News</span>
+        <div class="nav-links nav-links-topics">
+          <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
+          <a href="/category/space" class="<%= category === 'space' ? 'active' : '' %>">Space</a>
+          <a href="/category/beaches" class="<%= category === 'beaches' ? 'active' : '' %>">Beaches</a>
+          <a href="/category/florida-living" class="<%= category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
+          <a href="/category/wildlife" class="<%= category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
+          <a href="/category/cruises" class="<%= category === 'cruises' ? 'active' : '' %>">Cruises</a>
+          <a href="/category/food" class="<%= category === 'food' ? 'active' : '' %>">Food</a>
+          <a href="/category/events" class="<%= category === 'events' ? 'active' : '' %>">Events</a>
+          <a href="/category/travel-deals" class="<%= category === 'travel-deals' ? 'active' : '' %>">Travel Deals</a>
+        </div>
+      </div>
+    </div>
     <div class="mobile-menu" id="mobileMenu">
-      <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
+      <p class="mobile-menu-label">Explore</p>
       <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
       <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
       <a href="/wait-times">Wait Times</a>
       <a href="/planner">Day Planner</a>
       <a href="/dining">Dining</a>
+      <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
+      <p class="mobile-menu-label">News topics</p>
       <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
       <a href="/category/space" class="<%= category === 'space' ? 'active' : '' %>">Space</a>
       <a href="/category/beaches" class="<%= category === 'beaches' ? 'active' : '' %>">Beaches</a>
