@@ -19,3 +19,5 @@ letterboxed images in the finished Reel.
 ## Added for Lightning Lane worth-it sample
 - `seven-dwarfs-mine-train.jpg` from File:Seven Dwarfs Mine Train (Magic Kingdom) 1.jpg; license CC BY 2.0; artist/source metadata on Commons.
 - `big-thunder-lightning-lane.jpg` from File:Big Thunder Mountain Lightning Lane.jpg; license CC BY-SA 4.0; artist/source metadata on Commons.
+
+- `host-overlay.png` circular crop from File:Smiling woman with a phone (Unsplash).jpg; Unsplash/Commons license as listed on file page.
