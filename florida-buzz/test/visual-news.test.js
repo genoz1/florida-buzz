@@ -61,7 +61,7 @@ test('ASS writer uses clean caption size, brand, kinetic fade, and CTA', () => {
   assert.match(body, /\\fad\(/);
   assert.match(body, /Follow Florida Buzz/);
   assert.match(body, /&H00324EFF&/);
-  assert.match(body, /Style: Caption,Noto Sans Display,76,/);
+  assert.match(body, /Style: Caption,Noto Sans Display,68,/);
   assert.doesNotMatch(body, /MoneyAccent|\$\$\$\$ PRICE HIT|EMPTY WALLET/);
   assert.equal(stamp(1.5), '0:00:01.50');
   assert.equal(escapeAssText('a{b}\\c'), 'a b c');
@@ -75,9 +75,10 @@ test('overlay assets are a single premium price callout + brand pill', () => {
   assert.equal(assets.wallet, undefined);
   assert.equal(assets.dollars, undefined);
   const plan = lightningLaneOverlayPlan(assets);
-  assert.ok(plan.length <= 3);
+  assert.ok(plan.length <= 4);
   assert.ok(plan.some((p) => p.path === assets.priceCallout));
   assert.ok(plan.some((p) => p.path === assets.brandPill));
+  assert.ok(plan.some((p) => p.path === assets.captionScrim));
   assert.ok(!plan.some((p) => /wallet|dollars|spike/i.test(p.path)));
 });
 

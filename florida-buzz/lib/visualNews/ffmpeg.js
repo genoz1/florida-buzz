@@ -92,11 +92,11 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,Noto Sans Display,76,&H00FFFFFF,&H00FFFFFF,&H00101018,&H66000000,-1,0,0,0,100,100,0,0,1,3,2,2,36,36,290,1
+Style: Caption,Noto Sans Display,68,&H00FFFFFF,&H00FFFFFF,&H00101018,&H55000000,-1,0,0,0,100,100,0.5,0,1,2,1,2,40,40,200,1
 Style: Brand,Noto Sans Display,28,&H00F4F7FF,&H00FFFFFF,&H00101010,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,7,28,28,40,1
-Style: Loc,Noto Sans Display,26,&H00E8F0FF,&H00FFFFFF,&H00101018,&H99000000,-1,0,0,0,100,100,0,0,1,2,1,1,28,28,86,1
-Style: Cta,Noto Sans Display,48,&H00FFFFFF,&H00FFFFFF,&H00101018,&H99000000,-1,0,0,0,100,100,0,0,1,3,2,2,36,36,320,1
-Style: Accent,Noto Sans Display,64,&H00324EFF,&H00FFFFFF,&H00101018,&H66000000,-1,0,0,0,100,100,0,0,1,3,2,8,32,32,200,1
+Style: Loc,Noto Sans Display,28,&H00F0F4FF,&H00FFFFFF,&H00101018,&HAA000000,-1,0,0,0,100,100,0,0,1,2,1,1,28,28,110,1
+Style: Cta,Noto Sans Display,44,&H00FFFFFF,&H00FFFFFF,&H00101018,&H88000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,220,1
+Style: Accent,Noto Sans Display,58,&H00324EFF,&H00FFFFFF,&H00101018,&H55000000,-1,0,0,0,100,100,0,0,1,2,1,8,32,32,180,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

@@ -20,61 +20,59 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   presenter: false,
   // Geno-style delivery tags (ElevenLabs v4 audio tags).
   spoken: `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth emptying the wallet? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`,
-  // Fewer words per beat — kinetic social-news captions (park stays the hero).
+  // Fewer words per beat. Gap during $229 callout so the badge owns that moment.
   captions: [
     { start: 0.0, end: 2.3, text: 'RECORD HIGH', highlight: 'RECORD' },
-    // $229 beat handled by premium PNG callout — light caption only
-    { start: 2.3, end: 5.5, text: 'NEW HIGH', highlight: 'HIGH' },
-    { start: 5.5, end: 8.2, text: 'SEVEN DWARFS', highlight: 'SEVEN DWARFS' },
+    // 2.3–5.55: silent caption window — premium $229 PNG is the hero
+    { start: 5.55, end: 8.2, text: 'SEVEN DWARFS', highlight: 'SEVEN DWARFS' },
     { start: 8.2, end: 10.8, text: '50 MIN WAIT', highlight: '50 MIN' },
     { start: 10.8, end: 13.4, text: 'WORTH IT?', highlight: 'WORTH IT?' },
     { start: 13.4, end: 17.0, text: 'PAY ONLY IF IT HELPS', highlight: 'ONLY IF' },
     { start: 17.0, end: 22.0, text: 'NOT AN AUTO YES', highlight: 'AUTO YES' },
   ],
-  // No spam ASS money accents ($$$$ / EMPTY WALLET) — clean system.
   accents: [],
+  // Disney Magic Kingdom stills only (no Universal Express Entry plate).
   stills: [
     {
-      file: 'priority-access-entrance.jpg',
-      path: path.join(REFS, 'priority-access-entrance.jpg'),
-      credit: 'Priority / Lightning Lane entrance reference still (Magic Kingdom area)',
+      file: 'big-thunder-lightning-lane.jpg',
+      path: path.join(REFS, 'big-thunder-lightning-lane.jpg'),
+      credit: 'Big Thunder Mountain Lightning Lane, CC BY-SA 4.0, Wikimedia Commons',
       pan: 'up',
-      zoomEnd: 1.18,
-      weight: 0.22,
+      zoomEnd: 1.2,
+      weight: 0.2,
     },
     {
       file: 'seven-dwarfs-mine-train.jpg',
       path: path.join(REFS, 'seven-dwarfs-mine-train.jpg'),
       credit: 'Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons',
       pan: 'right',
-      zoomEnd: 1.2,
+      zoomEnd: 1.22,
       weight: 0.28,
     },
     {
-      file: 'big-thunder-lightning-lane.jpg',
-      path: path.join(REFS, 'big-thunder-lightning-lane.jpg'),
-      credit: 'Big Thunder Mountain Lightning Lane, CC BY-SA 4.0, Wikimedia Commons',
+      file: 'magic-kingdom-big-thunder.jpg',
+      path: path.join(REFS, 'magic-kingdom-big-thunder.jpg'),
+      credit: 'Magic Kingdom - Big Thunder Mountain, CC BY-SA 2.0, Wikimedia Commons',
       pan: 'left',
-      zoomEnd: 1.16,
-      weight: 0.25,
+      zoomEnd: 1.18,
+      weight: 0.24,
     },
     {
       file: 'seven-dwarfs-mine-train.jpg',
       path: path.join(REFS, 'seven-dwarfs-mine-train.jpg'),
       credit: 'Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons',
       pan: 'down',
-      zoomEnd: 1.22,
-      weight: 0.25,
+      zoomEnd: 1.24,
+      weight: 0.28,
     },
   ],
   ctaSpoken: CTA_SPOKEN,
   ctaCaption: CTA_CAPTION,
-  // One premium price callout (not wallet/$$$$ sticker dump).
   moneyOverlays: true,
   notes: [
     'Visual system: clean kinetic captions + one premium $229 callout (no wallet/$$$$ stickers).',
     'No AI presenter / host cutout.',
-    'Visuals: licensed Magic Kingdom stills with stronger Ken Burns cut rhythm.',
+    'Visuals: Magic Kingdom stills only, stronger Ken Burns cut rhythm, bottom caption scrim.',
     'Voice: Geno (ElevenLabs bg7PC2IzyIDwYgytMiW1).',
   ],
 });
