@@ -11,7 +11,8 @@ const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
 const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
-const { undercoverTouristUrl } = require('../lib/affiliates/undercoverTourist');
+const { undercoverTouristUrl, getActiveOffers } = require('../lib/affiliates');
+const { afterSubscribeWelcome } = require('../lib/email/welcomeSeries');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
@@ -400,6 +401,7 @@ router.get('/', async (req, res) => {
     guides,
     tools,
     undercoverTouristUrl: undercoverTouristUrl(),
+    planningOffers: getActiveOffers(process.env, { placement: 'home', limit: 1 }),
     podcastShow,
     podcastLatest,
     podcastRecent,
@@ -485,11 +487,16 @@ router.get('/article/:slug', async (req, res) => {
     process.env.BUZZ_BOARD_ENABLED === 'true'
   );
 
+  const showPlanningOffers =
+    article.category === 'theme-parks' || article.is_evergreen === true;
   res.render('article', {
     article,
     buzzDiscussion,
     related,
     ticker,
+    planningOffers: showPlanningOffers
+      ? getActiveOffers(process.env, { placement: 'article', limit: 2 })
+      : [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
     thumbUrl,
@@ -599,9 +606,10 @@ router.post('/subscribe', async (req, res) => {
     return res.redirect('/?subscribed=1');
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
   if (supabase) {
     const { error } = await supabase.from('subscribers').upsert(
-      { email: email.toLowerCase().trim(), active: true },
+      { email: normalizedEmail, active: true },
       { onConflict: 'email' }
     );
     if (error) {
@@ -609,6 +617,12 @@ router.post('/subscribe', async (req, res) => {
       return res.redirect('/?subscribed=error');
     }
   }
+
+  // Automated welcome email + nurture schedule (Resend). Never block signup UX.
+  afterSubscribeWelcome(supabase, normalizedEmail).catch((err) => {
+    console.error('Welcome email error:', err.message);
+  });
+
   res.redirect('/?subscribed=1');
 });
 
@@ -1398,6 +1412,7 @@ router.get('/wait-times', async (req, res) => {
   res.render('wait-times', {
     parks: data || [],
     fetchedAt,
+    planningOffers: getActiveOffers(process.env, { placement: 'wait-times', limit: 2 }),
     categoryLabels: CATEGORY_LABELS,
   });
 });
@@ -1522,6 +1537,7 @@ router.get('/planner', async (req, res) => {
     ridesByPark,
     diningByPark,
     resortDining,
+    planningOffers: getActiveOffers(process.env, { placement: 'planner', limit: 2 }),
   });
 });
 

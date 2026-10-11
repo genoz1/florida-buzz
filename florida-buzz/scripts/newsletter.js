@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
 const { sendEmail } = require('../lib/resend');
+const { newsletterMonetizationHtml } = require('../lib/affiliates');
 
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
 const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -16,7 +17,7 @@ const CATEGORY_LABELS = {
   events: '🎉 Events',
 };
 
-function buildDigestHtml(articles, unsubscribeUrl) {
+function buildDigestHtml(articles, unsubscribeUrl, env = process.env) {
   const rows = articles
     .map(
       (a) => `
@@ -32,6 +33,8 @@ function buildDigestHtml(articles, unsubscribeUrl) {
     )
     .join('');
 
+  const monetization = newsletterMonetizationHtml(env, { siteUrl: SITE_URL });
+
   return `
   <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, sans-serif; background: #f2e8d5; padding: 24px;">
     <div style="background: #0e3b43; padding: 24px; text-align: center; border-radius: 4px 4px 0 0;">
@@ -42,6 +45,7 @@ function buildDigestHtml(articles, unsubscribeUrl) {
       <table style="width: 100%; border-collapse: collapse;">
         ${rows}
       </table>
+      ${monetization}
       <p style="text-align: center; margin-top: 24px;">
         <a href="${SITE_URL}" style="background: #ff6452; color: white; padding: 12px 24px; border-radius: 3px; text-decoration: none; font-weight: bold; font-size: 14px;">See everything on the site</a>
       </p>

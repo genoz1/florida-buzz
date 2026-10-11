@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   CJ_EVERGREEN_BASE,
   undercoverTouristUrl,
+  undercoverTouristTrackedUrl,
   partnerShowNotesHtml,
   partnerDescriptionBlurb,
 } = require('../lib/affiliates/undercoverTourist');
@@ -38,4 +39,19 @@ test('partner show notes and description include disclosure + tracked link', () 
   assert.match(blurb, /Undercover Tourist/);
   assert.match(blurb, /jdoqocy\.com\/click-101851476-15733832/);
   assert.match(blurb, /commission|partner/i);
+});
+
+test('undercoverTouristTrackedUrl can prefer ready URL or deep-link by key', () => {
+  const ready = undercoverTouristTrackedUrl(
+    { UNDERCOVER_TOURIST_URL: 'https://example.com/ready' },
+    { preferReadyUrl: true }
+  );
+  assert.equal(ready, 'https://example.com/ready');
+
+  const deep = undercoverTouristTrackedUrl(
+    { UNDERCOVER_TOURIST_URL: 'https://example.com/ready' },
+    { key: 'universal-orlando', preferReadyUrl: false }
+  );
+  assert.match(decodeURIComponent(deep), /universal-orlando-resort/);
+  assert.equal(deep.startsWith(CJ_EVERGREEN_BASE), true);
 });

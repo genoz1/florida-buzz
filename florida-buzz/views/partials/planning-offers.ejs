@@ -1,0 +1,21 @@
+<%#
+  Soft, high-intent partner CTAs for trip-planning pages.
+  Expects: planningOffers (array from lib/affiliates getActiveOffers)
+  Optional: planningOffersVariant ('compact' | 'inline')
+%>
+<% const offers = typeof planningOffers !== 'undefined' && Array.isArray(planningOffers) ? planningOffers : []; %>
+<% if (offers.length) { %>
+<aside class="planning-offers <%= typeof planningOffersVariant === 'string' ? 'planning-offers--' + planningOffersVariant : '' %>" aria-label="Trip planning partners">
+  <% offers.forEach(function (offer, index) { %>
+    <div class="planning-offer <%= offer.soft ? 'planning-offer--soft' : '' %> <%= index === 0 ? 'planning-offer--primary' : 'planning-offer--secondary' %>">
+      <div class="planning-offer-copy">
+        <span class="planning-offer-eyebrow"><%= offer.eyebrow %></span>
+        <strong><%= offer.partner %></strong>
+        <p><%= offer.blurb %></p>
+        <p class="planning-offer-disclosure"><%= offer.disclosure %></p>
+      </div>
+      <a class="btn <%= index === 0 ? '' : 'btn-outline' %>" href="<%= offer.url %>" target="_blank" rel="nofollow sponsored noopener"><%= offer.cta %></a>
+    </div>
+  <% }) %>
+</aside>
+<% } %>

@@ -8,6 +8,26 @@
 const CJ_EVERGREEN_BASE = 'https://www.jdoqocy.com/click-101851476-15733832';
 const DEFAULT_DESTINATION = 'https://www.undercovertourist.com/disney/';
 
+const DESTINATIONS = {
+  disney: 'https://www.undercovertourist.com/disney/',
+  'disney-world': 'https://www.undercovertourist.com/orlando/walt-disney-world-resort/',
+  universal: 'https://www.undercovertourist.com/universal/',
+  'universal-orlando': 'https://www.undercovertourist.com/orlando/universal-orlando-resort/',
+  'epic-universe': 'https://www.undercovertourist.com/epic-universe/',
+  seaworld: 'https://www.undercovertourist.com/orlando/seaworld-orlando-resort/',
+  legoland: 'https://www.undercovertourist.com/orlando/legoland-florida-resort/',
+  'theme-parks': 'https://www.undercovertourist.com/theme-parks/',
+  orlando: 'https://www.undercovertourist.com/orlando/',
+};
+
+const HOTEL_DESTINATIONS = {
+  'disney-world': 'https://www.undercovertourist.com/disney-vacation-packages',
+  'universal-orlando': 'https://www.undercovertourist.com/universal-vacation-packages/',
+  'epic-universe': 'https://www.undercovertourist.com/universal-vacation-packages/',
+};
+
+const CAR_RENTAL_URL = 'https://www.undercovertourist.com/car-rental/';
+
 const PARTNER_NAME = 'Undercover Tourist';
 
 const AFFILIATE_DISCLOSURE_SHORT =
@@ -33,6 +53,31 @@ function undercoverTouristBase(env = process.env) {
 function undercoverTouristUrl(env = process.env, { destination = DEFAULT_DESTINATION } = {}) {
   const ready = String(env.UNDERCOVER_TOURIST_URL || '').trim();
   if (ready) return ready;
+  const base = undercoverTouristBase(env);
+  return `${base}?url=${encodeURIComponent(destination)}`;
+}
+
+function undercoverTouristDestinationUrl(key = 'disney', { variant = 'tickets' } = {}) {
+  const cleanKey = String(key || 'disney').trim().toLowerCase();
+  if (variant === 'car-rentals') return CAR_RENTAL_URL;
+  if (variant === 'hotel' && HOTEL_DESTINATIONS[cleanKey]) return HOTEL_DESTINATIONS[cleanKey];
+  return DESTINATIONS[cleanKey] || DESTINATIONS['theme-parks'] || DEFAULT_DESTINATION;
+}
+
+/**
+ * Build a tracked UCT URL for a destination key / variant.
+ * Unlike undercoverTouristUrl(), this ignores UNDERCOVER_TOURIST_URL so deep-links
+ * can still target hotels/cars/parks when a single evergreen override is set for CTAs.
+ */
+function undercoverTouristTrackedUrl(
+  env = process.env,
+  { key = 'disney', variant = 'tickets', preferReadyUrl = false } = {}
+) {
+  if (preferReadyUrl) {
+    const ready = String(env.UNDERCOVER_TOURIST_URL || '').trim();
+    if (ready) return ready;
+  }
+  const destination = undercoverTouristDestinationUrl(key, { variant });
   const base = undercoverTouristBase(env);
   return `${base}?url=${encodeURIComponent(destination)}`;
 }
@@ -63,12 +108,18 @@ function escapeHtml(value) {
 module.exports = {
   CJ_EVERGREEN_BASE,
   DEFAULT_DESTINATION,
+  DESTINATIONS,
+  HOTEL_DESTINATIONS,
+  CAR_RENTAL_URL,
   PARTNER_NAME,
   AFFILIATE_DISCLOSURE_SHORT,
   PODCAST_MIDROLL_DIRECTION,
   PODCAST_OUTRO_DIRECTION,
   undercoverTouristBase,
   undercoverTouristUrl,
+  undercoverTouristDestinationUrl,
+  undercoverTouristTrackedUrl,
   partnerShowNotesHtml,
   partnerDescriptionBlurb,
+  escapeHtml,
 };

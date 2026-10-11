@@ -24,7 +24,9 @@
         </a>
       <% }) %>
     </div>
-    <% if (typeof undercoverTouristUrl === 'string' && undercoverTouristUrl) { %>
+    <% if (typeof planningOffers !== 'undefined' && planningOffers && planningOffers.length) { %>
+      <%- include('partials/planning-offers', { planningOffers, planningOffersVariant: 'home' }) %>
+    <% } else if (typeof undercoverTouristUrl === 'string' && undercoverTouristUrl) { %>
     <aside class="home-partner-strip" aria-label="Ticket and hotel partner">
       <div class="home-partner-copy">
         <span class="home-tool-kicker">Book tickets &amp; hotels</span>

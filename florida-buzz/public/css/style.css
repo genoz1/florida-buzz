@@ -673,6 +673,82 @@ footer a:hover { opacity: 1; }
   font-size: 12px !important;
   color: var(--ink-600);
 }
+
+/* Soft partner CTAs on trip-planning pages (wait times, planner, guides). */
+.planning-offers {
+  margin: 22px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.planning-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: linear-gradient(120deg, var(--sand-100) 0%, #fffdf8 55%, #f0f7f4 100%);
+}
+.planning-offer--secondary {
+  background: #fff;
+  border-style: dashed;
+}
+.planning-offer-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 56ch;
+}
+.planning-offer-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+}
+.planning-offer-copy strong {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--teal-900);
+}
+.planning-offer-copy p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-600);
+  line-height: 1.4;
+}
+.planning-offer-disclosure {
+  font-size: 12px !important;
+  color: var(--ink-600);
+}
+.planning-offers--compact .planning-offer {
+  padding: 14px 16px;
+}
+.planning-offers--compact .planning-offer-copy strong {
+  font-size: 18px;
+}
+.planning-offers--home {
+  margin-top: 18px;
+}
+.planning-offers--home .planning-offer--primary {
+  /* Match the existing homepage partner strip the user already likes. */
+  padding: 20px 22px;
+}
+.planning-offers--inline .planning-offer {
+  text-align: left;
+}
+.btn-outline {
+  background: transparent;
+  color: var(--teal-900);
+  border: 1px solid var(--teal-900);
+}
+.btn-outline:hover {
+  background: var(--teal-900);
+  color: #fff;
+}
 .home-podcast-panel {
   display: grid;
   grid-template-columns: 220px 1fr;

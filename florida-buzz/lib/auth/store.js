@@ -102,6 +102,14 @@ function createSupabaseAuthStore({ client, encryptionKey, now = () => new Date()
         { onConflict: 'email' }
       );
       throwOnError(error, 'Could not save explicit newsletter consent.');
+      try {
+        const { afterSubscribeWelcome } = require('../email/welcomeSeries');
+        afterSubscribeWelcome(client, email).catch((err) => {
+          console.error('Welcome email error:', err.message);
+        });
+      } catch (err) {
+        console.error('Welcome email wiring error:', err.message);
+      }
     },
 
     async createSession({ userId, accessToken, refreshToken, accessTokenExpiresAt, idleSeconds, absoluteSeconds }) {

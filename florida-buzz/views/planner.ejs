@@ -140,6 +140,8 @@
     <p class="pl-intro">Disney's own app only builds your itinerary the day you're there. Plan ahead instead — enter your dining reservations, Lightning Lane times, and rank your must-do rides, and get a clean plan you can print or save as a PDF before you go.</p>
   </div>
 
+  <%- include('partials/planning-offers', { planningOffers: typeof planningOffers !== 'undefined' ? planningOffers : [], planningOffersVariant: 'compact' }) %>
+
   <div class="pl-form-section">
     <div class="pl-top-fields">
       <div>

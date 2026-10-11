@@ -163,7 +163,13 @@ if (scheduleFlags.newsletter) {
     console.log('Running scheduled newsletter send...');
     runScheduledCommand('newsletter send', 'node scripts/newsletter.js');
   }, { timezone: 'America/New_York' });
+  // Welcome nurture follow-ups (days 2/4/7) — soft secondary to the daily digest.
+  cron.schedule('15 9 * * *', () => {
+    console.log('Running scheduled welcome nurture...');
+    runScheduledCommand('welcome nurture', 'node scripts/welcome-nurture.js');
+  }, { timezone: 'America/New_York' });
   console.log('Newsletter scheduled: daily at 8am (Eastern time).');
+  console.log('Welcome nurture scheduled: daily at 9:15am (Eastern time).');
 } else {
   console.log('Newsletter NOT scheduled — set RESEND_API_KEY to enable.');
 }
