@@ -14,3 +14,8 @@ letterboxed images in the finished Reel.
   [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/). Source:
   <https://commons.wikimedia.org/wiki/File:Magic_Kingdom_-_Big_Thunder_Mountain_-_by_daryl_mitchell.jpg>.
   The crop is provided under the same license.
+
+
+## Added for Lightning Lane worth-it sample
+- `seven-dwarfs-mine-train.jpg` from File:Seven Dwarfs Mine Train (Magic Kingdom) 1.jpg; license CC BY 2.0; artist/source metadata on Commons.
+- `big-thunder-lightning-lane.jpg` from File:Big Thunder Mountain Lightning Lane.jpg; license CC BY-SA 4.0; artist/source metadata on Commons.
