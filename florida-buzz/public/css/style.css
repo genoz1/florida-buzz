@@ -175,8 +175,8 @@ img { max-width: 100%; display: block; }
 }
 .nav-links-topics {
   flex: 1 1 auto;
-  gap: 0;
-  justify-content: space-between;
+  gap: 18px;
+  justify-content: flex-start;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
