@@ -36,10 +36,6 @@ const H = 1920;
 /** Mid-30s mom-type green-screen still (generated; not Mixkit 42635). */
 const HOST_STILL_DEFAULT = process.env.HOST_STILL
   || path.join(REFS, 'mom-presenter-greenscreen.jpg');
-/** Darker chroma green from generated plate (~#0EBE11). */
-const HOST_KEY = process.env.HOST_KEY
-  || 'chromakey=0x0EBE11:0.22:0.10,despill=green:mix=0.45:expand=0.06';
-
 const STORY = {
   // Exact words from the production prompt — no added tags or paraphrasing.
   spoken: 'Theme-park visitors may soon have to budget more for faster access to popular attractions. Prices for priority passes have increased, meaning families could pay considerably more during busy travel periods. The exact cost may depend on the park, date, and attraction. Before your next visit, check the official park website and compare the price with the amount of time you could actually save. Would you still pay extra to skip the line?',
@@ -231,11 +227,60 @@ print(float(np.mean(np.abs(a-b))))
  * Keeps shoulders/hands for later keying.
  */
 function extractHostPlate(hostStill, outPng) {
+  // Landscape greenscreen still → tall waist-up plate with green margins for keying.
   run(ffmpegBin(), [
     '-y', '-i', hostStill, '-frames:v', '1',
-    // Center crop waist-up; leave green margins for keying after lip-sync
-    '-vf', 'scale=960:-1,crop=720:900:(iw-720)/2:(ih-900)/2+20',
+    '-vf', [
+      'scale=900:-1',
+      // Pad to a portrait plate so Wav2Lip/face-detect has headroom
+      'pad=900:1100:(ow-iw)/2:(oh-ih)/2:0x0EBE11',
+      'setsar=1',
+    ].join(','),
     outPng,
+  ]);
+}
+
+/**
+ * Build a solid alpha matte from the static greenscreen plate.
+ * ffmpeg chromakey was too aggressive on this plate (host went translucent);
+ * a G-dominant threshold keeps the navy blouse + curly hair opaque.
+ */
+function buildHostMask(hostPlatePng, maskPng) {
+  const py = `
+from PIL import Image
+import numpy as np, cv2
+a=np.asarray(Image.open(${JSON.stringify(hostPlatePng)}).convert('RGB')).astype(np.float32)
+r,g,b=a[:,:,0],a[:,:,1],a[:,:,2]
+green=(g>80)&(g>r*1.25)&(g>b*1.25)&((g-r)>25)&((g-b)>25)
+alpha=np.where(green,0,255).astype(np.uint8)
+k=np.ones((3,3),np.uint8)
+alpha=cv2.morphologyEx(alpha, cv2.MORPH_OPEN, k)
+alpha=cv2.GaussianBlur(alpha,(5,5),0)
+# Store as gray mask for alphamerge
+Image.fromarray(alpha).save(${JSON.stringify(maskPng)})
+print('mask opaque_frac', float((alpha>200).mean()))
+`;
+  const r = spawnSync('python3', ['-c', py], { encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`host mask failed: ${(r.stderr || r.stdout || '').slice(-800)}`);
+  console.log((r.stdout || '').trim());
+}
+
+/** Apply static matte to lip-synced host video → clean RGBA cutout. */
+function keySpeakingHost({ speakingMp4, maskPng, duration, hostH, outMov }) {
+  // Scale speaking + mask together, merge alpha, then size for ~25% screen.
+  run(ffmpegBin(), [
+    '-y',
+    '-i', speakingMp4,
+    '-loop', '1', '-i', maskPng,
+    '-t', String(duration),
+    '-filter_complex', [
+      '[0:v]scale=900:1100:force_original_aspect_ratio=decrease,pad=900:1100:(ow-iw)/2:(oh-ih)/2,format=rgba[v]',
+      '[1:v]scale=900:1100,format=gray[a]',
+      '[v][a]alphamerge,despill=green:mix=0.25:expand=0.02,scale=-1:' + hostH + '[out]',
+    ].join(';'),
+    '-map', '[out]',
+    '-c:v', 'qtrle', '-an',
+    outMov,
   ]);
 }
 
@@ -298,19 +343,39 @@ async function main() {
 
   // 4) Key → clean background-free cutout, ~25% of 1080x1920, bottom-right
   //    Presenter height ≈ 0.48*H → area roughly ~22–28% with width.
+  const hostMask = path.join(TMP, 'host-mask-bin.png');
   const keyed = path.join(TMP, 'host-keyed.mov');
   const hostH = Math.round(H * 0.48);
-  console.log('Keying waist-up cutout (no box)…');
+  console.log('Building solid host matte + keying waist-up cutout (no box)…');
+  buildHostMask(hostPlate, hostMask);
+  keySpeakingHost({
+    speakingMp4: speaking,
+    maskPng: hostMask,
+    duration,
+    hostH,
+    outMov: keyed,
+  });
+  // QA: cutout must be mostly opaque in the subject region
   run(ffmpegBin(), [
-    '-y', '-i', speaking, '-t', String(duration),
-    '-vf', [
-      HOST_KEY,
-      'format=rgba',
-      `scale=-1:${hostH}`,
-    ].join(','),
-    '-c:v', 'qtrle', '-an',
-    keyed,
+    '-y', '-ss', '3', '-i', keyed, '-frames:v', '1',
+    path.join(TMP, 'keyed-qa.png'),
   ]);
+  {
+    const qa = `
+from PIL import Image
+import numpy as np
+im=Image.open(${JSON.stringify(path.join(TMP, 'keyed-qa.png'))})
+a=np.asarray(im)
+assert a.shape[2]==4, a.shape
+opaque=float((a[:,:,3]>200).mean())
+print('keyed_opaque_frac', opaque)
+if opaque < 0.08:
+    raise SystemExit('keyed cutout too transparent')
+`;
+    const r = spawnSync('python3', ['-c', qa], { encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`keyed QA failed: ${(r.stderr || r.stdout || '').slice(-600)}`);
+    console.log((r.stdout || '').trim());
+  }
 
   // 5) Composite — static BG + cutout bottom-right
   const composited = path.join(TMP, 'composited.mp4');
