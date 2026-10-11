@@ -26,6 +26,48 @@ function countScriptWords(scriptText) {
     .filter(Boolean).length;
 }
 
+/**
+ * Hard-require the named show open before catch-up / weather / topic hook.
+ * Rejects the user's last bad pattern: "Okay, how was your week…" rain essay with no intros.
+ */
+function assertScriptOpenShape(scriptText) {
+  const lines = String(scriptText || '')
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.length) throw new Error('Generated script is empty');
+
+  const dialogue = lines.filter((l) => /^(Gena|Diane):/i.test(l));
+  const head = dialogue.slice(0, 6);
+  const headText = head.join('\n');
+  const earlyText = dialogue.slice(0, 12).join('\n');
+  const first = dialogue[0] || '';
+
+  // Ban the known bad cold open before other checks so errors name the weather pattern.
+  if (/^Gena:\s*Okay,?\s*how was your week/i.test(first)) {
+    throw new Error('Script open bans the weather-only cold open ("Okay, how was your week…")');
+  }
+  if (/how was your week/i.test(first) && !/I['’]?m Gena/i.test(first)) {
+    throw new Error('Script open bans starting on "how was your week" without the Gena name intro');
+  }
+
+  if (!/Gena:\s*Hi,?\s*I['’]?m Gena\.?/i.test(headText)) {
+    throw new Error('Script open must include Gena: Hi, I\'m Gena. in the first spoken lines');
+  }
+  if (!/Diane:\s*And I['’]?m Diane\.?/i.test(headText)) {
+    throw new Error('Script open must include Diane: And I\'m Diane. in the first spoken lines');
+  }
+  if (!/welcome to Florida Buzz(?::?\s*Disney)?/i.test(earlyText)) {
+    throw new Error('Script open must welcome listeners to Florida Buzz: Disney before the week catch-up');
+  }
+
+  const welcomeIdx = dialogue.findIndex((l) => /welcome to Florida Buzz/i.test(l));
+  const weekIdx = dialogue.findIndex((l) => /how was your week/i.test(l));
+  if (weekIdx >= 0 && (welcomeIdx < 0 || weekIdx < welcomeIdx)) {
+    throw new Error('Script open must say welcome to Florida Buzz: Disney before "how was your week"');
+  }
+}
+
 function appendContinuation(existing, continuation) {
   const base = String(existing || '').trim();
   let next = String(continuation || '').trim();
@@ -126,7 +168,7 @@ Conversation requirements:
 - LEAD / SUPPORT BY SUBJECT (critical — better than equal back-and-forth):
   - Follow the outline’s Lead host tags. For each main topic segment, one host is the lead (main speaker) and the other is support.
   - Lead host carries longer points, stories, and explanations for that subject — they may speak longer than the other while making a point.
-  - Support host mostly short comments, reactions, laughs, brief disagreements, and questions (often 1–6 words: “yep,” “no way,” “wait—,” “oh my lord,” “same,” “heck yeah”).
+  - Support host mostly short comments, reactions, laughs, brief disagreements, and questions (often 1–6 words: “yep,” “no way,” “wait—,” “oh my lord,” “same,” “heck yeah,” “THAT'S CRAZY,” “REALLY?”).
   - When the next subject starts, switch who leads so both hosts get main-speaker segments across the episode.
   - FORBID tennis-match equal turns for a whole segment (neat A/B same-length exchanges the entire topic).
 - ANTI-SCRIPTED HARD RULES (critical — listeners complained it still sounds written):
@@ -143,7 +185,8 @@ Conversation requirements:
     Gena: Hi, I'm Gena.
     Diane: And I'm Diane.
     Gena: And together — welcome to Florida Buzz: Disney.
-  - Only AFTER those lines: Gena asks how Diane's week was; Diane short real answer; Gena relates briefly; Diane bridges to parks from catch-up (sourced facts only); big natural reactions; soft Florida Buzz mention; then "What else is on the agenda today?"
+  - Only AFTER those lines: Gena asks how Diane's week was; Diane short real answer; Gena relates briefly; Diane bridges to parks from catch-up (sourced facts only); big natural reactions (“THAT'S CRAZY,” “REALLY?”); soft Florida Buzz mention; then "What else is on the agenda today?"
+  - Catch-up is SHORT — a few lines, not a long weather essay.
   - HARD BAN opening with "Okay, how was your week" (or similar) without name intros + show title. HARD BAN the anti-example: rain/errand/sandals banter → affiliation → EPCOT while skipping "Hi, I'm Gena" / "And I'm Diane" / "welcome to Florida Buzz: Disney".
   - Then topic hook → unofficial affiliation disclosure. Never cold-open on the news headline (“Okay if you were calling EPCOT…” / “Okay we have resort news…” as line 1).
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
@@ -234,6 +277,7 @@ Continue this script:\n\n${script.slice(-12000)}`,
   if (!/^Gena:/m.test(script) || !/^Diane:/m.test(script)) {
     throw new Error('Generated script must include Gena: and Diane: dialogue lines');
   }
+  assertScriptOpenShape(script);
   const words = countScriptWords(script);
   if (words < CONVERSATION_MIN_WORDS) {
     throw new Error(
@@ -309,6 +353,7 @@ module.exports = {
   CONVERSATION_TARGET_MAX_WORDS,
   CONVERSATION_REQUEST_TIMEOUT_MS,
   countScriptWords,
+  assertScriptOpenShape,
   appendContinuation,
   buildOutlinePrompt,
   buildConversationPrompt,

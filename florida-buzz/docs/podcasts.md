@@ -62,7 +62,8 @@ Defaults come from **public fal.ai documentation** for:
 - Why Diane left `Callirrhoe`: sat too close to Aoede (same easy warm-mom lane); `Kore` is firmer for contrast. fal Gemini TTS still has a **hard catalog limit** (~30 presets) and one shared `style_instructions` string — perfect dual-voice separation is not guaranteed
 - Per-speaker delivery cues in `style_instructions`: Gena slightly brighter/breezier; Diane slightly lower/firmer/grounded
 - Override without code changes: `PODCASTS_VOICE_GENA` / `PODCASTS_VOICE_DIANE` (must be a fal Gemini TTS voice enum value)
-- Catalog limit: fal exposes a fixed ~30-name preset list; contrast is limited to those timbres
+- Catalog limit: fal exposes a fixed ~30-name preset list; contrast is limited to those timbres. Honest limit: true dual-host voice separation may not be fully fixable inside fal Gemini TTS multi-speaker — best-effort is Aoede+Kore + style cues + env overrides
+- Single-speaker alternating (one fal job per host line, then concat) was considered for contrast; skipped for now — it would rewrite `audioPipeline` / join timing and still uses the same VoiceEnum, so it is unlikely to beat multi-speaker enough to justify the rewrite
 - After changing **script open** prompts: regenerate **script + audio** (named show intro is in the dialogue). After voice-only changes: regenerate audio only. Existing MP3s keep old voices/opens until regenerated
 - Spelling vs pronunciation: always spell **Gena**; pronounce like **Gina** (JEEN-uh) in TTS
 - Park names: **EPCOT** → EP-cot (two syllables, stress on first) via shared `lib/podcasts/pronunciation.js` in fal `style_instructions` (advisory; fal may still misread)

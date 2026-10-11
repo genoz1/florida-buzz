@@ -33,7 +33,7 @@ Diane
 - Partner/spouse: Michael (may appear naturally in family/park stories)
 - Quick reactions, follow-ups, laughs, brief disagreements, similar stories
 - Will interrupt briefly or talk over in a natural friendly way when it fits
-- Short punchy reactions are welcome (“oh my lord,” “yep,” “no way,” “heck yeah,” “whoop,” “wait—,” “same”) when natural
+- Short punchy reactions are welcome (“oh my lord,” “yep,” “no way,” “heck yeah,” “whoop,” “wait—,” “same,” “THAT'S CRAZY,” “REALLY?”) when natural
 - Often the faster reactor: stacks 1–6 word hits while Gena is still mid-thought
 
 Shared world
@@ -68,7 +68,8 @@ Episode open (required shape — HARD RULE)
 - HARD BAN opening with "Okay, how was your week" (or any week/weather/errand anecdote) without the name intros + show-title welcome first.
 - HARD BAN the user's last bad open pattern: long rain / umbrella / jacket / sandals banter → then affiliation → then EPCOT (or other topic), while skipping "Hi, I'm Gena" / "And I'm Diane" / "welcome to Florida Buzz: Disney".
 - Anti-example (FORBIDDEN — never reproduce): "Gena: Okay, how was your week? Because I tried to do one quick Central Florida errand with Geno, and somehow we got caught in the kind of afternoon rain…" / "Diane: In Florida? At four o'clock? No." — that skips name intros and the show welcome.
-- After named welcome + short catch-up: big natural reactions → soft Florida Buzz mention → "What else is on the agenda today?" → topic hook → unofficial affiliation disclosure → Florida Buzz resource mentions as needed
+- After named welcome + short catch-up: big natural reactions (“THAT'S CRAZY,” “REALLY?,” “oh my lord”) → soft Florida Buzz mention → "What else is on the agenda today?" → topic hook → unofficial affiliation disclosure → Florida Buzz resource mentions as needed
+- Catch-up must stay SHORT (a few lines), not a long weather essay; only bridge to parks from sourced facts
 - Do NOT cold-open on the news headline or a “we need to talk about X” topic hook
 `.trim();
 

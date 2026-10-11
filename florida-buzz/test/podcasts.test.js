@@ -23,6 +23,7 @@ const {
   buildOutlinePrompt,
   buildConversationPrompt,
   countScriptWords,
+  assertScriptOpenShape,
   appendContinuation,
   generateConversation,
   CONVERSATION_MAX_OUTPUT_TOKENS,
@@ -295,6 +296,70 @@ test('show notes always receive unofficial affiliation disclosure', () => {
   assert.equal(ensureShowNotesDisclosures(withAffiliation), withAffiliation);
 });
 
+test('assertScriptOpenShape requires name intros + welcome before week catch-up', () => {
+  const good = [
+    "Gena: Hi, I'm Gena.",
+    "Diane: And I'm Diane.",
+    'Gena: And together — welcome to Florida Buzz: Disney.',
+    'Gena: So Diane, how was your week?',
+    'Diane: Raining like crazy, but otherwise okay.',
+    'Gena: Same — rained four days straight.',
+    'Diane: THAT\'S CRAZY. And speaking of storms, parades got messy this week…',
+    'Gena: What else is on the agenda today?',
+  ].join('\n');
+  assert.doesNotThrow(() => assertScriptOpenShape(good));
+
+  const weatherColdOpen = [
+    'Gena: Okay, how was your week? Because I tried to do one quick Central Florida errand with Geno, and somehow we got caught in the kind of afternoon rain that makes everybody rethink sandals.',
+    'Diane: In Florida? At four o’clock? No.',
+    'Gena: Welcome to Florida Buzz: Disney.',
+  ].join('\n');
+  assert.throws(() => assertScriptOpenShape(weatherColdOpen), /Okay, how was your week/i);
+
+  const missingDiane = [
+    "Gena: Hi, I'm Gena.",
+    'Gena: Welcome to Florida Buzz: Disney.',
+    'Gena: So Diane, how was your week?',
+    'Diane: Fine.',
+  ].join('\n');
+  assert.throws(() => assertScriptOpenShape(missingDiane), /And I'm Diane/i);
+
+  const weekBeforeWelcome = [
+    "Gena: Hi, I'm Gena.",
+    "Diane: And I'm Diane.",
+    'Gena: So Diane, how was your week?',
+    'Diane: Fine.',
+    'Gena: And welcome to Florida Buzz: Disney.',
+  ].join('\n');
+  assert.throws(() => assertScriptOpenShape(weekBeforeWelcome), /before "how was your week"/i);
+});
+
+test('generateConversation rejects scripts that skip the named show open', async () => {
+  const pad = Array.from({ length: 320 }, (_, i) =>
+    i % 2 === 0
+      ? `Gena: Point ${i} about parks and planning for families this week.`
+      : `Diane: Yep — reacting to point ${i} with a short take.`
+  ).join('\n');
+  const badScript = [
+    'Gena: Okay, how was your week? Rain everywhere with Geno.',
+    'Diane: Oh my lord.',
+    pad,
+  ].join('\n');
+  await assert.rejects(
+    () =>
+      generateConversation({
+        aiText: {
+          generateText: async () => badScript,
+        },
+        show: { title: 'Florida Buzz: Disney' },
+        episode: { title: 'Open shape fail', description: 'Desc' },
+        outline: '1. Warm Open',
+        sources: [],
+      }),
+    /Okay, how was your week/i
+  );
+});
+
 test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.equal(HOST_STYLE, 'aftershow_energy');
   assert.match(HOST_BIBLE, /Geno/);
@@ -454,13 +519,21 @@ test('short AI scripts are rejected and continuations can append', async () => {
   assert.match(merged, /We start here/);
   assert.match(merged, /Magic Kingdom crowds/);
 
+  const namedOpen = [
+    "Gena: Hi, I'm Gena.",
+    "Diane: And I'm Diane.",
+    'Gena: And together — welcome to Florida Buzz: Disney.',
+    'Gena: So Diane, how was your week?',
+    'Diane: Fine — short week.',
+  ].join('\n\n');
+
   let calls = 0;
   const aiText = {
     async generateText(system, user, maxTokens) {
       calls += 1;
       assert.ok(maxTokens >= 12000);
       if (calls === 1) {
-        return 'Gena: Short open.\n\nDiane: Short reply only.';
+        return `${namedOpen}\n\nGena: Short open.\n\nDiane: Short reply only.`;
       }
       // Still short on purpose so generateConversation throws after continue attempts.
       return 'Gena: A little more.\n\nDiane: Still not enough words overall.';
@@ -486,13 +559,20 @@ test('continuation recovers a full-length script after a short first pass', asyn
     for (let i = 0; i < n; i += 1) words.push(`word${i}`);
     return `${label}: ${words.join(' ')}`;
   };
+  const namedOpen = [
+    "Gena: Hi, I'm Gena.",
+    "Diane: And I'm Diane.",
+    'Gena: And together — welcome to Florida Buzz: Disney.',
+    'Gena: So Diane, how was your week?',
+    'Diane: Fine — short week.',
+  ].join('\n\n');
   let calls = 0;
   const aiText = {
     async generateText(_system, _user, maxTokens) {
       calls += 1;
       assert.ok(maxTokens >= 12000);
       if (calls === 1) {
-        return `${pad('Gena', 40)}\n\n${pad('Diane', 40)}`;
+        return `${namedOpen}\n\n${pad('Gena', 40)}\n\n${pad('Diane', 40)}`;
       }
       // Second pass supplies enough spoken words to clear the 30-minute floor.
       return `${pad('Gena', 2200)}\n\n${pad('Diane', 2200)}`;
@@ -646,6 +726,8 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   assert.match(input.style_instructions, /brighter|breezier/i);
   assert.match(input.style_instructions, /firmer|grounded|lower/i);
   assert.match(input.style_instructions, /name intros|show welcome/i);
+  assert.match(input.style_instructions, /THAT'?S CRAZY|REALLY\?/i);
+  assert.match(input.style_instructions, /less radio polish|messy live friend/i);
   assert.match(input.style_instructions, /warm hellos|catch-up banter/i);
   assert.match(input.style_instructions, /symmetrical essay-dialogue/i);
   assert.match(input.style_instructions, /not hosts reading an essay|not reading an essay|not reading scripted/i);
