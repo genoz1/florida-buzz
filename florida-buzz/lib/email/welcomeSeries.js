@@ -42,7 +42,7 @@ function shellHtml({ title, dek, bodyHtml, unsubscribeUrl }) {
 function buildWelcomeEmails(env = process.env, { email, unsubscribeUrl } = {}) {
   const siteUrl = (env.SITE_URL || SITE_URL()).replace(/\/$/, '');
   const tools = siteTools(siteUrl);
-  const offers = getActiveOffers(env, { placement: 'email', limit: 2 });
+  const offers = getActiveOffers(env, { placement: 'email', limit: 3 });
   const unsub = unsubscribeUrl || `${siteUrl}/unsubscribe?email=${encodeURIComponent(email || '')}`;
 
   const steps = [
