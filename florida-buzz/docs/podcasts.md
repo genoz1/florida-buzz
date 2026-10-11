@@ -56,10 +56,12 @@ Defaults come from **public fal.ai documentation** for:
 
 - Endpoint: `fal-ai/gemini-tts`
 - Model: `gemini-2.5-pro-tts`
-- Voices (defaults): Gena=`Aoede` (warm/melodic), Diane=`Callirrhoe` (easy-going — clearer contrast than former `Zephyr`, which sounded bright/assistant-like next to Aoede)
+- Voices (defaults): Gena=`Aoede` (warm/melodic / breezy), Diane=`Callirrhoe` (easy-going)
+- Demographic lane: both must read as **~mid-30s American moms** (Central Florida friends). Prefer female-leaning easy-going / warm / soft presets; avoid youthful (`Leda`), mature/elderly-leaning (`Gacrux`), male-coded names (`Puck`/`Charon`/`Fenrir`/…), bright assistant-like (`Zephyr`), cartoon, or robotic delivery
+- Why Diane left `Zephyr`: bright/clear next to Aoede read too AI-assistant / not enough mom contrast; `Callirrhoe` stays adult-woman while sounding more relaxed/easy-going
 - Override without code changes: `PODCASTS_VOICE_GENA` / `PODCASTS_VOICE_DIANE` (must be a fal Gemini TTS voice enum value)
 - Catalog limit: fal exposes a fixed ~30-name preset list; contrast is limited to those timbres
-- After changing voices (or deploying a new default), **regenerate episode audio** (fal TTS preview) — existing MP3s keep the old voices; script text does not need regeneration
+- After changing voices (or deploying a new default), **regenerate episode audio only after deploy** (fal TTS preview) — existing MP3s keep the old voices; script text does not need regeneration
 - Spelling vs pronunciation: always spell **Gena**; pronounce like **Gina** (JEEN-uh) in TTS
 - Park names: **EPCOT** → EP-cot (two syllables, stress on first) via shared `lib/podcasts/pronunciation.js` in fal `style_instructions` (advisory; fal may still misread)
 - Language: `English (US)`

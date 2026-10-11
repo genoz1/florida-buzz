@@ -8,11 +8,14 @@ const DEFAULT_FAL_TTS_ENDPOINT = 'fal-ai/gemini-tts';
 const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
 
 // Multi-speaker voice presets from fal-ai/gemini-tts (same enum on speakers[].voice).
-// Catalog is finite (~30 names). Popular female labels from fal/Google docs:
-//   Aoede = warm/melodic (breezy), Zephyr = bright/clear, Callirrhoe = easy-going,
-//   Kore = firm, Sulafat = warm, Gacrux = mature, Achernar = soft.
-// Defaults: Gena=Aoede; Diane=Callirrhoe (easy-going contrast vs Aoede — less
-// bright/assistant-like than Zephyr, which users heard as too similar / AI-ish).
+// Catalog is finite (~30 names). Female-leaning labels from fal/Google docs:
+//   Aoede = warm/melodic (breezy), Callirrhoe = easy-going, Sulafat = warm,
+//   Achernar = soft, Vindemiatrix = gentle, Achird = friendly, Kore = firm,
+//   Zephyr = bright/clear (can read assistant-like), Leda = youthful (too young),
+//   Gacrux = mature (can read older). Skip male-coded presets (Puck, Charon,
+//   Fenrir, Orus, etc.) for these hosts.
+// Defaults: Gena=Aoede; Diane=Callirrhoe — same ~30s American-mom lane, easier-
+// going timbre contrast vs Aoede (replaces Zephyr, which sounded bright/AI-ish).
 const DEFAULT_GENA_VOICE = 'Aoede';
 const DEFAULT_DIANE_VOICE = 'Callirrhoe';
 

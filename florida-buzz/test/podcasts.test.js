@@ -624,6 +624,8 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   assert.match(input.style_instructions, /pronounced like Gina/i);
   assert.match(input.style_instructions, /JEEN-uh/);
   assert.match(input.style_instructions, /AfterBuzz|aftershow/i);
+  assert.match(input.style_instructions, /mid-30s American moms|warm, natural/i);
+  assert.match(input.style_instructions, /not a robotic AI assistant|not teens|not elderly/i);
   assert.match(input.style_instructions, /warm hellos|catch-up banter/i);
   assert.match(input.style_instructions, /symmetrical essay-dialogue/i);
   assert.match(input.style_instructions, /not hosts reading an essay|not reading an essay|not reading scripted/i);
