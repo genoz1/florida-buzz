@@ -14,10 +14,12 @@ const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
 //   Zephyr = bright/clear (can read assistant-like), Leda = youthful (too young),
 //   Gacrux = mature (can read older). Skip male-coded presets (Puck, Charon,
 //   Fenrir, Orus, etc.) for these hosts.
-// Defaults: Gena=Aoede; Diane=Callirrhoe — same ~30s American-mom lane, easier-
-// going timbre contrast vs Aoede (replaces Zephyr, which sounded bright/AI-ish).
+// Defaults: Gena=Aoede; Diane=Kore — firmer mom timbre vs Aoede's breezy/melodic
+// lane (Callirrhoe sat too close to Aoede; Zephyr read bright/AI-ish). fal only
+// offers ~30 presets, so contrast is limited; style_instructions add per-speaker
+// pitch/energy cues on top of the enum.
 const DEFAULT_GENA_VOICE = 'Aoede';
-const DEFAULT_DIANE_VOICE = 'Callirrhoe';
+const DEFAULT_DIANE_VOICE = 'Kore';
 
 const EPISODE_STATUSES = Object.freeze([
   'draft',

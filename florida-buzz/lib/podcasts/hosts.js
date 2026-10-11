@@ -59,11 +59,17 @@ Delivery style (active profile: ${HOST_STYLE}) — anti-scripted / live-aftersho
 - Keep it Disney-moms-talking-parks — not a TV panel with an audience, not announcer cadence, not forced comedy bits, not reading an essay aloud
 - Still accurate on park facts from approved sources; energy never excuses inventing news
 
-Episode open (required shape)
-- First 30–90 seconds: warm friend hello / catch-up banter BEFORE the main topic hook
-- Banter ideas: what’s new since last episode, whether they hit a park, kid chaos, Geno/Michael plans, weather, parking, a funny small life detail
+Episode open (required shape — HARD RULE)
+- REQUIRED first 3–5 spoken lines = name intros + show welcome BEFORE any week/weather anecdote or topic hook. Exact beat order:
+  1) Gena: Hi, I'm Gena.
+  2) Diane: And I'm Diane.
+  3) Gena: And together — welcome to Florida Buzz: Disney.
+  4) Then short catch-up: Gena asks how Diane's week was; Diane gives a short real answer; Gena relates briefly; Diane bridges to parks from catch-up using only sourced facts.
+- HARD BAN opening with "Okay, how was your week" (or any week/weather/errand anecdote) without the name intros + show-title welcome first.
+- HARD BAN the user's last bad open pattern: long rain / umbrella / jacket / sandals banter → then affiliation → then EPCOT (or other topic), while skipping "Hi, I'm Gena" / "And I'm Diane" / "welcome to Florida Buzz: Disney".
+- Anti-example (FORBIDDEN — never reproduce): "Gena: Okay, how was your week? Because I tried to do one quick Central Florida errand with Geno, and somehow we got caught in the kind of afternoon rain…" / "Diane: In Florida? At four o'clock? No." — that skips name intros and the show welcome.
+- After named welcome + short catch-up: big natural reactions → soft Florida Buzz mention → "What else is on the agenda today?" → topic hook → unofficial affiliation disclosure → Florida Buzz resource mentions as needed
 - Do NOT cold-open on the news headline or a “we need to talk about X” topic hook
-- After the warm open, transition into the topic hook, then the unofficial affiliation disclosure, then Florida Buzz resource mentions as needed
 `.trim();
 
 function ensureShowNotesDisclosures(html) {
