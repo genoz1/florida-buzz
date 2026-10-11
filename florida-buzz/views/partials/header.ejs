@@ -43,7 +43,7 @@
        fallback keeps fonts working correctly with JS disabled. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/style.css?v=20261011-logo-inline-2">
+  <link rel="stylesheet" href="/css/style.css?v=20261011-nav-masthead-1">
 
   <script type="application/ld+json">
   {
@@ -75,14 +75,14 @@
     </div>
   </div>
 
-  <nav class="nav" aria-label="Primary">
+  <nav class="nav" aria-label="Site">
     <div class="wrap nav-primary">
       <%# ™ is correct while the federal registration is pending. Do not use ® until the mark is registered. %>
       <a href="/" class="logo" title="Florida Buzz trademark" aria-label="Florida Buzz home">
         <img class="logo-mark" src="/images/florida-buzz-mark.svg" width="34" height="34" alt="" decoding="async">
         <span class="logo-wordmark">Florida <em>Buzz</em><span class="tm" aria-hidden="true">™</span></span>
       </a>
-      <div class="nav-links nav-links-primary">
+      <div class="nav-links nav-links-primary" aria-label="Tools and guides">
         <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
         <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
         <a href="/wait-times">Wait Times</a>
@@ -95,7 +95,7 @@
       </button>
     </div>
     <div class="nav-topics" aria-label="News topics">
-      <div class="wrap">
+      <div class="wrap nav-topics-inner">
         <span class="nav-topics-label">News</span>
         <div class="nav-links nav-links-topics">
           <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
