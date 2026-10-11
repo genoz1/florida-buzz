@@ -3,16 +3,13 @@
 
 /**
  * Reaction / storyteller format:
- *   FULL-SCREEN BACKGROUND: Lightning Lane / park entrance photos
- *   BOTTOM-RIGHT: keyed green-screen cutout of a consistent 30s white
- *                 female host (NO box, NO mic, NO studio background)
- *   VO: female voice lip-synced to the host via Wav2Lip when available
+ *   BACKGROUND: static Lightning Lane / park entrance image (full screen)
+ *   BOTTOM-RIGHT (~1/4): keyed green-screen cutout of a consistent 30s
+ *                       white female host — FULL MOTION (gestures, head,
+ *                       body). NOT a frozen still with only the mouth moving.
+ *   VO: female narrator over the keyed host
  *
  * Host plate: Mixkit 42635 (woman presenting on chroma — no mic).
- * Lip-sync: expects Wav2Lip at WAV2LIP_DIR (default /tmp/Wav2Lip) with
- * checkpoints already downloaded. Falls back to keyed plate without
- * lip-sync only if Wav2Lip is missing (prints a warning).
- *
  * Env: ELEVENLABS_API_KEY
  */
 
@@ -29,7 +26,6 @@ const ROOT = path.join(__dirname, '..');
 const REFS = path.join(ROOT, 'public', 'reels', 'references');
 const OUT_DIR = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
 const TMP = process.env.SAMPLE_TMP_DIR || '/tmp/fb-reaction-narrator';
-const WAV2LIP_DIR = process.env.WAV2LIP_DIR || '/tmp/Wav2Lip';
 
 const HOST_DEFAULT = '/tmp/fb-narrator/female/42635.mp4';
 const HOST_URL = 'https://assets.mixkit.co/videos/42635/42635-720.mp4';
@@ -46,11 +42,8 @@ const STORY = {
     { start: 13.4, end: 17.8, text: 'Pay only if it saves your morning' },
     { start: 17.8, end: 24.0, text: 'Record price ≠ automatic yes' },
   ],
-  stills: [
-    'big-thunder-lightning-lane.jpg',
-    'seven-dwarfs-mine-train.jpg',
-    'magic-kingdom-big-thunder.jpg',
-  ],
+  // Static story image (full-bleed). Prefer Lightning Lane entrance still.
+  bgStill: 'big-thunder-lightning-lane.jpg',
 };
 
 function ffmpegBin() {
@@ -59,12 +52,8 @@ function ffmpegBin() {
 function ffprobeBin() {
   try { return require('ffprobe-static').path; } catch { return 'ffprobe'; }
 }
-function run(bin, args, opts = {}) {
-  const result = spawnSync(bin, args, {
-    encoding: 'utf8',
-    maxBuffer: 40 * 1024 * 1024,
-    cwd: opts.cwd,
-  });
+function run(bin, args) {
+  const result = spawnSync(bin, args, { encoding: 'utf8', maxBuffer: 40 * 1024 * 1024 });
   if (result.status !== 0) {
     throw new Error(`${path.basename(bin)} failed: ${(result.stderr || result.stdout || '').slice(-1800)}`);
   }
@@ -83,7 +72,7 @@ WrapStyle: 0
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,40,&H00FFFFFF,&H00FFFFFF,&H00101010,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,200,180,1
+Style: Caption,DejaVu Sans,40,&H00FFFFFF,&H00FFFFFF,&H00101010,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,200,160,1
 Style: Brand,DejaVu Sans,24,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,24,24,28,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -135,49 +124,6 @@ async function ensureHost(narratorPath) {
   fs.writeFileSync(narratorPath, Buffer.from(await res.arrayBuffer()));
 }
 
-function buildStoryBackground(stills, duration, outPath) {
-  const seg = duration / stills.length;
-  const listPath = path.join(TMP, 'bg-concat.txt');
-  const parts = [];
-  stills.forEach((still, i) => {
-    const clip = path.join(TMP, `bg-still-${i}.mp4`);
-    const frames = Math.max(2, Math.round(seg * 30));
-    run(ffmpegBin(), [
-      '-y', '-loop', '1', '-i', still,
-      '-vf', `scale=820:1460:force_original_aspect_ratio=increase,crop=820:1460,zoompan=z='min(1+0.0009*on,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=720x1280:fps=30,format=yuv420p`,
-      '-frames:v', String(frames), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', clip,
-    ]);
-    parts.push(`file '${clip.replace(/'/g, "'\\''")}'`);
-  });
-  fs.writeFileSync(listPath, `${parts.join('\n')}\n`);
-  run(ffmpegBin(), [
-    '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
-    '-t', String(duration),
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-an',
-    '-pix_fmt', 'yuv420p',
-    outPath,
-  ]);
-}
-
-function wav2lipAvailable() {
-  return fs.existsSync(path.join(WAV2LIP_DIR, 'inference.py'))
-    && fs.existsSync(path.join(WAV2LIP_DIR, 'checkpoints', 'wav2lip_gan.pth'))
-    && fs.existsSync(path.join(WAV2LIP_DIR, 'face_detection', 'detection', 'sfd', 's3fd.pth'));
-}
-
-function runLipSync({ faceStill, audioWav, outMp4 }) {
-  console.log('Running Wav2Lip so mouth matches VO…');
-  run('python3', [
-    'inference.py',
-    '--checkpoint_path', 'checkpoints/wav2lip_gan.pth',
-    '--face', faceStill,
-    '--audio', audioWav,
-    '--outfile', outMp4,
-    '--fps', '25',
-    '--pads', '0', '20', '0', '0',
-  ], { cwd: WAV2LIP_DIR });
-}
-
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.mkdirSync(TMP, { recursive: true });
@@ -188,72 +134,69 @@ async function main() {
   const narrator = process.env.NARRATOR_CLIP || HOST_DEFAULT;
   await ensureHost(narrator);
 
-  const stills = STORY.stills
-    .map((name) => path.join(REFS, name))
-    .filter((p) => fs.existsSync(p));
-  if (stills.length < 2) throw new Error('Need at least 2 park stills in public/reels/references');
+  const bgStill = process.env.BG_IMAGE || path.join(REFS, STORY.bgStill);
+  if (!fs.existsSync(bgStill)) throw new Error(`Missing background still: ${bgStill}`);
 
   const voiceMp3 = path.join(TMP, 'voice.mp3');
-  const voiceWav = path.join(TMP, 'voice.wav');
   console.log('Synthesizing female narrator VO…');
   await elevenTts({ apiKey, text: STORY.spoken, outputPath: voiceMp3 });
-  run(ffmpegBin(), ['-y', '-i', voiceMp3, '-ar', '16000', '-ac', '1', voiceWav]);
   const duration = Math.min(Math.max(audioDuration(voiceMp3) + 0.25, 16), 28);
 
   const assPath = path.join(TMP, 'captions.ass');
   const captions = STORY.captions.map((c, i, arr) => (i === arr.length - 1 ? { ...c, end: duration - 0.1 } : c));
   writeAss(captions, duration, assPath);
 
-  // 1) Full-screen story background
+  // 1) STATIC full-screen story background (no Ken Burns / slideshow)
   const bgVideo = path.join(TMP, 'story-bg.mp4');
-  console.log(`Building full-screen story background (${duration.toFixed(1)}s)…`);
-  buildStoryBackground(stills, duration, bgVideo);
-
-  // 2) Face-forward still from green-screen plate (pointing pose, no mic)
-  // t≈7s: index-finger point + calm mouth — better Wav2Lip drive than a wide smile
-  const hostStill = path.join(TMP, 'host-still.png');
+  const frames = Math.round(duration * 30);
+  console.log(`Building static story background (${duration.toFixed(1)}s)…`);
   run(ffmpegBin(), [
-    '-y', '-ss', '7.0', '-i', narrator, '-frames:v', '1',
-    '-vf', 'scale=-1:900,crop=560:900:90:0',
-    hostStill,
+    '-y', '-loop', '1', '-i', bgStill,
+    '-vf', 'scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,format=yuv420p',
+    '-frames:v', String(frames),
+    '-r', '30',
+    '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
+    bgVideo,
   ]);
 
-  // 3) Lip-sync talking head on green (preferred) or plain looped plate
-  let hostTalking = path.join(TMP, 'host-talking.mp4');
-  let lipSynced = false;
-  if (wav2lipAvailable()) {
-    runLipSync({ faceStill: hostStill, audioWav: voiceWav, outMp4: hostTalking });
-    lipSynced = true;
-  } else {
-    console.warn('WARNING: Wav2Lip not available — mouth will not match VO. Set up /tmp/Wav2Lip.');
-    // Loop the source plate (gesturing) — better than a box, but lips won't match
-    run(ffmpegBin(), [
-      '-y', '-stream_loop', '-1', '-i', narrator, '-t', String(duration),
-      '-vf', 'scale=-1:900,crop=560:900:90:0,fps=25',
-      '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
-      hostTalking,
-    ]);
-  }
-
-  // 4) Key green → transparent cutout, flip so she points toward story content, feather bottom
-  const keyed = path.join(TMP, 'host-keyed.mov');
-  console.log('Keying green-screen cutout (no box)…');
+  // 2) FULL-MOTION host plate looped — gestures / head / body move (not a still)
+  const hostMotion = path.join(TMP, 'host-motion.mp4');
+  console.log('Preparing full-motion green-screen host…');
   run(ffmpegBin(), [
-    '-y', '-i', hostTalking, '-t', String(duration),
+    '-y',
+    '-stream_loop', '-1',
+    '-i', narrator,
+    '-t', String(duration),
+    '-vf',
+    // Keep her on the left of the plate (person ~x=92–712), full upper body
+    'scale=-1:900,crop=620:900:70:0,fps=30,format=yuv420p',
+    '-an',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '18',
+    hostMotion,
+  ]);
+
+  // 3) Key green → transparent cutout, flip so she points toward story, big BR quarter
+  const keyed = path.join(TMP, 'host-keyed.mov');
+  console.log('Keying green-screen cutout (full motion, no box)…');
+  run(ffmpegBin(), [
+    '-y', '-i', hostMotion,
     '-vf', [
       HOST_KEY,
       'format=rgba',
-      'hflip', // plate points right → flip so she points left at the story
-      // ~bottom-right quarter of 720x1280 (≈ half width × half height)
-      'scale=420:-1',
+      'hflip',
+      // Bottom-right ~1/4 of 720x1280
+      'scale=440:-1',
     ].join(','),
-    '-c:v', 'qtrle', '-an',
+    '-c:v', 'qtrle',
+    '-an',
     keyed,
   ]);
 
-  // 5) Composite: story full-bleed + cutout bottom-right (no border/box)
+  // 4) Composite: static story + stationary cutout anchored bottom-right
   const composited = path.join(TMP, 'composited.mp4');
-  console.log('Compositing cutout over story…');
+  console.log('Compositing…');
   run(ffmpegBin(), [
     '-y',
     '-i', bgVideo,
@@ -287,8 +230,7 @@ async function main() {
     master,
   ]);
 
-  // Verification frames for visual QA before sharing
-  for (const t of [2, 7, 12, 18]) {
+  for (const t of [2, 5, 8, 12, 16]) {
     run(ffmpegBin(), [
       '-y', '-ss', String(t), '-i', master, '-frames:v', '1',
       path.join(OUT_DIR, `reaction-narrator-frame-t${t}.jpg`),
@@ -297,9 +239,10 @@ async function main() {
 
   fs.writeFileSync(path.join(OUT_DIR, 'reaction-narrator-sample.md'), `# Reaction narrator sample
 
-- **Background:** full-screen Lightning Lane / park entrance photos
-- **Host:** keyed green-screen cutout in the bottom-right (no box, no mic, no studio)
-- **VO:** female voice${lipSynced ? ', lip-synced with Wav2Lip' : ' (lip-sync unavailable)'}
+- **Background:** static Lightning Lane / park entrance image (full screen)
+- **Host:** full-motion keyed green-screen cutout, bottom-right ~1/4
+  (gestures + body move — not a frozen still with only the mouth animated)
+- **VO:** female voice narrating the story
 
 Host identity: Mixkit 42635 (stock until Florida Buzz has a permanent host).
 Not Gene.
@@ -311,12 +254,14 @@ Run: \`npm run sample:reaction-narrator\`
     ok: true,
     master,
     duration,
-    format: 'story-bg-keyed-cutout-bottom-right',
+    format: 'static-bg-full-motion-keyed-cutout',
     hostIdentity: 'mixkit-42635-female-presenter-chroma',
-    lipSynced,
+    hostMotion: true,
+    frozenStillLipsync: false,
     boxBorder: false,
     micVisible: false,
     geneOnCamera: false,
+    background: bgStill,
   }, null, 2));
 }
 
