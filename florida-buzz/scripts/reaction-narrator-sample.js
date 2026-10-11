@@ -68,7 +68,7 @@ WrapStyle: 0
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,42,&H00FFFFFF,&H00FFFFFF,&H00101010,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,36,36,520,1
+Style: Caption,DejaVu Sans,40,&H00FFFFFF,&H00FFFFFF,&H00101010,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,210,1
 Style: Brand,DejaVu Sans,26,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,28,28,36,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -146,7 +146,9 @@ async function main() {
     '-frames:v', String(frames), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', bgVideo,
   ]);
 
-  // Loop narrator clip to cover full duration, chromakey green, place bottom-left.
+  // Loop narrator clip, key green → solid corner host (pointing / talking).
+  // Plate is 1280x720; host sits ~x=176–616. Sampled greenscreen ≈ 0x149038;
+  // colorkey against bright green with moderate similarity keeps the body opaque.
   const keyed = path.join(TMP, 'narrator-keyed.mov');
   console.log('Keying green-screen narrator…');
   run(ffmpegBin(), [
@@ -155,9 +157,14 @@ async function main() {
     '-i', narrator,
     '-t', String(duration),
     '-vf',
-    // Portrait crop first, then chromakey green → transparent corner host
-    // Host stands on the left of the green-screen plate — crop from x=0
-    'scale=-1:600,crop=340:600:0:0,chromakey=0x00b140:0.22:0.12,format=rgba',
+    [
+      'scale=-1:720',
+      'crop=420:720:160:0',
+      'colorkey=0x00FF00:0.30:0.12',
+      'despill=green:mix=0.55:expand=0.1',
+      'scale=300:-1',
+      'format=rgba',
+    ].join(','),
     '-c:v', 'qtrle', // keeps alpha
     '-an',
     keyed,
@@ -171,7 +178,7 @@ async function main() {
     '-i', keyed,
     '-filter_complex',
     // Bottom-left corner — classic reaction / “pointing at the screen” layout
-    '[0:v][1:v]overlay=20:1280-h-36:format=auto[v]',
+    '[0:v][1:v]overlay=16:1280-h-24:format=auto[v]',
     '-map', '[v]',
     '-an',
     '-c:v', 'libx264',
