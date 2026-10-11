@@ -64,6 +64,7 @@ function escapeAssText(text) {
 
 /**
  * Kinetic ASS captions: brand + location + timed lines with fade/pop + optional yellow highlights.
+ * Mobile-first: large bold caption type for 9:16 social.
  * highlight: substring to wrap in yellow ASS color tags.
  */
 function writeAss({
@@ -75,8 +76,10 @@ function writeAss({
   width = 720,
   height = 1280,
   ctaEndText = 'Follow Florida Buzz',
+  accents = [],
 }) {
   const fs = require('node:fs');
+  // Caption Fontsize 78 (~62% larger than prior 48) — readable on phone without zooming.
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${width}
@@ -86,11 +89,12 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,48,&H00FFFFFF,&H00FFFFFF,&H00101010,&H99000000,-1,0,0,0,100,100,0,0,1,3,1,2,36,36,210,1
-Style: Brand,DejaVu Sans,24,&H00F4F7FF,&H00FFFFFF,&H00101010,&H78000000,-1,0,0,0,100,100,0,0,1,2,0,8,24,24,36,1
-Style: Loc,DejaVu Sans,22,&H00E8F0FF,&H00FFFFFF,&H00101010,&H78000000,-1,0,0,0,100,100,0,0,1,2,0,2,32,32,64,1
-Style: Badge,DejaVu Sans,20,&H0000D7FF,&H00FFFFFF,&H00101010,&H78000000,-1,0,0,0,100,100,0,0,1,2,0,7,24,24,36,1
-Style: Cta,DejaVu Sans,36,&H00FFFFFF,&H00FFFFFF,&H00101010,&H99000000,-1,0,0,0,100,100,0,0,1,3,1,2,40,40,280,1
+Style: Caption,DejaVu Sans,78,&H00FFFFFF,&H00FFFFFF,&H00101010,&HAA000000,-1,0,0,0,100,100,0,0,1,5,2,2,28,28,240,1
+Style: Brand,DejaVu Sans,34,&H00F4F7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,8,20,20,28,1
+Style: Loc,DejaVu Sans,30,&H00E8F0FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,2,28,28,52,1
+Style: Badge,DejaVu Sans,28,&H0000D7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,7,20,20,28,1
+Style: Cta,DejaVu Sans,52,&H00FFFFFF,&H00FFFFFF,&H00101010,&HAA000000,-1,0,0,0,100,100,0,0,1,5,2,2,32,32,300,1
+Style: MoneyAccent,DejaVu Sans,64,&H0000FF5A,&H00FFFFFF,&H00101010,&HBB000000,-1,0,0,0,100,100,0,0,1,4,2,8,28,28,160,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -113,6 +117,13 @@ Dialogue: 0,0:00:00.00,${stamp(Math.min(3.2, duration))},Badge,,0,0,0,,{\\fad(12
     }
     // Fade + slight scale pop for kinetic feel
     ass += `Dialogue: 1,${stamp(c.start)},${stamp(end)},Caption,,0,0,0,,{\\fad(90,70)\\t(0,160,\\fscx108\\fscy108)\\t(160,280,\\fscx100\\fscy100)}${text}\n`;
+  }
+
+  for (const a of accents || []) {
+    const end = Math.min(a.end, duration - 0.05);
+    if (end <= a.start) continue;
+    const style = a.style || 'MoneyAccent';
+    ass += `Dialogue: 3,${stamp(a.start)},${stamp(end)},${style},,0,0,0,,{\\fad(100,80)}${escapeAssText(a.text)}\n`;
   }
 
   const ctaStart = Math.max(0, duration - 3.2);
@@ -167,16 +178,67 @@ function concatVideos(listPath, output) {
   run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', output]);
 }
 
-function muxAssAndAudio({ videoPath, audioPath, assPath, outputPath }) {
+/**
+ * Mux audio + ASS captions, optionally compositing timed PNG overlays (money/wallet accents).
+ * overlays: [{ path, start, end, x, y }]
+ */
+function muxAssAndAudio({ videoPath, audioPath, assPath, outputPath, overlays = [] }) {
   const assEscaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-  run(ffmpegBin(), [
-    '-y',
-    '-i',
-    videoPath,
-    '-i',
-    audioPath,
-    '-vf',
-    `ass=${assEscaped},format=yuv420p`,
+
+  // When no overlays, keep the simpler -vf path (avoids filter_complex map quirks).
+  if (!overlays.length) {
+    run(ffmpegBin(), [
+      '-y',
+      '-i',
+      videoPath,
+      '-i',
+      audioPath,
+      '-vf',
+      `ass=${assEscaped},format=yuv420p`,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '18',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-shortest',
+      '-movflags',
+      '+faststart',
+      outputPath,
+    ]);
+    return;
+  }
+
+  const args = ['-y', '-i', videoPath, '-i', audioPath];
+  for (const ov of overlays) {
+    args.push('-loop', '1', '-i', ov.path);
+  }
+
+  const parts = [];
+  let last = '[0:v]';
+  overlays.forEach((ov, i) => {
+    const inputIdx = i + 2; // 0=video, 1=audio, overlays start at 2
+    const out = i === overlays.length - 1 ? '[vbase]' : `[v${i}]`;
+    const x = ov.x || '(W-w)/2';
+    const y = ov.y || '240';
+    parts.push(
+      `${last}[${inputIdx}:v]overlay=x=${x}:y=${y}:enable='between(t,${ov.start},${ov.end})':format=auto${out}`
+    );
+    last = out;
+  });
+  parts.push(`[vbase]ass=${assEscaped},format=yuv420p[vout]`);
+
+  args.push(
+    '-filter_complex',
+    parts.join(';'),
+    '-map',
+    '[vout]',
+    '-map',
+    '1:a',
     '-c:v',
     'libx264',
     '-preset',
@@ -190,8 +252,9 @@ function muxAssAndAudio({ videoPath, audioPath, assPath, outputPath }) {
     '-shortest',
     '-movflags',
     '+faststart',
-    outputPath,
-  ]);
+    outputPath
+  );
+  run(ffmpegBin(), args);
 }
 
 module.exports = {

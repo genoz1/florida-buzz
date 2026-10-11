@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { config: loadConfig } = require('./config');
+const { config: loadConfig, DEFAULT_ELEVEN_VOICE_GENO } = require('./config');
 const { synthesizeElevenV4 } = require('./elevenTts');
 const {
   audioDuration,
@@ -12,11 +12,13 @@ const {
   muxAssAndAudio,
 } = require('./ffmpeg');
 const { getStory, LIGHTNING_LANE_WORTH_IT } = require('./stories');
+const { generateOverlayAssets, lightningLaneOverlayPlan } = require('./overlays');
 
 /**
  * Create a Florida Buzz visual news short:
- * - ElevenLabs eleven_v4 voiceover (direct API; never fal)
+ * - ElevenLabs eleven_v4 voiceover (direct API; never fal) — default Geno voice
  * - Local ffmpeg Ken Burns stills + kinetic ASS captions + brand overlays
+ * - Punchy money/price PNG overlays when story.moneyOverlays
  * - No AI presenter
  *
  * @param {object} options
@@ -78,6 +80,7 @@ async function createFloridaBuzzVisualVideo(options = {}) {
       reused: false,
       model: result.model,
       voiceId: result.voiceId,
+      voiceName: cfg.elevenVoiceId === DEFAULT_ELEVEN_VOICE_GENO ? 'Geno' : null,
       provider: result.provider,
       requestId: result.requestId,
     };
@@ -101,7 +104,15 @@ async function createFloridaBuzzVisualVideo(options = {}) {
     width: cfg.width,
     height: cfg.height,
     ctaEndText: story.ctaCaption || 'Follow Florida Buzz',
+    accents: story.accents || [],
   });
+
+  let overlays = [];
+  if (story.moneyOverlays !== false && (story.moneyOverlays || story.id === LIGHTNING_LANE_WORTH_IT.id)) {
+    const overlayDir = path.join(tmpDir, 'overlays');
+    const assets = generateOverlayAssets(overlayDir);
+    overlays = lightningLaneOverlayPlan(assets).filter((o) => o.start < duration);
+  }
 
   const totalFrames = Math.round(duration * cfg.fps);
   const weights = story.stills.map((s) => s.weight || 1 / story.stills.length);
@@ -139,16 +150,23 @@ async function createFloridaBuzzVisualVideo(options = {}) {
     audioPath: voiceMp3,
     assPath,
     outputPath: master,
+    overlays,
   });
 
   const credits = story.stills.map((s) => `- ${s.credit || s.file}`).join('\n');
+  const voiceLine =
+    ttsMeta.voiceId || cfg.elevenVoiceId
+      ? `**Voice:** Geno (\`${ttsMeta.voiceId || cfg.elevenVoiceId}\`) — ElevenLabs direct`
+      : '**Voice:** (reused local mp3)';
   fs.writeFileSync(
     readmePath,
     `# ${story.title}
 
 **Pipeline:** ElevenLabs \`${ttsMeta.model}\` (direct API) + local ffmpeg  
+${voiceLine}  
 **No fal.ai** — no FAL_KEY, no fal image/ffmpeg/ElevenLabs proxy  
-**No AI presenter**
+**No AI presenter**  
+**Overlays:** ${overlays.length ? '$$$$ / UP TO $229 / empty wallet / price spike PNGs' : 'none'}
 
 ## Script
 
@@ -174,6 +192,7 @@ ${credits}
     height: cfg.height,
     presenter: false,
     usesFal: false,
+    overlayCount: overlays.length,
     tts: ttsMeta,
   };
 }
@@ -183,4 +202,5 @@ module.exports = {
   loadConfig,
   getStory,
   LIGHTNING_LANE_WORTH_IT,
+  DEFAULT_ELEVEN_VOICE_GENO,
 };

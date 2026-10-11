@@ -4,20 +4,29 @@
 /**
  * Lightning Lane visual-news sample (no AI presenter).
  *
- * Pipeline: ElevenLabs eleven_v4 (direct) + local ffmpeg Ken Burns / kinetic captions.
+ * Pipeline: ElevenLabs eleven_v4 (direct) + local ffmpeg Ken Burns / kinetic captions
+ * + money/price PNG overlays ($$$$, UP TO $229, empty wallet).
  * Does NOT use fal.ai / FAL_KEY.
+ *
+ * Voice default: Geno — ElevenLabs voice id bg7PC2IzyIDwYgytMiW1
+ * (same as podcast host; see lib/podcasts/config.js DEFAULT_ELEVEN_VOICE_GENO).
  *
  * Env:
  *   ELEVENLABS_API_KEY   required (unless VISUAL_NEWS_REUSE_VOICE=path)
  *   ELEVENLABS_MODEL_ID  optional, default eleven_v4
- *   ELEVENLABS_VOICE_SAMPLE optional voice id
+ *   VISUAL_NEWS_ELEVEN_VOICE optional override (default Geno)
  *   SAMPLE_OUT_DIR       default /opt/cursor/artifacts
  */
 
 require('dotenv').config();
 
 const path = require('node:path');
-const { createFloridaBuzzVisualVideo, LIGHTNING_LANE_WORTH_IT } = require('../lib/visualNews');
+const fs = require('node:fs');
+const {
+  createFloridaBuzzVisualVideo,
+  LIGHTNING_LANE_WORTH_IT,
+  DEFAULT_ELEVEN_VOICE_GENO,
+} = require('../lib/visualNews');
 
 async function main() {
   const reuse =
@@ -26,10 +35,16 @@ async function main() {
       ? '/tmp/fb-ll-worth-it/ll.mp3'
       : null);
 
-  // Prefer live ElevenLabs when key present (unless REUSE_VOICE=true forces reuse).
+  // Prefer live ElevenLabs Geno when key present (unless REUSE_VOICE=true forces reuse).
+  // Default to live TTS so Geno voice is used — do not silently reuse a prior Matilda bake.
   const forceReuse = String(process.env.REUSE_VOICE || '').toLowerCase() === 'true';
   const hasKey = !!(process.env.ELEVENLABS_API_KEY || process.env.XI_API_KEY);
-  const voicePath = forceReuse || (!hasKey && reuse) ? reuse : null;
+  const voicePath = forceReuse && reuse ? reuse : !hasKey && reuse ? reuse : null;
+
+  // Ensure Geno is the resolved voice unless explicitly overridden.
+  if (!process.env.VISUAL_NEWS_ELEVEN_VOICE && !process.env.ELEVENLABS_VOICE_SAMPLE) {
+    process.env.VISUAL_NEWS_ELEVEN_VOICE = DEFAULT_ELEVEN_VOICE_GENO;
+  }
 
   const result = await createFloridaBuzzVisualVideo({
     story: LIGHTNING_LANE_WORTH_IT,
@@ -39,12 +54,37 @@ async function main() {
     voicePath: voicePath || undefined,
   });
 
-  console.log(JSON.stringify(result, null, 2));
+  // Extract verification frames for visual QA.
+  const outDir = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
+  const master = result.master;
+  const ffmpeg = require('../lib/visualNews/ffmpeg');
+  for (const t of [2, 4, 10, 12, 17]) {
+    const frame = path.join(outDir, `florida-buzz-visual-news-ll-t${t}.jpg`);
+    try {
+      ffmpeg.run(ffmpeg.ffmpegBin(), [
+        '-y',
+        '-ss',
+        String(t),
+        '-i',
+        master,
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        frame,
+      ]);
+      result[`frame_t${t}`] = frame;
+    } catch (err) {
+      result[`frame_t${t}_error`] = String(err.message || err);
+    }
+  }
+
+  console.log(JSON.stringify({ ...result, genoVoiceId: DEFAULT_ELEVEN_VOICE_GENO }, null, 2));
 }
 
 function pathExists(p) {
   try {
-    return require('node:fs').existsSync(p);
+    return fs.existsSync(p);
   } catch {
     return false;
   }

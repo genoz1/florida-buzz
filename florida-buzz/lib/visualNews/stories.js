@@ -18,14 +18,21 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   location: 'Magic Kingdom',
   // No AI presenter. Story-specific park stills only.
   presenter: false,
-  spoken: `[curious] Lightning Lane Single Pass just hit new highs for November first. Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. A record price is not an automatic yes. Follow Florida Buzz.`,
+  // Geno-style delivery tags (ElevenLabs v4 audio tags).
+  spoken: `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth emptying the wallet? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`,
   captions: [
-    { start: 0.0, end: 3.0, text: 'Lightning Lane hit new highs', highlight: 'new highs' },
-    { start: 3.0, end: 6.2, text: 'Seven Dwarfs Mine Train' },
-    { start: 6.2, end: 9.4, text: 'Standby: 50 minutes', highlight: '50 minutes' },
-    { start: 9.4, end: 12.6, text: 'So is it worth it?', highlight: 'worth it' },
-    { start: 12.6, end: 16.8, text: 'Pay only if it saves your morning', highlight: 'saves your morning' },
-    { start: 16.8, end: 22.0, text: 'Record price ≠ automatic yes', highlight: 'automatic yes' },
+    { start: 0.0, end: 2.8, text: 'Lightning Lane $$$', highlight: '$$$' },
+    { start: 2.8, end: 5.6, text: 'Up to $229 — new highs', highlight: '$229' },
+    { start: 5.6, end: 8.4, text: 'Seven Dwarfs Mine Train' },
+    { start: 8.4, end: 11.0, text: 'Standby: 50 minutes', highlight: '50 minutes' },
+    { start: 11.0, end: 13.8, text: 'Worth emptying the wallet?', highlight: 'wallet' },
+    { start: 13.8, end: 17.2, text: 'Pay only if it saves your morning', highlight: 'saves your morning' },
+    { start: 17.2, end: 22.0, text: 'Record price ≠ automatic yes', highlight: 'automatic yes' },
+  ],
+  // Extra ASS money accents (PNG overlays carry the heavy visual punch).
+  accents: [
+    { start: 0.3, end: 2.6, text: '$$$$ PRICE HIT' },
+    { start: 11.2, end: 13.6, text: 'EMPTY WALLET?' },
   ],
   stills: [
     {
@@ -47,10 +54,13 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   ],
   ctaSpoken: CTA_SPOKEN,
   ctaCaption: CTA_CAPTION,
+  // Enable wallet / $$$$ / $229 PNG overlays in the sample pipeline.
+  moneyOverlays: true,
   notes: [
-    'No invented dollar amounts.',
+    'Price-impact graphics ($$$$, empty wallet, up-to-$229 badge) are intentional visual accents.',
     'No AI presenter / host cutout.',
-    'Visuals: licensed Magic Kingdom stills only.',
+    'Visuals: licensed Magic Kingdom stills + generated money overlays.',
+    'Voice: Geno (ElevenLabs bg7PC2IzyIDwYgytMiW1).',
   ],
 });
 

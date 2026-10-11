@@ -8,10 +8,21 @@ Vertical (9:16) news-style shorts built from **article / reference stills**, kin
 |------|------|
 | Voiceover | **ElevenLabs direct API** (`eleven_v4`, or `eleven_v4_turbo` via env) |
 | Stills animation | **Local ffmpeg** (`ffmpeg-static`) Ken Burns zoom/pan |
-| Captions / brand | Local ffmpeg + ASS overlays |
+| Captions / brand | Local ffmpeg + ASS overlays (large mobile-first type) |
+| Price accents | Generated PNG overlays ($$$$, UP TO $229, empty wallet, price spike) + ASS accents |
 | Presenter | **None** — no AI host cutout |
 
 This feature **does not use** `FAL_KEY`, fal image generation, fal ffmpeg merge, or the fal ElevenLabs proxy.
+
+## Voice (Geno)
+
+Default ElevenLabs voice is **Geno** — the same podcast host voice:
+
+```
+bg7PC2IzyIDwYgytMiW1
+```
+
+Defined as `DEFAULT_ELEVEN_VOICE_GENO` in `lib/visualNews/config.js` (mirrors `lib/podcasts/config.js`).
 
 ## Environment variables
 
@@ -25,9 +36,9 @@ Optional:
 
 ```
 ELEVENLABS_MODEL_ID=eleven_v4
-ELEVENLABS_VOICE_SAMPLE=<voice id>          # default Matilda XrExE9yKIg1WjnnlVkGX
 VISUAL_NEWS_ELEVEN_MODEL=eleven_v4          # or eleven_v4_turbo
-VISUAL_NEWS_ELEVEN_VOICE=<voice id>
+VISUAL_NEWS_ELEVEN_VOICE=bg7PC2IzyIDwYgytMiW1   # Geno (default)
+PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1 # also accepted
 VISUAL_NEWS_ELEVEN_OUTPUT_FORMAT=mp3_44100_128
 VISUAL_NEWS_WIDTH=720
 VISUAL_NEWS_HEIGHT=1280
@@ -73,5 +84,7 @@ Output: `/opt/cursor/artifacts/florida-buzz-visual-news-ll.mp4`
 - No AI presenter
 - Story-specific stills (not generic filler)
 - Florida Buzz brand + location overlays
+- Large kinetic captions (ASS Fontsize ~78) for phone readability
+- Lightning Lane sample includes price-impact accents ($$$$, empty wallet, UP TO $229)
 - VO ends with Florida Buzz CTA (“Follow Florida Buzz.”)
-- No invented dollar amounts on Lightning Lane worth-it story
+- Default VO voice: Geno (`bg7PC2IzyIDwYgytMiW1`)

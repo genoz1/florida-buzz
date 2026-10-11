@@ -6,7 +6,9 @@
  */
 
 const DEFAULT_ELEVEN_MODEL = 'eleven_v4';
-const DEFAULT_VOICE = 'XrExE9yKIg1WjnnlVkGX'; // Matilda — clear conversational American
+/** Geno — same ElevenLabs voice as Florida Buzz podcast host (`lib/podcasts/config.js`). */
+const DEFAULT_ELEVEN_VOICE_GENO = 'bg7PC2IzyIDwYgytMiW1';
+const DEFAULT_VOICE = DEFAULT_ELEVEN_VOICE_GENO;
 const DEFAULT_OUTPUT_FORMAT = 'mp3_44100_128';
 const DEFAULT_WIDTH = 720;
 const DEFAULT_HEIGHT = 1280;
@@ -23,6 +25,8 @@ function config(env = process.env) {
     elevenModel: env.VISUAL_NEWS_ELEVEN_MODEL || env.ELEVENLABS_MODEL_ID || DEFAULT_ELEVEN_MODEL,
     elevenVoiceId:
       env.VISUAL_NEWS_ELEVEN_VOICE ||
+      env.PODCASTS_ELEVEN_VOICE_GENO ||
+      env.ELEVENLABS_VOICE_GENO ||
       env.ELEVENLABS_VOICE_SAMPLE ||
       env.ELEVENLABS_VOICE_ID ||
       DEFAULT_VOICE,
@@ -36,12 +40,15 @@ function config(env = process.env) {
     siteUrl: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     // Explicit: this pipeline must not depend on fal.
     usesFal: false,
+    defaultVoiceName: 'Geno',
+    defaultVoiceId: DEFAULT_ELEVEN_VOICE_GENO,
   });
 }
 
 module.exports = {
   config,
   DEFAULT_ELEVEN_MODEL,
+  DEFAULT_ELEVEN_VOICE_GENO,
   DEFAULT_VOICE,
   DEFAULT_OUTPUT_FORMAT,
   DEFAULT_WIDTH,
