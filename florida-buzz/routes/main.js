@@ -1169,28 +1169,18 @@ router.get('/admin/preview-newsletter', async (req, res) => {
     return res.send('Supabase is not configured — cannot fetch articles for the preview.');
   }
 
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: articles, error: articlesError } = await supabase
-    .from('articles')
-    .select('*')
-    .gte('published_at', oneDayAgo)
-    .order('published_at', { ascending: false })
-    .limit(10);
-
-  if (articlesError) {
-    return res.send(`Could not fetch articles: ${articlesError.message}`);
-  }
-  if (!articles || articles.length === 0) {
-    return res.send('No articles published in the last 24 hours — nothing to preview right now.');
-  }
-
   try {
-    const { buildDigestHtml } = require('../scripts/newsletter');
+    const { buildDigestHtml, buildDigestSubject, collectDigestContent } = require('../scripts/newsletter');
     const { sendEmail } = require('../lib/resend');
+    const digest = await collectDigestContent(supabase);
+    if (!digest) {
+      return res.send('No articles/guides available for a preview right now.');
+    }
     const unsubscribeUrl = `${process.env.SITE_URL}/unsubscribe?email=${encodeURIComponent(to)}`;
-    const html = buildDigestHtml(articles, unsubscribeUrl);
-    await sendEmail({ to, subject: `[PREVIEW] Florida Buzz: ${articles.length} stories from today`, html });
-    res.send(`Sent a preview of the real digest (${articles.length} articles) to ${to}.`);
+    const html = buildDigestHtml(digest, unsubscribeUrl);
+    const subject = `[PREVIEW] ${buildDigestSubject(digest)}`;
+    await sendEmail({ to, subject, html });
+    res.send(`Sent a preview of the redesigned Disney-focused digest to ${to}.`);
   } catch (err) {
     res.send(`Failed: ${err.message}`);
   }

@@ -82,13 +82,14 @@ test('afterSubscribeWelcome records nurture step when supabase upsert works', as
 
 test('daily digest includes automated monetization tools block', () => {
   const html = buildDigestHtml(
-    [{ slug: 'test-story', title: 'Test', dek: 'Dek', category: 'theme-parks' }],
+    [{ slug: 'test-story', title: 'Disney World Test', dek: 'Dek', category: 'theme-parks' }],
     'https://thefloridabuzz.com/unsubscribe?email=a%40b.com',
     {}
   );
-  assert.match(html, /Plan the trip with free tools/);
+  assert.match(html, /Plan the trip with free tools|Plan with free tools/);
   assert.match(html, /\/wait-times/);
-  assert.match(html, /Undercover Tourist|commission/i);
+  assert.match(html, /Undercover Tourist|Hotels\.com|commission/i);
+  assert.match(html, /Disney planning tips/i);
 });
 
 test('buildWelcomeEmail is the first series message', () => {
