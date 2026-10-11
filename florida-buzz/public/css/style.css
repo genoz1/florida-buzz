@@ -634,6 +634,38 @@ footer a:hover { opacity: 1; }
   font-size: 14px;
   color: var(--ink-600);
 }
+.home-partner-strip {
+  margin-top: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: linear-gradient(120deg, var(--sand-100) 0%, #fffdf8 55%, #f0f7f4 100%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.home-partner-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 52ch;
+}
+.home-partner-copy strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--teal-900);
+}
+.home-partner-copy p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-600);
+}
+.home-partner-disclosure {
+  font-size: 12px !important;
+  color: var(--ink-600);
+}
 .home-podcast-panel {
   display: grid;
   grid-template-columns: 220px 1fr;

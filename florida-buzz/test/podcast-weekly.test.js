@@ -219,6 +219,21 @@ test('show notes include resources section with tracking params', () => {
   assert.match(html, /\/wait-times/);
   assert.match(html, /\/planner/);
   assert.match(html, /\/dining/);
+  assert.match(html, /Undercover Tourist/i);
+  assert.match(html, /jdoqocy\.com\/click-101851476-15733832|UNDERCOVER|undercovertourist/i);
+  assert.match(html, /commission|affiliate|partner/i);
+});
+
+test('episode description appends Undercover Tourist partner link', async () => {
+  const copy = await buildEpisodeCopy({
+    aiText: null,
+    weekKey: '2026-W41',
+    collection: { sources: [] },
+    releaseSlot: { key: 'tue', label: 'Tuesday' },
+  });
+  assert.match(copy.description, /Undercover Tourist/i);
+  assert.match(copy.description, /jdoqocy\.com\/click-101851476-15733832/);
+  assert.match(copy.description, /commission|partner/i);
 });
 
 test('weekly draft stays disabled by default and never auto-publishes', async () => {

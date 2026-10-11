@@ -7,6 +7,11 @@ const {
   ELEVENLABS_AUDIO_TAGS_GUIDANCE,
 } = require('./hosts');
 const { verifiedToolsBlock } = require('./siteResources');
+const {
+  PARTNER_NAME,
+  PODCAST_MIDROLL_DIRECTION,
+  PODCAST_OUTRO_DIRECTION,
+} = require('../affiliates/undercoverTourist');
 
 // Back-compat export name used by older imports/tests.
 const DISCLOSURE = AFFILIATION_DISCLOSURE;
@@ -112,12 +117,14 @@ Outline rules:
   4) Lock in park-day energy / cut through the noise
   5) Let's go
 - Plan sparse-to-moderate ElevenLabs audio tags on spoken beats across the episode (Named Open keeps [excited]/[warmly]; mark a few Quick Hits / Deep Dive / CTA lines with [chuckles], [upbeat], [nostalgic], [conversational], etc. where natural).
-- After Named Open: Quick Hits (several short sourced topics) → one Deep Dive → CTA / close with Florida Buzz resources + affiliation if needed.
+- After Named Open: Quick Hits (several short sourced topics) → short ${PARTNER_NAME} partner mid-roll → one Deep Dive → CTA / close with Florida Buzz resources + soft ${PARTNER_NAME} show-notes reminder + affiliation if needed.
 - HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + unofficial + Let's go.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
 - Plan exactly 1–2 brief "recent park experience" anecdote beats tied to the deep dive (or one quick hit).
 - Plan 3–5 natural Florida Buzz resource mentions across the episode (not ads): at least one early, one in the deep dive, and a CTA near the close.
+- REQUIRED Partner mid-roll segment (mark as "Partner mid-roll:"): ${PODCAST_MIDROLL_DIRECTION}
+- REQUIRED Soft outro partner reminder in the close (mark as "Partner outro:"): ${PODCAST_OUTRO_DIRECTION}
 - Mark resource beats (e.g. "Resource:") naming only verified tools/articles from the lists below.
 - Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, or URLs.
 - When source notes lack a dated park detail, plan timeless composite experiences — do not claim a specific date.
@@ -134,7 +141,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be Geno Option A (welcome / I'm Geno / unofficial / let's go). Then Quick Hits, one Deep Dive, Florida Buzz resource beats, and a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be Geno Option A (welcome / I'm Geno / unofficial / let's go). Then Quick Hits, a short ${PARTNER_NAME} partner mid-roll, one Deep Dive, Florida Buzz resource beats, a soft ${PARTNER_NAME} show-notes reminder, and a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -164,8 +171,9 @@ Conversation requirements:
   1) Named Open — Geno Option A (exact intent; wording may match closely; keep audio tags):
      Geno: ${GENO_NAMED_OPEN_OPTION_A}
   2) Quick Hits — several short sourced topics with punchy takes (tag a few lines where energy shifts)
-  3) One Deep Dive — longer planning opinion + one brief park anecdote (use [nostalgic]/[sighs]/[chuckles] where natural)
-  4) CTA / close — The Florida Buzz dot com resources + warm goodbye ([warmly] / [upbeat] near the close is good)
+  3) Partner mid-roll — SHORT (~15–25 seconds): ${PODCAST_MIDROLL_DIRECTION}
+  4) One Deep Dive — longer planning opinion + one brief park anecdote (use [nostalgic]/[sighs]/[chuckles] where natural)
+  5) CTA / close — The Florida Buzz dot com resources + soft ${PARTNER_NAME} show-notes reminder + warm goodbye ([warmly] / [upbeat] near the close is good)
 - HARD BAN dual-host dialogue (no Gena:/Diane: lines, no cohost reactions).
 - HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + unofficial + Let's go.
 - HARD BAN writing a full episode with no square-bracket audio tags after the open.
@@ -183,6 +191,8 @@ Florida Buzz listener guidance (helpful, not ad-read):
 - At least one useful recommendation near the beginning, one or more during the deep dive, and a brief call to action near the end.
 - Say “The Florida Buzz dot com” when speaking; never read long URLs aloud.
 - Do not interrupt an emotional, humorous, or personal moment with a promotion.
+- REQUIRED mid-episode partner mention: after Quick Hits (before the Deep Dive), include one short human line about partner ${PARTNER_NAME} for Disney tickets/hotels, disclose partner/affiliate nature, point listeners to the show notes link, and note that booking there helps support the show. No hard-sell spam; do not invent prices or deals.
+- Soft outro: briefly remind that the ${PARTNER_NAME} link is in the show notes, then close.
 - Closing must include a concise conversational reminder that listeners can find the articles, guides, dining information, wait times, day planner, and community discussions at The Florida Buzz dot com.
 - STANDALONE EPISODE RULE (critical): Never say “Part 1”, “Part 2”, “to be continued”, or any multi-part tease. Close as a complete show with a normal goodbye.
 - No forced comedy, no exaggerated/childish voices, no heavy accents, no announcer cadence.
@@ -193,6 +203,8 @@ Return ONLY the dialogue script.`,
 Description: ${episode.description}
 Release framing: ${episode.release_label || 'standalone'} episode — complete on its own (not Part 1 or Part 2 of a larger show).
 Affiliation disclosure (already woven into Geno Option A open; keep consistent): ${AFFILIATION_DISCLOSURE}
+Partner mid-roll direction: ${PODCAST_MIDROLL_DIRECTION}
+Partner soft outro direction: ${PODCAST_OUTRO_DIRECTION}
 
 Outline:
 ${outline}
@@ -203,7 +215,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: Geno Option A — welcome / I'm Geno / unofficial / let's go — before quick hits. Structure: quick hits + one deep dive + CTA. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: Geno Option A — welcome / I'm Geno / unofficial / let's go — before quick hits. Structure: quick hits + short ${PARTNER_NAME} mid-roll + one deep dive + CTA with soft ${PARTNER_NAME} show-notes reminder. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 

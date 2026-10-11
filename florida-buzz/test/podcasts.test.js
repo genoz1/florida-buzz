@@ -298,6 +298,8 @@ test('show notes always receive unofficial affiliation disclosure', () => {
   const withAffiliation = ensureShowNotesDisclosures('<p>Episode notes</p>');
   assert.match(withAffiliation, /not affiliated with/i);
   assert.doesNotMatch(withAffiliation, /AI-generated hosts/i);
+  assert.match(withAffiliation, /Undercover Tourist/i);
+  assert.match(withAffiliation, /jdoqocy\.com\/click-101851476-15733832/);
   assert.equal(ensureShowNotesDisclosures(withAffiliation), withAffiliation);
 });
 
@@ -372,6 +374,9 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /\[chuckles\]/);
   assert.match(HOST_BIBLE, /\[nostalgic\]/);
   assert.match(HOST_BIBLE, /sparse to moderate|sparse-to-moderate/i);
+  assert.match(HOST_BIBLE, /Undercover Tourist/i);
+  assert.match(HOST_BIBLE, /partner mid-roll/i);
+  assert.match(HOST_BIBLE, /show notes/i);
   const show = { title: 'Florida Buzz: Disney' };
   const episode = { title: 'Week in the parks', description: 'News and tips' };
   const sources = [
@@ -392,8 +397,12 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(outline.system, /welcome to Florida Buzz: Disney/i);
   assert.match(outline.system, /solo/i);
   assert.match(outline.system, /ElevenLabs audio tags|audio tags/i);
+  assert.match(outline.system, /Partner mid-roll/i);
+  assert.match(outline.system, /Undercover Tourist/i);
+  assert.match(outline.system, /Partner outro/i);
   assert.doesNotMatch(outline.system, /Lead: Diane/);
   assert.match(outline.user, /solo Geno|Geno Option A/i);
+  assert.match(outline.user, /Undercover Tourist/i);
   const conversation = buildConversationPrompt({
     show,
     episode,
@@ -418,7 +427,13 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /\[chuckles\]/);
   assert.match(conversation.system, /sparse-to-moderate|sparse to moderate/i);
   assert.match(conversation.system, /Trailer-style expressiveness|audio tags so eleven_v4/i);
-  assert.match(conversation.user, /quick hits \+ one deep dive/i);
+  assert.match(conversation.system, /Partner mid-roll/i);
+  assert.match(conversation.system, /Undercover Tourist/i);
+  assert.match(conversation.system, /REQUIRED mid-episode partner mention/i);
+  assert.match(conversation.system, /Soft outro/i);
+  assert.match(conversation.user, /Undercover Tourist/i);
+  assert.match(conversation.user, /Partner mid-roll direction/i);
+  assert.match(conversation.user, /quick hits \+ short Undercover Tourist mid-roll/i);
   assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);

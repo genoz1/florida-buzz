@@ -15,6 +15,11 @@ const { ensureShowNotesDisclosures, AFFILIATION_DISCLOSURE } = require('./hosts'
 const { buildResourcesMentionedHtml, trackedSiteUrl } = require('./siteResources');
 const { notifyDraftReady } = require('./notify');
 const { slugify } = require('./validation');
+const {
+  PARTNER_NAME,
+  partnerDescriptionBlurb,
+  partnerShowNotesHtml,
+} = require('../affiliates/undercoverTourist');
 
 /** Standalone weekly shows — not halves of one episode. Default: Tuesday + Friday 6:00 AM ET. */
 const DEFAULT_RELEASE_SLOTS = [
@@ -183,9 +188,18 @@ ${linkList(buzz)}
 <p>Have a take? Visit the <a href="${escape(buzzHome)}">Buzz Board</a> and add your answer.</p>
 <h2>Evergreen discussion</h2>
 ${linkList(evergreen)}
+${partnerShowNotesHtml()}
 <p>${AFFILIATION_DISCLOSURE}</p>
 `.trim();
   return ensureShowNotesDisclosures(html);
+}
+
+function withPartnerDescription(description, env = process.env) {
+  const base = String(description || '').trim();
+  if (/Undercover Tourist/i.test(base)) return base.slice(0, 4000);
+  const blurb = partnerDescriptionBlurb(env);
+  const joined = base ? `${base} ${blurb}` : blurb;
+  return joined.slice(0, 4000);
 }
 
 function escape(value) {
@@ -261,7 +275,7 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
   if (!aiText) {
     return {
       title: stripPartLabels(fallbackTitle).slice(0, 200),
-      description: stripPartLabels(fallbackDescription).slice(0, 4000),
+      description: withPartnerDescription(stripPartLabels(fallbackDescription)),
       release_slot: slot.key,
       release_label: slot.label,
     };
@@ -295,7 +309,7 @@ Evergreen topic: ${collection.sources.find((s) => s.source_kind === 'evergreen_t
     );
     return {
       title: title.slice(0, 200),
-      description: description.slice(0, 4000),
+      description: withPartnerDescription(description),
       release_slot: slot.key,
       release_label: slot.label,
     };
@@ -303,7 +317,7 @@ Evergreen topic: ${collection.sources.find((s) => s.source_kind === 'evergreen_t
     console.warn('[podcasts] packaging AI failed, using fallback:', err.message);
     return {
       title: stripPartLabels(fallbackTitle).slice(0, 200),
-      description: stripPartLabels(fallbackDescription).slice(0, 4000),
+      description: withPartnerDescription(stripPartLabels(fallbackDescription)),
       release_slot: slot.key,
       release_label: slot.label,
     };
@@ -317,7 +331,8 @@ function buildFallbackOutline({ weekKey, sources, copy }) {
   byKind('guide').slice(0, 3).forEach((s) => lines.push(`Guide — ${s.title}`));
   byKind('buzz_board').slice(0, 3).forEach((s) => lines.push(`Buzz Board — ${s.title}`));
   byKind('evergreen_topic').slice(0, 1).forEach((s) => lines.push(`Evergreen — ${s.title}`));
-  lines.push('Close with Florida Buzz site CTAs (dining guide, wait times, day planner, Buzz Board).');
+  lines.push(`Partner mid-roll: short ${PARTNER_NAME} mention — tickets/hotels, partner disclosure, link in show notes.`);
+  lines.push(`Close with Florida Buzz site CTAs (dining guide, wait times, day planner, Buzz Board) plus soft ${PARTNER_NAME} show-notes reminder.`);
   return lines.join('\n');
 }
 
@@ -335,6 +350,9 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   articles.forEach((s) => {
     turns.push(`Geno: Quick hit — The Florida Buzz covered “${s.title}.” Here’s the planning take I’m watching.`);
   });
+  turns.push(
+    `Geno: [conversational] Quick pause — if you're planning a Disney trip, check our partner ${PARTNER_NAME} for tickets and hotel deals. Link's in the show notes; booking there helps support the show.`
+  );
   guides.forEach((s) => {
     turns.push(`Geno: For planning, I’d point people to the Florida Buzz guide on “${s.title}.” That’s the kind of thing I actually use before we leave the house.`);
   });
@@ -346,6 +364,9 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   }
   turns.push(
     'Geno: That’s our week-of scaffold for review. Once AI packaging expands this into the full solo cut, we’ll keep the same energy.'
+  );
+  turns.push(
+    `Geno: [warmly] Reminder — ${PARTNER_NAME} partner link is in the show notes if you need tickets or hotels. And grab the dining guide, wait times, day planner, and Buzz Board at The Florida Buzz dot com.`
   );
   turns.push(`Geno: Draft week key ${weekKey} — not for publication until approved.`);
   return turns.join('\n\n');
@@ -755,6 +776,7 @@ module.exports = {
   findEpisodeForReleaseSlot,
   stripPartLabels,
   buildShowNotesHtml,
+  withPartnerDescription,
   buildEpisodeCopy,
   buildFallbackOutline,
   buildFallbackScript,

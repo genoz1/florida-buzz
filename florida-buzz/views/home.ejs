@@ -24,6 +24,17 @@
         </a>
       <% }) %>
     </div>
+    <% if (typeof undercoverTouristUrl === 'string' && undercoverTouristUrl) { %>
+    <aside class="home-partner-strip" aria-label="Ticket and hotel partner">
+      <div class="home-partner-copy">
+        <span class="home-tool-kicker">Book tickets &amp; hotels</span>
+        <strong>Undercover Tourist</strong>
+        <p>Compare Disney World ticket and hotel deals before you lock in dates — a Florida Buzz planning partner.</p>
+        <p class="home-partner-disclosure">Affiliate disclosure: we may earn a commission if you book through this link, at no extra cost to you.</p>
+      </div>
+      <a class="btn" href="<%= undercoverTouristUrl %>" target="_blank" rel="nofollow sponsored noopener">Check deals at Undercover Tourist &rarr;</a>
+    </aside>
+    <% } %>
   </section>
 
   <% if (guides && guides.length) { %>

@@ -11,6 +11,7 @@ const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
 const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
+const { undercoverTouristUrl } = require('../lib/affiliates/undercoverTourist');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
@@ -398,6 +399,7 @@ router.get('/', async (req, res) => {
     byCategory,
     guides,
     tools,
+    undercoverTouristUrl: undercoverTouristUrl(),
     podcastShow,
     podcastLatest,
     podcastRecent,

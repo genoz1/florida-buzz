@@ -1,6 +1,13 @@
 'use strict';
 
 const { pronunciationHostBibleNote } = require('./pronunciation');
+const {
+  PARTNER_NAME,
+  AFFILIATE_DISCLOSURE_SHORT,
+  PODCAST_MIDROLL_DIRECTION,
+  PODCAST_OUTRO_DIRECTION,
+  partnerShowNotesHtml,
+} = require('../affiliates/undercoverTourist');
 
 const AFFILIATION_DISCLOSURE =
   'This is an unofficial fan podcast and is not affiliated with, endorsed by, or sponsored by The Walt Disney Company.';
@@ -54,9 +61,11 @@ Shared world
 
 Delivery style (active profile: ${HOST_STYLE})
 - Aim for lively solo aftershow / briefing energy: warm, excited, conversational — never sounding written
-- HARD RULE — episode structure: (1) Named Open, (2) Quick Hits, (3) one Deep Dive, (4) CTA / close
+- HARD RULE — episode structure: (1) Named Open, (2) Quick Hits, (3) short partner mid-roll, (4) one Deep Dive, (5) CTA / soft partner reminder + close
 - Quick hits: several short sourced topics with punchy takes (not tennis-match dual-host dialogue)
+- Partner mid-roll (REQUIRED, ~15–25 seconds spoken): ${PODCAST_MIDROLL_DIRECTION}
 - Deep dive: one longer subject where Geno goes deeper with planning opinion + one brief park anecdote
+- Soft outro partner reminder (REQUIRED, brief): ${PODCAST_OUTRO_DIRECTION}
 - FORBID dual-host formats: no “Gena:” / “Diane:” lines, no cohost banter, no “And I'm Diane”
 - FORBID tidy thesis → example → lesson beats and neat moral wraps after every anecdote
 - Still accurate on park facts from approved sources; energy never excuses inventing news
@@ -69,15 +78,21 @@ Episode open (required shape — HARD RULE)
   Geno: ${GENO_NAMED_OPEN_OPTION_A}
 - HARD BAN opening with dual-host intros (“Hi, I'm Gena” / “And I'm Diane”)
 - HARD BAN opening with long rain / umbrella / jacket / sandals banter that skips “I'm Geno” + welcome + unofficial + “Let's go”
-- After named open: brief agenda (“here's what we're locking in today”) → quick hits → deep dive → Florida Buzz resource CTA → affiliation reminder if not already covered in the open → close
+- After named open: brief agenda (“here's what we're locking in today”) → quick hits → short ${PARTNER_NAME} partner mid-roll → deep dive → Florida Buzz resource CTA + soft ${PARTNER_NAME} show-notes reminder → affiliation reminder if not already covered in the open → close
 - Do NOT cold-open on a news headline without the Geno Option A welcome
 `.trim();
 
-function ensureShowNotesDisclosures(html) {
+function ensureShowNotesDisclosures(html, env = process.env) {
   let out = String(html || '').trim();
   const needsAffiliation = !/not affiliated with,\s*endorsed by,\s*or sponsored by The Walt Disney Company/i.test(out);
   if (needsAffiliation) {
     out = `${out}${out ? '\n' : ''}<p>${AFFILIATION_DISCLOSURE}</p>`;
+  }
+  const needsPartner = !/Undercover Tourist/i.test(out);
+  if (needsPartner) {
+    out = `${out}${out ? '\n' : ''}${partnerShowNotesHtml(env)}`;
+  } else if (!/commission|affiliate|partner/i.test(out)) {
+    out = `${out}\n<p><em>${AFFILIATE_DISCLOSURE_SHORT}</em></p>`;
   }
   return out;
 }
