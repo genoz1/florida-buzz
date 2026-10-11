@@ -1,10 +1,11 @@
 'use strict';
 
-// Isolated fal Gemini TTS client for podcasts.
+// Isolated fal Gemini TTS client for podcasts (optional fallback).
 // Never call when PODCASTS_GENERATION_ENABLED is not true.
-// Does not share request allowlists with lib/reels/fal.js.
+// Production default is ElevenLabs solo Geno; set PODCASTS_TTS_PROVIDER=fal to use this path.
 
 const { pronunciationStyleInstructions } = require('./pronunciation');
+const { formatScriptForTts } = require('./script');
 
 function queueUrl(raw) {
   const url = new URL(raw);
@@ -39,22 +40,18 @@ function createFalTts(cfg, fetcher = fetch) {
   }
 
   function buildInput(prompt) {
+    const soloPrompt = formatScriptForTts(prompt, { keepSpeakerPrefix: false });
     return {
-      prompt,
+      prompt: soloPrompt,
       model: cfg.falModel,
       language_code: cfg.languageCode,
       temperature: cfg.temperature,
       output_format: cfg.outputFormat,
+      voice: cfg.falSoloVoice || cfg.genaVoice || 'Aoede',
       style_instructions: [
-        'Conversational AfterBuzz-style aftershow between two Central Florida moms who are longtime friends — reactive friends chatting, not hosts reading an essay. Both hosts must sound like mid-30s American moms (warm, natural, everyday Central Florida women) — not teens, not elderly, not male, not a British aristocrat, not cartoon voices, not a robotic AI assistant. Per-speaker contrast (same age/lane, different delivery): Gena slightly brighter / breezier / a touch higher energy; Diane slightly lower / firmer / more grounded — do not make them sound like the same voice clone. Open with clear name intros and show welcome before catch-up. Prefer big reactive exclamations (“THAT\'S CRAZY,” “REALLY?,” “no way,” “oh my lord,” “heck yeah”) over polished narration — less radio polish, more messy live friend reactions. Warm hellos and catch-up banter early, then excited park talk. Lead/support dynamics: one host may carry a longer point while the other mostly reacts with 1–6 word affirmations (“yep,” “oh my lord,” “heck yeah,” “wait—,” “THAT\'S CRAZY,” “REALLY?”), short comments, or questions — then they flip who leads on the next subject. Natural uneven pacing: mix short reactions, medium turns, and occasional longer rambles — never tennis-match equal-length volleys for a whole topic. CRITICAL timing: vary pause length between turns — some replies almost overlap / back-to-back, some take a short breath, occasional longer beat. Do NOT use identical beat-matched metronomic pauses between every line. Soft laughs, brief overlaps, mid-thought energy. Less announcer, more live reaction. Sound engaged and slightly messy like friends interrupting each other, not polished symmetrical essay-dialogue, not stiff radio presenters, not reading scripted paragraphs. Not chaotic or shouty. No cartoon voices, no heavy accents, no announcer cadence.',
+        'Solo energetic Central Florida park-day host (Geno) — warm, punchy, conversational aftershow energy. Mid-30s American male host energy preferred when the preset allows; never cartoon, never robotic AI assistant, never dual-host banter. Named welcome first (I\'m Geno / Florida Buzz: Disney / unofficial / Let\'s go), then quick hits, one deep dive, CTA. Prefer big reactive moments over polished narration. Natural uneven pacing. Less announcer, more live solo briefing.',
         pronunciationStyleInstructions(),
       ].join(' '),
-      // Voices come from config (PODCASTS_VOICE_GENA / PODCASTS_VOICE_DIANE).
-      // fal-ai/gemini-tts multi-speaker uses the same ~30-name VoiceEnum as single-speaker.
-      speakers: [
-        { speaker_id: 'Gena', voice: cfg.genaVoice },
-        { speaker_id: 'Diane', voice: cfg.dianeVoice },
-      ],
     };
   }
 

@@ -22,7 +22,7 @@
   <h1>Florida Buzz Podcast admin</h1>
   <p class="notice">
     Audio generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>
-    (<code>PODCASTS_GENERATION_ENABLED</code>).
+    (<code>PODCASTS_GENERATION_ENABLED</code>; TTS provider <code><%= cfg.ttsProvider || 'elevenlabs' %></code>, solo Geno).
     Each scheduled run creates <strong>exactly one</strong> standalone ~20–25 min episode — Tuesday run → Tuesday show, Friday run → Friday show. Never two at once, never Part 1/Part 2. Drafts never auto-publish.
   </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
@@ -86,7 +86,7 @@
         <input type="hidden" name="csrf" value="<%= runCsrf %>">
         <button class="btn btn-secondary" type="submit">Run weekly draft now (force)</button>
       </form>
-      <p class="muted">Force-run creates <strong>exactly one</strong> ~20–25 min episode for today’s slot if it is Tuesday or Friday; otherwise the next upcoming slot (never two at once). It will not start fal TTS. Open the draft and click Generate private preview when ready. Do not click force-run twice.</p>
+      <p class="muted">Force-run creates <strong>exactly one</strong> ~20–25 min episode for today’s slot if it is Tuesday or Friday; otherwise the next upcoming slot (never two at once). It will not start ElevenLabs/fal TTS. Open the draft and click Generate private preview when ready. Do not click force-run twice.</p>
     </section>
 
     <section class="card">

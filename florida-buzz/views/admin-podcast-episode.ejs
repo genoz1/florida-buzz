@@ -44,7 +44,7 @@
       <strong>This is only a short scaffold (~2 minutes), not the full ~30 minute episode.</strong>
       The script box below is cleared on purpose so the next click asks AI for a full script.
       Click <strong>Save / generate script</strong> and wait a few minutes — do not Approve or Publish until
-      a long Gena/Diane script appears in the box, then click <strong>Generate private preview (fal TTS)</strong>.
+      a long solo Geno script appears in the box, then click <strong>Generate private preview (ElevenLabs TTS)</strong>.
     </p>
   <% } else if (notice === 'script-generated') { %>
     <p class="notice">Full AI script generated. Scroll down to confirm the Conversation script box is filled before generating audio.</p>
@@ -124,11 +124,11 @@
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/script" data-long-job="script">
     <h2>Conversation script</h2>
     <input type="hidden" name="csrf" value="<%= csrf %>">
-    <label>Script (Gena:/Diane: lines; leave blank to generate the full ~30 minute conversation)
+    <label>Script (Geno: lines; leave blank to generate the full ~20–25 minute solo episode)
       <textarea name="script_text" rows="16"><%= isScaffold ? '' : scriptShown %></textarea>
       <small>
         <% if (isScaffold) { %>Scaffold text was cleared above so Generate will create a real full script. <% } else if (scriptShown) { %>Script loaded (<%= String(scriptShown).trim().split(/\s+/).filter(Boolean).length %> words). <% } %>
-        Full episodes: lively Gena/Diane conversation with park anecdotes. Wait for the page to finish — script generation is slow.
+        Full episodes: solo Geno — named open (Option A) + quick hits + one deep dive + CTA. Wait for the page to finish — script generation is slow.
       </small>
     </label>
     <button class="btn" type="submit">Save / generate script</button>
@@ -157,14 +157,14 @@
     <% } %>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/generate-audio" id="generateAudioForm">
       <input type="hidden" name="csrf" value="<%= csrf %>">
-      <button class="btn" type="submit" id="generateAudioBtn" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (fal TTS)</button>
+      <button class="btn" type="submit" id="generateAudioBtn" <%= cfg.generation ? '' : 'disabled' %>>Generate private preview (<%= cfg.ttsProvider === 'fal' ? 'fal TTS' : 'ElevenLabs TTS' %>)</button>
     </form>
     <p style="color:#5b6b73">This page polls the server every 5s. <strong>LIVE</strong> means heartbeats are fresh. <strong>DEAD</strong> means the process stopped (503/redeploy) even if an old job line still says running.</p>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reset-stuck-audio" style="margin-top:8px" id="resetAudioForm">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn btn-secondary" type="submit" id="resetAudioBtn">Reset stuck audio → script_ready</button>
     </form>
-    <p>Weekly draft no longer auto-runs fal TTS. Generate preview from this page after the full script is ready. Enabling <code>PODCASTS_GENERATION_ENABLED</code> incurs fal.ai charges.</p>
+    <p>Weekly draft no longer auto-runs TTS. Generate preview from this page after the full script is ready. Requires <code>PODCASTS_GENERATION_ENABLED=true</code> plus <code>ELEVENLABS_API_KEY</code> (default) or fal fallback via <code>PODCASTS_TTS_PROVIDER=fal</code>.</p>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-audio" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <label>Upload replacement MP3 <input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>

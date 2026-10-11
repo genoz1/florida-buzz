@@ -3,7 +3,8 @@
 
 /**
  * Upload Florida Buzz Disney show cover art to podcast-artwork and point
- * podcast_shows (+ non-published episode artwork_url) at the new public URL.
+ * podcast_shows (+ episode artwork_url) at the new public URL.
+ * Also aligns show hosts/description to solo Geno.
  * Does not touch intro audio or trailer audio masters.
  */
 
@@ -20,11 +21,14 @@ const COVER_PATH =
   path.join(__dirname, '../public/img/podcasts/florida-buzz-disney-cover-3000.jpg');
 const STORAGE_OBJECT =
   process.env.PODCASTS_COVER_OBJECT ||
-  'shows/florida-buzz-disney/florida-buzz-disney-cover-v2-3000.jpg';
+  'shows/florida-buzz-disney/florida-buzz-disney-cover-v3-geno-3000.jpg';
 const COVER_ALT =
   process.env.PODCASTS_COVER_ALT ||
-  'Florida Buzz Disney Podcast cover — hosted by Gene Zentko';
+  'Florida Buzz Disney Podcast cover — hosted by Geno';
 const ARTWORK_BUCKET = process.env.PODCASTS_ARTWORK_BUCKET || 'podcast-artwork';
+
+const SHOW_DESCRIPTION =
+  'Geno hosts Florida Buzz: Disney — an unofficial fan podcast with park news, attractions, food, resorts, events, and Disney World vacation planning. Energetic solo coverage of Magic Kingdom, EPCOT, Disney’s Animal Kingdom, Hollywood Studios, wait times, dining, and practical trip tips. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.';
 
 async function main() {
   if (!FB_URL || !FB_KEY) throw new Error('Florida Buzz Supabase URL/key required');
@@ -46,6 +50,7 @@ async function main() {
   const legacyNames = [
     'shows/florida-buzz-disney/florida-buzz-disney-cover-3000.jpg',
     'shows/florida-buzz-disney/florida-buzz-disney-cover.jpg',
+    'shows/florida-buzz-disney/florida-buzz-disney-cover-v2-3000.jpg',
   ];
   for (const legacy of legacyNames) {
     if (legacy === STORAGE_OBJECT) continue;
@@ -55,6 +60,8 @@ async function main() {
   const updated = await store.updateShow(show.id, {
     cover_url: publicUrl,
     cover_alt: COVER_ALT,
+    hosts: [{ name: 'Geno', role: 'host' }],
+    description: SHOW_DESCRIPTION,
   });
 
   const episodes = await store.listEpisodes(show.id);
@@ -70,14 +77,22 @@ async function main() {
   const episodeUpdates = [];
   for (const ep of episodes) {
     if (!touchStatuses.has(ep.status)) continue;
-    // Skip only when artwork is already the new URL; refresh legacy cover paths.
-    if (ep.artwork_url === publicUrl) continue;
+    if (ep.artwork_url === publicUrl && ep.artwork_alt === COVER_ALT) continue;
     if (
       ep.artwork_url == null ||
       String(ep.artwork_url).includes('/podcast-artwork/shows/florida-buzz-disney/')
     ) {
-      const row = await checkedUpdate(client, ep.id, { artwork_url: publicUrl });
-      episodeUpdates.push({ id: ep.id, slug: ep.slug, status: ep.status, artwork_url: row.artwork_url });
+      const row = await checkedUpdate(client, ep.id, {
+        artwork_url: publicUrl,
+        artwork_alt: COVER_ALT,
+      });
+      episodeUpdates.push({
+        id: ep.id,
+        slug: ep.slug,
+        status: ep.status,
+        artwork_url: row.artwork_url,
+        artwork_alt: row.artwork_alt,
+      });
     }
   }
 
@@ -88,11 +103,12 @@ async function main() {
         show: updated.slug,
         cover_url: updated.cover_url,
         cover_alt: updated.cover_alt,
+        hosts: updated.hosts,
         bytes: bytes.length,
         storage_object: STORAGE_OBJECT,
         episodes_updated: episodeUpdates.length,
         episodes: episodeUpdates.map((e) => ({ slug: e.slug, status: e.status })),
-        note: 'Intro audio unchanged. Cover art text kept as designed (GENE ZENTKO).',
+        note: 'Intro audio unchanged. Cover is HOSTED BY GENO (solo).',
       },
       null,
       2
@@ -105,7 +121,7 @@ async function checkedUpdate(client, episodeId, patch) {
     .from('podcast_episodes')
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', episodeId)
-    .select('id, slug, status, artwork_url')
+    .select('id, slug, status, artwork_url, artwork_alt')
     .single();
   if (error) throw new Error(error.message);
   return data;

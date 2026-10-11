@@ -169,7 +169,7 @@ function buildShowNotesHtml({ episodeTitle, sources, site, episode = {} }) {
   const buzzHome = trackedSiteUrl('/buzz', site, epMeta);
 
   const html = `
-<p>${escape(episodeTitle)} — a Florida Buzz: Disney conversation with Gena and Diane.</p>
+<p>${escape(episodeTitle)} — a Florida Buzz: Disney episode hosted by Geno.</p>
 <p>Facts about prices, policies, hours, attraction status, and wait times are drawn only from the approved Florida Buzz sources linked below.</p>
 <h2>Florida Buzz Resources Mentioned</h2>
 <p>Direct links to every article, guide, tool, and Buzz Board discussion referenced for this episode (with podcast tracking parameters):</p>
@@ -256,7 +256,7 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
     ? articleTitles[0].slice(0, 48)
     : `${slot.label} planning talk & park opinions`;
   const fallbackTitle = `Florida Buzz: Disney — ${focusHint}`;
-  const fallbackDescription = `Standalone ${slot.label} episode: Gena and Diane catch up on Florida Buzz Disney coverage, share recent park experiences, and weigh in on Buzz Board questions and planning topics. Visit https://thefloridabuzz.com. Unofficial fan podcast.`;
+  const fallbackDescription = `Standalone ${slot.label} episode: Geno covers Florida Buzz Disney news with quick hits, one deep dive, and planning tips from The Florida Buzz. Visit https://thefloridabuzz.com. Unofficial fan podcast.`;
 
   if (!aiText) {
     return {
@@ -272,7 +272,7 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
 Return plain text with two lines only:
 TITLE: ...
 DESCRIPTION: ...
-Rules: title under 80 chars; description under 320 chars; spell Gena not Gina; no Disney affiliation claims; do not invent news facts.
+Rules: title under 80 chars; description under 320 chars; solo host Geno (never dual-host Gena/Diane packaging); no Disney affiliation claims; do not invent news facts.
 This is a standalone ~20–25 minute weekly episode intended for ${slot.label} release — not "Part 1/Part 2" of another show.
 Never use the words "Part 1", "Part 2", "part of", or similar multi-part episode language in the title or description.
 Give this episode its own distinct title based on its focus sources (different from other episodes this week).`,
@@ -327,32 +327,27 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   const buzz = sources.filter((s) => s.source_kind === 'buzz_board' && s.included !== false).slice(0, 2);
   const evergreen = sources.find((s) => s.source_kind === 'evergreen_topic' && s.included !== false);
   const turns = [];
-  turns.push(`Gena: Hey Diane — welcome back to Florida Buzz: Disney. This week’s draft is ${copy.title}.`);
-  turns.push('Diane: Heck yeah — let’s get into it. Quick reminder though: unofficial fan podcast, not affiliated with Disney.');
-  turns.push('Gena: Exact facts still come from The Florida Buzz — articles, guides, and the Buzz Board.');
-  articles.forEach((s, i) => {
-    turns.push(
-      i % 2 === 0
-        ? `Gena: So The Florida Buzz covered “${s.title}.” I’m curious what stood out to you from that reporting.`
-        : `Diane: Yeah, “${s.title}” was on my mind too — especially for planning our next park day.`
-    );
+  turns.push(
+    `Geno: [excited] Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host bringing park news and real planning from The Florida Buzz. Not affiliated with Disney — just a fan who lives this stuff. Today we're locking in that park-day energy and cutting through the noise. Let's go.`
+  );
+  turns.push(`Geno: This week’s draft focus is ${copy.title}. Quick hits first, then one deeper dive.`);
+  turns.push('Geno: Exact facts still come from The Florida Buzz — articles, guides, and the Buzz Board.');
+  articles.forEach((s) => {
+    turns.push(`Geno: Quick hit — The Florida Buzz covered “${s.title}.” Here’s the planning take I’m watching.`);
   });
   guides.forEach((s) => {
-    turns.push(`Diane: And for planning, I’d point people to the Florida Buzz guide on “${s.title}.”`);
-    turns.push('Gena: Same — that’s the kind of thing we actually use before we leave the house.');
+    turns.push(`Geno: For planning, I’d point people to the Florida Buzz guide on “${s.title}.” That’s the kind of thing I actually use before we leave the house.`);
   });
   buzz.forEach((s) => {
-    turns.push(`Gena: Over on the Buzz Board, people were talking about “${s.title}.”`);
-    turns.push('Diane: I have thoughts — but I’d also tell listeners to add their answer on The Florida Buzz dot com.');
+    turns.push(`Geno: Over on the Buzz Board, people were talking about “${s.title}.” I’ve got a take — and you should add yours on The Florida Buzz dot com.`);
   });
   if (evergreen) {
-    turns.push(`Gena: Before we wrap, evergreen chat: ${evergreen.title}.`);
-    turns.push('Diane: Always relevant. Okay — dining guide, wait times, day planner, Buzz Board. Go use them.');
+    turns.push(`Geno: Deep dive / evergreen: ${evergreen.title}. Dining guide, wait times, day planner, Buzz Board — go use them.`);
   }
   turns.push(
-    'Gena: That’s our week-of scaffold for review. Once AI packaging is available we’ll expand this into the full conversational cut.'
+    'Geno: That’s our week-of scaffold for review. Once AI packaging expands this into the full solo cut, we’ll keep the same energy.'
   );
-  turns.push(`Diane: Draft week key ${weekKey} — not for publication until approved.`);
+  turns.push(`Geno: Draft week key ${weekKey} — not for publication until approved.`);
   return turns.join('\n\n');
 }
 

@@ -3,6 +3,7 @@
 const {
   AFFILIATION_DISCLOSURE,
   HOST_BIBLE,
+  GENO_NAMED_OPEN_OPTION_A,
 } = require('./hosts');
 const { verifiedToolsBlock } = require('./siteResources');
 
@@ -10,7 +11,6 @@ const { verifiedToolsBlock } = require('./siteResources');
 const DISCLOSURE = AFFILIATION_DISCLOSURE;
 
 // Target ~20–25 minutes per episode for twice-weekly publishing (~150 wpm → ~3,000–3,800 words).
-// Output-token headroom must stay above that so Responses API does not truncate.
 const CONVERSATION_MAX_OUTPUT_TOKENS = Number(process.env.PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS || 16000);
 const CONVERSATION_MIN_WORDS = Number(process.env.PODCASTS_SCRIPT_MIN_WORDS || 3000);
 const CONVERSATION_TARGET_MAX_WORDS = Number(process.env.PODCASTS_SCRIPT_TARGET_MAX_WORDS || 3800);
@@ -19,6 +19,7 @@ const CONVERSATION_CONTINUE_ATTEMPTS = Number(process.env.PODCASTS_SCRIPT_CONTIN
 
 function countScriptWords(scriptText) {
   return String(scriptText || '')
+    .replace(/^Geno:\s*/gim, ' ')
     .replace(/^Gena:\s*/gim, ' ')
     .replace(/^Diane:\s*/gim, ' ')
     .trim()
@@ -27,8 +28,7 @@ function countScriptWords(scriptText) {
 }
 
 /**
- * Hard-require the named show open before catch-up / weather / topic hook.
- * Rejects the user's last bad pattern: "Okay, how was your week…" rain essay with no intros.
+ * Hard-require Geno Option A named open before topic hooks / weather essays.
  */
 function assertScriptOpenShape(scriptText) {
   const lines = String(scriptText || '')
@@ -37,34 +37,30 @@ function assertScriptOpenShape(scriptText) {
     .filter(Boolean);
   if (!lines.length) throw new Error('Generated script is empty');
 
-  const dialogue = lines.filter((l) => /^(Gena|Diane):/i.test(l));
-  const head = dialogue.slice(0, 6);
-  const headText = head.join('\n');
-  const earlyText = dialogue.slice(0, 12).join('\n');
+  const dialogue = lines.filter((l) => /^Geno:/i.test(l));
+  if (!dialogue.length) throw new Error('Script open must use Geno: dialogue lines');
+
+  const headText = dialogue.slice(0, 4).join('\n');
+  const earlyText = dialogue.slice(0, 8).join('\n');
   const first = dialogue[0] || '';
 
-  // Ban the known bad cold open before other checks so errors name the weather pattern.
-  if (/^Gena:\s*Okay,?\s*how was your week/i.test(first)) {
+  if (/^(Gena|Diane):/im.test(String(scriptText || '').split(/\n+/).slice(0, 8).join('\n'))) {
+    throw new Error('Script open bans dual-host Gena/Diane lines — solo Geno only');
+  }
+  if (/^Geno:\s*Okay,?\s*how was your week/i.test(first)) {
     throw new Error('Script open bans the weather-only cold open ("Okay, how was your week…")');
   }
-  if (/how was your week/i.test(first) && !/I['’]?m Gena/i.test(first)) {
-    throw new Error('Script open bans starting on "how was your week" without the Gena name intro');
+  if (!/I['’]?m Geno/i.test(headText)) {
+    throw new Error('Script open must include I\'m Geno in the first spoken lines');
   }
-
-  if (!/Gena:\s*Hi,?\s*I['’]?m Gena\.?/i.test(headText)) {
-    throw new Error('Script open must include Gena: Hi, I\'m Gena. in the first spoken lines');
+  if (!/welcome to Florida Buzz(?::?\s*Disney)?/i.test(headText)) {
+    throw new Error('Script open must welcome listeners to Florida Buzz: Disney');
   }
-  if (!/Diane:\s*And I['’]?m Diane\.?/i.test(headText)) {
-    throw new Error('Script open must include Diane: And I\'m Diane. in the first spoken lines');
+  if (!/unofficial/i.test(earlyText)) {
+    throw new Error('Script open must mention this is an unofficial fan show');
   }
-  if (!/welcome to Florida Buzz(?::?\s*Disney)?/i.test(earlyText)) {
-    throw new Error('Script open must welcome listeners to Florida Buzz: Disney before the week catch-up');
-  }
-
-  const welcomeIdx = dialogue.findIndex((l) => /welcome to Florida Buzz/i.test(l));
-  const weekIdx = dialogue.findIndex((l) => /how was your week/i.test(l));
-  if (weekIdx >= 0 && (welcomeIdx < 0 || weekIdx < welcomeIdx)) {
-    throw new Error('Script open must say welcome to Florida Buzz: Disney before "how was your week"');
+  if (!/let['’]?s go/i.test(earlyText)) {
+    throw new Error('Script open must end the named open with Let\'s go (Geno Option A)');
   }
 }
 
@@ -72,14 +68,11 @@ function appendContinuation(existing, continuation) {
   const base = String(existing || '').trim();
   let next = String(continuation || '').trim();
   if (!next) return base;
-  // Drop accidental full restarts that repeat the warm open / episode restart.
   const looksLikeRestart =
-    (/^Gena:\s*(Hey|Hi|Okay,? hey|Okay,? how was your week)/i.test(next) && /Florida Buzz/i.test(next.slice(0, 500))) ||
-    (/Hi, I'm Gena/i.test(next.slice(0, 200)) && /welcome to Florida Buzz/i.test(next.slice(0, 500))) ||
+    (/^Geno:\s*(Welcome to Florida Buzz|Hey|Hi)/i.test(next) && /I['’]?m Geno/i.test(next.slice(0, 500))) ||
     (/welcome back to Florida Buzz/i.test(next.slice(0, 400)));
   if (looksLikeRestart) {
     const lines = next.split(/\n+/).filter((line) => line.trim());
-    // Keep from first line that isn't an exact duplicate of an early base line.
     const baseHead = base.slice(0, 400);
     while (lines.length && baseHead.includes(lines[0].trim().slice(0, 40))) {
       lines.shift();
@@ -105,34 +98,26 @@ function buildOutlinePrompt({ show, episode, sources }) {
 ${HOST_BIBLE}
 
 Outline rules:
-- Always spell Gena (never Gina).
-- Shape a lively aftershow-style conversation between friends, not a news rundown or article roundup — must feel unscripted / reactive, not written.
-- Segment 1 MUST be a Warm Open and MUST list these beats explicitly (in order) before any topic hook:
-  1) Name intro — Gena: "Hi, I'm Gena."
-  2) Name intro — Diane: "And I'm Diane."
-  3) Show welcome — Gena: "And together — welcome to Florida Buzz: Disney."
-  4) Short week catch-up (only AFTER the three lines above): how was your week → short real answer → brief relate → bridge to parks from catch-up (sourced facts only).
-  5) Soft Florida Buzz mention + "What else is on the agenda today?" then Topic Hook → Affiliation Disclosure.
-- HARD BAN Segment 1 opening with "Okay, how was your week" / rain-errand banter without name intros + show welcome. Ban the anti-example that skips intros for long umbrella/jacket weather chat then affiliation then EPCOT.
-- After Warm Open: Topic Hook → Affiliation Disclosure → main discussion. Never cold-open on the headline.
+- Always spell Geno. Solo host only — never outline Gena/Diane dual-host segments.
+- Shape a lively solo energetic briefing, not a news rundown or dual-host chat — must feel unscripted / reactive, not written.
+- Segment 1 MUST be Named Open and MUST list Geno Option A beats explicitly before any topic hook:
+  1) Welcome to Florida Buzz: Disney
+  2) I'm Geno — unofficial fan host from The Florida Buzz
+  3) Not affiliated with Disney — just a fan
+  4) Lock in park-day energy / cut through the noise
+  5) Let's go
+- After Named Open: Quick Hits (several short sourced topics) → one Deep Dive → CTA / close with Florida Buzz resources + affiliation if needed.
+- HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + unofficial + Let's go.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
-- Plan exactly 2–3 brief "recent park experience" anecdote beats tied directly to episode topics (in addition to the warm-open banter).
-- Anecdotes may involve Geno or Michael, long waits, parking, transportation, weather, mobile ordering, tired kids, crowds, cast members, or something amusing another guest did.
-- Mark anecdote beats clearly (e.g. "Anecdote:") and note a later callback opportunity when natural.
-- Plan 3–5 natural Florida Buzz resource mentions across the episode (not ads): at least one after the warm open / near the early topic, one or more in the main discussion, and a brief CTA near the close.
-- Mark resource beats (e.g. "Resource:") naming only verified tools/articles from the lists below, with a one-line note on how it helps the listener.
-- Lead host per topic segment (critical): for each main discussion segment after Warm Open / topic hook / disclosure, name exactly one Lead host — "Lead: Gena" or "Lead: Diane" — and rotate leads across segments so both hosts get main-speaker turns.
-- Support host is the other person for that segment; note that the lead carries longer points while support mostly reacts / comments / asks short questions.
-- Anti-scripted energy notes per segment: lead/support uneven exchanges; ban tennis-match equal-length volleys for a whole segment; mix 1–6 word support reactions, medium turns, and longer lead rambles; soft interruptions / “wait—” pivots; mild disagreement — forbid tidy thesis→example→lesson shapes and equal-length polished host monologues.
-- Prefer real friend/aftershow dynamics (one person runs a point; the other comments) over polished symmetrical essay-dialogue.
-- Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, or URLs. Those must come from approved source material / verified tools only.
+- Plan exactly 1–2 brief "recent park experience" anecdote beats tied to the deep dive (or one quick hit).
+- Plan 3–5 natural Florida Buzz resource mentions across the episode (not ads): at least one early, one in the deep dive, and a CTA near the close.
+- Mark resource beats (e.g. "Resource:") naming only verified tools/articles from the lists below.
+- Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, or URLs.
 - When source notes lack a dated park detail, plan timeless composite experiences — do not claim a specific date.
 - Do not place a promotion inside an emotional, humorous, or personal anecdote beat.
 - No Disney affiliation or inside-access claims.
-- No forced comedy or presenter/host-read tone.
-- Do not recycle the same experiences, jokes, family details, or sentence patterns from a generic template; invent fresh specifics for this episode.
-- This is ONE standalone episode. Never outline “Part 1”, “Part 2”, “to be continued”, or a tease for another half of the same show.
+- This is ONE standalone episode. Never outline “Part 1”, “Part 2”, or a tease for another half of the same show.
 Return plain text outline with numbered segments.`,
     user: `Episode title: ${episode.title}
 Episode description: ${episode.description}
@@ -143,7 +128,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted). Segment 1 Warm Open MUST explicitly list beats: (1) Hi I'm Gena (2) And I'm Diane (3) welcome to Florida Buzz: Disney (4) short week catch-up only after those lines (5) agenda/topic hook + affiliation — never open with "Okay, how was your week" without names/title. Then 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. On each main topic segment name a rotating Lead host (Lead: Gena / Lead: Diane) and mark lead/support energy (lead longer points; support short reactions — not tennis-match equal turns for a whole segment). End with a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be Geno Option A (welcome / I'm Geno / unofficial / let's go). Then Quick Hits, one Deep Dive, Florida Buzz resource beats, and a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -155,77 +140,49 @@ function buildConversationPrompt({ show, episode, outline, sources }) {
   return {
     system: `You write natural full-episode podcast scripts for "${show.title}".
 Format every spoken line as:
-Gena: ...
-Diane: ...
+Geno: ...
+
+Optional short performance tags at the start of a line are allowed for TTS, e.g.:
+Geno: [excited] Welcome to Florida Buzz: Disney. I'm Geno...
 
 ${HOST_BIBLE}
 
 Conversation requirements:
-- Target roughly 20–25 minutes of natural dialogue (~3,000–3,800 spoken words; substantive, not rushed; not padded filler).
-- Write a FULL episode script in one pass when possible — do not stop after a short warm open or a few topics.
-- Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles, not reading a written essay aloud.
-- Lean into lively aftershow/reaction energy (AfterBuzz-style bounce): real friend dynamics where one person leads a subject and the other comments — not equal scripted volleys.
-- LEAD / SUPPORT BY SUBJECT (critical — better than equal back-and-forth):
-  - Follow the outline’s Lead host tags. For each main topic segment, one host is the lead (main speaker) and the other is support.
-  - Lead host carries longer points, stories, and explanations for that subject — they may speak longer than the other while making a point.
-  - Support host mostly short comments, reactions, laughs, brief disagreements, and questions (often 1–6 words: “yep,” “no way,” “wait—,” “oh my lord,” “same,” “heck yeah,” “THAT'S CRAZY,” “REALLY?”).
-  - When the next subject starts, switch who leads so both hosts get main-speaker segments across the episode.
-  - FORBID tennis-match equal turns for a whole segment (neat A/B same-length exchanges the entire topic).
-- ANTI-SCRIPTED HARD RULES (critical — listeners complained it still sounds written):
-  - HARD BAN tennis-match equal-length turns: never alternate neat same-sized host volleys for a whole subject.
-  - Turn lengths MUST be uneven. Lead may hold longer rambles / story beats; support fires frequent 1–6 word reactions (“yep,” “no way,” “wait—,” “oh my lord,” “same,” “heck yeah”), plus medium turns.
-  - Include occasional mid-thought pivots, unfinished sentences, soft interruptions, and overlapping agreement energy (“right—” / “exactly—”).
-  - Both hosts must NOT sound equally polished — lead can riff messier / trail off; support stacks quick reactions.
-  - Allow mild disagreement and talking-over energy; forbid constant tidy agreement.
-  - FORBID tidy thesis → example → lesson beats and neat moral wrap-ups after anecdotes.
-  - FORBID polished symmetrical essay-dialogue (neat equal-length paragraphs alternating hosts).
-  - Cap most support turns under ~40–50 spoken words; lead story/point beats may run longer when the subject needs it.
-- OPEN SHAPE (critical — name intros + show welcome FIRST):
-  - REQUIRED first 3–5 lines (before any week/weather anecdote):
-    Gena: Hi, I'm Gena.
-    Diane: And I'm Diane.
-    Gena: And together — welcome to Florida Buzz: Disney.
-  - Only AFTER those lines: Gena asks how Diane's week was; Diane short real answer; Gena relates briefly; Diane bridges to parks from catch-up (sourced facts only); big natural reactions (“THAT'S CRAZY,” “REALLY?”); soft Florida Buzz mention; then "What else is on the agenda today?"
-  - Catch-up is SHORT — a few lines, not a long weather essay.
-  - HARD BAN opening with "Okay, how was your week" (or similar) without name intros + show title. HARD BAN the anti-example: rain/errand/sandals banter → affiliation → EPCOT while skipping "Hi, I'm Gena" / "And I'm Diane" / "welcome to Florida Buzz: Disney".
-  - Then topic hook → unofficial affiliation disclosure. Never cold-open on the news headline (“Okay if you were calling EPCOT…” / “Okay we have resort news…” as line 1).
-- Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
+- Target roughly 20–25 minutes of natural solo talk (~3,000–3,800 spoken words; substantive, not rushed; not padded filler).
+- Write a FULL episode script in one pass when possible — do not stop after a short open or a few topics.
+- Sound like a Central Florida park-day host who regularly visits the parks — not a presenter summarizing articles, not reading a written essay aloud.
+- SOLO STRUCTURE (critical):
+  1) Named Open — Geno Option A (exact intent; wording may match closely):
+     Geno: ${GENO_NAMED_OPEN_OPTION_A}
+  2) Quick Hits — several short sourced topics with punchy takes
+  3) One Deep Dive — longer planning opinion + one brief park anecdote
+  4) CTA / close — The Florida Buzz dot com resources + warm goodbye
+- HARD BAN dual-host dialogue (no Gena:/Diane: lines, no cohost reactions).
+- HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + unofficial + Let's go.
+- Cover approved source topics accurately, but weave them into energetic host talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
-- Confirm time-sensitive details against approved source notes before stating them as fact; if unsure, speak generally or as opinion.
-- When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer differing host opinions, and invite listeners to visit the Buzz Board.
-- Include two or three brief recent-park-experience stories connected directly to the episode topics (separate from the warm-open banter).
-- Make stories specific and conversational with small believable details; the lead can stretch a story beat while support cuts in with reactions before it becomes a solo monologue.
-- The support host must react quickly: ask a follow-up, laugh, disagree, interrupt briefly, drop a short affirmation (“yep,” “oh my lord,” “heck yeah,” “no way,” “wait—”), or relate a similar short experience.
-- Prefer lead-driven subject blocks with stacked support reactions over equal short/medium volleys for an entire segment.
-- Uneven turn lengths are required: lead rambles while support fires 1–6 word reactions; flip who leads on the next subject — never tidy equal volleys for a whole topic.
-- Include at least one natural callback later in the episode to an earlier anecdote or detail.
-- Do not make every anecdote neatly resolve into a scripted lesson.
-- Avoid repeating the same experiences, jokes, family details, or sentence patterns across episodes; invent fresh specifics each time.
-- Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, URLs, or offerings. Use only approved sources and verified Florida Buzz tools.
-- When no factual park notes are available, use timeless composite experiences rather than claiming something happened on a specific date.
-- Always spell Gena (never Gina). Do not write phonetic pronunciations in dialogue.
-- Mention the unofficial-fan affiliation disclosure once near the open — AFTER the named show welcome, short catch-up, and topic hook is fine (never before the name intros / welcome).
-- Do not claim a live studio audience, callers, or TV panel format — keep it two hosts talking parks.
+- When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer Geno's take, and invite listeners to visit the Buzz Board.
+- Include one or two brief recent-park-experience stories connected directly to the episode topics.
+- Uneven pacing is good: mix short punchy hits with longer deep-dive stretches; allow mid-thought pivots and unfinished sentences.
+- Mention the unofficial-fan affiliation in the named open (Option A already covers it); do not bury the show identity.
+- Do not claim a live studio audience, callers, or TV panel format.
 
 Florida Buzz listener guidance (helpful, not ad-read):
 - Naturally reference relevant Florida Buzz content/tools throughout: the specific articles being discussed, planning guides, the dining guide, wait times, the day planner, Buzz Board discussions, and any other verified Florida Buzz resource tied to the topic.
 - About 2–4 natural Florida Buzz references in a 20–25 minute episode.
-- At least one useful recommendation near the beginning, one or more during the main discussion, and a brief call to action near the end.
-- When an article or resource’s information is discussed, name that Florida Buzz piece and briefly explain how it helps the listener — not a bare “go check our site.”
-- Vary the wording so references do not sound like repeated advertisements.
-- Let the other host respond naturally (e.g. how she’d use the day planner, dining guide, or wait times with her family).
+- At least one useful recommendation near the beginning, one or more during the deep dive, and a brief call to action near the end.
 - Say “The Florida Buzz dot com” when speaking; never read long URLs aloud.
 - Do not interrupt an emotional, humorous, or personal moment with a promotion.
 - Closing must include a concise conversational reminder that listeners can find the articles, guides, dining information, wait times, day planner, and community discussions at The Florida Buzz dot com.
-- STANDALONE EPISODE RULE (critical): Never say “Part 1”, “Part 2”, “part one”, “part two”, “before we wrap Part 1”, “we have more in Part 2”, “see you in Part 2”, “to be continued”, or any multi-part tease. Close as a complete show with a normal goodbye. Another episode later in the week is a separate show with its own topics — do not reference it as a continuation.
-- No forced comedy, no constant agreement, no exaggerated/childish voices, no heavy accents, no announcer cadence.
-- Write lines that sound spoken/reactive — contractions, fragments, interruptions — not tidy prose paragraphs.
+- STANDALONE EPISODE RULE (critical): Never say “Part 1”, “Part 2”, “to be continued”, or any multi-part tease. Close as a complete show with a normal goodbye.
+- No forced comedy, no exaggerated/childish voices, no heavy accents, no announcer cadence.
+- Write lines that sound spoken/reactive — contractions, fragments — not tidy prose paragraphs.
 
 Return ONLY the dialogue script.`,
     user: `Episode: ${episode.title}
 Description: ${episode.description}
 Release framing: ${episode.release_label || 'standalone'} episode — complete on its own (not Part 1 or Part 2 of a larger show).
-Affiliation disclosure to include once near the open: ${AFFILIATION_DISCLOSURE}
+Affiliation disclosure (already woven into Geno Option A open; keep consistent): ${AFFILIATION_DISCLOSURE}
 
 Outline:
 ${outline}
@@ -236,20 +193,18 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). REQUIRED open: first lines must be name intros + "welcome to Florida Buzz: Disney" before any "how was your week" / weather anecdote — ban the rain-errand cold catch-up that skips names and the show title. Do not return a short teaser or a cold topic open. Honor outline Lead tags: lead host carries longer points; support mostly short reactions; rotate lead by subject — forbid tennis-match equal turns for a whole segment. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: Geno Option A — welcome / I'm Geno / unofficial / let's go — before quick hits. Structure: quick hits + one deep dive + CTA. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
 async function generateOutline({ aiText, show, episode, sources }) {
   const prompt = buildOutlinePrompt({ show, episode, sources });
-  // Florida Buzz aiText.generateText(system, user, maxTokens[, timeoutMs]) — positional args only.
   const text = await aiText.generateText(prompt.system, prompt.user, 2000, CONVERSATION_REQUEST_TIMEOUT_MS);
   return String(text || '').trim();
 }
 
 async function generateConversation({ aiText, show, episode, outline, sources }) {
   const prompt = buildConversationPrompt({ show, episode, outline, sources });
-  // Florida Buzz aiText.generateText(system, user, maxTokens[, timeoutMs]) — positional args only.
   let script = String(
     await aiText.generateText(prompt.system, prompt.user, CONVERSATION_MAX_OUTPUT_TOKENS, CONVERSATION_REQUEST_TIMEOUT_MS)
   ).trim();
@@ -260,11 +215,12 @@ async function generateConversation({ aiText, show, episode, outline, sources })
     const words = countScriptWords(script);
     const continuation = String(
       await aiText.generateText(
-        `You continue an unfinished Florida Buzz: Disney podcast script.
-Keep the exact "Gena:" / "Diane:" line format.
-Do not restart the episode or repeat the warm open / hello banter.
+        `You continue an unfinished Florida Buzz: Disney solo podcast script.
+Keep the exact "Geno:" line format.
+Do not restart the episode or repeat the named open.
 Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
-Preserve host bible anti-scripted aftershow energy (lead/support by subject, no tennis-match equal turns for a whole segment; lead longer points + frequent 1–6 word support reactions; soft interruptions; mild disagreement — not polished essay-dialogue) and Florida Buzz source accuracy rules.`,
+Preserve solo energetic host style (quick hits + deep dive + CTA) and Florida Buzz source accuracy rules.
+Never introduce Gena/Diane dual-host lines.`,
         `Spoken words so far: ${words}. Need at least ${CONVERSATION_MIN_WORDS}.
 Continue this script:\n\n${script.slice(-12000)}`,
         CONVERSATION_MAX_OUTPUT_TOKENS,
@@ -274,8 +230,11 @@ Continue this script:\n\n${script.slice(-12000)}`,
     script = appendContinuation(script, continuation);
   }
 
-  if (!/^Gena:/m.test(script) || !/^Diane:/m.test(script)) {
-    throw new Error('Generated script must include Gena: and Diane: dialogue lines');
+  if (!/^Geno:/m.test(script)) {
+    throw new Error('Generated script must include Geno: dialogue lines');
+  }
+  if (/^(Gena|Diane):/m.test(script)) {
+    throw new Error('Generated script must be solo Geno — remove Gena:/Diane: dual-host lines');
   }
   assertScriptOpenShape(script);
   const words = countScriptWords(script);
@@ -288,20 +247,18 @@ Continue this script:\n\n${script.slice(-12000)}`,
 }
 
 /**
- * Pack dialogue into larger multi-turn TTS chunks.
- * Prefer keeping several host exchanges together so fal paces a real conversation
- * instead of many tiny one-line-at-a-time sections with identical seams.
+ * Pack solo host lines into TTS chunks.
+ * Prefer keeping several beats together so seams stay natural.
  */
-function splitScriptIntoSections(scriptText, maxChars, { minTurns = 8 } = {}) {
+function splitScriptIntoSections(scriptText, maxChars, { minTurns = 6 } = {}) {
   const lines = String(scriptText || '')
     .split(/\n+/)
     .map((l) => l.trim())
     .filter(Boolean);
   if (!lines.length) throw new Error('Script is empty');
-  const softMax = Math.max(500, Number(maxChars) || 5600);
-  // Allow a little overflow so we do not cut a short reaction volley off mid-exchange.
+  const softMax = Math.max(500, Number(maxChars) || 4000);
   const hardMax = Math.floor(softMax * 1.2);
-  const minKeep = Math.max(2, Number(minTurns) || 8);
+  const minKeep = Math.max(2, Number(minTurns) || 6);
   const sections = [];
   let current = [];
   let size = 0;
@@ -320,12 +277,11 @@ function splitScriptIntoSections(scriptText, maxChars, { minTurns = 8 } = {}) {
     }
   }
   if (current.length) sections.push(current.join('\n'));
-  // Absorb a tiny trailing section into the previous chunk when possible (fewer seams).
   if (sections.length >= 2) {
     const last = sections[sections.length - 1];
     const prev = sections[sections.length - 2];
     const lastTurns = last.split('\n').length;
-    if (lastTurns < Math.min(4, minKeep) && prev.length + 1 + last.length <= hardMax) {
+    if (lastTurns < Math.min(3, minKeep) && prev.length + 1 + last.length <= hardMax) {
       sections[sections.length - 2] = `${prev}\n${last}`;
       sections.pop();
     }
@@ -333,21 +289,29 @@ function splitScriptIntoSections(scriptText, maxChars, { minTurns = 8 } = {}) {
   return sections;
 }
 
-function formatScriptForTts(sectionText) {
-  // fal multi-speaker expects "SpeakerId: text" prefixes matching speakers[].speaker_id.
-  // Keep turns on separate lines (required), but do not insert blank lines between them —
-  // blank lines encourage identical dead-air gaps between every host statement.
-  return String(sectionText || '')
+/**
+ * Format a script section for TTS.
+ * ElevenLabs solo: strip Geno:/Gena:/Diane: prefixes; keep [emotion] tags.
+ * fal multi-speaker fallback may still want SpeakerId prefixes — pass keepSpeakerPrefix.
+ */
+function formatScriptForTts(sectionText, { keepSpeakerPrefix = false } = {}) {
+  const lines = String(sectionText || '')
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .join('\n');
+    .map((line) => {
+      if (keepSpeakerPrefix) return line;
+      return line.replace(/^(Geno|Gena|Diane):\s*/i, '');
+    })
+    .filter(Boolean);
+  return lines.join('\n');
 }
 
 module.exports = {
   DISCLOSURE,
   AFFILIATION_DISCLOSURE,
   HOST_BIBLE,
+  GENO_NAMED_OPEN_OPTION_A,
   CONVERSATION_MAX_OUTPUT_TOKENS,
   CONVERSATION_MIN_WORDS,
   CONVERSATION_TARGET_MAX_WORDS,

@@ -10,8 +10,8 @@ const {
   config,
   DEFAULT_FAL_TTS_ENDPOINT,
   DEFAULT_FAL_TTS_MODEL,
-  DEFAULT_GENA_VOICE,
-  DEFAULT_DIANE_VOICE,
+  DEFAULT_ELEVEN_MODEL,
+  DEFAULT_ELEVEN_VOICE_GENO,
 } = require('../lib/podcasts/config');
 const { createMemoryStore } = require('../lib/podcasts/memoryStore');
 const { buildRss } = require('../lib/podcasts/rss');
@@ -28,6 +28,7 @@ const {
   generateConversation,
   CONVERSATION_MAX_OUTPUT_TOKENS,
   CONVERSATION_MIN_WORDS,
+  GENO_NAMED_OPEN_OPTION_A,
 } = require('../lib/podcasts/script');
 const {
   HOST_BIBLE,
@@ -37,6 +38,7 @@ const {
 const { createPublicRouter } = require('../lib/podcasts/routerPublic');
 const { createAdminRouter } = require('../lib/podcasts/routerAdmin');
 const { createFalTts } = require('../lib/podcasts/falTts');
+const { createElevenTts } = require('../lib/podcasts/elevenTts');
 const { createAudioPipeline } = require('../lib/podcasts/audioPipeline');
 
 test('podcast public routes default on; generation stays off', () => {
@@ -45,23 +47,26 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(cfg.generation, false);
   assert.equal(config({ PODCASTS_ENABLED: 'false' }).enabled, false);
   assert.equal(config({ PODCASTS_ENABLED: 'true' }).enabled, true);
+  assert.equal(cfg.ttsProvider, 'elevenlabs');
+  assert.equal(cfg.hostMode, 'solo');
+  assert.equal(cfg.elevenModel, DEFAULT_ELEVEN_MODEL);
+  assert.equal(cfg.elevenVoiceGeno, DEFAULT_ELEVEN_VOICE_GENO);
   assert.equal(cfg.falEndpoint, DEFAULT_FAL_TTS_ENDPOINT);
   assert.equal(cfg.falModel, DEFAULT_FAL_TTS_MODEL);
-  assert.equal(cfg.genaVoice, DEFAULT_GENA_VOICE);
-  assert.equal(cfg.dianeVoice, DEFAULT_DIANE_VOICE);
-  assert.equal(cfg.genaVoice, 'Aoede');
-  assert.equal(cfg.dianeVoice, 'Kore');
   assert.equal(cfg.falConfigVerifiedInRepo, false);
 });
 
-test('podcast host voices override via PODCASTS_VOICE_* env', () => {
-  const cfg = config({
-    PODCASTS_VOICE_GENA: 'Kore',
-    PODCASTS_VOICE_DIANE: 'Sulafat',
-  });
-  assert.equal(cfg.genaVoice, 'Kore');
-  assert.equal(cfg.dianeVoice, 'Sulafat');
-  assert.equal(config({ PODCASTS_VOICE_DIANE: '  ' }).dianeVoice, DEFAULT_DIANE_VOICE);
+test('podcast TTS provider and Geno voice resolve from env', () => {
+  assert.equal(config({ ELEVENLABS_API_KEY: 'sk_test' }).ttsProvider, 'elevenlabs');
+  assert.equal(config({ PODCASTS_TTS_PROVIDER: 'fal', FAL_KEY: 'x' }).ttsProvider, 'fal');
+  assert.equal(
+    config({ PODCASTS_ELEVEN_VOICE_GENO: 'customVoice123' }).elevenVoiceGeno,
+    'customVoice123'
+  );
+  assert.equal(
+    config({ PODCASTS_ELEVEN_VOICE_ID: 'aliasVoice456' }).elevenVoiceGeno,
+    'aliasVoice456'
+  );
 });
 
 test('encodePodcastMaster recompresses audio under a smaller bitrate', async () => {
@@ -296,53 +301,38 @@ test('show notes always receive unofficial affiliation disclosure', () => {
   assert.equal(ensureShowNotesDisclosures(withAffiliation), withAffiliation);
 });
 
-test('assertScriptOpenShape requires name intros + welcome before week catch-up', () => {
+test('assertScriptOpenShape requires Geno Option A named open', () => {
   const good = [
-    "Gena: Hi, I'm Gena.",
-    "Diane: And I'm Diane.",
-    'Gena: And together — welcome to Florida Buzz: Disney.',
-    'Gena: So Diane, how was your week?',
-    'Diane: Raining like crazy, but otherwise okay.',
-    'Gena: Same — rained four days straight.',
-    'Diane: THAT\'S CRAZY. And speaking of storms, parades got messy this week…',
-    'Gena: What else is on the agenda today?',
+    `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`,
+    'Geno: Quick hits first, then one deeper dive.',
   ].join('\n');
   assert.doesNotThrow(() => assertScriptOpenShape(good));
 
   const weatherColdOpen = [
-    'Gena: Okay, how was your week? Because I tried to do one quick Central Florida errand with Geno, and somehow we got caught in the kind of afternoon rain that makes everybody rethink sandals.',
-    'Diane: In Florida? At four o’clock? No.',
-    'Gena: Welcome to Florida Buzz: Disney.',
+    'Geno: Okay, how was your week? Rain everywhere and sandals were a mistake.',
+    'Geno: Welcome to Florida Buzz: Disney.',
   ].join('\n');
   assert.throws(() => assertScriptOpenShape(weatherColdOpen), /Okay, how was your week/i);
 
-  const missingDiane = [
-    "Gena: Hi, I'm Gena.",
-    'Gena: Welcome to Florida Buzz: Disney.',
-    'Gena: So Diane, how was your week?',
-    'Diane: Fine.',
-  ].join('\n');
-  assert.throws(() => assertScriptOpenShape(missingDiane), /And I'm Diane/i);
-
-  const weekBeforeWelcome = [
+  const dualHost = [
     "Gena: Hi, I'm Gena.",
     "Diane: And I'm Diane.",
-    'Gena: So Diane, how was your week?',
-    'Diane: Fine.',
-    'Gena: And welcome to Florida Buzz: Disney.',
+    'Gena: Welcome to Florida Buzz: Disney.',
   ].join('\n');
-  assert.throws(() => assertScriptOpenShape(weekBeforeWelcome), /before "how was your week"/i);
+  assert.throws(() => assertScriptOpenShape(dualHost), /dual-host|Geno:/i);
+
+  const missingLetsGo = [
+    "Geno: Welcome to Florida Buzz: Disney. I'm Geno — unofficial fan host from The Florida Buzz.",
+  ].join('\n');
+  assert.throws(() => assertScriptOpenShape(missingLetsGo), /Let's go/i);
 });
 
 test('generateConversation rejects scripts that skip the named show open', async () => {
   const pad = Array.from({ length: 320 }, (_, i) =>
-    i % 2 === 0
-      ? `Gena: Point ${i} about parks and planning for families this week.`
-      : `Diane: Yep — reacting to point ${i} with a short take.`
+    `Geno: Point ${i} about parks and planning for families this week.`
   ).join('\n');
   const badScript = [
-    'Gena: Okay, how was your week? Rain everywhere with Geno.',
-    'Diane: Oh my lord.',
+    'Geno: Okay, how was your week? Rain everywhere.',
     pad,
   ].join('\n');
   await assert.rejects(
@@ -353,40 +343,27 @@ test('generateConversation rejects scripts that skip the named show open', async
         },
         show: { title: 'Florida Buzz: Disney' },
         episode: { title: 'Open shape fail', description: 'Desc' },
-        outline: '1. Warm Open',
+        outline: '1. Named Open',
         sources: [],
       }),
     /Okay, how was your week/i
   );
 });
 
-test('full-episode prompts keep host bible and anecdote rules', () => {
-  assert.equal(HOST_STYLE, 'aftershow_energy');
+test('full-episode prompts keep solo Geno host bible and structure', () => {
+  assert.equal(HOST_STYLE, 'solo_energetic');
   assert.match(HOST_BIBLE, /Geno/);
-  assert.match(HOST_BIBLE, /Michael/);
   assert.match(HOST_BIBLE, /mid-thirties/i);
-  assert.match(HOST_BIBLE, /aftershow|reaction/i);
-  assert.match(HOST_BIBLE, /Hi, I'm Gena/i);
-  assert.match(HOST_BIBLE, /And I'm Diane/i);
+  assert.match(HOST_BIBLE, /solo/i);
+  assert.match(HOST_BIBLE, /I'm Geno/i);
   assert.match(HOST_BIBLE, /welcome to Florida Buzz: Disney/i);
-  assert.match(HOST_BIBLE, /Okay, how was your week/i);
+  assert.match(HOST_BIBLE, /unofficial/i);
+  assert.match(HOST_BIBLE, /Let's go/i);
+  assert.match(HOST_BIBLE, /Quick Hits|quick hits/i);
+  assert.match(HOST_BIBLE, /Deep Dive|deep dive/i);
   assert.match(HOST_BIBLE, /HARD BAN/i);
-  assert.match(HOST_BIBLE, /afternoon rain|sandals|umbrella|jacket/i);
-  assert.match(HOST_BIBLE, /Anti-example|FORBIDDEN/i);
-  assert.match(HOST_BIBLE, /Warm Open|warm open|named welcome/i);
-  assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open/i);
-  assert.match(HOST_BIBLE, /symmetrical essay-dialogue/i);
-  assert.match(HOST_BIBLE, /1–6 word/i);
-  assert.match(HOST_BIBLE, /tennis-match/i);
-  assert.match(HOST_BIBLE, /lead\/support by subject/i);
-  assert.match(HOST_BIBLE, /Rotate the lead across segments/i);
-  assert.match(HOST_BIBLE, /longer rambles|longer points/i);
-  assert.match(HOST_BIBLE, /uneven/i);
-  assert.match(HOST_BIBLE, /mid-thought|unfinished sentences/i);
-  assert.match(HOST_BIBLE, /wait—/);
-  assert.match(HOST_BIBLE, /thesis\s*→\s*example\s*→\s*lesson|thesis → example → lesson/i);
-  assert.match(HOST_BIBLE, /equally polished/i);
-  assert.match(HOST_BIBLE, /mild disagreement/i);
+  assert.match(HOST_BIBLE, /Gena|Diane/);
+  assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open|do NOT cold-open/i);
   const show = { title: 'Florida Buzz: Disney' };
   const episode = { title: 'Week in the parks', description: 'News and tips' };
   const sources = [
@@ -398,72 +375,36 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
     },
   ];
   const outline = buildOutlinePrompt({ show, episode, sources });
-  assert.match(outline.system, /2–3 brief/);
   assert.match(outline.system, /Never invent breaking-news/);
   assert.match(outline.system, /Geno/);
-  assert.match(outline.system, /not a news rundown|friends exchanging stories|aftershow-style conversation/i);
-  assert.match(outline.system, /Warm Open/i);
-  assert.match(outline.system, /Hi, I'm Gena/i);
-  assert.match(outline.system, /And I'm Diane/i);
+  assert.match(outline.system, /Named Open/i);
+  assert.match(outline.system, /Quick Hits/i);
+  assert.match(outline.system, /Deep Dive/i);
+  assert.match(outline.system, /I'm Geno|I\'m Geno/i);
   assert.match(outline.system, /welcome to Florida Buzz: Disney/i);
-  assert.match(outline.system, /Okay, how was your week/i);
-  assert.match(outline.system, /HARD BAN Segment 1|without name intros/i);
-  assert.match(outline.system, /before any topic hook/i);
-  assert.match(outline.user, /Hi I'm Gena|Hi, I'm Gena/i);
-  assert.match(outline.user, /welcome to Florida Buzz: Disney/i);
-  assert.match(outline.system, /Anti-scripted energy|1–6 word|tennis-match/i);
-  assert.match(outline.system, /Lead host per topic segment/i);
-  assert.match(outline.system, /Lead: Gena/);
-  assert.match(outline.system, /Lead: Diane/);
-  assert.match(outline.system, /rotate leads across segments/i);
-  assert.match(outline.system, /thesis→example→lesson|thesis → example → lesson/i);
-  assert.match(outline.user, /Warm Open/i);
-  assert.match(outline.user, /Lead: Gena|Lead: Diane|rotating Lead host/i);
-  assert.match(outline.user, /tennis-match|lead\/support|anti-scripted/i);
+  assert.match(outline.system, /solo/i);
+  assert.doesNotMatch(outline.system, /Lead: Diane/);
+  assert.match(outline.user, /solo Geno|Geno Option A/i);
   const conversation = buildConversationPrompt({
     show,
     episode,
-    outline: '1. Warm Open\n2. Topic hook\n3. Dessert talk\nAnecdote: mobile order mixup',
+    outline: '1. Named Open\n2. Quick Hits\n3. Deep Dive\nAnecdote: mobile order mixup',
     sources,
   });
-  assert.match(conversation.system, /not presenters summarizing articles/i);
-  assert.match(conversation.system, /callback/i);
-  assert.match(conversation.system, /timeless composite/i);
+  assert.match(conversation.system, /not a presenter summarizing articles|not presenters summarizing articles/i);
+  assert.match(outline.system, /timeless composite/i);
   assert.doesNotMatch(conversation.user, /AI-generated hosts/i);
   assert.match(conversation.user, /not affiliated with/i);
-  assert.match(conversation.system, /taking turns reading article summaries/i);
   assert.match(conversation.system, /The Florida Buzz dot com/i);
   assert.match(conversation.system, /2–4 natural Florida Buzz references/);
   assert.match(conversation.system, /never read long URLs/i);
   assert.match(conversation.system, /STANDALONE EPISODE RULE/i);
   assert.match(conversation.system, /Part 1/);
-  assert.match(conversation.system, /see you in Part 2/i);
-  assert.match(conversation.system, /OPEN SHAPE/i);
-  assert.match(conversation.system, /Hi, I'm Gena/i);
-  assert.match(conversation.system, /And I'm Diane/i);
+  assert.match(conversation.system, /SOLO STRUCTURE/i);
+  assert.match(conversation.system, /I'm Geno|I\'m Geno/i);
   assert.match(conversation.system, /welcome to Florida Buzz: Disney/i);
-  assert.match(conversation.system, /HARD BAN opening with "Okay, how was your week"/i);
-  assert.match(conversation.system, /rain\/errand\/sandals|Anti-example|HARD BAN the anti-example/i);
-  assert.match(conversation.system, /Never cold-open/i);
-  assert.match(conversation.system, /AFTER the named show welcome|AFTER the warm friend banter/i);
-  assert.match(conversation.user, /welcome to Florida Buzz: Disney/i);
-  assert.match(conversation.user, /Okay, how was your week|rain-errand/i);
-  assert.match(conversation.system, /symmetrical essay-dialogue/i);
-  assert.match(conversation.system, /LEAD \/ SUPPORT BY SUBJECT/i);
-  assert.match(conversation.system, /Lead host carries longer points/i);
-  assert.match(conversation.system, /Support host mostly short/i);
-  assert.match(conversation.system, /switch who leads/i);
-  assert.match(conversation.system, /ANTI-SCRIPTED HARD RULES/i);
-  assert.match(conversation.system, /tennis-match/i);
-  assert.match(conversation.system, /1–6 word/i);
-  assert.match(conversation.system, /longer rambles|longer points/i);
-  assert.match(conversation.system, /mid-thought pivots|unfinished sentences/i);
-  assert.match(conversation.system, /equally polished/i);
-  assert.match(conversation.system, /thesis → example → lesson/i);
-  assert.match(conversation.system, /mild disagreement/i);
-  assert.match(conversation.system, /40–50 spoken words/i);
-  assert.match(conversation.user, /Honor outline Lead tags/i);
-  assert.match(conversation.user, /tennis-match|rotate lead by subject/i);
+  assert.match(conversation.system, /HARD BAN dual-host/i);
+  assert.match(conversation.user, /quick hits \+ one deep dive/i);
   assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
@@ -471,29 +412,26 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.user, /\/dining/);
 });
 
-test('outline and conversation prompts require rotating lead/support hosts', () => {
+test('outline and conversation prompts require solo Geno structure', () => {
   const show = { title: 'Florida Buzz: Disney' };
-  const episode = { title: 'Lead support check', description: 'Desc' };
+  const episode = { title: 'Solo structure check', description: 'Desc' };
   const sources = [];
   const outline = buildOutlinePrompt({ show, episode, sources });
-  assert.match(outline.system, /Lead: Gena/);
-  assert.match(outline.system, /Lead: Diane/);
-  assert.match(outline.system, /rotate leads across segments/i);
-  assert.match(outline.system, /Support host is the other person/i);
-  assert.match(outline.user, /rotating Lead host|Lead: Gena \/ Lead: Diane/i);
+  assert.match(outline.system, /Named Open/i);
+  assert.match(outline.system, /Quick Hits/i);
+  assert.match(outline.system, /Deep Dive/i);
+  assert.doesNotMatch(outline.system, /Lead: Gena/);
+  assert.doesNotMatch(outline.system, /Lead: Diane/);
   const conversation = buildConversationPrompt({
     show,
     episode,
-    outline: '1. Warm Open\n2. Topic A — Lead: Gena\n3. Topic B — Lead: Diane',
+    outline: '1. Named Open\n2. Quick Hits\n3. Deep Dive',
     sources,
   });
-  assert.match(conversation.system, /LEAD \/ SUPPORT BY SUBJECT/i);
-  assert.match(conversation.system, /Lead host carries longer points/i);
-  assert.match(conversation.system, /Support host mostly short comments/i);
-  assert.match(conversation.system, /When the next subject starts, switch who leads/i);
-  assert.match(conversation.system, /FORBID tennis-match equal turns for a whole segment/i);
-  assert.match(conversation.user, /Honor outline Lead tags/i);
-  assert.match(HOST_BIBLE, /lead\/support by subject/i);
+  assert.match(conversation.system, /SOLO STRUCTURE/i);
+  assert.match(conversation.system, /Geno:/);
+  assert.doesNotMatch(conversation.system, /Support host mostly short comments/);
+  assert.match(HOST_BIBLE, /solo energetic/i);
 });
 
 test('conversation token budget supports a ~20–25 minute script', () => {
@@ -511,21 +449,15 @@ test('conversation token budget supports a ~20–25 minute script', () => {
 });
 
 test('short AI scripts are rejected and continuations can append', async () => {
-  assert.equal(countScriptWords('Gena: Hello there.\n\nDiane: Hi back.'), 4);
+  assert.equal(countScriptWords('Geno: Hello there.\n\nGeno: Hi back.'), 4);
   const merged = appendContinuation(
-    'Gena: We start here.\n\nDiane: Yes.',
-    'Gena: And then we keep going about Magic Kingdom crowds.'
+    'Geno: We start here.\n\nGeno: Yes.',
+    'Geno: And then we keep going about Magic Kingdom crowds.'
   );
   assert.match(merged, /We start here/);
   assert.match(merged, /Magic Kingdom crowds/);
 
-  const namedOpen = [
-    "Gena: Hi, I'm Gena.",
-    "Diane: And I'm Diane.",
-    'Gena: And together — welcome to Florida Buzz: Disney.',
-    'Gena: So Diane, how was your week?',
-    'Diane: Fine — short week.',
-  ].join('\n\n');
+  const namedOpen = `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`;
 
   let calls = 0;
   const aiText = {
@@ -533,10 +465,9 @@ test('short AI scripts are rejected and continuations can append', async () => {
       calls += 1;
       assert.ok(maxTokens >= 12000);
       if (calls === 1) {
-        return `${namedOpen}\n\nGena: Short open.\n\nDiane: Short reply only.`;
+        return `${namedOpen}\n\nGeno: Short open only.`;
       }
-      // Still short on purpose so generateConversation throws after continue attempts.
-      return 'Gena: A little more.\n\nDiane: Still not enough words overall.';
+      return 'Geno: A little more but still not enough words overall.';
     },
   };
   await assert.rejects(
@@ -559,23 +490,16 @@ test('continuation recovers a full-length script after a short first pass', asyn
     for (let i = 0; i < n; i += 1) words.push(`word${i}`);
     return `${label}: ${words.join(' ')}`;
   };
-  const namedOpen = [
-    "Gena: Hi, I'm Gena.",
-    "Diane: And I'm Diane.",
-    'Gena: And together — welcome to Florida Buzz: Disney.',
-    'Gena: So Diane, how was your week?',
-    'Diane: Fine — short week.',
-  ].join('\n\n');
+  const namedOpen = `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`;
   let calls = 0;
   const aiText = {
     async generateText(_system, _user, maxTokens) {
       calls += 1;
       assert.ok(maxTokens >= 12000);
       if (calls === 1) {
-        return `${namedOpen}\n\n${pad('Gena', 40)}\n\n${pad('Diane', 40)}`;
+        return `${namedOpen}\n\n${pad('Geno', 80)}`;
       }
-      // Second pass supplies enough spoken words to clear the 30-minute floor.
-      return `${pad('Gena', 2200)}\n\n${pad('Diane', 2200)}`;
+      return pad('Geno', 3200);
     },
   };
   const script = await generateConversation({
@@ -589,16 +513,15 @@ test('continuation recovers a full-length script after a short first pass', asyn
   assert.equal(calls, 2);
 });
 
-test('script sections split for long episodes and keep dialogue prefixes', () => {
+test('script sections split for long episodes and strip Geno prefixes for TTS', () => {
   const lines = [];
   for (let i = 0; i < 40; i += 1) {
-    lines.push(`Gena: Point number ${i} with enough text to force multiple sections eventually.`);
-    lines.push(`Diane: Short reaction ${i}.`);
+    lines.push(`Geno: Point number ${i} with enough text to force multiple sections eventually.`);
   }
   const sections = splitScriptIntoSections(lines.join('\n'), 400);
   assert.ok(sections.length > 1);
-  assert.match(formatScriptForTts(sections[0]), /^Gena:/m);
-  // Prefer multi-turn chunks (not one line per section) even when soft max is small.
+  assert.doesNotMatch(formatScriptForTts(sections[0]), /^Geno:/m);
+  assert.match(formatScriptForTts(sections[0]), /Point number/i);
   assert.ok(sections[0].split('\n').length >= 2);
   assert.doesNotMatch(formatScriptForTts(sections[0]), /\n\n/);
 });
@@ -606,13 +529,12 @@ test('script sections split for long episodes and keep dialogue prefixes', () =>
 test('script sections prefer larger multi-turn packs and absorb tiny tails', () => {
   const lines = [];
   for (let i = 0; i < 24; i += 1) {
-    lines.push(`Gena: Longer beat ${i} with park talk that fills a bit of space for chunking.`);
-    lines.push(`Diane: Yep ${i}.`);
+    lines.push(`Geno: Longer beat ${i} with park talk that fills a bit of space for chunking.`);
   }
   const sections = splitScriptIntoSections(lines.join('\n'), 900, { minTurns: 6 });
   assert.ok(sections.length >= 2);
   for (const section of sections) {
-    assert.ok(section.split('\n').length >= 4, 'sections should keep multi-turn dialogue packs');
+    assert.ok(section.split('\n').length >= 4, 'sections should keep multi-turn packs');
   }
 });
 
@@ -703,46 +625,51 @@ test('episode ordering is newest published first', async () => {
 });
 
 test('fal TTS submit refuses when generation disabled', async () => {
-  const cfg = config({ PODCASTS_GENERATION_ENABLED: 'false', FAL_KEY: 'test-key' });
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'false',
+    PODCASTS_TTS_PROVIDER: 'fal',
+    FAL_KEY: 'test-key',
+  });
   const fal = createFalTts(cfg, async () => {
     throw new Error('network should not be called');
   });
-  await assert.rejects(() => fal.submit('Gena: hi\nDiane: hello'), /disabled/i);
+  await assert.rejects(() => fal.submit('Geno: hi there'), /disabled/i);
 });
 
-test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
-  const cfg = config({ PODCASTS_GENERATION_ENABLED: 'true', FAL_KEY: 'test-key' });
+test('fal fallback builds solo Geno single-speaker input', () => {
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'true',
+    PODCASTS_TTS_PROVIDER: 'fal',
+    FAL_KEY: 'test-key',
+  });
   const fal = createFalTts(cfg);
-  const input = fal.buildInput('Gena: Hello\nDiane: Hi');
-  assert.equal(input.speakers[0].speaker_id, 'Gena');
-  assert.equal(input.speakers[0].voice, 'Aoede');
-  assert.equal(input.speakers[1].speaker_id, 'Diane');
-  assert.equal(input.speakers[1].voice, 'Kore');
-  assert.match(input.style_instructions, /pronounced like Gina/i);
-  assert.match(input.style_instructions, /JEEN-uh/);
-  assert.match(input.style_instructions, /AfterBuzz|aftershow/i);
-  assert.match(input.style_instructions, /mid-30s American moms|warm, natural/i);
-  assert.match(input.style_instructions, /not a robotic AI assistant|not teens|not elderly/i);
-  assert.match(input.style_instructions, /brighter|breezier/i);
-  assert.match(input.style_instructions, /firmer|grounded|lower/i);
-  assert.match(input.style_instructions, /name intros|show welcome/i);
-  assert.match(input.style_instructions, /THAT'?S CRAZY|REALLY\?/i);
-  assert.match(input.style_instructions, /less radio polish|messy live friend/i);
-  assert.match(input.style_instructions, /warm hellos|catch-up banter/i);
-  assert.match(input.style_instructions, /symmetrical essay-dialogue/i);
-  assert.match(input.style_instructions, /not hosts reading an essay|not reading an essay|not reading scripted/i);
-  assert.match(input.style_instructions, /Less announcer|more live reaction/i);
-  assert.match(input.style_instructions, /1–6 word|wait—/i);
-  assert.match(input.style_instructions, /tennis-match/i);
-  assert.match(input.style_instructions, /Lead\/support|carry a longer point|mostly reacts/i);
-  assert.match(input.style_instructions, /uneven pacing|Natural uneven/i);
-  assert.match(input.style_instructions, /metronomic|beat-matched|vary pause/i);
+  const input = fal.buildInput('Geno: Hello from the parks');
+  assert.equal(input.voice, 'Aoede');
+  assert.doesNotMatch(input.prompt, /^Geno:/m);
+  assert.match(input.prompt, /Hello from the parks/);
+  assert.match(input.style_instructions, /Solo energetic|solo energetic/i);
+  assert.match(input.style_instructions, /Geno/);
+  assert.match(input.style_instructions, /quick hits/i);
+  assert.match(input.style_instructions, /deep dive/i);
 });
 
-test('podcast TTS defaults use larger multi-turn sections', () => {
+test('elevenlabs TTS refuses when generation disabled', async () => {
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'false',
+    ELEVENLABS_API_KEY: 'sk_test',
+  });
+  const eleven = createElevenTts(cfg, async () => {
+    throw new Error('network should not be called');
+  });
+  await assert.rejects(() => eleven.synthesize('Geno: hi'), /disabled/i);
+});
+
+test('podcast TTS defaults use ElevenLabs-sized sections', () => {
   const cfg = config({});
-  assert.ok(cfg.sectionMaxChars >= 5000);
+  assert.ok(cfg.sectionMaxChars >= 3500);
+  assert.ok(cfg.sectionMaxChars <= 5600);
   assert.ok(cfg.temperature >= 0.85);
+  assert.equal(cfg.ttsProvider, 'elevenlabs');
 });
 
 test('fal TTS style_instructions include EPCOT as EP-cot (shared pronunciation map)', () => {
@@ -751,11 +678,14 @@ test('fal TTS style_instructions include EPCOT as EP-cot (shared pronunciation m
   assert.ok(PRONUNCIATION_MAP.some((e) => e.term === 'EPCOT'));
   assert.match(pronunciationStyleInstructions(), /EP-cot/);
   assert.match(pronunciationStyleInstructions(), /never.*letter-by-letter/i);
-  const cfg = config({ PODCASTS_GENERATION_ENABLED: 'true', FAL_KEY: 'test-key' });
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'true',
+    PODCASTS_TTS_PROVIDER: 'fal',
+    FAL_KEY: 'test-key',
+  });
   const fal = createFalTts(cfg);
-  const input = fal.buildInput('Gena: We hit EPCOT early.\nDiane: Same.');
+  const input = fal.buildInput('Geno: We hit EPCOT early.');
   assert.match(input.style_instructions, /EPCOT is two syllables, EP-cot/i);
-  assert.match(input.style_instructions, /pronounced like Gina/i);
   assert.match(HOST_BIBLE, /EPCOT is pronounced EP-cot/i);
 });
 
@@ -770,17 +700,30 @@ test('audio pipeline refuses paid generation when flag off', async () => {
     episode_number: 3,
   });
   await store.setStatus(episode.id, 'script_ready');
-  const cfg = config({ PODCASTS_GENERATION_ENABLED: 'false', FAL_KEY: 'x' });
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'false',
+    ELEVENLABS_API_KEY: 'sk_test',
+  });
   const pipeline = createAudioPipeline({
     cfg,
     store,
     fal: createFalTts(cfg),
+    eleven: createElevenTts(cfg),
     ffmpegPath: 'ffmpeg',
   });
   await assert.rejects(
-    () => pipeline.generatePreview(episode, 'Gena: Hello\nDiane: Hi there'),
+    () => pipeline.generatePreview(episode, `Geno: ${GENO_NAMED_OPEN_OPTION_A}`),
     /PODCASTS_GENERATION_ENABLED/
   );
+});
+
+test('memory show seed is solo Geno with hosted-by-Geno cover alt', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  assert.deepEqual(show.hosts, [{ name: 'Geno', role: 'host' }]);
+  assert.match(show.cover_alt, /hosted by Geno/i);
+  assert.doesNotMatch(show.cover_alt, /Gene Zentko/i);
+  assert.match(show.description, /Geno hosts/i);
 });
 
 function listen(app) {

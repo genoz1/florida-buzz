@@ -1,23 +1,16 @@
 'use strict';
 
-// fal.ai Gemini TTS — sourced from public fal model docs (fal-ai/gemini-tts).
-// Florida Buzz repo has no verified "approved trailer" Pro-model lockfile.
-// Override with PODCASTS_FAL_TTS_ENDPOINT / PODCASTS_FAL_TTS_MODEL if your
-// account uses a different approved alias. Do not guess private trailer IDs.
+// fal.ai Gemini TTS — optional fallback only (public fal model docs).
 const DEFAULT_FAL_TTS_ENDPOINT = 'fal-ai/gemini-tts';
 const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
+const DEFAULT_FAL_SOLO_VOICE = 'Aoede';
 
-// Multi-speaker voice presets from fal-ai/gemini-tts (same enum on speakers[].voice).
-// Catalog is finite (~30 names). Female-leaning labels from fal/Google docs:
-//   Aoede = warm/melodic (breezy), Callirrhoe = easy-going, Sulafat = warm,
-//   Achernar = soft, Vindemiatrix = gentle, Achird = friendly, Kore = firm,
-//   Zephyr = bright/clear (can read assistant-like), Leda = youthful (too young),
-//   Gacrux = mature (can read older). Skip male-coded presets (Puck, Charon,
-//   Fenrir, Orus, etc.) for these hosts.
-// Defaults: Gena=Aoede; Diane=Kore — firmer mom timbre vs Aoede's breezy/melodic
-// lane (Callirrhoe sat too close to Aoede; Zephyr read bright/AI-ish). fal only
-// offers ~30 presets, so contrast is limited; style_instructions add per-speaker
-// pitch/energy cues on top of the enum.
+// ElevenLabs solo Geno (production default).
+const DEFAULT_ELEVEN_MODEL = 'eleven_v4';
+const DEFAULT_ELEVEN_VOICE_GENO = 'bg7PC2IzyIDwYgytMiW1';
+const DEFAULT_ELEVEN_OUTPUT_FORMAT = 'mp3_44100_128';
+
+// Legacy fal multi-speaker presets (only used if PODCASTS_TTS_PROVIDER=fal with dual mode).
 const DEFAULT_GENA_VOICE = 'Aoede';
 const DEFAULT_DIANE_VOICE = 'Kore';
 
@@ -39,53 +32,78 @@ function normalizeVoice(raw, fallback) {
   return voice || fallback;
 }
 
+function resolveTtsProvider(env = {}) {
+  const explicit = String(env.PODCASTS_TTS_PROVIDER || '').trim().toLowerCase();
+  if (explicit === 'elevenlabs' || explicit === 'fal') return explicit;
+  // auto: prefer ElevenLabs when key present
+  if (env.ELEVENLABS_API_KEY) return 'elevenlabs';
+  if (env.FAL_KEY) return 'fal';
+  return 'elevenlabs';
+}
+
 function config(env = process.env) {
   const temperature = Number(env.PODCASTS_TTS_TEMPERATURE ?? 0.9);
-  // Larger multi-turn chunks sound less metronomic than many tiny one-volley sections.
-  // fal Pro still times out on huge prompts — ~5600 chars keeps several host exchanges per job.
-  const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 5600);
+  const ttsProvider = resolveTtsProvider(env);
+  // ElevenLabs solo chunks stay under reliable request sizes; fal can take larger packs.
+  const defaultSectionChars = ttsProvider === 'elevenlabs' ? 4000 : 5600;
+  const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || defaultSectionChars);
   const maxUploadMb = Number(env.PODCASTS_MAX_UPLOAD_MB || 80);
   const genaVoice = normalizeVoice(env.PODCASTS_VOICE_GENA, DEFAULT_GENA_VOICE);
   const dianeVoice = normalizeVoice(env.PODCASTS_VOICE_DIANE, DEFAULT_DIANE_VOICE);
+  const falSoloVoice = normalizeVoice(env.PODCASTS_VOICE_FAL_SOLO || env.PODCASTS_VOICE_GENA, DEFAULT_FAL_SOLO_VOICE);
+  const elevenVoiceGeno = normalizeVoice(
+    env.PODCASTS_ELEVEN_VOICE_GENO || env.PODCASTS_ELEVEN_VOICE_ID || env.ELEVENLABS_VOICE_GENO,
+    DEFAULT_ELEVEN_VOICE_GENO
+  );
   return Object.freeze({
     // Public directory/show/episode/RSS are on unless explicitly disabled.
-    // Paid fal TTS stays hard-off until PODCASTS_GENERATION_ENABLED=true.
+    // Paid TTS stays hard-off until PODCASTS_GENERATION_ENABLED=true.
     enabled: env.PODCASTS_ENABLED !== 'false',
     generation: env.PODCASTS_GENERATION_ENABLED === 'true',
-    // Hourly tick may run; actual weekly drafts still require admin schedule enable.
     weeklyCron: env.PODCASTS_WEEKLY_CRON_ENABLED !== 'false',
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
-    // Podcast-owner inbox for Apple/Spotify verification (must be an inbox Florida Buzz can access).
     ownerEmail: env.PODCASTS_OWNER_EMAIL || 'floridabuzzonline@gmail.com',
+    ttsProvider,
+    hostMode: 'solo',
+    elevenApiKey: env.ELEVENLABS_API_KEY || null,
+    elevenModel: env.PODCASTS_ELEVEN_MODEL || env.ELEVENLABS_MODEL_ID || DEFAULT_ELEVEN_MODEL,
+    elevenVoiceGeno,
+    elevenOutputFormat: env.PODCASTS_ELEVEN_OUTPUT_FORMAT || DEFAULT_ELEVEN_OUTPUT_FORMAT,
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,
     falModel: env.PODCASTS_FAL_TTS_MODEL || DEFAULT_FAL_TTS_MODEL,
+    falSoloVoice,
     temperature: Number.isFinite(temperature) ? temperature : 0.9,
     languageCode: 'English (US)',
     outputFormat: 'mp3',
     genaVoice,
     dianeVoice,
-    sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 5600,
-    // fal Pro multi-speaker chunks can take several minutes; 90×2s was too short.
+    sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : defaultSectionChars,
     falPollAttempts: Number(env.PODCASTS_FAL_POLL_ATTEMPTS || 180),
     falPollIntervalMs: Number(env.PODCASTS_FAL_POLL_INTERVAL_MS || 2000),
     falSectionRetries: Number(env.PODCASTS_FAL_SECTION_RETRIES || 2),
+    elevenSectionRetries: Number(env.PODCASTS_ELEVEN_SECTION_RETRIES || 2),
     maxUploadBytes: (Number.isFinite(maxUploadMb) && maxUploadMb > 0 ? maxUploadMb : 80) * 1024 * 1024,
     audioBucket: env.PODCASTS_AUDIO_BUCKET || 'podcast-audio',
     artworkBucket: env.PODCASTS_ARTWORK_BUCKET || 'podcast-artwork',
     defaultShowSlug: DISNEY_SHOW_SLUG,
     falConfigVerifiedInRepo: false,
     falConfigSource:
-      `Public fal.ai docs for fal-ai/gemini-tts (model gemini-2.5-pro-tts, voices ${genaVoice}/${dianeVoice}). No in-repo approved-trailer verification found.`,
+      `Optional fal fallback for fal-ai/gemini-tts (model gemini-2.5-pro-tts, solo voice ${falSoloVoice}). Production default is ElevenLabs ${DEFAULT_ELEVEN_MODEL} solo Geno.`,
   });
 }
 
 module.exports = {
   config,
+  resolveTtsProvider,
   EPISODE_STATUSES,
   DISNEY_SHOW_SLUG,
   DEFAULT_FAL_TTS_ENDPOINT,
   DEFAULT_FAL_TTS_MODEL,
+  DEFAULT_FAL_SOLO_VOICE,
   DEFAULT_GENA_VOICE,
   DEFAULT_DIANE_VOICE,
+  DEFAULT_ELEVEN_MODEL,
+  DEFAULT_ELEVEN_VOICE_GENO,
+  DEFAULT_ELEVEN_OUTPUT_FORMAT,
 };

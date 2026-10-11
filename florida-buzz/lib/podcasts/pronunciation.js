@@ -1,19 +1,13 @@
 'use strict';
 
 /**
- * Shared TTS pronunciation guidance for fal Gemini TTS style_instructions.
+ * Shared TTS pronunciation guidance for ElevenLabs / fal style instructions.
  * Keep spellings in scripts/dialogue as written; do not insert phonetic
- * respellings into host lines. fal may still ignore hints — this is advisory.
+ * respellings into host lines. Engines may still ignore hints — advisory only.
  *
  * Do not invent Disney affiliation or official-voice claims here.
  */
 const PRONUNCIATION_MAP = [
-  {
-    term: 'Gena',
-    // Host spelling stays Gena; spoken form matches Gina.
-    guidance:
-      'The host name Gena is spelled G-E-N-A but must be pronounced like Gina (JEEN-uh), never Jenna or Gee-nuh.',
-  },
   {
     term: 'EPCOT',
     guidance:

@@ -3,6 +3,7 @@
 const { config } = require('./config');
 const { createStore } = require('./store');
 const { createFalTts } = require('./falTts');
+const { createElevenTts } = require('./elevenTts');
 const { createAudioPipeline } = require('./audioPipeline');
 const { createPublicRouter } = require('./routerPublic');
 const { createAdminRouter } = require('./routerAdmin');
@@ -26,6 +27,7 @@ function production(env = process.env) {
   }
   const store = createStore(supabase);
   const fal = createFalTts(cfg);
+  const eleven = createElevenTts(cfg);
   let aiText = null;
   try {
     aiText = require('../aiText');
@@ -36,9 +38,10 @@ function production(env = process.env) {
     cfg,
     store,
     fal,
+    eleven,
     ffmpegPath: resolveFfmpegPath(env),
   });
-  return { cfg, store, fal, pipeline, aiText, supabase };
+  return { cfg, store, fal, eleven, pipeline, aiText, supabase };
 }
 
 function mount(app, env = process.env) {
@@ -73,7 +76,7 @@ function mount(app, env = process.env) {
     console.error('[podcasts] admin router not mounted:', err.message);
   }
   console.log(
-    `[podcasts] mounted (generation=${runtime.cfg.generation ? 'ON' : 'OFF'}; weeklyCron=${runtime.cfg.weeklyCron ? 'ON' : 'OFF'}; fal endpoint=${runtime.cfg.falEndpoint}; model=${runtime.cfg.falModel})`
+    `[podcasts] mounted (generation=${runtime.cfg.generation ? 'ON' : 'OFF'}; weeklyCron=${runtime.cfg.weeklyCron ? 'ON' : 'OFF'}; tts=${runtime.cfg.ttsProvider}; elevenModel=${runtime.cfg.elevenModel}; fal endpoint=${runtime.cfg.falEndpoint})`
   );
   return { ...runtime, sendEmail, mounted: true };
 }
@@ -104,6 +107,7 @@ module.exports = {
   sitemapEntries,
   createStore,
   createFalTts,
+  createElevenTts,
   createAudioPipeline,
   createPublicRouter,
   createAdminRouter,
