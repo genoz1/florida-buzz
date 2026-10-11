@@ -99,6 +99,16 @@ adds source/campaign/topic UTM tags, and records per-platform success in
 - **No Make.com needed** — the automation is built directly into this app, so that's one
   fewer subscription than the original plan.
 
+## Visual news shorts (no fal.ai)
+
+Vertical 9:16 news clips use **ElevenLabs `eleven_v4` directly** (`ELEVENLABS_API_KEY`)
+and **local ffmpeg** (`ffmpeg-static`) — not fal. See [docs/visual-news.md](docs/visual-news.md).
+
+```bash
+ELEVENLABS_API_KEY=sk_... npm run sample:visual-news-ll
+# → /opt/cursor/artifacts/florida-buzz-visual-news-ll.mp4
+```
+
 ## Monetization — recommended order
 1. Apply to **Ezoic** (no traffic minimum) once the site has any real visitors — better
    payouts than starting with Google AdSense.

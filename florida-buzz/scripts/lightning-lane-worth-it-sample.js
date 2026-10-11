@@ -7,6 +7,10 @@
  *
  * Visuals: licensed Magic Kingdom stills (Seven Dwarfs + Big Thunder LL).
  * Does not invent dollar amounts. Env: ELEVENLABS_API_KEY
+ *
+ * Prefer the shared visual-news pipeline (no fal, no presenter):
+ *   npm run sample:visual-news-ll
+ *   → lib/visualNews createFloridaBuzzVisualVideo
  */
 
 require('dotenv').config();
