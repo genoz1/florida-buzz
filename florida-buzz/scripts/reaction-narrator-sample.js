@@ -208,12 +208,13 @@ async function main() {
 
   fs.writeFileSync(path.join(OUT_DIR, 'reaction-narrator-sample.md'), `# Reaction narrator sample
 
-Format you asked for:
-- **Background:** Disney Lightning Lane news / park visual (full screen)
-- **Corner:** green-screen narrator keyed in, gesturing / pointing at the story
-- **VO:** tells the worth-it story
+Viral reaction layout:
+- **Background:** full-screen Lightning Lane news + Seven Dwarfs still
+- **Corner:** solid green-screen host (keyed), talking / pointing at the story
+- **VO + captions:** worth-it takeaway
 
-Not Gene. Stock green-screen host for layout proof.
+Not Gene — stock Mixkit host for format proof.
+Run: \`npm run sample:reaction-narrator\`
 `);
 
   console.log(JSON.stringify({
