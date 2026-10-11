@@ -156,7 +156,8 @@ async function main() {
     '-t', String(duration),
     '-vf',
     // Portrait crop first, then chromakey green → transparent corner host
-    'scale=-1:560,crop=320:560:(iw-320)/2:0,chromakey=0x00b140:0.20:0.10,format=rgba',
+    // Host stands on the left of the green-screen plate — crop from x=0
+    'scale=-1:600,crop=340:600:0:0,chromakey=0x00b140:0.22:0.12,format=rgba',
     '-c:v', 'qtrle', // keeps alpha
     '-an',
     keyed,
