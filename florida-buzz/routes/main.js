@@ -965,6 +965,40 @@ are no longer PNGs, so they get automatically skipped on any future run.
   `);
 });
 
+// Generate OpenAI article images for evergreen guides that were saved without one
+// (e.g. bulk-seeded intent guides). Safe to re-run — skips guides that already
+// have image_url set.
+router.get('/admin/generate-guide-images', (req, res) => {
+  const { key, dryRun } = req.query;
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).type('text').send('OPENAI_API_KEY is not configured on this app.');
+  }
+
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'generate-guide-images.js');
+  const child = spawn('node', [scriptPath], {
+    env: {
+      ...process.env,
+      DRY_RUN: dryRun === 'true' ? 'true' : 'false',
+    },
+    detached: true,
+    stdio: 'inherit',
+  });
+  child.unref();
+
+  res.send(`
+    <pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">
+Started generating missing guide images in the background${dryRun === 'true' ? ' (DRY RUN)' : ''}.
+
+Uses gpt-image-1 + visual review for each evergreen guide with a null image_url.
+Watch DigitalOcean runtime logs for progress. Safe to re-run — guides that already
+have an image are skipped.
+    </pre>
+  `);
+});
+
 router.post('/admin/submit-topic', (req, res) => {
   const { key, category, topic, title } = req.body;
 

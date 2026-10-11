@@ -16,6 +16,9 @@ const { createClient } = require('@supabase/supabase-js');
 const SITE_URL = (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 const BYLINE = 'Gene Zentko';
+// Optional: GENERATE_IMAGES=1 node scripts/seed-intent-guides.js
+// Requires OPENAI_API_KEY. Prefer /admin/generate-guide-images in production.
+const GENERATE_IMAGES = process.env.GENERATE_IMAGES === '1' || process.env.GENERATE_IMAGES === 'true';
 
 function supabaseClient() {
   const url = process.env.SUPABASE_URL || process.env.FLORIDA_BUZZ_SUPABASE_URL;
@@ -342,6 +345,31 @@ async function seed() {
         continue;
       }
       console.log(`Inserted /article/${guide.slug}`);
+    }
+
+    if (GENERATE_IMAGES && !DRY_RUN) {
+      try {
+        const { generateArticleImage } = require('../lib/imageGen');
+        const { data: current } = await sb.from('articles').select('id, image_url').eq('slug', guide.slug).maybeSingle();
+        if (current && !current.image_url) {
+          console.log(`  Generating image for ${guide.slug}...`);
+          const imageUrl = await generateArticleImage({
+            title: guide.title,
+            category: guide.category,
+            slug: guide.slug,
+            dek: guide.dek,
+            bodyHtml: guide.body_html,
+          });
+          if (imageUrl) {
+            await sb.from('articles').update({ image_url: imageUrl }).eq('id', current.id);
+            console.log(`  Image saved for ${guide.slug}`);
+          } else {
+            console.error(`  Image generation returned null for ${guide.slug}`);
+          }
+        }
+      } catch (err) {
+        console.error(`  Image generation error for ${guide.slug}: ${err.message}`);
+      }
     }
   }
   console.log(DRY_RUN ? 'Dry run complete.' : 'Intent guides seeded.');
