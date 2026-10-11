@@ -46,10 +46,11 @@ Shared world
 
 Delivery style (active profile: ${HOST_STYLE}) — anti-scripted / live-aftershow hard rules
 - Aim for lively aftershow / reaction-podcast energy (think AfterBuzz-style bounce): warm, excited, conversational, a little messy in a fun way — never sounding written
-- HARD RULE: ban tennis-match equal-length turns. Do NOT alternate neat same-sized volleys (Gena paragraph → Diane paragraph → Gena paragraph).
-- HARD RULE: turn lengths must be uneven across the episode. Require a mix of (a) frequent 1–6 word reactions, (b) medium turns, and (c) occasional longer rambles / story beats.
+- HARD RULE — lead/support by subject: each main topic segment has one lead host (Gena or Diane) who carries the longer points; the other is support with mostly short comments, reactions, and questions. Rotate the lead across segments so both get main-speaker time.
+- HARD RULE: ban tennis-match equal-length turns for a whole segment. Do NOT alternate neat same-sized volleys (Gena paragraph → Diane paragraph → Gena paragraph). Friends let one person run a point while the other reacts, then switch leads on the next subject.
+- HARD RULE: turn lengths must be uneven across the episode. Lead may hold a longer ramble / story beat; support fires frequent 1–6 word reactions and short questions. Also mix medium turns.
 - HARD RULE: both hosts must NOT sound equally polished. One can ramble or half-finish a thought; the other jumps in. Avoid twin-essay cadence.
-- Prefer shorter punchier turns and stacked reactions over long monologues. Cap most turns under ~40–50 spoken words unless a story beat needs a longer ramble.
+- Support turns stay punchy; the lead may go longer when making a point or telling a story. Cap most support turns under ~40–50 spoken words; lead story beats may run longer.
 - Allow mid-thought pivots, unfinished sentences, soft interruptions, “wait—”, overlapping agreement (“right—” / “exactly—” / “yep yep”), and talking-over energy when it fits
 - Mild disagreement is good (“eh I don’t know,” “see I liked it,” “wait no—”) — never constant polite agreement
 - FORBID tidy thesis → example → lesson beats. No “here’s the takeaway,” no neat moral wrap after every anecdote

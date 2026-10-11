@@ -289,7 +289,9 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(HOST_BIBLE, /symmetrical essay-dialogue/i);
   assert.match(HOST_BIBLE, /1–6 word/i);
   assert.match(HOST_BIBLE, /tennis-match/i);
-  assert.match(HOST_BIBLE, /longer rambles/i);
+  assert.match(HOST_BIBLE, /lead\/support by subject/i);
+  assert.match(HOST_BIBLE, /Rotate the lead across segments/i);
+  assert.match(HOST_BIBLE, /longer rambles|longer points/i);
   assert.match(HOST_BIBLE, /uneven/i);
   assert.match(HOST_BIBLE, /mid-thought|unfinished sentences/i);
   assert.match(HOST_BIBLE, /wait—/);
@@ -314,10 +316,15 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(outline.system, /Warm Open/i);
   assert.match(outline.system, /30–90 seconds/i);
   assert.match(outline.system, /before any topic hook/i);
-  assert.match(outline.system, /Anti-scripted energy|1–6 word reaction|tennis-match/i);
+  assert.match(outline.system, /Anti-scripted energy|1–6 word|tennis-match/i);
+  assert.match(outline.system, /Lead host per topic segment/i);
+  assert.match(outline.system, /Lead: Gena/);
+  assert.match(outline.system, /Lead: Diane/);
+  assert.match(outline.system, /rotate leads across segments/i);
   assert.match(outline.system, /thesis→example→lesson|thesis → example → lesson/i);
   assert.match(outline.user, /Warm Open/i);
-  assert.match(outline.user, /tennis-match|1–6 word reactions|anti-scripted/i);
+  assert.match(outline.user, /Lead: Gena|Lead: Diane|rotating Lead host/i);
+  assert.match(outline.user, /tennis-match|lead\/support|anti-scripted/i);
   const conversation = buildConversationPrompt({
     show,
     episode,
@@ -341,23 +348,52 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /Never cold-open/i);
   assert.match(conversation.system, /AFTER the warm friend banter/i);
   assert.match(conversation.system, /symmetrical essay-dialogue/i);
-  assert.match(conversation.system, /short punchy|punchier turns/i);
+  assert.match(conversation.system, /LEAD \/ SUPPORT BY SUBJECT/i);
+  assert.match(conversation.system, /Lead host carries longer points/i);
+  assert.match(conversation.system, /Support host mostly short/i);
+  assert.match(conversation.system, /switch who leads/i);
   assert.match(conversation.system, /ANTI-SCRIPTED HARD RULES/i);
   assert.match(conversation.system, /tennis-match/i);
   assert.match(conversation.system, /1–6 word/i);
-  assert.match(conversation.system, /longer rambles/i);
+  assert.match(conversation.system, /longer rambles|longer points/i);
   assert.match(conversation.system, /mid-thought pivots|unfinished sentences/i);
   assert.match(conversation.system, /equally polished/i);
   assert.match(conversation.system, /thesis → example → lesson/i);
   assert.match(conversation.system, /mild disagreement/i);
   assert.match(conversation.system, /40–50 spoken words/i);
   assert.match(conversation.user, /warm friend hello/i);
-  assert.match(conversation.user, /tennis-match|1–6 word reactions|does not sound scripted/i);
+  assert.match(conversation.user, /Honor outline Lead tags/i);
+  assert.match(conversation.user, /tennis-match|rotate lead by subject/i);
   assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
   assert.match(conversation.user, /\/planner/);
   assert.match(conversation.user, /\/dining/);
+});
+
+test('outline and conversation prompts require rotating lead/support hosts', () => {
+  const show = { title: 'Florida Buzz: Disney' };
+  const episode = { title: 'Lead support check', description: 'Desc' };
+  const sources = [];
+  const outline = buildOutlinePrompt({ show, episode, sources });
+  assert.match(outline.system, /Lead: Gena/);
+  assert.match(outline.system, /Lead: Diane/);
+  assert.match(outline.system, /rotate leads across segments/i);
+  assert.match(outline.system, /Support host is the other person/i);
+  assert.match(outline.user, /rotating Lead host|Lead: Gena \/ Lead: Diane/i);
+  const conversation = buildConversationPrompt({
+    show,
+    episode,
+    outline: '1. Warm Open\n2. Topic A — Lead: Gena\n3. Topic B — Lead: Diane',
+    sources,
+  });
+  assert.match(conversation.system, /LEAD \/ SUPPORT BY SUBJECT/i);
+  assert.match(conversation.system, /Lead host carries longer points/i);
+  assert.match(conversation.system, /Support host mostly short comments/i);
+  assert.match(conversation.system, /When the next subject starts, switch who leads/i);
+  assert.match(conversation.system, /FORBID tennis-match equal turns for a whole segment/i);
+  assert.match(conversation.user, /Honor outline Lead tags/i);
+  assert.match(HOST_BIBLE, /lead\/support by subject/i);
 });
 
 test('conversation token budget supports a ~20–25 minute script', () => {
