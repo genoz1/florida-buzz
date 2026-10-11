@@ -148,6 +148,7 @@ img { max-width: 100%; display: block; }
 .nav-topics-inner {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 16px;
   padding-top: 9px;
   padding-bottom: 9px;
@@ -173,8 +174,14 @@ img { max-width: 100%; display: block; }
   height: 12px;
   background: var(--line);
 }
+/* Shrink-wrap to content so topics pack left with a normal gap.
+   Growing this flex child to full wrap width was what let space-between
+   (and any residual justify rules) stretch links across the masthead. */
 .nav-links-topics {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
+  margin-right: auto;
   gap: 18px;
   justify-content: flex-start;
   min-width: 0;
@@ -717,7 +724,13 @@ footer a:hover { opacity: 1; }
 
 @media (max-width: 1100px) {
   .nav-links-primary { gap: 16px; font-size: 14px; }
+  .nav-topics-inner {
+    justify-content: flex-start;
+  }
   .nav-links-topics {
+    flex: 0 1 auto;
+    width: max-content;
+    max-width: 100%;
     justify-content: flex-start;
     gap: 18px;
   }
