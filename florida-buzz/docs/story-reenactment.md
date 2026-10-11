@@ -1,28 +1,29 @@
-# Story-first shorts
+# Story-first Disney shorts
 
-What stops the scroll is the **story**, not the format.
+What stops the scroll is the **story**, not the format — but the story and visuals must be **clearly Disney / park-day**. Generic pool or vacation filler does not count.
 
-- Prefer **motion** when we have it (splash, scramble, near-miss reenactment)
-- A **static image is fine** when the story/hook is strong enough on its own
-- Avoid dull ride photos + tip cards with no stakes
+- Prefer **motion** when we have Disney-relevant motion
+- A **static Magic Kingdom / park still is fine** when the story is strong
+- No host on camera
+- No tip-card screens that explain production rules to the viewer
 
 ## Format that works
 
-1. **Hook** — stakes in the first line (“Nobody warns you about this”)
-2. **Story** — what almost went wrong / what people get wrong
+1. **Hook** — Disney stakes in the first line
+2. **Story** — a real park-day mistake (wrong rope-drop side, burned Lightning Lane, etc.)
 3. **Payoff rule** — one memorable takeaway
-4. **No host on camera** — anonymous people / AI / licensed media only
+4. **Visuals** — Magic Kingdom / park context the viewer recognizes as Disney World
 
-Example: kids hit the hotel pool ten minutes before park open → wet flip-flop sprint → still made rope drop → rule: pool after the park.
+Example: rope-dropped Magic Kingdom, walked the wrong way first — Big Thunder walk-on, Seven Dwarfs already 75 minutes.
 
 ## Samples in this repo
 
 | Script | Needs | Output |
 | --- | --- | --- |
-| `npm run sample:story-reenactment` | ElevenLabs + licensed motion clips in `/tmp/fb-reenact/raw` | Real motion sample |
-| `node scripts/ai-story-reenactment.js` | `FAL_KEY` (quote only) | Cost check |
-| `node scripts/ai-story-reenactment.js --generate` | `FAL_KEY` + balance | Custom Seedance beats |
+| `npm run sample:disney-story` | ElevenLabs | Magic Kingdom story + licensed MK stills |
+| `npm run sample:story-reenactment` | ElevenLabs + motion clips | Older motion experiment (not the Disney default) |
+| `node scripts/ai-story-reenactment.js --generate` | `FAL_KEY` | Custom Seedance beats for a written Disney story |
 
 ## Custom AI path
 
-When fal is configured, Seedance can generate purpose-built motion beats for a written story (splash → scramble → park energy) without putting Gene on camera and without trademarked Disney characters/logos in the prompt.
+When fal is configured, Seedance can generate purpose-built motion beats for a written Disney trip story without putting Gene on camera and without trademarked characters/logos in the prompt.

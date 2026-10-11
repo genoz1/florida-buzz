@@ -11,6 +11,7 @@
     "buzz-social:dry": "DRY_RUN=true node scripts/buzz-board-social.js",
     "sample:disney-right-now": "node scripts/disney-right-now-sample.js",
     "sample:story-reenactment": "node scripts/story-reenactment-sample.js",
+    "sample:disney-story": "node scripts/disney-story-sample.js",
     "sample:ai-reenactment": "node scripts/ai-story-reenactment.js",
     "buzz-facebook-sync": "node scripts/sync-facebook-buzz-comments.js",
     "build:launch-inventory": "node scripts/build-buzz-board-launch.js --write",
