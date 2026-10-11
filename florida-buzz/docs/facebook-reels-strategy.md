@@ -81,9 +81,9 @@ No hashtag dumps on Facebook.
 | Sample (Lightning Lane, for Gene to watch) | `npm run sample:facebook-park-reel` |
 | Schedule | `server.js` at **10:15am ET** when enabled |
 
-**What each Reel looks like:** park article photo(s), camera slowly zooms/pans, big white text on screen, Florida Buzz brand label. Silent/text-only by default (no AI host, no green screen, no wallet stickers).
+**What each Reel looks like:** park article photo(s), camera slowly zooms/pans, **Geno ElevenLabs VO** (`eleven_v4`, voice `bg7PC2IzyIDwYgytMiW1`), and big white captions that match the spoken beats. Florida Buzz brand label. No AI host, no green screen, no wallet stickers.
 
-**Does use:** existing article image, ffmpeg slow zoom/pan, big ASS captions, Page `/videos` upload helper.  
+**Does use:** existing article image, ffmpeg slow zoom/pan, Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, Page `/videos` upload helper.  
 **Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
 
 ### Code vs production secrets
@@ -94,8 +94,9 @@ No hashtag dumps on Facebook.
 | Render → `public/reels/daily/*.mp4` | `FB_PARK_REEL_PUBLISH=true` (after one good manual post) |
 | Topic picker for park/cruise articles | Existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
 | Public URL shape `SITE_URL/reels/daily/<file>.mp4` | Confirm `SITE_URL=https://thefloridabuzz.com` and that `/reels/daily/` is served |
+| Geno VO when `ELEVENLABS_API_KEY` is set (default on) | Same `ELEVENLABS_API_KEY` as podcasts; optional `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1` |
 
-Code **cannot** flip DigitalOcean secrets by itself. Until those two Reel flags are set in the host, the daily Reel cron stays off (or only renders if enabled without publish).
+Code **cannot** flip DigitalOcean secrets by itself. Until those two Reel flags are set in the host, the daily Reel cron stays off (or only renders if enabled without publish). VO needs `ELEVENLABS_API_KEY` in production (set `FB_PARK_REEL_WITH_VOICE=false` only for intentional silent renders).
 
 ### Turn on in production (Gene) — exact steps
 
@@ -129,9 +130,10 @@ FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
 ```bash
 FB_PARK_REEL_ENABLED=true
 FB_PARK_REEL_PUBLISH=true
+ELEVENLABS_API_KEY=<same Geno key as podcasts>
 ```
 
-Until step 7, the daily Reel cron is off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render.
+Until step 7, the daily Reel cron is off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render. With the key present, daily Reels mux Geno VO and scale captions to the spoken script.
 
 Meta still receives a **Page video** via `/{page-id}/videos` (same helper as before). That is good enough for discovery testing; dedicated Facebook Reels Graph placement can be layered later. Put the article URL in the first comment (already wired).
 
@@ -148,7 +150,7 @@ Meta still receives a **Page video** via `/{page-id}/videos` (same helper as bef
 npm run sample:facebook-park-reel
 ```
 
-Writes `florida-buzz-park-reel-sample.mp4` (and frames) under `/opt/cursor/artifacts/`. Same look as the daily path: Magic Kingdom stills, slow zoom/pan, big text about Lightning Lane — no voiceover required.
+Writes `florida-buzz-park-reel-sample.mp4` (and frames) under `/opt/cursor/artifacts/`. Same look as the daily path: Magic Kingdom stills, slow zoom/pan, Geno VO, captions aligned to the Lightning Lane script.
 
 ## Recommendation summary
 

@@ -4,8 +4,8 @@
  * Inexpensive Disney / theme-park Reel path for Facebook discovery.
  *
  * NOT the fal Seedance guide-reels pipeline. Uses article/park still photos
- * with a slow zoom/pan plus big on-screen text (optional ElevenLabs VO if a
- * key is present and FB_PARK_REEL_WITH_VOICE=true).
+ * with a slow zoom/pan, Geno ElevenLabs VO (eleven_v4), and kinetic captions
+ * aligned to the spoken script. No AI presenter / green screen / fal.
  *
  * Status: daily cron is wired in server.js when FB_PARK_REEL_ENABLED=true
  * (plus FB + Supabase credentials). Actual Meta posting also needs
@@ -14,8 +14,9 @@
  * Env:
  *   FB_PARK_REEL_ENABLED=true          schedule daily 10:15am ET runner
  *   FB_PARK_REEL_PUBLISH=true          actually call Facebook video API
- *   FB_PARK_REEL_WITH_VOICE=true       use ElevenLabs when key is set (default off)
- *   ELEVENLABS_API_KEY                 optional VO
+ *   FB_PARK_REEL_WITH_VOICE=false      disable VO (default: on when key set)
+ *   ELEVENLABS_API_KEY                 Geno VO via visualNews/elevenTts
+ *   PODCASTS_ELEVEN_VOICE_GENO         optional override (default Geno clone)
  *   SITE_URL                           used to build public /reels/daily URL
  *   FB_PARK_REEL_OUT_DIR               default public/reels/daily
  */
@@ -26,6 +27,11 @@ const { spawnSync } = require('node:child_process');
 const { isFacebookTopicAllowed } = require('./facebookDistribution');
 const { postToFacebookPage } = require('./facebook');
 const { toFacebookFeedCaption } = require('./socialCopy');
+const { synthesizeElevenV4 } = require('./visualNews/elevenTts');
+const {
+  config: visualNewsConfig,
+  DEFAULT_ELEVEN_VOICE_GENO,
+} = require('./visualNews/config');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -34,6 +40,14 @@ function ffmpegBin() {
     return require('ffmpeg-static');
   } catch {
     return 'ffmpeg';
+  }
+}
+
+function ffprobeBin() {
+  try {
+    return require('ffprobe-static').path;
+  } catch {
+    return 'ffprobe';
   }
 }
 
@@ -48,6 +62,30 @@ function runFfmpeg(args) {
   return result.stdout;
 }
 
+function runFfprobe(args) {
+  const result = spawnSync(ffprobeBin(), args, {
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error(`ffprobe failed: ${(result.stderr || result.stdout || '').slice(-800)}`);
+  }
+  return result.stdout;
+}
+
+function audioDuration(file) {
+  const n = Number(
+    runFfprobe([
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      file,
+    ]).trim()
+  );
+  if (!Number.isFinite(n) || n <= 0) throw new Error('Invalid audio duration');
+  return n;
+}
+
 function stamp(seconds) {
   const c = Math.round(seconds * 100);
   const h = Math.floor(c / 360000);
@@ -57,20 +95,95 @@ function stamp(seconds) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
+/** Voice is on by default whenever an ElevenLabs key is present. */
+function parkReelVoiceEnabled(env = process.env) {
+  if (env.FB_PARK_REEL_WITH_VOICE === 'false' || env.FB_PARK_REEL_WITH_VOICE === '0') {
+    return false;
+  }
+  return Boolean(env.ELEVENLABS_API_KEY || env.XI_API_KEY);
+}
+
+function stripAudioTags(text) {
+  return String(text || '')
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function spokenScriptFromArticle(article) {
+  if (article?.spoken) return String(article.spoken).trim();
+  const title = String(article?.title || 'Florida theme parks').trim();
+  const dek = String(article?.dek || '').trim();
+  const tip = dek || 'Worth knowing before your next park day.';
+  return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
+}
+
+function shortenCaption(text, max = 42) {
+  const t = String(text || '').trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+/**
+ * Split spoken copy into kinetic caption beats and scale them to audio duration.
+ * Caption text matches what Geno says (audio tags stripped).
+ */
+function captionBeatsFromSpoken(spoken, durationSec) {
+  const plain = stripAudioTags(spoken);
+  let parts = plain
+    .split(/(?<=[.!?…])\s+|\s+[—–]\s+|\s+So\.\.\.\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  // Keep Reels readable: merge tiny fragments, split very long ones.
+  const normalized = [];
+  for (const part of parts) {
+    if (normalized.length && (part.length < 12 || normalized[normalized.length - 1].length < 18)) {
+      normalized[normalized.length - 1] = `${normalized[normalized.length - 1]} ${part}`.trim();
+    } else if (part.length > 48) {
+      const mid = part.lastIndexOf(' ', Math.floor(part.length / 2));
+      if (mid > 12) {
+        normalized.push(part.slice(0, mid).trim());
+        normalized.push(part.slice(mid).trim());
+      } else {
+        normalized.push(part);
+      }
+    } else {
+      normalized.push(part);
+    }
+  }
+  parts = normalized.length ? normalized : [plain || 'Florida Buzz'];
+
+  const weights = parts.map((p) => Math.max(p.length, 8));
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const usable = Math.max(durationSec - 0.12, 1);
+  let t = 0;
+  return parts.map((text, i) => {
+    const share = weights[i] / weightSum;
+    const start = t;
+    const end = i === parts.length - 1 ? usable : Math.min(usable, t + share * usable);
+    t = end;
+    return { start, end, text: shortenCaption(text) };
+  });
+}
+
+/** Legacy silent-path captions (kept for tests / FB_PARK_REEL_WITH_VOICE=false). */
 function captionBeatsFromArticle(article, durationSec) {
-  const title = String(article.title || 'Florida theme parks').trim();
-  const dek = String(article.dek || '').trim();
-  const hook = title.length > 42 ? `${title.slice(0, 40)}…` : title;
-  const mid = dek
-    ? (dek.length > 48 ? `${dek.slice(0, 46)}…` : dek)
-    : 'Worth knowing before your next park day';
-  const end = 'Follow Florida Buzz';
-  const third = durationSec / 3;
-  return [
-    { start: 0, end: third, text: hook },
-    { start: third, end: third * 2, text: mid },
-    { start: third * 2, end: durationSec - 0.05, text: end },
-  ];
+  return captionBeatsFromSpoken(spokenScriptFromArticle(article), durationSec);
+}
+
+function scaleCaptionBeats(captions, durationSec) {
+  if (!Array.isArray(captions) || !captions.length) return null;
+  const maxEnd = Math.max(...captions.map((c) => Number(c.end) || 0));
+  if (!(maxEnd > 0)) return captions;
+  const scale = (durationSec - 0.1) / maxEnd;
+  return captions.map((c, i, arr) => {
+    const start = Math.max(0, (Number(c.start) || 0) * scale);
+    const end = i === arr.length - 1
+      ? durationSec - 0.05
+      : Math.max(start + 0.2, (Number(c.end) || 0) * scale);
+    return { ...c, start, end, text: String(c.text || '').trim() };
+  });
 }
 
 function writeAss(captions, duration, outPath) {
@@ -135,6 +248,55 @@ function slowZoomPanStill(input, output, frames, { zoomEnd = 1.12, pan = 'up' } 
 }
 
 /**
+ * Synthesize Geno VO (eleven_v4) via visualNews/elevenTts — never fal.
+ * Returns local mp3 path + duration. Pass voicePath to reuse a prebaked Geno file.
+ */
+async function synthesizeParkReelVoice({
+  spoken,
+  outPath,
+  voicePath = null,
+  env = process.env,
+  fetcher = fetch,
+} = {}) {
+  if (voicePath) {
+    if (!fs.existsSync(voicePath)) throw new Error(`voicePath not found: ${voicePath}`);
+    fs.copyFileSync(voicePath, outPath);
+    return {
+      path: outPath,
+      duration: audioDuration(outPath),
+      voiceId: DEFAULT_ELEVEN_VOICE_GENO,
+      model: 'prebaked',
+      provider: 'local-file',
+      reused: true,
+    };
+  }
+
+  const cfg = visualNewsConfig(env);
+  if (!cfg.elevenApiKey) {
+    throw new Error('ELEVENLABS_API_KEY is required for park Reel Geno VO (or pass voicePath)');
+  }
+
+  const result = await synthesizeElevenV4({
+    apiKey: cfg.elevenApiKey,
+    voiceId: cfg.elevenVoiceId || DEFAULT_ELEVEN_VOICE_GENO,
+    modelId: cfg.elevenModel || 'eleven_v4',
+    text: spoken,
+    outputFormat: cfg.elevenOutputFormat || 'mp3_44100_128',
+    fetcher,
+  });
+  fs.writeFileSync(outPath, result.buffer);
+  return {
+    path: outPath,
+    duration: audioDuration(outPath),
+    voiceId: result.voiceId,
+    model: result.model,
+    provider: result.provider,
+    requestId: result.requestId,
+    reused: false,
+  };
+}
+
+/**
  * Pick the newest theme-park / cruise article with an image that passes the
  * Facebook topic allowlist and has not already been used for a park Reel
  * (detail marker in post_log when client is provided).
@@ -187,7 +349,7 @@ function buildReelCaption(article) {
 }
 
 /**
- * Render a short vertical MP4 from one article still + kinetic captions.
+ * Render a short vertical MP4 from park stills + Geno VO + kinetic captions.
  * Returns local paths + suggested public URL (if SITE_URL is set).
  */
 async function renderParkReelFromArticle(article, {
@@ -199,6 +361,11 @@ async function renderParkReelFromArticle(article, {
   imagePaths = null,
   masterFileName = null,
   captions = null,
+  spoken = null,
+  voicePath = null,
+  withVoice = null,
+  env = process.env,
+  fetcher = fetch,
 } = {}) {
   const sources = Array.isArray(imagePaths) && imagePaths.length
     ? imagePaths
@@ -211,11 +378,32 @@ async function renderParkReelFromArticle(article, {
   const slugSafe = String(article.slug || 'park-tip').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 80);
   const assPath = path.join(tmpDir, `${slugSafe}.ass`);
   const videoOnly = path.join(tmpDir, `${slugSafe}-video.mp4`);
+  const voiceMp3 = path.join(tmpDir, `${slugSafe}-voice.mp3`);
   const masterName = masterFileName || `${slugSafe}-${Date.now().toString(36)}.mp4`;
   const masterPath = path.join(outDir, masterName);
 
-  const duration = Math.min(Math.max(Number(durationSec) || 12, 8), 20);
-  const beats = captions || captionBeatsFromArticle(article, duration);
+  const spokenText = String(spoken || spokenScriptFromArticle(article)).trim();
+  const wantVoice = withVoice == null ? (Boolean(voicePath) || parkReelVoiceEnabled(env)) : Boolean(withVoice);
+
+  let voiceMeta = null;
+  let duration = Math.min(Math.max(Number(durationSec) || 12, 8), 28);
+  if (wantVoice) {
+    voiceMeta = await synthesizeParkReelVoice({
+      spoken: spokenText,
+      outPath: voiceMp3,
+      voicePath,
+      env,
+      fetcher,
+    });
+    duration = Math.min(Math.max(voiceMeta.duration + 0.35, 8), 28);
+  }
+
+  let beats;
+  if (Array.isArray(captions) && captions.length) {
+    beats = scaleCaptionBeats(captions, duration) || captions;
+  } else {
+    beats = captionBeatsFromSpoken(spokenText, duration);
+  }
   writeAss(beats, duration, assPath);
 
   const fps = 30;
@@ -250,28 +438,50 @@ async function renderParkReelFromArticle(article, {
   }
 
   const assEscaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-  runFfmpeg([
-    '-y',
-    '-i', videoOnly,
-    '-f', 'lavfi',
-    '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-    '-vf', `ass=${assEscaped},format=yuv420p`,
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '20',
-    '-c:a', 'aac',
-    '-b:a', '128k',
-    '-shortest',
-    '-t', String(duration),
-    '-movflags', '+faststart',
-    masterPath,
-  ]);
+  if (wantVoice && fs.existsSync(voiceMp3)) {
+    runFfmpeg([
+      '-y',
+      '-i', videoOnly,
+      '-i', voiceMp3,
+      '-vf', `ass=${assEscaped},format=yuv420p`,
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '20',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-ar', '44100',
+      '-ac', '2',
+      '-shortest',
+      '-movflags', '+faststart',
+      masterPath,
+    ]);
+  } else {
+    runFfmpeg([
+      '-y',
+      '-i', videoOnly,
+      '-f', 'lavfi',
+      '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+      '-vf', `ass=${assEscaped},format=yuv420p`,
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '20',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-shortest',
+      '-t', String(duration),
+      '-movflags', '+faststart',
+      masterPath,
+    ]);
+  }
 
   const publicUrl = `${String(siteUrl).replace(/\/$/, '')}/reels/daily/${masterName}`;
   return {
     masterPath,
     publicUrl,
     duration,
+    spoken: spokenText,
+    captions: beats,
+    voice: voiceMeta,
     caption: buildReelCaption(article),
     articleUrl: `${String(siteUrl).replace(/\/$/, '')}/article/${article.slug}`,
   };
@@ -336,6 +546,9 @@ async function runParkReelJob({
   const rendered = await renderParkReelFromArticle(picked);
   console.log(`Rendered: ${rendered.masterPath}`);
   console.log(`Public URL (must be reachable for Meta): ${rendered.publicUrl}`);
+  if (rendered.voice) {
+    console.log(`Voice: Geno ${rendered.voice.voiceId} (${rendered.voice.model})`);
+  }
 
   const published = await publishParkReel({
     article: picked,
@@ -363,11 +576,16 @@ function parkReelScheduleEnabled(env = process.env) {
 module.exports = {
   buildReelCaption,
   captionBeatsFromArticle,
+  captionBeatsFromSpoken,
   parkReelScheduleEnabled,
+  parkReelVoiceEnabled,
   pickParkCruiseArticle,
   publishParkReel,
   renderParkReelFromArticle,
   resolveStillImage,
   runParkReelJob,
   slowZoomPanStill,
+  spokenScriptFromArticle,
+  stripAudioTags,
+  synthesizeParkReelVoice,
 };
