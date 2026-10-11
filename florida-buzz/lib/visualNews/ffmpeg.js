@@ -79,7 +79,7 @@ function writeAss({
   accents = [],
 }) {
   const fs = require('node:fs');
-  // Caption Fontsize 78 (~62% larger than prior 48) — readable on phone without zooming.
+  // Caption Fontsize 88 (~83% larger than prior 48) — mobile-first, bold social type.
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${width}
@@ -89,12 +89,12 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,78,&H00FFFFFF,&H00FFFFFF,&H00101010,&HAA000000,-1,0,0,0,100,100,0,0,1,5,2,2,28,28,240,1
-Style: Brand,DejaVu Sans,34,&H00F4F7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,8,20,20,28,1
-Style: Loc,DejaVu Sans,30,&H00E8F0FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,2,28,28,52,1
-Style: Badge,DejaVu Sans,28,&H0000D7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,7,20,20,28,1
-Style: Cta,DejaVu Sans,52,&H00FFFFFF,&H00FFFFFF,&H00101010,&HAA000000,-1,0,0,0,100,100,0,0,1,5,2,2,32,32,300,1
-Style: MoneyAccent,DejaVu Sans,64,&H0000FF5A,&H00FFFFFF,&H00101010,&HBB000000,-1,0,0,0,100,100,0,0,1,4,2,8,28,28,160,1
+Style: Caption,DejaVu Sans,88,&H00FFFFFF,&H00FFFFFF,&H00101010,&HBB000000,-1,0,0,0,100,100,0,0,1,6,3,2,24,24,250,1
+Style: Brand,DejaVu Sans,36,&H00F4F7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,8,18,18,26,1
+Style: Loc,DejaVu Sans,32,&H00E8F0FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,2,24,24,48,1
+Style: Badge,DejaVu Sans,30,&H0000D7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,7,18,18,26,1
+Style: Cta,DejaVu Sans,56,&H00FFFFFF,&H00FFFFFF,&H00101010,&HBB000000,-1,0,0,0,100,100,0,0,1,6,3,2,28,28,310,1
+Style: MoneyAccent,DejaVu Sans,72,&H0000FF5A,&H00FFFFFF,&H00101010,&HCC000000,-1,0,0,0,100,100,0,0,1,5,2,8,24,24,150,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -112,7 +112,8 @@ Dialogue: 0,0:00:00.00,${stamp(Math.min(3.2, duration))},Badge,,0,0,0,,{\\fad(12
     if (c.highlight) {
       const h = escapeAssText(c.highlight);
       if (h && text.includes(h)) {
-        text = text.replace(h, `{\\c&H00FFFF&}${h}{\\c&HFFFFFF&}`);
+        // Use a function replacer — string replace treats $ specially ($$$$ → $$).
+        text = text.replace(h, () => `{\\c&H00FFFF&}${h}{\\c&HFFFFFF&}`);
       }
     }
     // Fade + slight scale pop for kinetic feel

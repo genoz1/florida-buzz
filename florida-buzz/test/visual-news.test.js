@@ -56,7 +56,7 @@ test('ASS writer uses large mobile caption size, brand, kinetic fade, and CTA', 
   assert.match(body, /\\fad\(/);
   assert.match(body, /Follow Florida Buzz/);
   assert.match(body, /&H00FFFF&/);
-  assert.match(body, /Style: Caption,DejaVu Sans,78,/);
+  assert.match(body, /Style: Caption,DejaVu Sans,88,/);
   assert.match(body, /MoneyAccent/);
   assert.match(body, /\$\$\$\$ PRICE HIT/);
   assert.equal(stamp(1.5), '0:00:01.50');

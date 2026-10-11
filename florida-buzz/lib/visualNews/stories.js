@@ -21,13 +21,13 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   // Geno-style delivery tags (ElevenLabs v4 audio tags).
   spoken: `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth emptying the wallet? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`,
   captions: [
-    { start: 0.0, end: 2.8, text: 'Lightning Lane $$$', highlight: '$$$' },
-    { start: 2.8, end: 5.6, text: 'Up to $229 — new highs', highlight: '$229' },
-    { start: 5.6, end: 8.4, text: 'Seven Dwarfs Mine Train' },
-    { start: 8.4, end: 11.0, text: 'Standby: 50 minutes', highlight: '50 minutes' },
-    { start: 11.0, end: 13.8, text: 'Worth emptying the wallet?', highlight: 'wallet' },
-    { start: 13.8, end: 17.2, text: 'Pay only if it saves your morning', highlight: 'saves your morning' },
-    { start: 17.2, end: 22.0, text: 'Record price ≠ automatic yes', highlight: 'automatic yes' },
+    { start: 0.0, end: 2.8, text: 'LL hit $$$$ highs', highlight: '$$$$' },
+    { start: 2.8, end: 5.6, text: 'UP TO $229', highlight: '$229' },
+    { start: 5.6, end: 8.4, text: 'Seven Dwarfs', highlight: 'Seven Dwarfs' },
+    { start: 8.4, end: 11.0, text: 'Standby 50 min', highlight: '50 min' },
+    { start: 11.0, end: 13.8, text: 'Empty the wallet?', highlight: 'wallet' },
+    { start: 13.8, end: 17.2, text: 'Pay only if it saves you', highlight: 'saves you' },
+    { start: 17.2, end: 22.0, text: 'Record $ ≠ auto YES', highlight: 'auto YES' },
   ],
   // Extra ASS money accents (PNG overlays carry the heavy visual punch).
   accents: [
