@@ -643,9 +643,11 @@ footer a:hover { opacity: 1; }
   .home-tools-grid { grid-template-columns: 1fr 1fr; }
   .home-podcast-panel { grid-template-columns: 1fr; }
   .home-intro-title { font-size: 34px; max-width: none; }
-  .nav-links { display: none; }
+  .nav-links-primary { display: none; }
+  .nav-topics { display: none; }
   .menu-toggle { display: flex; }
   .mobile-menu { display: flex; }
+  .logo { font-size: 26px; }
 }
 @media (max-width: 560px) {
   .grid { grid-template-columns: 1fr; }
