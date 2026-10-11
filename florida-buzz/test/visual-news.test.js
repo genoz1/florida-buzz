@@ -27,23 +27,26 @@ test('visual news config defaults to eleven_v4 Geno and never marks fal', () => 
   assert.equal(cfg.defaultVoiceName, 'Geno');
 });
 
-test('Lightning Lane story has no presenter, multi-still cuts, and Florida Buzz CTA', () => {
+test('Lightning Lane story is a static slideshow with wallet + long line stills', () => {
   assert.equal(LIGHTNING_LANE_WORTH_IT.presenter, false);
   assert.match(LIGHTNING_LANE_WORTH_IT.spoken, /Follow Florida Buzz\.?\s*$/);
-  assert.ok(LIGHTNING_LANE_WORTH_IT.stills.length >= 3);
-  assert.equal(LIGHTNING_LANE_WORTH_IT.moneyOverlays, true);
+  assert.ok(LIGHTNING_LANE_WORTH_IT.stills.length >= 4);
+  assert.equal(LIGHTNING_LANE_WORTH_IT.moneyOverlays, false);
   assert.equal((LIGHTNING_LANE_WORTH_IT.accents || []).length, 0);
   assert.match(LIGHTNING_LANE_WORTH_IT.spoken, /two hundred twenty-nine|wallet/i);
+  const files = LIGHTNING_LANE_WORTH_IT.stills.map((s) => s.file);
+  assert.ok(files.includes('empty-wallet.jpg'));
+  assert.ok(files.includes('long-line.jpg'));
   for (const s of LIGHTNING_LANE_WORTH_IT.stills) {
     assert.ok(fs.existsSync(s.path), `missing still ${s.file}`);
-    assert.doesNotMatch(s.file, /wallet|empty-wallet/i);
+    assert.equal(s.static, true);
   }
   for (const c of LIGHTNING_LANE_WORTH_IT.captions) {
     assert.ok(c.text.split(/\s+/).length <= 6, `caption too wordy: ${c.text}`);
   }
 });
 
-test('ASS writer uses clean caption size, brand, kinetic fade, and CTA', () => {
+test('ASS writer uses large captions, brand, fade, and CTA (no sticker accents)', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-vn-ass-'));
   const out = path.join(dir, 't.ass');
   writeAss({
@@ -51,36 +54,27 @@ test('ASS writer uses clean caption size, brand, kinetic fade, and CTA', () => {
     duration: 20,
     outPath: out,
     brand: 'THE FLORIDA BUZZ',
-    location: 'Magic Kingdom',
+    location: 'Walt Disney World',
     ctaEndText: 'Follow Florida Buzz · thefloridabuzz.com',
     accents: [],
   });
   const body = fs.readFileSync(out, 'utf8');
   assert.match(body, /THE FLORIDA BUZZ/);
-  assert.match(body, /Magic Kingdom/);
+  assert.match(body, /Walt Disney World/);
   assert.match(body, /\\fad\(/);
   assert.match(body, /Follow Florida Buzz/);
   assert.match(body, /&H00324EFF&/);
-  assert.match(body, /Style: Caption,Noto Sans Display,68,/);
-  assert.doesNotMatch(body, /MoneyAccent|\$\$\$\$ PRICE HIT|EMPTY WALLET/);
+  assert.match(body, /Style: Caption,DejaVu Sans,84,/);
+  assert.doesNotMatch(body, /MoneyAccent|\$\$\$\$ PRICE HIT/);
   assert.equal(stamp(1.5), '0:00:01.50');
   assert.equal(escapeAssText('a{b}\\c'), 'a b c');
 });
 
-test('overlay assets are a single premium price callout + brand pill + scrim', () => {
+test('overlay plan is empty in slideshow mode (no stacked stickers)', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-vn-ov-'));
   const assets = generateOverlayAssets(dir);
-  assert.ok(fs.existsSync(assets.priceCallout));
-  assert.ok(fs.existsSync(assets.brandPill));
-  assert.ok(fs.existsSync(assets.captionScrim));
-  assert.equal(assets.wallet, undefined);
-  assert.equal(assets.dollars, undefined);
   const plan = lightningLaneOverlayPlan(assets);
-  assert.ok(plan.length <= 4);
-  assert.ok(plan.some((p) => p.path === assets.priceCallout));
-  assert.ok(plan.some((p) => p.path === assets.brandPill));
-  assert.ok(plan.some((p) => p.path === assets.captionScrim));
-  assert.ok(!plan.some((p) => /wallet|dollars|spike/i.test(p.path)));
+  assert.deepEqual(plan, []);
 });
 
 test('synthesizeElevenV4 hits ElevenLabs direct URL with eleven_v4 (not fal)', async () => {

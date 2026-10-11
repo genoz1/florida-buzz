@@ -3,10 +3,7 @@
 
 /**
  * Lightning Lane visual-news sample — static slideshow (no AI presenter).
- *
  * Beats: pricey rides → empty wallet photo → long line → tip/CTA
- * Pipeline: ElevenLabs eleven_v4 (Geno) + local ffmpeg
- * No fal.ai / no stacked sticker overlays.
  */
 
 require('dotenv').config();
@@ -24,7 +21,6 @@ async function main() {
     process.env.VISUAL_NEWS_ELEVEN_VOICE = DEFAULT_ELEVEN_VOICE_GENO;
   }
 
-  // Fresh Geno VO for the new slideshow script unless REUSE_VOICE=true.
   const forceReuse = String(process.env.REUSE_VOICE || '').toLowerCase() === 'true';
   const voicePath =
     forceReuse && fs.existsSync('/tmp/fb-visual-news-ll/voice.mp3')
@@ -42,9 +38,7 @@ async function main() {
   const outDir = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
   const master = result.master;
   const ffmpeg = require('../lib/visualNews/ffmpeg');
-  // Sample each slide: ~0.16 * duration boundaries for 6 slides
-  const times = [1, 4, 8, 11, 15, 19];
-  for (const t of times) {
+  for (const t of [1, 4, 8, 11, 15, 19]) {
     const frame = path.join(outDir, `florida-buzz-visual-news-ll-t${t}.jpg`);
     try {
       ffmpeg.run(ffmpeg.ffmpegBin(), [

@@ -1,26 +1,29 @@
 # Florida Buzz visual news shorts
 
-Vertical (9:16) news-style shorts built from **article / reference stills**, kinetic captions, brand overlays, and ElevenLabs voiceover.
+Vertical (9:16) news-style shorts built as a **static slideshow** of story stills, large captions, and ElevenLabs voiceover.
 
 ## Pipeline (no fal.ai)
 
 | Step | Tool |
 |------|------|
-| Voiceover | **ElevenLabs direct API** (`eleven_v4`) |
-| Stills animation | **Local ffmpeg** Ken Burns zoom/pan + multi-still cuts |
-| Captions / brand | ASS kinetic captions + brand pill PNG + bottom scrim |
-| Price accents | **One** premium `$229` callout (no wallet / $$$$ / arrow sticker dumps) |
+| Voiceover | **ElevenLabs direct API** (`eleven_v4`) — Geno by default |
+| Visuals | **Local ffmpeg** static full-frame stills in sequence |
+| Captions | ASS — one large caption per beat |
+| Stickers | **None** — no stacked $$$$ / wallet PNG dumps |
 | Presenter | **None** |
 
-## Voice (Geno)
+## Slideshow beats (Lightning Lane)
 
-`bg7PC2IzyIDwYgytMiW1` — `DEFAULT_ELEVEN_VOICE_GENO` in `lib/visualNews/config.js`.
+1. Pricey ride still  
+2. Lightning Lane / second ride still  
+3. Real empty-wallet photo (full frame)  
+4. Long line photo (full frame)  
+5. Tip / CTA stills  
 
-## Lightning Lane sample
+## Run sample
 
 ```bash
-REUSE_VOICE=true VISUAL_NEWS_REUSE_VOICE=/tmp/fb-visual-news-ll/voice.mp3 \
-  npm run sample:visual-news-ll
+npm run sample:visual-news-ll
 ```
 
 Output: `/opt/cursor/artifacts/florida-buzz-visual-news-ll.mp4`
