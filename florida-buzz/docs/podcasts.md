@@ -2,6 +2,16 @@
 
 Isolated podcast publishing for The Florida Buzz. Public pages are on by default; paid generation stays off.
 
+## ElevenLabs v4 bakeoff (direct API)
+
+Paused fal Gemini / fal-EL-v3 for voice quality trials. See **[podcast-tts-elevenlabs-bakeoff.md](./podcast-tts-elevenlabs-bakeoff.md)** and run:
+
+```bash
+ELEVENLABS_API_KEY=sk_... node scripts/podcast-tts-bakeoff-eleven.js
+```
+
+Uses ElevenLabs `eleven_v4` Text to Dialogue (true multi-speaker), not fal.
+
 ## Flags (additive — do not change unrelated existing env vars)
 
 ```
