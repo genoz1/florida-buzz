@@ -1,31 +1,12 @@
-# Disney Right Now — no-face sample
+# Disney Right Now — superseded still-photo sample
 
-Short-form engagement format for Florida Buzz:
+This Ken Burns / tip-card sample is **not the engagement direction**.
 
-- **No person on camera**
-- Stock ElevenLabs voice (Matilda by default — not Geno)
-- **Actual park visuals in the sample** = licensed Wikimedia Magic Kingdom stills already in `public/reels/references/`
-- Captions + tip card + Florida Buzz branding
+Use the story-reenactment format instead:
 
-## Generate locally
+- `docs/story-reenactment.md`
+- `npm run sample:story-reenactment` (real motion + trip story VO)
+- `npm run sample:ai-reenactment` (Seedance custom beats when `FAL_KEY` is set)
 
-```bash
-# needs ELEVENLABS_API_KEY
-npm run sample:disney-right-now
-```
-
-Writes `disney-right-now-sample.mp4` (and a short readme) to `/opt/cursor/artifacts` by default.
-
-## Park footage note
-
-| Path | Visuals |
-| --- | --- |
-| This sample | Real licensed park **still photos** (Ken Burns motion) |
-| Guide → Reel pipeline (`lib/reels`) | AI motion clips guided by those licensed references + illustrative label — not scraped live park video |
-
-## Buzz Board opinion posts
-
-Paused while this channel is the focus. Resume only with both:
-
-- `BUZZ_BOARD_SOCIAL_ENABLED=true`
-- `BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true`
+Buzz Board opinion posts remain paused unless both
+`BUZZ_BOARD_SOCIAL_ENABLED=true` and `BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true`.
