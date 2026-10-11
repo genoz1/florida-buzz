@@ -57,6 +57,16 @@ function ticketsBox() {
   });
 }
 
+function carRentalBox() {
+  const href = `https://www.jdoqocy.com/click-101851476-15733832?url=${encodeURIComponent('https://www.undercovertourist.com/car-rental/')}`;
+  return shopBox({
+    eyebrow: 'Rental Cars',
+    body: 'Compare Orlando rental-car rates through Undercover Tourist (Alamo, Avis, Budget, Enterprise, National and more). Affiliate disclosure: we may earn a commission at no extra cost to you.',
+    href,
+    cta: 'Compare rental-car rates',
+  });
+}
+
 const GUIDES = [
   {
     slug: 'best-hotels-near-disney-world-orlando',
@@ -184,6 +194,108 @@ ${ticketsBox()}
 <p>One midday return to the hotel (or a long sit-down meal) beats a meltdown at 3 p.m. If your hotel commute makes midday breaks impossible, plan a slower evening and skip the fantasy of doing everything.</p>
 <p>Revisit the plan three days out with current wait trends, then again the night before. The framework stays; the ride order flexes.</p>
 <p><em>By Gene Zentko. Hotel and ticket partner links may earn a commission at no extra cost to you.</em></p>
+`.trim(),
+  },
+  {
+    slug: 'orlando-rental-car-disney-universal',
+    title: 'Do You Need a Rental Car for Disney and Universal? An Orlando Decision Guide',
+    dek: 'When a rental car saves a Florida park trip — and when rideshare, shuttles, or staying on-site are smarter.',
+    category: 'travel-deals',
+    body_html: `
+<p>Orlando transportation is not one answer. A rental car is a tool: great for split Disney + Universal trips, Port Canaveral mornings, and grocery runs — expensive dead weight if you’re staying on-site and never leaving the Disney bubble.</p>
+${carRentalBox()}
+<h2>Rent a car if…</h2>
+<ul>
+<li>You’re park-hopping between Disney and Universal in the same trip</li>
+<li>You’re staying off-site without a reliable shuttle</li>
+<li>You want a beach day, outlet day, or Kennedy Space Center side trip</li>
+<li>You’re driving to Port Canaveral before or after a cruise</li>
+</ul>
+<h2>Skip the rental if…</h2>
+<ul>
+<li>You’re 100% Disney on-site and happy with buses / skyliner / boats</li>
+<li>Your hotel’s shuttle actually matches your rope-drop time (verify, don’t assume)</li>
+<li>Parking fees + gas would erase any “freedom” benefit for a short trip</li>
+</ul>
+<h2>MCO pickup tips that matter</h2>
+<p>Book the car for your real airport arrival window, not the optimistic one. Compare total price with taxes and young-driver fees, not the homepage teaser rate. If you’re landing late with kids, a hotel shuttle the first night and a morning rental pickup can be calmer than wrestling car seats at midnight.</p>
+${hotelsBox('orlando', 'Orlando hotels')}
+<p>Pair the car decision with lodging: a cheap Kissimmee hotel without a car can cost more in Uber than a slightly pricier room closer to the parks.</p>
+${ticketsBox()}
+<p><em>By Gene Zentko. Rental-car and hotel partner links may earn Florida Buzz a commission at no extra cost to you.</em></p>
+`.trim(),
+  },
+  {
+    slug: 'best-orlando-tours-and-day-trips',
+    title: 'Best Orlando Tours and Day Trips Beyond the Theme Parks',
+    dek: 'Airboat rides, Kennedy Space Center, Clearwater beaches, and other Florida day trips worth booking when you need a park break.',
+    category: 'travel-deals',
+    body_html: `
+<p>Theme parks are the headline, but many Orlando vacations get better with one non-park day — especially on trips longer than five nights. The goal is not to collect tourist checkboxes; it’s to pick one outing that matches your group’s energy and drive tolerance.</p>
+${hotelsBox('orlando', 'Orlando-area hotels')}
+<h2>High-value day-trip categories</h2>
+<ul>
+<li><strong>Kennedy Space Center:</strong> Best for space fans and school-age kids; plan a full day and an early start from Orlando.</li>
+<li><strong>Airboat / wetlands:</strong> Short half-day reset when parks feel loud; morning tours beat afternoon heat.</li>
+<li><strong>Beach day (Clearwater / Cocoa):</strong> Worth it if someone in the group needs salt air more than another queue.</li>
+<li><strong>Food or craft experiences in Orlando:</strong> Lower logistics, still feels like a “different” day.</li>
+</ul>
+<h2>How to book without wrecking the park plan</h2>
+<p>Put tours on a naturally slower day — after a late fireworks night, or between Disney and Universal blocks. Avoid stacking a dawn tour the morning after rope drop. Confirm cancellation windows; Florida weather moves plans.</p>
+<p>If you’re driving, treat the tour like a park day: water, snacks, and a backup indoor option. If you’re ridesharing, price the round trip before you “save” on skipping a rental car.</p>
+${carRentalBox()}
+<p>For park tickets on the other days, compare authorized sellers the same way you compare tour operators — total price, entry rules, and refund flexibility.</p>
+${ticketsBox()}
+<p><em>By Gene Zentko. Some links are affiliate partners; commissions never raise your price.</em></p>
+`.trim(),
+  },
+  {
+    slug: 'port-canaveral-cruise-planning-guide',
+    title: 'Port Canaveral Cruise Planning Guide: Flights, Hotels, and Embarkation Day',
+    dek: 'A practical Florida cruise-port playbook — MCO timing, pre-cruise hotels, parking vs transfers, and how to keep embarkation calm.',
+    category: 'cruises',
+    body_html: `
+<p>Port Canaveral cruises fail in the logistics, not the itinerary. Missed embarkation windows usually come from optimistic flight connections, the wrong hotel base, or an embarkation-morning drive that looked fine on a map.</p>
+${hotelsBox('port-canaveral', 'hotels near Port Canaveral')}
+<h2>Flight rule of thumb</h2>
+<p>Arrive the day before when you can. Same-day MCO → cruise port is a gamble once bags, kids, or storms enter the chat. Flying out the same evening you debark is similarly fragile — build buffer.</p>
+<h2>Where to sleep the night before</h2>
+<ul>
+<li><strong>Cape Canaveral / port area:</strong> Shortest morning transfer</li>
+<li><strong>Cocoa Beach:</strong> Better if you arrive early enough to enjoy the beach</li>
+<li><strong>Orlando:</strong> Only if parks come first and you’re willing to drive east at dawn</li>
+</ul>
+<p>Book cancellable rates until flights are firm. Then lock the room.</p>
+${carRentalBox()}
+<h2>Parking, transfers, and the boring checklist</h2>
+<p>Decide early: port parking, hotel shuttle, or rideshare. Screenshot confirmation numbers. Pack documents in a personal item, not a checked bag. Eat a real breakfast — cruise terminal snack lines are not a plan.</p>
+<p>If your vacation mixes Disney or Universal with a cruise, do parks first, move toward the coast for the final night, then sail. Trying to rope-drop and embark on the same calendar day is how people write angry vacation diaries.</p>
+<p><em>By Gene Zentko. Hotel and car-rental partner links may earn a commission at no extra cost to you.</em></p>
+`.trim(),
+  },
+  {
+    slug: 'universal-orlando-trip-itinerary-framework',
+    title: 'Universal Orlando Trip Itinerary Framework: Parks, Early Entry, and Rest',
+    dek: 'A practical Universal Studios, Islands of Adventure, and Epic Universe planning framework — priorities first, wish lists second.',
+    category: 'theme-parks',
+    body_html: `
+<p>Universal Orlando rewards a clear headliner list more than a minute-by-minute fantasy schedule. Early Park Admission, Express strategies, and park order matter — but only after you’ve decided which parks get which days and where you’re sleeping.</p>
+${hotelsBox('universal', 'hotels near Universal Orlando')}
+<h2>Build the trip in layers</h2>
+<ol>
+<li>Hotel base (on-site vs nearby)</li>
+<li>Park ticket type and which parks you’ll enter</li>
+<li>Must-do headliners per park</li>
+<li>One recovery block each day (meal, hotel, or show)</li>
+<li>Wait-time adjustments the week of travel</li>
+</ol>
+<p>If Epic Universe is on the itinerary, don’t assume old “Universal corridor” hotel advice still maps cleanly — check drive times for the parks you actually booked.</p>
+${ticketsBox()}
+<h2>Energy beats optimism</h2>
+<p>Put your longest walking day when the group is freshest. Keep one lighter evening. Use Florida Buzz wait times close to your visit; distant itineraries should stay flexible on ride order.</p>
+<p>Split Disney + Universal trips work best with either a hotel change or a central base plus honest rideshare budgeting — not wishful thinking about “it’s all Orlando.”</p>
+${carRentalBox()}
+<p><em>By Gene Zentko. Hotel, ticket, and rental-car partner links may earn a commission at no extra cost to you.</em></p>
 `.trim(),
   },
 ];
