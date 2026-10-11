@@ -53,7 +53,7 @@ const STORY = {
     {
       start: 5.4,
       end: 10.8,
-      text: '{\\c&H00FFFF&}Prices have increased{\\c&HFFFFFF&}\\Nfor priority passes',
+      text: '{\\c&H00FFFF&}Prices have increased{\\r}\\N{\\c&HFFFFFF&}for priority passes',
     },
     {
       start: 10.8,
