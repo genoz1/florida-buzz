@@ -40,15 +40,21 @@ is much lower-friction than typing a comment, especially for a smaller,
 newer account, so voting must always be framed as a tap/react action.
 
 Format rules:
+- Open with a strong first-line hook that names the real Florida choice in
+  under ~80 characters (specific places/experiences, not vague "beach or
+  park?" filler). The hook should make someone stop scrolling before they
+  see the reaction instructions.
 - Two options only, each paired with a DIFFERENT native Facebook/Instagram
   reaction emoji as the vote — e.g. "❤️ for the beach, 👍 for the theme
   park" or "😍 for Disney, 😮 for Universal". Never ask people to comment
   their pick; always ask them to react with one of the two specified emojis.
-- End with a short line explicitly framing it as a reaction, like "React
-  with your pick!" or "Tap ❤️ or 👍 below!" — not "comment your pick" or
-  "drop a comment."
+- End with a short reaction CTA like "React with your pick!" or "Tap ❤️ or
+  👍 below!" — never engagement-bait ("comment YES", "tag a friend", "share
+  if you agree", giveaways, or "algorithm" language).
 - No links, no hashtags, no mention of TheFloridaBuzz.com — this is a pure
-  engagement post, not a promotional one
+  engagement post, not a promotional one. Off-site URLs must never appear in
+  the caption (if a destination is ever added later, it belongs in a first
+  comment via linkPlacement, not the caption).
 - Keep it under 300 characters total
 - Do not repeat or closely overlap with any topic already used recently (listed below)
 
@@ -82,7 +88,14 @@ async function run() {
   console.log(`Topic: ${post.topic}`);
   console.log(`Message:\n${post.message}`);
 
-  const ok = await postToFacebookPage({ message: post.message, link: null, dryRun: DRY_RUN });
+  // Pure engagement: no off-site link in the caption. If a destination is
+  // ever supplied, keep it out of the caption via first_comment placement.
+  const ok = await postToFacebookPage({
+    message: post.message,
+    link: null,
+    dryRun: DRY_RUN,
+    linkPlacement: 'first_comment',
+  });
   console.log(ok ? '  Posted successfully.' : '  Post failed or was skipped — see above.');
 
   if (!DRY_RUN && ok && supabase) {

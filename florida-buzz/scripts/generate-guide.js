@@ -6,6 +6,7 @@ const { validateGuide, validateTopic } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { postToFacebookPage } = require('../lib/facebook');
+const { normalizePinCopy, toFacebookFeedCaption } = require('../lib/socialCopy');
 const { notifyIndexNow } = require('../lib/indexnow');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -357,9 +358,9 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "title": "string, under 70 characters",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, well-structured guide as HTML using <p>, <h3>, and <ul>/<li> as needed, 500-900 words, ends with a brief practical tip or takeaway",
-  "fb_caption": "string, Facebook post: 1-2 punchy sentences plus a relevant emoji, ends with 'Full guide \\u2193' — no hashtags",
-  "pin_title": "string, under 100 characters, descriptive and keyword-rich (Pinterest is a search engine, not a feed)",
-  "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type"
+  "fb_caption": "string, Facebook photo caption: 1-2 punchy sentences plus a relevant emoji, then a short genuine comment invite (e.g. 'Which tip would you use first?') — no hashtags, no URL, no 'Full guide' / link teases",
+  "pin_title": "string, under 100 characters, descriptive and keyword-rich for Pinterest search/saves (place/topic + planning angle)",
+  "pin_description": "string, 1-2 sentences, under 500 characters, written for Pinterest search with natural Florida + topic keywords"
 }`;
 
   const user = `Category: ${category}
@@ -378,12 +379,20 @@ Working title idea: ${workingTitle}`;
 
 async function postToFacebook({ fb_caption, slug, imageUrl }) {
   const articleUrl = `${SITE_URL}/article/${slug}`;
-  return postToFacebookPage({ message: fb_caption, link: articleUrl, imageUrl, dryRun: DRY_RUN });
+  return postToFacebookPage({
+    message: toFacebookFeedCaption(fb_caption),
+    link: articleUrl,
+    imageUrl,
+    dryRun: DRY_RUN,
+    linkPlacement: 'first_comment',
+    linkCommentKind: 'guide',
+  });
 }
 
-async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
+async function postToPinterest({ pin_title, pin_description, slug, imageUrl, category = null, title = null }) {
+  const pin = normalizePinCopy({ pin_title, pin_description, category, title });
   if (DRY_RUN) {
-    console.log(`  [dry-run] Would create Pin: "${pin_title}"`);
+    console.log(`  [dry-run] Would create Pin: "${pin.pin_title}"`);
     return true;
   }
   if (!process.env.PINTEREST_ACCESS_TOKEN || !process.env.PINTEREST_BOARD_ID) {
@@ -400,8 +409,8 @@ async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
   try {
     await createPin({
       imageUrl,
-      title: pin_title,
-      description: pin_description,
+      title: pin.pin_title,
+      description: pin.pin_description,
       link: articleUrl,
     });
     return true;
@@ -509,6 +518,8 @@ async function run() {
     pin_description: guide.pin_description,
     slug,
     imageUrl,
+    category,
+    title: guide.title,
   });
 
   console.log('\n=== Run complete ===');

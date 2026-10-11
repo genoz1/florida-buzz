@@ -11,6 +11,12 @@ const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
 const { createPost: createThreadsPost } = require('../lib/threads');
 const { postToFacebookPage } = require('../lib/facebook');
+const {
+  normalizePinCopy,
+  toFacebookFeedCaption,
+  toInstagramCaption,
+  toThreadsPost,
+} = require('../lib/socialCopy');
 const { notifyIndexNow } = require('../lib/indexnow');
 const {
   findDuplicateImage,
@@ -416,9 +422,9 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
   "category": "string, exactly one of: theme-parks, space, beaches, florida-living, wildlife, cruises, food, events, travel-deals — pick whichever ACTUALLY matches this specific story's real subject, regardless of which feed it came from (a ride closure is theme-parks even if it came through a food-focused feed; a restaurant opening is food even if it came through a general Disney feed; a hotel discount, ticket sale, or airline fare deal is travel-deals even if the property itself is a theme-park resort)",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, useful factual article as <p> tags, length appropriate to the available facts, with supported context woven in naturally; headings only when helpful",
-  "fb_caption": "string, Facebook post: 1-2 sentences plus a relevant emoji, ends with 'Full story \\u2193' — no hashtags. Name the real place, attraction, or subject clearly so readers know what this is about, and make clear that a specific concrete detail exists (a price, a date, a name, a number) — but hold that detail back rather than stating it outright, so there's a genuine reason to click through and see it. For example, write toward 'Disney just changed something about Lightning Lane pricing this week' rather than stating the new price directly in the caption. This is a real curiosity gap, not vague hype — it must point at something specific and true from the story, just without giving away the payoff itself. Never imply something the article doesn't actually say just to make the hook stronger.",
-  "pin_title": "string, under 100 characters, descriptive and keyword-rich (Pinterest is a search engine, not a feed — favor clarity over punchiness)",
-  "pin_description": "string, 1-2 sentences, under 500 characters, naturally including relevant search terms a Florida traveler might type (e.g. category, location, activity) without keyword-stuffing",
+  "fb_caption": "string, Facebook photo caption: lead with a strong first-line curiosity-gap hook (1-2 sentences + a relevant emoji), then a short genuine comment invite such as 'Would you change your plans?' or 'What would you do?' — no hashtags, no URL, no 'Full story', no 'link in bio', no 'comment for a chance to win' bait. Name the real place, attraction, or subject clearly, and make clear that a specific concrete detail exists (a price, a date, a name, a number) — but hold that detail back rather than stating it outright. Example direction: 'Disney just changed something about Lightning Lane pricing this week — would this change your park plan?' rather than stating the new price. The curiosity gap must point at something specific and true from the story; never invent stakes the article does not support.",
+  "pin_title": "string, under 100 characters, descriptive and keyword-rich for Pinterest search/saves (favor clarity over punchiness; include the place or topic plus a planning angle, e.g. 'Magic Kingdom Lightning Lane price change — what to know')",
+  "pin_description": "string, 1-2 sentences, under 500 characters, written for Pinterest search: naturally include Florida + topic keywords a traveler might type (park/beach/cruise/city + planning intent) without keyword-stuffing or hype",
   "image_subject": "specific concrete visual subject for this exact article, or null when skipped",
   "image_location": "specific supported destination/city/venue, or null when no location is supported or when skipped",
   "image_entities": "array of 1-10 central named entities that the image must preserve, or null when skipped",
@@ -445,12 +451,22 @@ Source link (for context only, do not include in body_html): ${sourceUrl}`;
 
 async function postToFacebook({ title, fb_caption, source_url, slug, imageUrl }) {
   const articleUrl = `${process.env.SITE_URL}/article/${slug}`;
-  return postToFacebookPage({ message: fb_caption, link: articleUrl, imageUrl, dryRun: DRY_RUN });
+  // Keep the feed unit as a native photo + curiosity hook. Article URL goes in
+  // the first comment so Meta is less likely to throttle distribution.
+  return postToFacebookPage({
+    message: toFacebookFeedCaption(fb_caption),
+    link: articleUrl,
+    imageUrl,
+    dryRun: DRY_RUN,
+    linkPlacement: 'first_comment',
+    linkCommentKind: 'article',
+  });
 }
 
-async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
+async function postToPinterest({ pin_title, pin_description, slug, imageUrl, category = null, title = null }) {
+  const pin = normalizePinCopy({ pin_title, pin_description, category, title });
   if (DRY_RUN) {
-    console.log(`  [dry-run] Would create Pin: "${pin_title}"`);
+    console.log(`  [dry-run] Would create Pin: "${pin.pin_title}"`);
     return true;
   }
   if (!process.env.PINTEREST_ACCESS_TOKEN || !process.env.PINTEREST_BOARD_ID) {
@@ -467,8 +483,8 @@ async function postToPinterest({ pin_title, pin_description, slug, imageUrl }) {
   try {
     await createPin({
       imageUrl,
-      title: pin_title,
-      description: pin_description,
+      title: pin.pin_title,
+      description: pin.pin_description,
       link: articleUrl,
     });
     return true;
@@ -518,26 +534,6 @@ async function postToThreads({ text, imageUrl }) {
     console.error(`  [error] Threads post failed: ${err.message}`);
     return false;
   }
-}
-
-// Unlike Instagram, Threads posts DO support real clickable links directly in
-// the text — so instead of the "link in bio" workaround, this drops the
-// Facebook-specific "Full story ↓" phrasing (which implied a separate link
-// preview card Threads doesn't have) and appends the actual article URL
-// directly, where Threads will auto-link it.
-function toThreadsPost(fbCaption, articleUrl) {
-  const withoutSuffix = (fbCaption || '').replace(/Full story\s*↓\s*$/i, '').trim();
-  return withoutSuffix ? `${withoutSuffix}\n\n${articleUrl}` : articleUrl;
-}
-
-// Facebook captions end with "Full story ↓" since Facebook supports a real
-// clickable link right there in the post. Instagram has no clickable links in
-// captions at all — the only clickable spot on the whole platform is the
-// profile's bio link — so that phrasing is actively misleading on Instagram.
-// This swaps it for wording that points people to the right place instead.
-function toInstagramCaption(fbCaption) {
-  if (!fbCaption) return fbCaption;
-  return fbCaption.replace(/Full story\s*↓\s*$/i, 'Full story — link in bio');
 }
 
 async function alreadySeen(guid) {
@@ -861,9 +857,22 @@ async function run() {
       await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
     }
     await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
-    await postToPinterest({ pin_title: article.pin_title, pin_description: article.pin_description, slug, imageUrl: finalImage });
-    await postToInstagram({ caption: toInstagramCaption(article.fb_caption), imageUrl: finalImage });
-    await postToThreads({ text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`), imageUrl: finalImage });
+    await postToPinterest({
+      pin_title: article.pin_title,
+      pin_description: article.pin_description,
+      slug,
+      imageUrl: finalImage,
+      category: article.category,
+      title: article.title,
+    });
+    await postToInstagram({
+      caption: toInstagramCaption(article.fb_caption, article.category),
+      imageUrl: finalImage,
+    });
+    await postToThreads({
+      text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`),
+      imageUrl: finalImage,
+    });
     postCount += 1;
     await completeItem(guid);
   }
@@ -914,4 +923,8 @@ module.exports = {
   originCropPercent,
   titleSimilarity,
   createArticleRetryQueue,
+  toFacebookFeedCaption,
+  toInstagramCaption,
+  toThreadsPost,
+  normalizePinCopy,
 };

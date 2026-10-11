@@ -120,4 +120,8 @@ async function createPost({ imageUrl, videoUrl, caption, logDetail = null }) {
   }
 }
 
-module.exports = { createPost };
+// Article/guide caption shaping lives in socialCopy so publish scripts share
+// one comment-first + short-hashtag convention.
+const { toInstagramCaption, instagramHashtagsForCategory } = require('./socialCopy');
+
+module.exports = { createPost, toInstagramCaption, instagramHashtagsForCategory };

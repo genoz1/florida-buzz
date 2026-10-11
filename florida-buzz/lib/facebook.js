@@ -6,8 +6,8 @@ const GRAPH_BASE = 'https://graph.facebook.com/v19.0';
 
 /**
  * Meta downranks posts that push people off-platform in the first seconds.
- * For engagement posts, put the destination URL in a first comment instead
- * of the caption so the feed unit stays a native photo + discussion prompt.
+ * Prefer linkPlacement: 'first_comment' for photo posts so the feed unit stays
+ * a native photo + discussion prompt, with the destination URL in a comment.
  * @param {'caption'|'first_comment'} linkPlacement
  */
 async function commentOnFacebookPost(postId, message, accessToken) {
@@ -28,8 +28,19 @@ async function commentOnFacebookPost(postId, message, accessToken) {
   return payload.id || null;
 }
 
-function firstCommentMessage(link) {
-  return `Continue the chat on Buzz Board (saves your answer + joins the community):\n${link}`;
+/**
+ * @param {string} link
+ * @param {'article'|'buzz_board'|'guide'} [kind='article']
+ */
+function firstCommentMessage(link, kind = 'article') {
+  if (!link) return '';
+  if (kind === 'buzz_board') {
+    return `Continue the chat on Buzz Board (saves your answer + joins the community):\n${link}`;
+  }
+  if (kind === 'guide') {
+    return `Full guide:\n${link}`;
+  }
+  return `Full story:\n${link}`;
 }
 
 async function postToFacebookPage({
@@ -41,8 +52,11 @@ async function postToFacebookPage({
   logDetail = null,
   returnResult = false,
   linkPlacement = 'caption',
+  linkCommentKind = 'article',
+  firstCommentText = null,
 }) {
   const putLinkInFirstComment = linkPlacement === 'first_comment' && Boolean(link);
+  const resolveFirstComment = () => firstCommentText || firstCommentMessage(link, linkCommentKind);
 
   if (dryRun) {
     const linkNote = putLinkInFirstComment
@@ -68,7 +82,7 @@ async function postToFacebookPage({
     }
     let commentId = null;
     if (putLinkInFirstComment && payload.id) {
-      commentId = await commentOnFacebookPost(payload.id, firstCommentMessage(link), process.env.FB_PAGE_ACCESS_TOKEN);
+      commentId = await commentOnFacebookPost(payload.id, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
     }
     await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
     return returnResult ? { ok: true, postId: payload.id, commentId, linkPlacement } : true;
@@ -111,7 +125,7 @@ async function postToFacebookPage({
     const postId = payload.post_id || payload.id;
     let commentId = null;
     if (putLinkInFirstComment && postId) {
-      commentId = await commentOnFacebookPost(postId, firstCommentMessage(link), process.env.FB_PAGE_ACCESS_TOKEN);
+      commentId = await commentOnFacebookPost(postId, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
     }
 
     await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
@@ -151,7 +165,7 @@ async function postToFacebookPage({
 
   let commentId = null;
   if (putLinkInFirstComment && payload.id) {
-    commentId = await commentOnFacebookPost(payload.id, firstCommentMessage(link), process.env.FB_PAGE_ACCESS_TOKEN);
+    commentId = await commentOnFacebookPost(payload.id, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
   }
 
   await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });

@@ -38,9 +38,31 @@ function getScheduleFlags(env = process.env) {
   };
 }
 
+const FACEBOOK_BUZZ_SLOT_SCHEDULE = [
+  { cron: '30 8 * * *', slot: 'morning', label: '8:30am' },
+  { cron: '15 14 * * *', slot: 'afternoon', label: '2:15pm' },
+  { cron: '30 21 * * *', slot: 'evening', label: '9:30pm' },
+];
+
+/**
+ * Optional cadence knob for Buzz Board Facebook only.
+ * BUZZ_FACEBOOK_SLOTS=morning,afternoon,evening (default all three).
+ */
+function parseBuzzFacebookSlots(raw) {
+  const requested = String(raw || 'morning,afternoon,evening')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const allowed = new Set(requested);
+  const selected = FACEBOOK_BUZZ_SLOT_SCHEDULE.filter((entry) => allowed.has(entry.slot));
+  return selected.length ? selected : [...FACEBOOK_BUZZ_SLOT_SCHEDULE];
+}
+
 module.exports = {
   aiContentSchedulesEnabled,
+  FACEBOOK_BUZZ_SLOT_SCHEDULE,
   getScheduleFlags,
   hasRequiredConfig,
+  parseBuzzFacebookSlots,
   shouldScheduleAI,
 };

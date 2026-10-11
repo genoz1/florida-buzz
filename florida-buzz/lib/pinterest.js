@@ -236,6 +236,10 @@ async function createVideoPin({ videoUrl, coverImageUrl, title, description, lin
   return res.json();
 }
 
+// Pin title/description search shaping for article/guide posts (does not
+// touch media/image rules or block on token refresh).
+const { normalizePinCopy } = require('./socialCopy');
+
 module.exports = {
   createPin,
   createVideoPin,
@@ -243,6 +247,7 @@ module.exports = {
   formatPinFailureDetail,
   isPinterestAuthFailure,
   hasRefreshCredentials,
+  normalizePinCopy,
   resetTokenCacheForTests,
   // Exported for focused tests / diagnostics only.
   getAccessToken,

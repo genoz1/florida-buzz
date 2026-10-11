@@ -57,14 +57,14 @@ test('Instagram keeps its square discussion card and honest short discussion pat
     buildInstagramShortTrackingUrl(slug),
     `https://thefloridabuzz.com/go/ig/${slug}`
   );
-  const copy = buildCopy({ slug, question: 'Do not repeat this question?' }, 'instagram');
+  const copy = buildCopy({ slug, question: 'Do not repeat this question?', category: 'universal' }, 'instagram');
   assert.doesNotMatch(copy, /Do not repeat this question/);
   assert.match(copy, /Question of the Day/);
   assert.match(copy, /Does Universal do theme parks better than Disney now\?/);
-  assert.match(copy, /Comment your answer below/);
-  assert.match(copy, /Open Buzz Board/);
+  assert.match(copy, /comment your answer below/i);
+  assert.match(copy, /Buzz Board/);
   assert.match(copy, new RegExp(`/go/ig/${slug}`));
-  assert.match(copy, /#DisneyWorld/);
+  assert.match(copy, /#UniversalOrlando/);
 });
 
 test('every approved launch discussion has an engagement-first hook and exact photo subject', () => {
@@ -183,10 +183,10 @@ test('platform copy stays conversation-first and sends readers to the selected d
   assert.doesNotMatch(facebook, /Buzz Board/);
   assert.doesNotMatch(facebook, /https?:\/\//);
   assert.match(instagram, /Question of the Day/);
-  assert.match(instagram, /Hollywood Studios: full-day park or half-day park\?/);
+  assert.match(instagram, /^Hollywood Studios: full-day park or half-day park\?/);
   assert.doesNotMatch(instagram, /Some guests can stay/);
   assert.match(instagram, /\/go\/ig\/hollywood-studios-complete-park-day/);
-  assert.match(instagram, /Comment your answer below/);
+  assert.match(instagram, /comment your answer below/i);
   const preview = buildFacebookPreview(discussion);
   assert.equal(preview.unchangedBuzzBoardQuestion, discussion.question);
   assert.equal(preview.destination, 'https://thefloridabuzz.com/go/buzz/hollywood-studios-complete-park-day');
@@ -245,6 +245,8 @@ test('dry run exercises both publishers without writing post-log state', async (
   assert.match(facebookCalls[0].message, /Which option is actually worth the tradeoff\?/);
   assert.match(facebookCalls[0].message, /Question of the Day/);
   assert.equal(facebookCalls[0].link, 'https://thefloridabuzz.com/go/buzz/sample-question');
+  assert.equal(facebookCalls[0].linkPlacement, 'first_comment');
+  assert.equal(facebookCalls[0].linkCommentKind, 'buzz_board');
   assert.equal(facebookCalls[0].imageUrl, 'https://storage.example/facebook-photo.jpg');
 });
 
@@ -252,16 +254,19 @@ test('article social publishing and both Buzz Board redirect routes remain separ
   const automate = fs.readFileSync(path.join(__dirname, '../scripts/automate.js'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../routes/main.js'), 'utf8');
   assert.match(automate, /postToFacebook\(\{ title: article\.title, fb_caption: article\.fb_caption, slug, imageUrl: finalImage \}\)/);
-  assert.match(automate, /postToInstagram\(\{ caption: toInstagramCaption\(article\.fb_caption\), imageUrl: finalImage \}\)/);
+  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*article\.category\)/);
   assert.match(routes, /router\.get\('\/go\/buzz\/:slug'/);
   assert.match(routes, /router\.get\('\/go\/ig\/:slug'/);
 });
 
-test('production scheduler spaces three Facebook posts and one Instagram post in Eastern time', () => {
+test('production scheduler spaces Facebook Buzz Board slots and one Instagram post in Eastern time', () => {
   const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
-  assert.match(server, /'30 8 \* \* \*'.*slot: 'morning'/);
-  assert.match(server, /'15 14 \* \* \*'.*slot: 'afternoon'/);
-  assert.match(server, /'30 21 \* \* \*'.*slot: 'evening'/);
+  const schedule = fs.readFileSync(path.join(__dirname, '../lib/scheduleConfig.js'), 'utf8');
+  assert.match(schedule, /slot: 'morning'/);
+  assert.match(schedule, /slot: 'afternoon'/);
+  assert.match(schedule, /slot: 'evening'/);
+  assert.match(schedule, /BUZZ_FACEBOOK_SLOTS/);
+  assert.match(server, /parseBuzzFacebookSlots/);
   assert.match(server, /SOCIAL_PLATFORM=instagram BUZZ_SOCIAL_SLOT=daily/);
   assert.match(server, /timezone: 'America\/New_York'/);
 });

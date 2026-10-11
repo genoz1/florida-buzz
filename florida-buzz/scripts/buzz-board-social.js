@@ -21,6 +21,7 @@ const CATEGORY_ROTATION = String(process.env.BUZZ_SOCIAL_CATEGORIES || 'disney')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
+const { parseBuzzFacebookSlots, FACEBOOK_BUZZ_SLOT_SCHEDULE } = require('../lib/scheduleConfig');
 const FACEBOOK_COOLDOWN_DAYS = 10;
 const INSTAGRAM_COOLDOWN_DAYS = 21;
 const FACEBOOK_SLOTS = { morning: 0, afternoon: 1, evening: 2 };
@@ -193,6 +194,7 @@ async function run({
         // Keep the feed unit native (photo + question). Off-site link in the
         // first comment so Meta is less likely to throttle distribution.
         linkPlacement: 'first_comment',
+        linkCommentKind: 'buzz_board',
         imageUrl: facebookImageUrl,
         dryRun,
         logDetail: logMarker('facebook', discussion.slug),
@@ -248,6 +250,7 @@ module.exports = {
   easternDateKey,
   loadLaunchDiscussions,
   logMarker,
+  parseBuzzFacebookSlots,
   run,
   selectDailyDiscussion,
   selectSocialDiscussion,
@@ -255,6 +258,7 @@ module.exports = {
   loadPostHistory,
   CATEGORY_ROTATION,
   FACEBOOK_COOLDOWN_DAYS,
+  FACEBOOK_BUZZ_SLOT_SCHEDULE,
   INSTAGRAM_COOLDOWN_DAYS,
   wasPosted,
 };

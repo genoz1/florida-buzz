@@ -150,4 +150,7 @@ async function createPost({ text, imageUrl, videoUrl }) {
   }
 }
 
-module.exports = { createPost };
+// Conversation-first Threads text helpers (link secondary) shared with automate.
+const { toThreadsPost } = require('./socialCopy');
+
+module.exports = { createPost, toThreadsPost };

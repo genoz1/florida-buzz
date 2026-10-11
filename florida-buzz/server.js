@@ -4,7 +4,7 @@ const path = require('path');
 const cron = require('node-cron');
 const { logNotFound } = require('./lib/notFoundLog');
 const { createScheduledRunner } = require('./lib/scheduledRun');
-const { getScheduleFlags } = require('./lib/scheduleConfig');
+const { getScheduleFlags, parseBuzzFacebookSlots } = require('./lib/scheduleConfig');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -214,16 +214,14 @@ if (scheduleFlags.engagementPosts) {
   console.log('Engagement post NOT scheduled — AI_CONTENT_SCHEDULES_ENABLED must be true and the OpenAI/Facebook variables must be set.');
 }
 
-// Facebook receives three spaced conversation posts. Instagram remains at one
-// daily Buzz Board post so it complements, rather than floods, the existing
-// article feed. Selection is deterministic, category-weighted and protected by
-// platform-specific cooldowns in scripts/buzz-board-social.js.
+// Facebook receives spaced conversation posts. Instagram remains at one daily
+// Buzz Board post so it complements, rather than floods, the existing article
+// feed. Selection is deterministic and protected by platform-specific cooldowns
+// in scripts/buzz-board-social.js.
+// Optional cadence knob: BUZZ_FACEBOOK_SLOTS=morning,afternoon,evening (default)
+// e.g. BUZZ_FACEBOOK_SLOTS=morning,evening to post twice/day only.
 if (scheduleFlags.buzzBoardSocial) {
-  const facebookBuzzSlots = [
-    { cron: '30 8 * * *', slot: 'morning', label: '8:30am' },
-    { cron: '15 14 * * *', slot: 'afternoon', label: '2:15pm' },
-    { cron: '30 21 * * *', slot: 'evening', label: '9:30pm' },
-  ];
+  const facebookBuzzSlots = parseBuzzFacebookSlots(process.env.BUZZ_FACEBOOK_SLOTS);
   for (const entry of facebookBuzzSlots) {
     cron.schedule(entry.cron, () => {
       console.log(`Running scheduled Facebook Buzz Board post (${entry.slot})...`);
@@ -240,7 +238,8 @@ if (scheduleFlags.buzzBoardSocial) {
       'SOCIAL_PLATFORM=instagram BUZZ_SOCIAL_SLOT=daily node scripts/buzz-board-social.js'
     );
   }, { timezone: 'America/New_York' });
-  console.log('Facebook Buzz Board distribution scheduled: 8:30am, 2:15pm, and 9:30pm daily (Eastern time).');
+  const fbLabels = facebookBuzzSlots.map((entry) => entry.label).join(', ') || '(none)';
+  console.log(`Facebook Buzz Board distribution scheduled: ${fbLabels} daily (Eastern time).`);
   console.log('Instagram Buzz Board distribution scheduled: 9:30pm daily (Eastern time).');
 } else {
   console.log('Buzz Board social distribution NOT scheduled — enable both Buzz Board flags and configure Facebook/Instagram credentials.');

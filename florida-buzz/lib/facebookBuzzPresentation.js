@@ -220,11 +220,23 @@ function buildFacebookCopy(discussion) {
   return `${presentation.hook}\n\n${label} — drop your answer in the comments 👇`;
 }
 
+const INSTAGRAM_HASHTAGS_BY_CATEGORY = {
+  disney: '#DisneyWorld #WaltDisneyWorld #DisneyParks #FloridaBuzz',
+  universal: '#UniversalOrlando #EpicUniverse #ThemeParks #FloridaBuzz',
+  cruises: '#FloridaCruises #CruiseLife #PortCanaveral #FloridaBuzz',
+  'florida-life': '#FloridaTravel #VisitFlorida #FloridaLife #FloridaBuzz',
+};
+
+function instagramHashtagsFor(category) {
+  return INSTAGRAM_HASHTAGS_BY_CATEGORY[category] || INSTAGRAM_HASHTAGS_BY_CATEGORY['florida-life'];
+}
+
 function buildInstagramCopy(discussion, siteUrl = 'https://thefloridabuzz.com') {
   const presentation = presentationFor(discussion);
   const label = discussion?.category === 'disney' ? 'Disney Question of the Day' : 'Question of the Day';
   const destination = new URL(`/go/ig/${encodeURIComponent(discussion.slug)}`, siteUrl).toString();
-  return `${label}\n\n${presentation.hook}\n\nComment your answer below 👇\nWant the full thread? Open Buzz Board: ${destination}\n\n#DisneyWorld #WaltDisneyWorld #DisneyParks #FloridaBuzz`;
+  // Comment-first: ask for a reply before the off-platform path; keep hashtags tight.
+  return `${presentation.hook}\n\n${label} — comment your answer below 👇\n\nFull thread on Buzz Board: ${destination}\n\n${instagramHashtagsFor(discussion?.category)}`;
 }
 
 /** @deprecated Photorealistic Buzz photos are retired; cards are rendered locally. Kept for tests/compat. */
@@ -303,6 +315,7 @@ function buildFacebookPreview(discussion, siteUrl = 'https://thefloridabuzz.com'
 
 module.exports = {
   FACEBOOK_PRESENTATIONS,
+  INSTAGRAM_HASHTAGS_BY_CATEGORY,
   buildFacebookCopy,
   buildFacebookImagePrompt,
   buildFacebookPreview,
@@ -310,6 +323,7 @@ module.exports = {
   ensureFacebookBuzzImage,
   ensureInstagramBuzzImage,
   facebookImageFilename,
+  instagramHashtagsFor,
   instagramImageFilename,
   plannedFacebookImageUrl,
   presentationFor,
