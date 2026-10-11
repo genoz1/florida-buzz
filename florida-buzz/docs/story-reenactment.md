@@ -1,15 +1,19 @@
-# Story reenactment shorts
+# Story-first shorts
 
-Scroll-stopping Florida Buzz videos are **mini reenactments of a trip story**, not static ride photos or tip cards.
+What stops the scroll is the **story**, not the format.
+
+- Prefer **motion** when we have it (splash, scramble, near-miss reenactment)
+- A **static image is fine** when the story/hook is strong enough on its own
+- Avoid dull ride photos + tip cards with no stakes
 
 ## Format that works
 
-1. **Hook in the first second** — someone jumping in water, a scramble, a near-miss
-2. **Story VO** — what almost went wrong / what people get wrong
+1. **Hook** — stakes in the first line (“Nobody warns you about this”)
+2. **Story** — what almost went wrong / what people get wrong
 3. **Payoff rule** — one memorable takeaway
-4. **No host on camera** — anonymous actors / AI people / licensed motion only
+4. **No host on camera** — anonymous people / AI / licensed media only
 
-Example story: kids hit the hotel pool ten minutes before park open → wet flip-flop sprint → still made rope drop → rule: pool after the park.
+Example: kids hit the hotel pool ten minutes before park open → wet flip-flop sprint → still made rope drop → rule: pool after the park.
 
 ## Samples in this repo
 
@@ -19,10 +23,6 @@ Example story: kids hit the hotel pool ten minutes before park open → wet flip
 | `node scripts/ai-story-reenactment.js` | `FAL_KEY` (quote only) | Cost check |
 | `node scripts/ai-story-reenactment.js --generate` | `FAL_KEY` + balance | Custom Seedance beats |
 
-## Why not still photos
-
-Static Magic Kingdom photos do not create the “I have to watch this” feeling. The product target is the same instinct as viral “people jumping in the water” clips: motion + human stakes + a story.
-
 ## Custom AI path
 
-When fal is configured in production, Seedance text-to-video can generate purpose-built beats for each story (splash → scramble → park energy) without putting Gene on camera and without trademarked Disney characters/logos in the prompt.
+When fal is configured, Seedance can generate purpose-built motion beats for a written story (splash → scramble → park energy) without putting Gene on camera and without trademarked Disney characters/logos in the prompt.
