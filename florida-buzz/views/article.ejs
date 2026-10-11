@@ -11,9 +11,11 @@
     <p class="dek"><%= article.dek %></p>
     <p class="byline">
       <% if (article.is_review) { %>
-        A Personal Review by <%= article.source_name %>
+        A Personal Review by <% if (article.source_name === 'Gene Zentko') { %><a href="/gene-zentko">Gene Zentko</a><% } else { %><%= article.source_name %><% } %>
+      <% } else if (article.is_evergreen) { %>
+        By <% if (article.source_name === 'Gene Zentko') { %><a href="/gene-zentko">Gene Zentko</a><% } else { %><%= article.source_name %><% } %>
       <% } else { %>
-        By <%= article.is_evergreen ? article.source_name : 'The Florida Buzz staff' %>
+        By The Florida Buzz staff
       <% } %>
       &middot; <%= timeAgo(article.published_at) %>
     </p>
@@ -114,7 +116,7 @@
     </p>
     <% } else if (article.is_evergreen) { %>
     <p class="source-note">
-      Written and researched by <%= article.source_name %>.
+      Written and researched by <% if (article.source_name === 'Gene Zentko') { %><a href="/gene-zentko">Gene Zentko</a><% } else { %><%= article.source_name %><% } %>.
     </p>
     <% } else { %>
     <p class="source-note">

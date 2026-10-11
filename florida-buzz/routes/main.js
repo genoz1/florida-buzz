@@ -270,8 +270,13 @@ async function hasAnyRealArticles() {
 }
 
 async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen, slug, author } = {}) {
+  const { filterRedirectedArticles } = require('../lib/articleRedirects');
+
   if (supabase) {
     const runQuery = async () => {
+      // When listing (no exact slug), over-fetch slightly so redirected
+      // duplicate losers can be filtered without shrinking the page.
+      const fetchLimit = !slug && limit ? Math.min(Number(limit) + 8, 1000) : limit;
       let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
       if (category) query = query.eq('category', category);
       if (city) query = query.eq('city', city);
@@ -279,7 +284,7 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
       if (excludeEvergreen) query = query.eq('is_evergreen', false);
       if (slug) query = query.eq('slug', slug); // exact match — not subject to `limit`, so old articles are always findable
       if (author) query = query.eq('source_name', author);
-      if (limit) query = query.limit(limit);
+      if (fetchLimit) query = query.limit(fetchLimit);
       return query;
     };
 
@@ -299,7 +304,11 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
         console.error(`  [error] Supabase query failed again after retry: ${error.message}`);
       }
     }
-    if (!error && data && data.length) return data;
+    if (!error && data && data.length) {
+      // Exact slug lookups still return the row (route may 301); listings hide losers.
+      const rows = slug ? data : filterRedirectedArticles(data);
+      return limit && !slug ? rows.slice(0, limit) : rows;
+    }
     // A persistent error (still failing after the retry above) falls
     // through to the fallback logic below, same as before this change —
     // that's a real safety net (showing something rather than nothing) and
@@ -315,6 +324,7 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
   if (category) sample = sample.filter((a) => a.category === category);
   if (slug) sample = sample.filter((a) => a.slug === slug);
   if (author) sample = sample.filter((a) => a.source_name === author);
+  if (!slug) sample = filterRedirectedArticles(sample);
   return limit ? sample.slice(0, limit) : sample;
 }
 
@@ -397,6 +407,11 @@ router.get('/city/:city', async (req, res) => {
 
 router.get('/article/:slug', async (req, res) => {
   const { slug } = req.params;
+  const { resolveArticleRedirect } = require('../lib/articleRedirects');
+  const redirectTo = resolveArticleRedirect(slug);
+  if (redirectTo) {
+    return res.redirect(301, `/article/${redirectTo}`);
+  }
 
   // Fetch this specific article directly by slug — NOT by fetching a
   // capped "200 most recent" list and searching in memory. That older

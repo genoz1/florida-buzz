@@ -33,10 +33,9 @@ const CATEGORY_WEIGHTS = {
   space: 1,
 };
 
-const BYLINE_WEIGHTS = {
-  'The Florida Buzz Team': 67,
-  'Gene Zentko': 33,
-};
+// All evergreen guides publish under Gene Zentko (founder byline) — AdSense
+// and trust reviewers treat anonymous "staff/team" evergreen pages as weaker.
+const GUIDE_BYLINE = 'Gene Zentko';
 
 // Which categories to pull from if a guide's own category doesn't have
 // enough other guides yet to fill out a "Related Guides" block.
@@ -54,22 +53,8 @@ const CATEGORY_AFFINITY = {
 
 const RELATED_GUIDES_COUNT = 3;
 
-function pickWeightedByline() {
-  const entries = Object.entries(BYLINE_WEIGHTS);
-  const total = entries.reduce((sum, [, w]) => sum + w, 0);
-  let roll = Math.random() * total;
-  for (const [byline, weight] of entries) {
-    if (roll < weight) return byline;
-    roll -= weight;
-  }
-  return entries[0][0];
-}
-
-function pickByline(category, topicText) {
-  const isDisney = /disney/i.test(topicText || '');
-  if (category === 'theme-parks' && isDisney) return 'Gene Zentko';
-  if (category === 'theme-parks') return Math.random() < 0.75 ? 'Gene Zentko' : 'The Florida Buzz Team';
-  return pickWeightedByline();
+function pickByline(_category, _topicText) {
+  return GUIDE_BYLINE;
 }
 
 function slugify(title) {
@@ -536,4 +521,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, pickTopic, researchAndWriteGuide };
+module.exports = { run, pickTopic, researchAndWriteGuide, pickByline, GUIDE_BYLINE };
