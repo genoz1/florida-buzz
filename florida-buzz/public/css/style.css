@@ -84,58 +84,38 @@ img { max-width: 100%; display: block; }
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: var(--teal-900);
   white-space: nowrap;
   min-width: 0;
 }
 .logo-mark {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
-  border-radius: 10px;
-  box-shadow: 0 1px 0 rgba(14, 59, 67, 0.08);
+  border-radius: 9px;
 }
 .logo-wordmark {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: -0.015em;
   line-height: 1;
-  gap: 2px;
-  padding-top: 1px;
-}
-.logo-florida {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
   color: var(--teal-900);
 }
-.logo-buzz-line {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 1px;
-}
 .logo em {
-  font-family: var(--font-display);
   font-style: italic;
-  font-weight: 600;
-  font-size: 28px;
-  letter-spacing: -0.02em;
   color: var(--coral-600);
-  line-height: 1;
 }
 .logo .tm {
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 500;
   font-style: normal;
-  margin-left: 2px;
-  margin-top: 2px;
+  vertical-align: super;
+  margin-left: 1px;
   color: var(--teal-900);
   opacity: 0.7;
-  line-height: 1;
 }
 .nav-links {
   display: flex;
@@ -683,10 +663,9 @@ footer a:hover { opacity: 1; }
   .nav-topics { display: none; }
   .menu-toggle { display: flex; }
   .mobile-menu { display: flex; }
-  .logo-mark { width: 36px; height: 36px; border-radius: 9px; }
-  .logo { gap: 10px; }
-  .logo em { font-size: 24px; }
-  .logo-florida { font-size: 10px; letter-spacing: 0.16em; }
+  .logo-mark { width: 30px; height: 30px; border-radius: 8px; }
+  .logo { gap: 8px; }
+  .logo-wordmark { font-size: 22px; }
 }
 @media (max-width: 560px) {
   .grid { grid-template-columns: 1fr; }
