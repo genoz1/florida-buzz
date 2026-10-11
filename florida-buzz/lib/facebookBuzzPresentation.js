@@ -4,7 +4,7 @@ const { renderBuzzSocialImage } = require('./buzzSocialImage');
 
 const IMAGE_BUCKET = 'article-images';
 // Versioned card filenames so older photorealistic Buzz photos are not reused.
-const CARD_VERSION = 'qotd-v1';
+const CARD_VERSION = 'qotd-v2';
 
 // Facebook-only presentation copy. The underlying Buzz Board questions and
 // records remain untouched; this is the shorter, feed-native framing used by
@@ -214,13 +214,15 @@ function presentationFor(discussion) {
 
 function buildFacebookCopy(discussion) {
   const presentation = presentationFor(discussion);
-  return `${presentation.hook}\n\nQuestion of the Day — answer on Buzz Board 👇`;
+  const label = discussion?.category === 'disney' ? 'Disney Question of the Day' : 'Question of the Day';
+  return `${presentation.hook}\n\n${label} — answer on Buzz Board 👇`;
 }
 
 function buildInstagramCopy(discussion, siteUrl = 'https://thefloridabuzz.com') {
   const presentation = presentationFor(discussion);
+  const label = discussion?.category === 'disney' ? 'Disney Question of the Day' : 'Question of the Day';
   const destination = new URL(`/go/ig/${encodeURIComponent(discussion.slug)}`, siteUrl).toString();
-  return `Question of the Day\n\n${presentation.hook}\n\nAnswer here or continue the discussion on Buzz Board. Copy this short address into your browser: ${destination}`;
+  return `${label}\n\n${presentation.hook}\n\nAnswer here or continue the discussion on Buzz Board. Copy this short address into your browser: ${destination}`;
 }
 
 /** @deprecated Photorealistic Buzz photos are retired; cards are rendered locally. Kept for tests/compat. */

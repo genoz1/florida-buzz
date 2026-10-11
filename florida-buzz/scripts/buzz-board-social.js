@@ -15,7 +15,12 @@ const { createPost: createInstagramPost } = require('../lib/instagram');
 const CAMPAIGN = 'buzz_board_launch';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
 const DRY_RUN = process.env.DRY_RUN === 'true';
-const CATEGORY_ROTATION = ['disney', 'universal', 'disney', 'universal', 'disney', 'cruises', 'disney', 'universal', 'florida-life'];
+// Social QOTD posts are Disney-only by default (engagement focus).
+// Override with BUZZ_SOCIAL_CATEGORIES=disney,universal if you want the old mix.
+const CATEGORY_ROTATION = String(process.env.BUZZ_SOCIAL_CATEGORIES || 'disney')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
 const FACEBOOK_COOLDOWN_DAYS = 10;
 const INSTAGRAM_COOLDOWN_DAYS = 21;
 const FACEBOOK_SLOTS = { morning: 0, afternoon: 1, evening: 2 };
@@ -53,6 +58,11 @@ function selectSocialDiscussion(discussions, history = [], {
   now = new Date(),
 } = {}) {
   if (!Array.isArray(discussions) || discussions.length === 0) return null;
+  const allowed = new Set(CATEGORY_ROTATION);
+  const scoped = discussions.filter((discussion) => allowed.has(discussion.category));
+  // Stay inside the configured social categories (Disney-only by default).
+  // Do not fall back to Universal/cruises/etc. when Disney is in cooldown.
+  if (!scoped.length) return null;
   const cooldownDays = platform === 'instagram' ? INSTAGRAM_COOLDOWN_DAYS : FACEBOOK_COOLDOWN_DAYS;
   const cutoff = now.getTime() - (cooldownDays * 24 * 60 * 60 * 1000);
   const recent = new Set(history
@@ -60,7 +70,7 @@ function selectSocialDiscussion(discussions, history = [], {
     .map((row) => row.slug));
   const counts = new Map();
   for (const row of history) counts.set(row.slug, (counts.get(row.slug) || 0) + 1);
-  const eligible = discussions.filter((discussion) => !recent.has(discussion.slug));
+  const eligible = scoped.filter((discussion) => !recent.has(discussion.slug));
   if (!eligible.length) return null;
   const desiredCategory = categoryForSlot(platform, slot, now);
   const categoryPool = eligible.filter((discussion) => discussion.category === desiredCategory);

@@ -27,12 +27,19 @@ test('bitmap punctuation normalization preserves the complete wording', () => {
   );
 });
 
-test('the longest approved launch question remains renderable in the Instagram square format', async () => {
+test('the longest approved Disney social hook remains renderable in the Instagram square format', async () => {
+  const { FACEBOOK_PRESENTATIONS } = require('../lib/facebookBuzzPresentation');
   const inventory = require('../content/buzz-board-launch-inventory.json');
-  const longest = inventory.discussions.reduce((left, right) => (
-    right.question.length > left.question.length ? right : left
-  ));
-  const buffer = await renderBuzzSocialImage(longest);
+  const disney = inventory.discussions.filter((d) => d.category === 'disney');
+  const longest = disney.reduce((left, right) => {
+    const leftHook = FACEBOOK_PRESENTATIONS[left.slug]?.hook || left.question;
+    const rightHook = FACEBOOK_PRESENTATIONS[right.slug]?.hook || right.question;
+    return rightHook.length > leftHook.length ? right : left;
+  });
+  const buffer = await renderBuzzSocialImage({
+    question: FACEBOOK_PRESENTATIONS[longest.slug].hook,
+    category: 'disney',
+  });
   const dimensions = imageSize(buffer);
   assert.equal(dimensions.width, 1080);
   assert.equal(dimensions.height, 1080);

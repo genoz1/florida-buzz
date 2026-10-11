@@ -12,6 +12,7 @@ const {
   buildShortTrackingUrl,
   buildTrackingUrl,
   categoryForSlot,
+  CATEGORY_ROTATION,
   FACEBOOK_COOLDOWN_DAYS,
   INSTAGRAM_COOLDOWN_DAYS,
   logMarker,
@@ -45,13 +46,13 @@ test('Facebook keeps its clean Florida Buzz redirect and uses a discussion-speci
   );
   assert.equal(
     facebookImageFilename('what-universal-does-better-than-disney'),
-    'facebook-buzz-qotd-v1-what-universal-does-better-than-disney.png'
+    'facebook-buzz-qotd-v2-what-universal-does-better-than-disney.png'
   );
 });
 
 test('Instagram keeps its square discussion card and honest short discussion path', () => {
   const slug = 'what-universal-does-better-than-disney';
-  assert.equal(instagramImageFilename(slug), `instagram-buzz-qotd-v1-${slug}.png`);
+  assert.equal(instagramImageFilename(slug), `instagram-buzz-qotd-v2-${slug}.png`);
   assert.equal(
     buildInstagramShortTrackingUrl(slug),
     `https://thefloridabuzz.com/go/ig/${slug}`
@@ -107,15 +108,15 @@ test('Instagram Buzz Board creative mirrors the Facebook QOTD card square', asyn
   const client = { storage: { from: () => bucket } };
   const url = await ensureInstagramBuzzImage({ slug: 'rope-drop-or-slow-disney-morning' }, {
     client,
-    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-qotd-v1-rope-drop-or-slow-disney-morning.png',
+    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-qotd-v2-rope-drop-or-slow-disney-morning.png',
     store: async (buffer, filename, contentType) => {
       stored = { buffer, filename, contentType };
       return `https://storage.example/${filename}`;
     },
   });
-  assert.equal(url, 'https://storage.example/instagram-buzz-qotd-v1-rope-drop-or-slow-disney-morning.png');
+  assert.equal(url, 'https://storage.example/instagram-buzz-qotd-v2-rope-drop-or-slow-disney-morning.png');
   assert.equal(stored.contentType, 'image/png');
-  assert.equal(stored.filename, 'instagram-buzz-qotd-v1-rope-drop-or-slow-disney-morning.png');
+  assert.equal(stored.filename, 'instagram-buzz-qotd-v2-rope-drop-or-slow-disney-morning.png');
   assert.deepEqual(imageSize(stored.buffer), { height: 1080, type: 'png', width: 1080 });
 });
 
@@ -131,31 +132,39 @@ test('daily selection is deterministic and rotates approved discussions', () => 
   );
 });
 
-test('social rotation weights Disney and Universal while retaining Cruises and Florida Life', () => {
+test('social rotation defaults to Disney-only for Buzz Board QOTD posts', () => {
+  assert.deepEqual(CATEGORY_ROTATION, ['disney']);
   const categories = Array.from({ length: 9 }, (_, offset) => {
     const now = new Date(Date.UTC(2026, 9, 1 + offset, 12));
     return categoryForSlot('instagram', 'daily', now);
   });
-  assert.equal(categories.filter((value) => value === 'disney').length, 4);
-  assert.equal(categories.filter((value) => value === 'universal').length, 3);
-  assert.equal(categories.filter((value) => value === 'cruises').length, 1);
-  assert.equal(categories.filter((value) => value === 'florida-life').length, 1);
+  assert.equal(categories.every((value) => value === 'disney'), true);
   assert.equal(FACEBOOK_COOLDOWN_DAYS, 10);
   assert.equal(INSTAGRAM_COOLDOWN_DAYS, 21);
 });
 
-test('selection excludes discussions inside the platform cooldown and falls back across categories', () => {
+test('selection stays Disney-only and skips when Disney topics are in cooldown', () => {
   const now = new Date('2026-10-04T16:00:00Z');
   const discussions = [
     { slug: 'disney-a', category: 'disney' },
+    { slug: 'disney-b', category: 'disney' },
     { slug: 'universal-a', category: 'universal' },
     { slug: 'cruise-a', category: 'cruises' },
   ];
   const history = [
     { slug: 'disney-a', created_at: '2026-10-03T16:00:00Z' },
-    { slug: 'universal-a', created_at: '2026-10-03T16:00:00Z' },
   ];
-  assert.equal(selectSocialDiscussion(discussions, history, { platform: 'facebook', slot: 'morning', now }).slug, 'cruise-a');
+  assert.equal(
+    selectSocialDiscussion(discussions, history, { platform: 'facebook', slot: 'morning', now }).slug,
+    'disney-b'
+  );
+  assert.equal(
+    selectSocialDiscussion(discussions, [
+      { slug: 'disney-a', created_at: '2026-10-03T16:00:00Z' },
+      { slug: 'disney-b', created_at: '2026-10-03T16:00:00Z' },
+    ], { platform: 'facebook', slot: 'morning', now }),
+    null
+  );
 });
 
 test('platform copy stays conversation-first and sends readers to the selected discussion', () => {
@@ -195,7 +204,7 @@ test('dry run exercises both publishers without writing post-log state', async (
     id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     slug: 'sample-question',
     question: 'Which option is actually worth the tradeoff?',
-    category: 'florida-life',
+    category: 'disney',
     topic: 'Tradeoffs',
     created_at: '2026-10-03T00:00:00Z',
   }];
