@@ -98,7 +98,12 @@ async function createFloridaBuzzVisualVideo(options = {}) {
     const aligned = [];
     let prev = 0;
     for (let i = 0; i < n; i++) {
-      const end = i === captions.length - 1 ? Math.max(slideEnds[i], duration - 3.3) : slideEnds[i];
+      let end = slideEnds[i];
+      // Keep last caption clear of the CTA window so text never stacks.
+      if (i === captions.length - 1) {
+        end = Math.min(end, duration - 3.35);
+      }
+      if (end <= prev + 0.15) end = Math.min(slideEnds[i], prev + 0.8);
       aligned.push({ ...captions[i], start: prev, end });
       prev = slideEnds[i];
     }
