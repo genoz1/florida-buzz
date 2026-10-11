@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Punchy price-impact PNG overlays for visual news (local ffmpeg compositing).
- * Generated with Python/PIL at build time — no fal.ai, no AI presenter.
+ * Premium price callout for visual news (local ffmpeg compositing).
+ * One clean badge — no wallet / $$$$ / arrow sticker dumps.
  */
 
 const fs = require('node:fs');
@@ -12,18 +12,20 @@ const { spawnSync } = require('node:child_process');
 const OVERLAY_SCRIPT = `
 import sys
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 out_dir = Path(sys.argv[1])
 out_dir.mkdir(parents=True, exist_ok=True)
 
-def font(size, bold=True):
-    candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-    ]
-    for p in candidates:
+FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/noto/NotoSansDisplay-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/croscore/Arimo-Bold.ttf",
+]
+
+def font(size):
+    for p in FONT_CANDIDATES:
         if Path(p).exists():
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
@@ -33,73 +35,63 @@ def save(img, name):
     img.save(path, "PNG")
     print(path)
 
-# Big $$$$ burst — dominate upper third on 720-wide
-w, h = 700, 260
-dollars = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-d = ImageDraw.Draw(dollars)
-f = font(148)
-text = "$$$$"
-bbox = d.textbbox((0, 0), text, font=f)
-tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-x, y = (w - tw) // 2, (h - th) // 2 - 10
-d.rounded_rectangle((x - 36, y - 14, x + tw + 36, y + th + 22), radius=34, fill=(10, 10, 10, 185))
-for ox, oy in ((-5, 0), (5, 0), (0, -5), (0, 5), (-4, -4), (4, 4)):
-    d.text((x + ox, y + oy), text, font=f, fill=(0, 0, 0, 230))
-d.text((x, y), text, font=f, fill=(0, 230, 90, 255))
-save(dollars, "dollars-burst.png")
+# Single premium price callout — glass card, coral accent, no meme stickers
+bw, bh = 560, 200
+card = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+cd = ImageDraw.Draw(card)
 
-# UP TO $229 price badge
-bw, bh = 620, 210
-badge = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
-bd = ImageDraw.Draw(badge)
-bd.rounded_rectangle((8, 8, bw - 8, bh - 8), radius=40, fill=(190, 20, 40, 240))
-bd.rounded_rectangle((18, 18, bw - 18, bh - 18), radius=32, outline=(255, 230, 80, 255), width=6)
-label_f = font(42)
-price_f = font(88)
-label = "UP TO"
+# Soft outer shadow
+shadow = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+sd = ImageDraw.Draw(shadow)
+sd.rounded_rectangle((18, 22, bw - 10, bh - 8), radius=28, fill=(0, 0, 0, 90))
+shadow = shadow.filter(ImageFilter.GaussianBlur(10))
+card = Image.alpha_composite(card, shadow)
+cd = ImageDraw.Draw(card)
+
+# Glass panel
+cd.rounded_rectangle((12, 10, bw - 18, bh - 22), radius=26, fill=(12, 16, 24, 210))
+# Coral left accent bar
+cd.rounded_rectangle((12, 10, 28, bh - 22), radius=8, fill=(255, 78, 52, 255))
+# Thin top highlight edge
+cd.rounded_rectangle((28, 10, bw - 18, 14), radius=2, fill=(255, 255, 255, 35))
+
+eyebrow_f = font(28)
+price_f = font(92)
+eyebrow = "SINGLE PASS"
 price = "$229"
-lb = bd.textbbox((0, 0), label, font=label_f)
-pb = bd.textbbox((0, 0), price, font=price_f)
-lx = (bw - (lb[2] - lb[0])) // 2
-ly = 30
-px = (bw - (pb[2] - pb[0])) // 2
-py = 78
-bd.text((lx, ly), label, font=label_f, fill=(255, 245, 200, 255))
-bd.text((px, py), price, font=price_f, fill=(255, 255, 255, 255))
-save(badge, "price-up-to-229.png")
 
-# Empty wallet icon — large enough to read on phone
-ww, wh = 360, 320
-wallet = Image.new("RGBA", (ww, wh), (0, 0, 0, 0))
-wd = ImageDraw.Draw(wallet)
-wd.rounded_rectangle((12, 16, ww - 12, wh - 12), radius=34, fill=(0, 0, 0, 160))
-wd.rounded_rectangle((44, 70, ww - 44, wh - 50), radius=26, fill=(120, 72, 40, 255))
-wd.rounded_rectangle((54, 80, ww - 54, wh - 60), radius=18, fill=(168, 108, 58, 255))
-wd.rounded_rectangle((44, 48, ww - 44, 118), radius=22, fill=(95, 55, 30, 255))
-wd.rounded_rectangle((78, 140, ww - 78, 198), radius=12, fill=(40, 25, 15, 235))
-xf = font(72)
-xb = wd.textbbox((0, 0), "X", font=xf)
-xx = (ww - (xb[2] - xb[0])) // 2
-xy = 132
-wd.text((xx, xy), "X", font=xf, fill=(255, 60, 60, 255))
-wd.ellipse((110, 220, 140, 248), fill=(235, 215, 120, 230))
-wd.ellipse((210, 218, 245, 250), fill=(235, 215, 120, 210))
-save(wallet, "empty-wallet.png")
+eb = cd.textbbox((0, 0), eyebrow, font=eyebrow_f)
+pb = cd.textbbox((0, 0), price, font=price_f)
+ex = 48
+ey = 28
+px = 44
+py = 62
 
-# PRICE SPIKE arrow callout
-aw, ah = 520, 180
-arrow = Image.new("RGBA", (aw, ah), (0, 0, 0, 0))
-ad = ImageDraw.Draw(arrow)
-ad.rounded_rectangle((10, 18, aw - 10, ah - 18), radius=28, fill=(15, 15, 20, 200))
-af = font(56)
-at = "PRICE SPIKE"
-ab = ad.textbbox((0, 0), at, font=af)
-ax = 32
-ay = (ah - (ab[3] - ab[1])) // 2 - 4
-ad.text((ax, ay), at, font=af, fill=(255, 70, 70, 255))
-pts = [(aw - 110, ah - 48), (aw - 60, 32), (aw - 10, ah - 48)]
-ad.polygon(pts, fill=(0, 230, 90, 255))
-save(arrow, "price-spike.png")
+cd.text((ex, ey), eyebrow, font=eyebrow_f, fill=(255, 196, 160, 255))
+cd.text((px, py), price, font=price_f, fill=(255, 255, 255, 255))
+
+# Small "UP TO" chip on the right
+chip = "UP TO"
+cf = font(22)
+cb = cd.textbbox((0, 0), chip, font=cf)
+cw, ch = cb[2] - cb[0] + 28, cb[3] - cb[1] + 16
+cx, cy = bw - cw - 36, 36
+cd.rounded_rectangle((cx, cy, cx + cw, cy + ch), radius=12, fill=(255, 78, 52, 235))
+cd.text((cx + 14, cy + 6), chip, font=cf, fill=(255, 255, 255, 255))
+
+save(card, "price-callout-229.png")
+
+# Thin brand pill (optional lower-third accent asset)
+pw, ph = 420, 64
+pill = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
+pd = ImageDraw.Draw(pill)
+pd.rounded_rectangle((0, 4, pw - 4, ph - 4), radius=18, fill=(10, 14, 22, 200))
+pd.rounded_rectangle((0, 4, 10, ph - 4), radius=4, fill=(255, 78, 52, 255))
+bf = font(26)
+bt = "THE FLORIDA BUZZ"
+bb = pd.textbbox((0, 0), bt, font=bf)
+pd.text((22, (ph - (bb[3] - bb[1])) // 2 - 2), bt, font=bf, fill=(245, 248, 255, 255))
+save(pill, "brand-pill.png")
 `;
 
 function generateOverlayAssets(outDir) {
@@ -112,10 +104,8 @@ function generateOverlayAssets(outDir) {
     throw new Error(`Overlay PNG generation failed: ${(result.stderr || result.stdout || '').slice(-800)}`);
   }
   const files = {
-    dollars: path.join(outDir, 'dollars-burst.png'),
-    priceBadge: path.join(outDir, 'price-up-to-229.png'),
-    wallet: path.join(outDir, 'empty-wallet.png'),
-    spike: path.join(outDir, 'price-spike.png'),
+    priceCallout: path.join(outDir, 'price-callout-229.png'),
+    brandPill: path.join(outDir, 'brand-pill.png'),
   };
   for (const p of Object.values(files)) {
     if (!fs.existsSync(p)) throw new Error(`Missing overlay asset: ${p}`);
@@ -124,53 +114,29 @@ function generateOverlayAssets(outDir) {
 }
 
 /**
- * Default timed overlays for the Lightning Lane price story (seconds).
- * Positions are ffmpeg overlay expressions for 720x1280.
+ * Lightning Lane overlays — ONE price moment + persistent brand pill.
+ * Positions tuned for 720x1280 so park faces stay visible.
  */
 function lightningLaneOverlayPlan(assets) {
   return [
     {
-      path: assets.dollars,
-      start: 0.15,
-      end: 3.2,
-      x: '(W-w)/2',
-      y: '180',
+      path: assets.brandPill,
+      start: 0.0,
+      end: 999,
+      x: '28',
+      y: '36',
+      fadeIn: 0.25,
+      fadeOut: 0.35,
     },
     {
-      path: assets.priceBadge,
-      start: 2.2,
-      end: 6.3,
+      // Single premium $229 callout — upper third, not stacked with stickers
+      path: assets.priceCallout,
+      start: 2.4,
+      end: 5.6,
       x: '(W-w)/2',
-      y: '320',
-    },
-    {
-      path: assets.spike,
-      start: 5.6,
-      end: 9.4,
-      x: '(W-w)/2',
-      y: '220',
-    },
-    {
-      // Centered large empty-wallet — hard to miss on mobile
-      path: assets.wallet,
-      start: 9.0,
-      end: 13.6,
-      x: '(W-w)/2',
-      y: '260',
-    },
-    {
-      path: assets.dollars,
-      start: 15.6,
-      end: 19.4,
-      x: '(W-w)/2',
-      y: '200',
-    },
-    {
-      path: assets.priceBadge,
-      start: 16.2,
-      end: 20.0,
-      x: '(W-w)/2',
-      y: '420',
+      y: '210',
+      fadeIn: 0.18,
+      fadeOut: 0.28,
     },
   ];
 }

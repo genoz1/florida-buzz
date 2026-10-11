@@ -27,53 +27,58 @@ test('visual news config defaults to eleven_v4 Geno and never marks fal', () => 
   assert.equal(cfg.defaultVoiceName, 'Geno');
 });
 
-test('Lightning Lane story has no presenter and ends with Florida Buzz CTA', () => {
+test('Lightning Lane story has no presenter, multi-still cuts, and Florida Buzz CTA', () => {
   assert.equal(LIGHTNING_LANE_WORTH_IT.presenter, false);
   assert.match(LIGHTNING_LANE_WORTH_IT.spoken, /Follow Florida Buzz\.?\s*$/);
-  assert.equal(LIGHTNING_LANE_WORTH_IT.stills.length, 2);
+  assert.ok(LIGHTNING_LANE_WORTH_IT.stills.length >= 3);
   assert.equal(LIGHTNING_LANE_WORTH_IT.moneyOverlays, true);
+  assert.equal((LIGHTNING_LANE_WORTH_IT.accents || []).length, 0);
   assert.match(LIGHTNING_LANE_WORTH_IT.spoken, /two hundred twenty-nine|wallet/i);
   for (const s of LIGHTNING_LANE_WORTH_IT.stills) {
     assert.ok(fs.existsSync(s.path), `missing still ${s.file}`);
   }
+  // Captions stay short (social-news beats, not paragraphs)
+  for (const c of LIGHTNING_LANE_WORTH_IT.captions) {
+    assert.ok(c.text.split(/\s+/).length <= 6, `caption too wordy: ${c.text}`);
+  }
 });
 
-test('ASS writer uses large mobile caption size, brand, kinetic fade, and CTA', () => {
+test('ASS writer uses clean caption size, brand, kinetic fade, and CTA', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-vn-ass-'));
   const out = path.join(dir, 't.ass');
   writeAss({
-    captions: [{ start: 0, end: 2, text: 'Hello highs', highlight: 'highs' }],
+    captions: [{ start: 0, end: 2, text: 'RECORD HIGH', highlight: 'RECORD' }],
     duration: 20,
     outPath: out,
     brand: 'THE FLORIDA BUZZ',
     location: 'Magic Kingdom',
     ctaEndText: 'Follow Florida Buzz · thefloridabuzz.com',
-    accents: [{ start: 0.2, end: 1.5, text: '$$$$  PRICE HIT' }],
+    accents: [],
   });
   const body = fs.readFileSync(out, 'utf8');
   assert.match(body, /THE FLORIDA BUZZ/);
   assert.match(body, /Magic Kingdom/);
   assert.match(body, /\\fad\(/);
   assert.match(body, /Follow Florida Buzz/);
-  assert.match(body, /&H00FFFF&/);
-  assert.match(body, /Style: Caption,DejaVu Sans,88,/);
-  assert.match(body, /MoneyAccent/);
-  assert.match(body, /\$\$\$\$ PRICE HIT/);
+  assert.match(body, /&H00324EFF&/);
+  assert.match(body, /Style: Caption,Noto Sans Display,76,/);
+  assert.doesNotMatch(body, /MoneyAccent|\$\$\$\$ PRICE HIT|EMPTY WALLET/);
   assert.equal(stamp(1.5), '0:00:01.50');
   assert.equal(escapeAssText('a{b}\\c'), 'a b c');
 });
 
-test('money overlay PNGs generate and plan includes wallet + price badge', () => {
+test('overlay assets are a single premium price callout + brand pill', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-vn-ov-'));
   const assets = generateOverlayAssets(dir);
-  assert.ok(fs.existsSync(assets.dollars));
-  assert.ok(fs.existsSync(assets.priceBadge));
-  assert.ok(fs.existsSync(assets.wallet));
-  assert.ok(fs.existsSync(assets.spike));
+  assert.ok(fs.existsSync(assets.priceCallout));
+  assert.ok(fs.existsSync(assets.brandPill));
+  assert.equal(assets.wallet, undefined);
+  assert.equal(assets.dollars, undefined);
   const plan = lightningLaneOverlayPlan(assets);
-  assert.ok(plan.length >= 4);
-  assert.ok(plan.some((p) => p.path === assets.wallet));
-  assert.ok(plan.some((p) => p.path === assets.priceBadge));
+  assert.ok(plan.length <= 3);
+  assert.ok(plan.some((p) => p.path === assets.priceCallout));
+  assert.ok(plan.some((p) => p.path === assets.brandPill));
+  assert.ok(!plan.some((p) => /wallet|dollars|spike/i.test(p.path)));
 });
 
 test('synthesizeElevenV4 hits ElevenLabs direct URL with eleven_v4 (not fal)', async () => {

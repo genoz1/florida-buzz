@@ -20,46 +20,61 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   presenter: false,
   // Geno-style delivery tags (ElevenLabs v4 audio tags).
   spoken: `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth emptying the wallet? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`,
+  // Fewer words per beat — kinetic social-news captions (park stays the hero).
   captions: [
-    { start: 0.0, end: 2.8, text: 'LL hit $$$$ highs', highlight: '$$$$' },
-    { start: 2.8, end: 5.6, text: 'UP TO $229', highlight: '$229' },
-    { start: 5.6, end: 8.4, text: 'Seven Dwarfs', highlight: 'Seven Dwarfs' },
-    { start: 8.4, end: 11.0, text: 'Standby 50 min', highlight: '50 min' },
-    { start: 11.0, end: 13.8, text: 'Empty the wallet?', highlight: 'wallet' },
-    { start: 13.8, end: 17.2, text: 'Pay only if it saves you', highlight: 'saves you' },
-    { start: 17.2, end: 22.0, text: 'Record $ ≠ auto YES', highlight: 'auto YES' },
+    { start: 0.0, end: 2.3, text: 'RECORD HIGH', highlight: 'RECORD' },
+    // $229 beat handled by premium PNG callout — light caption only
+    { start: 2.3, end: 5.5, text: 'NEW HIGH', highlight: 'HIGH' },
+    { start: 5.5, end: 8.2, text: 'SEVEN DWARFS', highlight: 'SEVEN DWARFS' },
+    { start: 8.2, end: 10.8, text: '50 MIN WAIT', highlight: '50 MIN' },
+    { start: 10.8, end: 13.4, text: 'WORTH IT?', highlight: 'WORTH IT?' },
+    { start: 13.4, end: 17.0, text: 'PAY ONLY IF IT HELPS', highlight: 'ONLY IF' },
+    { start: 17.0, end: 22.0, text: 'NOT AN AUTO YES', highlight: 'AUTO YES' },
   ],
-  // Extra ASS money accents (PNG overlays carry the heavy visual punch).
-  accents: [
-    { start: 0.3, end: 2.6, text: '$$$$ PRICE HIT' },
-    { start: 11.2, end: 13.6, text: 'EMPTY WALLET?' },
-  ],
+  // No spam ASS money accents ($$$$ / EMPTY WALLET) — clean system.
+  accents: [],
   stills: [
+    {
+      file: 'priority-access-entrance.jpg',
+      path: path.join(REFS, 'priority-access-entrance.jpg'),
+      credit: 'Priority / Lightning Lane entrance reference still (Magic Kingdom area)',
+      pan: 'up',
+      zoomEnd: 1.18,
+      weight: 0.22,
+    },
     {
       file: 'seven-dwarfs-mine-train.jpg',
       path: path.join(REFS, 'seven-dwarfs-mine-train.jpg'),
       credit: 'Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons',
       pan: 'right',
-      zoomEnd: 1.13,
-      weight: 0.55,
+      zoomEnd: 1.2,
+      weight: 0.28,
     },
     {
       file: 'big-thunder-lightning-lane.jpg',
       path: path.join(REFS, 'big-thunder-lightning-lane.jpg'),
       credit: 'Big Thunder Mountain Lightning Lane, CC BY-SA 4.0, Wikimedia Commons',
       pan: 'left',
-      zoomEnd: 1.1,
-      weight: 0.45,
+      zoomEnd: 1.16,
+      weight: 0.25,
+    },
+    {
+      file: 'seven-dwarfs-mine-train.jpg',
+      path: path.join(REFS, 'seven-dwarfs-mine-train.jpg'),
+      credit: 'Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons',
+      pan: 'down',
+      zoomEnd: 1.22,
+      weight: 0.25,
     },
   ],
   ctaSpoken: CTA_SPOKEN,
   ctaCaption: CTA_CAPTION,
-  // Enable wallet / $$$$ / $229 PNG overlays in the sample pipeline.
+  // One premium price callout (not wallet/$$$$ sticker dump).
   moneyOverlays: true,
   notes: [
-    'Price-impact graphics ($$$$, empty wallet, up-to-$229 badge) are intentional visual accents.',
+    'Visual system: clean kinetic captions + one premium $229 callout (no wallet/$$$$ stickers).',
     'No AI presenter / host cutout.',
-    'Visuals: licensed Magic Kingdom stills + generated money overlays.',
+    'Visuals: licensed Magic Kingdom stills with stronger Ken Burns cut rhythm.',
     'Voice: Geno (ElevenLabs bg7PC2IzyIDwYgytMiW1).',
   ],
 });

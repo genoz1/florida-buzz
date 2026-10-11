@@ -63,9 +63,11 @@ function escapeAssText(text) {
 }
 
 /**
- * Kinetic ASS captions: brand + location + timed lines with fade/pop + optional yellow highlights.
- * Mobile-first: large bold caption type for 9:16 social.
- * highlight: substring to wrap in yellow ASS color tags.
+ * Clean modern social-news ASS:
+ * - Bold kinetic captions (not meme spam)
+ * - Coral accent highlights
+ * - Brand via PNG pill (ASS brand kept subtle / optional location)
+ * - Captions sit in lower safe zone so faces stay readable
  */
 function writeAss({
   captions,
@@ -79,7 +81,8 @@ function writeAss({
   accents = [],
 }) {
   const fs = require('node:fs');
-  // Caption Fontsize 88 (~83% larger than prior 48) — mobile-first, bold social type.
+  // Noto Sans Display when available via fontconfig; DejaVu is a safe ASS fallback name.
+  // Outline 3 (not 6) — readable without meme-generator look.
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${width}
@@ -89,20 +92,23 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,88,&H00FFFFFF,&H00FFFFFF,&H00101010,&HBB000000,-1,0,0,0,100,100,0,0,1,6,3,2,24,24,250,1
-Style: Brand,DejaVu Sans,36,&H00F4F7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,8,18,18,26,1
-Style: Loc,DejaVu Sans,32,&H00E8F0FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,2,24,24,48,1
-Style: Badge,DejaVu Sans,30,&H0000D7FF,&H00FFFFFF,&H00101010,&H90000000,-1,0,0,0,100,100,0,0,1,3,1,7,18,18,26,1
-Style: Cta,DejaVu Sans,56,&H00FFFFFF,&H00FFFFFF,&H00101010,&HBB000000,-1,0,0,0,100,100,0,0,1,6,3,2,28,28,310,1
-Style: MoneyAccent,DejaVu Sans,72,&H0000FF5A,&H00FFFFFF,&H00101010,&HCC000000,-1,0,0,0,100,100,0,0,1,5,2,8,24,24,150,1
+Style: Caption,Noto Sans Display,76,&H00FFFFFF,&H00FFFFFF,&H00101018,&H66000000,-1,0,0,0,100,100,0,0,1,3,2,2,36,36,290,1
+Style: Brand,Noto Sans Display,28,&H00F4F7FF,&H00FFFFFF,&H00101010,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,7,28,28,40,1
+Style: Loc,Noto Sans Display,26,&H00E8F0FF,&H00FFFFFF,&H00101018,&H99000000,-1,0,0,0,100,100,0,0,1,2,1,1,28,28,86,1
+Style: Cta,Noto Sans Display,48,&H00FFFFFF,&H00FFFFFF,&H00101018,&H99000000,-1,0,0,0,100,100,0,0,1,3,2,2,36,36,320,1
+Style: Accent,Noto Sans Display,64,&H00324EFF,&H00FFFFFF,&H00101018,&H66000000,-1,0,0,0,100,100,0,0,1,3,2,8,32,32,200,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,${escapeAssText(brand)}
-Dialogue: 0,0:00:00.00,${stamp(Math.min(3.2, duration))},Badge,,0,0,0,,{\\fad(120,80)}FLORIDA NEWS
 `;
+  // Brand mark is the PNG pill — ASS brand kept for tests / callers that assert presence,
+  // but drawn off-canvas so it does not double-stack with the pill.
+  if (brand) {
+    ass += `Dialogue: 0,0:00:00.00,${stamp(Math.min(0.05, duration))},Brand,,0,0,0,,{\\alpha&HFF&}${escapeAssText(brand)}\n`;
+  }
+  // Location sits bottom-left as a quiet lower-third cue (above TikTok chrome).
   if (location) {
-    ass += `Dialogue: 0,0:00:00.00,${stamp(duration)},Loc,,0,0,0,,${escapeAssText(location)}\n`;
+    ass += `Dialogue: 0,0:00:00.00,${stamp(duration)},Loc,,0,0,0,,{\\fad(200,200)}${escapeAssText(location)}\n`;
   }
 
   for (const c of captions) {
@@ -112,48 +118,55 @@ Dialogue: 0,0:00:00.00,${stamp(Math.min(3.2, duration))},Badge,,0,0,0,,{\\fad(12
     if (c.highlight) {
       const h = escapeAssText(c.highlight);
       if (h && text.includes(h)) {
-        // Use a function replacer — string replace treats $ specially ($$$$ → $$).
-        text = text.replace(h, () => `{\\c&H00FFFF&}${h}{\\c&HFFFFFF&}`);
+        // Coral accent (&H00324EFF = BGR for #FF4E32)
+        text = text.replace(h, () => `{\\c&H00324EFF&}${h}{\\c&HFFFFFF&}`);
       }
     }
-    // Fade + slight scale pop for kinetic feel
-    ass += `Dialogue: 1,${stamp(c.start)},${stamp(end)},Caption,,0,0,0,,{\\fad(90,70)\\t(0,160,\\fscx108\\fscy108)\\t(160,280,\\fscx100\\fscy100)}${text}\n`;
+    // Fade + modest scale pop (not cartoon bounce)
+    ass += `Dialogue: 1,${stamp(c.start)},${stamp(end)},Caption,,0,0,0,,{\\fad(110,90)\\t(0,140,\\fscx106\\fscy106)\\t(140,260,\\fscx100\\fscy100)}${text}\n`;
   }
 
   for (const a of accents || []) {
     const end = Math.min(a.end, duration - 0.05);
     if (end <= a.start) continue;
-    const style = a.style || 'MoneyAccent';
+    const style = a.style || 'Accent';
     ass += `Dialogue: 3,${stamp(a.start)},${stamp(end)},${style},,0,0,0,,{\\fad(100,80)}${escapeAssText(a.text)}\n`;
   }
 
   const ctaStart = Math.max(0, duration - 3.2);
-  if (ctaEndText && ctaStart < duration) {
+  if (ctaEndText && layoutCta(ctaStart, duration)) {
     ass += `Dialogue: 2,${stamp(ctaStart)},${stamp(duration)},Cta,,0,0,0,,{\\fad(160,0)}${escapeAssText(ctaEndText)}\n`;
   }
 
   fs.writeFileSync(outPath, ass);
 }
 
+function layoutCta(ctaStart, duration) {
+  return ctaStart < duration;
+}
+
 function kenBurnsClip({
   input,
   output,
   frames,
-  zoomEnd = 1.12,
+  zoomEnd = 1.16,
   width = 720,
   height = 1280,
   fps = 30,
   pan = 'center',
 }) {
-  const scaleW = Math.round(width * 1.25);
-  const scaleH = Math.round(height * 1.25);
+  const scaleW = Math.round(width * 1.32);
+  const scaleH = Math.round(height * 1.32);
   let xExpr = 'iw/2-(iw/zoom/2)';
   let yExpr = 'ih/2-(ih/zoom/2)';
-  if (pan === 'left') xExpr = `iw/2-(iw/zoom/2)-0.08*iw*(on/${frames})`;
-  if (pan === 'right') xExpr = `iw/2-(iw/zoom/2)+0.08*iw*(on/${frames})`;
-  if (pan === 'up') yExpr = `ih/2-(ih/zoom/2)-0.06*ih*(on/${frames})`;
-  if (pan === 'down') yExpr = `ih/2-(ih/zoom/2)+0.06*ih*(on/${frames})`;
+  // Stronger pans for higher energy without looking drunk
+  if (pan === 'left') xExpr = `iw/2-(iw/zoom/2)-0.12*iw*(on/${frames})`;
+  if (pan === 'right') xExpr = `iw/2-(iw/zoom/2)+0.12*iw*(on/${frames})`;
+  if (pan === 'up') yExpr = `ih/2-(ih/zoom/2)-0.1*ih*(on/${frames})`;
+  if (pan === 'down') yExpr = `ih/2-(ih/zoom/2)+0.1*ih*(on/${frames})`;
 
+  // Faster zoom ramp for punchier Ken Burns
+  const zStep = Math.max(0.0014, (zoomEnd - 1) / Math.max(frames, 1));
   run(ffmpegBin(), [
     '-y',
     '-loop',
@@ -161,7 +174,7 @@ function kenBurnsClip({
     '-i',
     input,
     '-vf',
-    `scale=${scaleW}:${scaleH}:force_original_aspect_ratio=increase,crop=${scaleW}:${scaleH},zoompan=z='min(1+0.00115*on,${zoomEnd})':x='${xExpr}':y='${yExpr}':d=1:s=${width}x${height}:fps=${fps},format=yuv420p`,
+    `scale=${scaleW}:${scaleH}:force_original_aspect_ratio=increase,crop=${scaleW}:${scaleH},zoompan=z='min(1+${zStep}*on,${zoomEnd})':x='${xExpr}':y='${yExpr}':d=1:s=${width}x${height}:fps=${fps},eq=contrast=1.06:saturation=1.08,format=yuv420p`,
     '-frames:v',
     String(frames),
     '-an',
@@ -180,13 +193,12 @@ function concatVideos(listPath, output) {
 }
 
 /**
- * Mux audio + ASS captions, optionally compositing timed PNG overlays (money/wallet accents).
- * overlays: [{ path, start, end, x, y }]
+ * Mux audio + ASS captions, optionally compositing timed PNG overlays.
+ * overlays: [{ path, start, end, x, y, fadeIn?, fadeOut? }]
  */
-function muxAssAndAudio({ videoPath, audioPath, assPath, outputPath, overlays = [] }) {
+function muxAssAndAudio({ videoPath, audioPath, assPath, outputPath, overlays = [], duration }) {
   const assEscaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-  // When no overlays, keep the simpler -vf path (avoids filter_complex map quirks).
   if (!overlays.length) {
     run(ffmpegBin(), [
       '-y',
@@ -220,14 +232,33 @@ function muxAssAndAudio({ videoPath, audioPath, assPath, outputPath, overlays = 
   }
 
   const parts = [];
+  // Prepare each overlay with optional alpha fades
+  overlays.forEach((ov, i) => {
+    const inputIdx = i + 2;
+    const fadeIn = Number(ov.fadeIn) || 0;
+    const fadeOut = Number(ov.fadeOut) || 0;
+    const start = ov.start;
+    const end = ov.end >= 900 ? (duration || 30) : ov.end;
+    let chain = `[${inputIdx}:v]format=rgba`;
+    if (fadeIn > 0) {
+      chain += `,fade=t=in:st=${start}:d=${fadeIn}:alpha=1`;
+    }
+    if (fadeOut > 0) {
+      const outStart = Math.max(start, end - fadeOut);
+      chain += `,fade=t=out:st=${outStart}:d=${fadeOut}:alpha=1`;
+    }
+    chain += `[ov${i}]`;
+    parts.push(chain);
+  });
+
   let last = '[0:v]';
   overlays.forEach((ov, i) => {
-    const inputIdx = i + 2; // 0=video, 1=audio, overlays start at 2
     const out = i === overlays.length - 1 ? '[vbase]' : `[v${i}]`;
     const x = ov.x || '(W-w)/2';
-    const y = ov.y || '240';
+    const y = ov.y || '210';
+    const end = ov.end >= 900 ? (duration || 30) : ov.end;
     parts.push(
-      `${last}[${inputIdx}:v]overlay=x=${x}:y=${y}:enable='between(t,${ov.start},${ov.end})':format=auto${out}`
+      `${last}[ov${i}]overlay=x=${x}:y=${y}:enable='between(t,${ov.start},${end})':format=auto${out}`
     );
     last = out;
   });

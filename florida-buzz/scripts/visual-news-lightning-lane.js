@@ -5,7 +5,7 @@
  * Lightning Lane visual-news sample (no AI presenter).
  *
  * Pipeline: ElevenLabs eleven_v4 (direct) + local ffmpeg Ken Burns / kinetic captions
- * + money/price PNG overlays ($$$$, UP TO $229, empty wallet).
+ * + one premium $229 callout (no wallet / $$$$ sticker dump).
  * Does NOT use fal.ai / FAL_KEY.
  *
  * Voice default: Geno — ElevenLabs voice id bg7PC2IzyIDwYgytMiW1
@@ -31,9 +31,11 @@ const {
 async function main() {
   const reuse =
     process.env.VISUAL_NEWS_REUSE_VOICE ||
-    (process.env.REUSE_VOICE !== 'false' && pathExists('/tmp/fb-ll-worth-it/ll.mp3')
-      ? '/tmp/fb-ll-worth-it/ll.mp3'
-      : null);
+    (pathExists('/tmp/fb-visual-news-ll/voice.mp3')
+      ? '/tmp/fb-visual-news-ll/voice.mp3'
+      : pathExists('/tmp/fb-ll-worth-it/ll.mp3')
+        ? '/tmp/fb-ll-worth-it/ll.mp3'
+        : null);
 
   // Prefer live ElevenLabs Geno when key present (unless REUSE_VOICE=true forces reuse).
   // Default to live TTS so Geno voice is used — do not silently reuse a prior Matilda bake.

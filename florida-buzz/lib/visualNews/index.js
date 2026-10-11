@@ -18,7 +18,7 @@ const { generateOverlayAssets, lightningLaneOverlayPlan } = require('./overlays'
  * Create a Florida Buzz visual news short:
  * - ElevenLabs eleven_v4 voiceover (direct API; never fal) — default Geno voice
  * - Local ffmpeg Ken Burns stills + kinetic ASS captions + brand overlays
- * - Punchy money/price PNG overlays when story.moneyOverlays
+ * - Optional premium price callout when story.moneyOverlays (no sticker dump)
  * - No AI presenter
  *
  * @param {object} options
@@ -151,13 +151,17 @@ async function createFloridaBuzzVisualVideo(options = {}) {
     assPath,
     outputPath: master,
     overlays,
+    duration,
   });
 
-  const credits = story.stills.map((s) => `- ${s.credit || s.file}`).join('\n');
+  const credits = [...new Set(story.stills.map((s) => `- ${s.credit || s.file}`))].join('\n');
   const voiceLine =
     ttsMeta.voiceId || cfg.elevenVoiceId
       ? `**Voice:** Geno (\`${ttsMeta.voiceId || cfg.elevenVoiceId}\`) — ElevenLabs direct`
-      : '**Voice:** (reused local mp3)';
+      : '**Voice:** Geno (reused local ElevenLabs mp3; voice id bg7PC2IzyIDwYgytMiW1)';
+  const overlayDesc = overlays.length
+    ? 'brand pill + single premium $229 callout (no wallet/$$$$ stickers)'
+    : 'none';
   fs.writeFileSync(
     readmePath,
     `# ${story.title}
@@ -166,7 +170,7 @@ async function createFloridaBuzzVisualVideo(options = {}) {
 ${voiceLine}  
 **No fal.ai** — no FAL_KEY, no fal image/ffmpeg/ElevenLabs proxy  
 **No AI presenter**  
-**Overlays:** ${overlays.length ? '$$$$ / UP TO $229 / empty wallet / price spike PNGs' : 'none'}
+**Overlays:** ${overlayDesc}
 
 ## Script
 

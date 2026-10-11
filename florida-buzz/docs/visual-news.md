@@ -7,12 +7,20 @@ Vertical (9:16) news-style shorts built from **article / reference stills**, kin
 | Step | Tool |
 |------|------|
 | Voiceover | **ElevenLabs direct API** (`eleven_v4`, or `eleven_v4_turbo` via env) |
-| Stills animation | **Local ffmpeg** (`ffmpeg-static`) Ken Burns zoom/pan |
-| Captions / brand | Local ffmpeg + ASS overlays (large mobile-first type) |
-| Price accents | Generated PNG overlays ($$$$, UP TO $229, empty wallet, price spike) + ASS accents |
+| Stills animation | **Local ffmpeg** (`ffmpeg-static`) Ken Burns zoom/pan + cut rhythm |
+| Captions / brand | Local ffmpeg + ASS kinetic captions + brand pill PNG |
+| Price accents | **One** premium `$229` callout (no wallet / $$$$ / arrow sticker dumps) |
 | Presenter | **None** — no AI host cutout |
 
 This feature **does not use** `FAL_KEY`, fal image generation, fal ffmpeg merge, or the fal ElevenLabs proxy.
+
+## Visual system (post-punch cleanup)
+
+- Park photography stays the hero — overlays never cover faces with clip-art.
+- Short caption beats (≤ ~4 words) with coral accent highlights.
+- Single premium price card for the `$229` moment.
+- Intentional Florida Buzz brand pill (top-left), location as quiet lower-third.
+- Stronger Ken Burns + multi-still cuts for energy.
 
 ## Voice (Geno)
 
@@ -71,8 +79,8 @@ const result = await createFloridaBuzzVisualVideo({
 # Live ElevenLabs v4 + local ffmpeg
 ELEVENLABS_API_KEY=sk_... npm run sample:visual-news-ll
 
-# Or reuse a prior VO mp3 (assembly-only)
-REUSE_VOICE=true VISUAL_NEWS_REUSE_VOICE=/tmp/fb-ll-worth-it/ll.mp3 \
+# Or reuse a prior Geno VO mp3 (assembly-only)
+REUSE_VOICE=true VISUAL_NEWS_REUSE_VOICE=/tmp/fb-visual-news-ll/voice.mp3 \
   npm run sample:visual-news-ll
 ```
 
@@ -84,7 +92,7 @@ Output: `/opt/cursor/artifacts/florida-buzz-visual-news-ll.mp4`
 - No AI presenter
 - Story-specific stills (not generic filler)
 - Florida Buzz brand + location overlays
-- Large kinetic captions (ASS Fontsize ~78) for phone readability
-- Lightning Lane sample includes price-impact accents ($$$$, empty wallet, UP TO $229)
+- Large kinetic captions for phone readability (clean outline, not meme spam)
+- Lightning Lane sample: one premium `$229` callout only
 - VO ends with Florida Buzz CTA (“Follow Florida Buzz.”)
 - Default VO voice: Geno (`bg7PC2IzyIDwYgytMiW1`)
