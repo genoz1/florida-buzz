@@ -2,8 +2,11 @@
 'use strict';
 
 /**
- * Upload the approved Florida Buzz park intro and attach it to the Disney show.
- * Does not touch the trailer episode master.
+ * Upload the approved Florida Buzz cold intro (announcer-only v7) and attach it
+ * to the Disney show. Does not touch the trailer episode master.
+ *
+ * Official cold open spoken line (Whisper):
+ *   "Welcome aboard your next stop the Florida Buzz Disney podcast."
  */
 
 const fs = require('node:fs');
@@ -16,7 +19,9 @@ const FB_URL = process.env.FLORIDA_BUZZ_SUPABASE_URL || process.env.SUPABASE_URL
 const FB_KEY = process.env.FLORIDA_BUZZ_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const INTRO_PATH =
   process.env.PODCASTS_INTRO_FILE ||
-  path.join(__dirname, '../public/podcasts/florida-buzz-park-intro-trimmed-v6.mp3');
+  path.join(__dirname, '../public/podcasts/florida-buzz-park-intro-announcer-only-v7.mp3');
+const STORAGE_OBJECT =
+  process.env.PODCASTS_INTRO_STORAGE_OBJECT || 'show-intro-announcer-only-v7.mp3';
 
 async function main() {
   if (!FB_URL || !FB_KEY) throw new Error('Florida Buzz Supabase URL/key required');
@@ -31,7 +36,7 @@ async function main() {
   const show = await store.getShow(DISNEY_SHOW_SLUG);
   if (!show) throw new Error('florida-buzz-disney show missing');
 
-  const storagePath = `${show.id}/show-intro-park-trimmed-v6.mp3`;
+  const storagePath = `${show.id}/${STORAGE_OBJECT}`;
   const publicUrl = await store.uploadBytes('podcast-audio', storagePath, bytes, 'audio/mpeg');
   const updated = await store.updateShow(show.id, { intro_audio_url: publicUrl });
 
@@ -41,6 +46,7 @@ async function main() {
         ok: true,
         show: updated.slug,
         intro_audio_url: updated.intro_audio_url,
+        storage_path: storagePath,
         bytes: bytes.length,
         note: 'Regenerate episode private preview to prepend this intro. Trailer episode is unchanged.',
       },

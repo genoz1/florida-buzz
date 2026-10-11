@@ -106,7 +106,7 @@ FAL_KEY=<set securely in DO; never commit>
 4. Public routes mount unless `PODCASTS_ENABLED=false`.
 5. Keep `PODCASTS_GENERATION_ENABLED=false` until a future episode is explicitly approved for generation.
 6. Do not submit the RSS feed to Apple/Spotify until approved.
-7. Show intro: approved `florida-buzz-park-intro-trimmed-v6.mp3` is stored on `podcast_shows.intro_audio_url`. Episode **Generate private preview** prepends that intro before the fal dialogue (trailer episode stays untouched). Supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
+7. Show intro: approved cold open `florida-buzz-park-intro-announcer-only-v7.mp3` (~8.3s announcer-only) is stored on `podcast_shows.intro_audio_url`. Upload/attach with `node scripts/podcast-upload-intro.js` (creds via `FLORIDA_BUZZ_SUPABASE_*`). Episode **Generate private preview** prepends that intro via `loadIntroBuffer` before the fal dialogue (trailer episode stays untouched). Supply only original/licensed Florida Buzz audio — never Disney music, voices, announcements, or chimes.
 8. Episode masters are recompressed to ~96kbps mono before upload so a full ~30–45 minute show stays under Supabase Free’s **50MB** global Storage limit. In Supabase → Storage → Settings, keep Global file size at 50MB (or higher on Pro) and set the `podcast-audio` bucket limit to 50MB.
 
 ## Weekly draft schedule (America/New_York)
