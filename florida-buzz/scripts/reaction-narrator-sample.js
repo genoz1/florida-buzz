@@ -2,17 +2,16 @@
 'use strict';
 
 /**
- * Reaction-narrator format sample:
- *   full-screen Disney news / park visual
- *   + corner host (green-screen keyed) talking / pointing at it
- *   + story VO
+ * Reaction / storyteller format:
+ *   FULL-SCREEN BACKGROUND: Lightning Lane / park entrance photos playing out
+ *   BOTTOM-RIGHT: consistent 30s white female host in a solid video panel,
+ *                 speaking and telling the story (same energy as the
+ *                 “guy at the bottom pointing at the content” reference)
  *
- * This is the TikTok/Reels style: background content, narrator in the corner.
- * Host is stock green-screen footage (not Gene).
+ * Host identity (locked for samples): Mixkit 52184 — 30s white female
+ * talking to camera. Override with NARRATOR_CLIP for a permanent host.
  *
  * Env: ELEVENLABS_API_KEY
- * Narrator clip: set NARRATOR_CLIP or default /tmp/fb-narrator/talk/49581.mp4
- * Background image: set BG_IMAGE or default news screenshot / Seven Dwarfs still
  */
 
 require('dotenv').config();
@@ -22,23 +21,30 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const TTS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
-// Male stock host on green screen → male VO for a natural match
-const VOICE_ID = process.env.ELEVENLABS_VOICE_SAMPLE || 'pNInz6obpgDQGcFmaJgB'; // Adam
+const VOICE_ID = process.env.ELEVENLABS_VOICE_SAMPLE || 'XrExE9yKIg1WjnnlVkGX'; // Matilda
 const MODEL_ID = process.env.ELEVENLABS_MODEL_ID || 'eleven_v4';
 const ROOT = path.join(__dirname, '..');
 const REFS = path.join(ROOT, 'public', 'reels', 'references');
 const OUT_DIR = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
 const TMP = process.env.SAMPLE_TMP_DIR || '/tmp/fb-reaction-narrator';
 
+const HOST_DEFAULT = '/tmp/fb-narrator/female/52184.mp4';
+const HOST_URL = 'https://assets.mixkit.co/videos/52184/52184-720.mp4';
+
 const STORY = {
-  spoken: `[curious] Lightning Lane Single Pass just hit new highs for November first. Look at this — Seven Dwarfs, Lightning Lane on one side, standby fifty minutes on the other. So is it worth it? Pay only when that wait would wreck your morning and you're already in the park that day. A record price is not an automatic yes. Follow Florida Buzz.`,
+  spoken: `[curious] Lightning Lane Single Pass just hit new highs for November first. Look at this — Big Thunder, Lightning Lane right at the entrance, standby stacked next to it. Same story at Seven Dwarfs. Standby can hit fifty minutes. So is it worth it? Pay only when that wait would wreck your morning and you're already in the park that day. A record price is not an automatic yes. Follow Florida Buzz.`,
   captions: [
     { start: 0.0, end: 3.2, text: 'Lightning Lane hit new highs' },
-    { start: 3.2, end: 6.8, text: 'Seven Dwarfs — look at this' },
-    { start: 6.8, end: 10.2, text: 'Standby: 50 minutes' },
+    { start: 3.2, end: 7.0, text: 'Look at these entrances' },
+    { start: 7.0, end: 10.2, text: 'Standby: 50 minutes' },
     { start: 10.2, end: 13.4, text: 'So is it worth it?' },
     { start: 13.4, end: 17.8, text: 'Pay only if it saves your morning' },
     { start: 17.8, end: 24.0, text: 'Record price ≠ automatic yes' },
+  ],
+  stills: [
+    'big-thunder-lightning-lane.jpg',
+    'seven-dwarfs-mine-train.jpg',
+    'magic-kingdom-big-thunder.jpg',
   ],
 };
 
@@ -60,6 +66,7 @@ function stamp(seconds) {
   return `${Math.floor(c / 360000)}:${String(Math.floor(c / 6000) % 60).padStart(2, '0')}:${String(Math.floor(c / 100) % 60).padStart(2, '0')}.${String(c % 100).padStart(2, '0')}`;
 }
 function writeAss(captions, duration, outPath) {
+  // Captions upper-mid so they sit on the story, clear of the host panel
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: 720
@@ -68,8 +75,8 @@ WrapStyle: 0
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,40,&H00FFFFFF,&H00FFFFFF,&H00101010,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,210,1
-Style: Brand,DejaVu Sans,26,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,28,28,36,1
+Style: Caption,DejaVu Sans,40,&H00FFFFFF,&H00FFFFFF,&H00101010,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,200,200,1
+Style: Brand,DejaVu Sans,24,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,24,24,28,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
@@ -111,6 +118,40 @@ function audioDuration(file) {
   return n;
 }
 
+async function ensureHost(narratorPath) {
+  if (fs.existsSync(narratorPath)) return;
+  fs.mkdirSync(path.dirname(narratorPath), { recursive: true });
+  console.log(`Downloading consistent female host clip…\n  ${HOST_URL}`);
+  const res = await fetch(HOST_URL, { signal: AbortSignal.timeout(120000) });
+  if (!res.ok) throw new Error(`Host clip download failed: ${res.status}`);
+  fs.writeFileSync(narratorPath, Buffer.from(await res.arrayBuffer()));
+}
+
+function buildStoryBackground(stills, duration, outPath) {
+  // Full-bleed 9:16 Ken Burns of entrance / park stills
+  const seg = duration / stills.length;
+  const listPath = path.join(TMP, 'bg-concat.txt');
+  const parts = [];
+  stills.forEach((still, i) => {
+    const clip = path.join(TMP, `bg-still-${i}.mp4`);
+    const frames = Math.max(2, Math.round(seg * 30));
+    run(ffmpegBin(), [
+      '-y', '-loop', '1', '-i', still,
+      '-vf', `scale=820:1460:force_original_aspect_ratio=increase,crop=820:1460,zoompan=z='min(1+0.0009*on,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=720x1280:fps=30,format=yuv420p`,
+      '-frames:v', String(frames), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', clip,
+    ]);
+    parts.push(`file '${clip.replace(/'/g, "'\\''")}'`);
+  });
+  fs.writeFileSync(listPath, `${parts.join('\n')}\n`);
+  run(ffmpegBin(), [
+    '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
+    '-t', String(duration),
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-an',
+    '-pix_fmt', 'yuv420p',
+    outPath,
+  ]);
+}
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.mkdirSync(TMP, { recursive: true });
@@ -118,18 +159,16 @@ async function main() {
   const apiKey = process.env.ELEVENLABS_API_KEY || process.env.XI_API_KEY;
   if (!apiKey) throw new Error('Missing ELEVENLABS_API_KEY');
 
-  const narrator = process.env.NARRATOR_CLIP || '/tmp/fb-narrator/talk/49581.mp4';
-  const bgCandidates = [
-    process.env.BG_IMAGE,
-    '/tmp/fb-narrator/bg-news.jpg',
-    path.join(REFS, 'seven-dwarfs-mine-train.jpg'),
-  ].filter(Boolean);
-  const bg = bgCandidates.find((p) => fs.existsSync(p));
-  if (!bg) throw new Error('Missing background image');
-  if (!fs.existsSync(narrator)) throw new Error(`Missing narrator clip: ${narrator}`);
+  const narrator = process.env.NARRATOR_CLIP || HOST_DEFAULT;
+  await ensureHost(narrator);
+
+  const stills = STORY.stills
+    .map((name) => path.join(REFS, name))
+    .filter((p) => fs.existsSync(p));
+  if (stills.length < 2) throw new Error('Need at least 2 park stills in public/reels/references');
 
   const voiceMp3 = path.join(TMP, 'voice.mp3');
-  console.log('Synthesizing narrator VO…');
+  console.log('Synthesizing female narrator VO…');
   await elevenTts({ apiKey, text: STORY.spoken, outputPath: voiceMp3 });
   const duration = Math.min(Math.max(audioDuration(voiceMp3) + 0.3, 16), 26);
 
@@ -137,48 +176,42 @@ async function main() {
   const captions = STORY.captions.map((c, i, arr) => (i === arr.length - 1 ? { ...c, end: duration - 0.1 } : c));
   writeAss(captions, duration, assPath);
 
-  const bgVideo = path.join(TMP, 'bg.mp4');
-  const frames = Math.round(duration * 30);
-  console.log(`Building 9:16 background (${duration.toFixed(1)}s)…`);
-  run(ffmpegBin(), [
-    '-y', '-loop', '1', '-i', bg,
-    '-vf', `scale=820:1460,zoompan=z='min(1+0.0008*on,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=720x1280:fps=30,format=yuv420p`,
-    '-frames:v', String(frames), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', bgVideo,
-  ]);
+  // 1) Full-screen story background
+  const bgVideo = path.join(TMP, 'story-bg.mp4');
+  console.log(`Building full-screen story background (${duration.toFixed(1)}s)…`);
+  buildStoryBackground(stills, duration, bgVideo);
 
-  // Loop narrator clip, key green → solid corner host (pointing / talking).
-  // Plate is 1280x720; host sits ~x=176–616. Sampled greenscreen ≈ 0x149038;
-  // colorkey against bright green with moderate similarity keeps the body opaque.
-  const keyed = path.join(TMP, 'narrator-keyed.mov');
-  console.log('Keying green-screen narrator…');
+  // 2) Host panel — solid portrait video for bottom-right (large, readable face)
+  const hostPanel = path.join(TMP, 'host-panel.mp4');
+  console.log('Building bottom-right host panel…');
   run(ffmpegBin(), [
     '-y',
     '-stream_loop', '-1',
     '-i', narrator,
     '-t', String(duration),
     '-vf',
-    [
-      'scale=-1:720',
-      'crop=420:720:160:0',
-      'colorkey=0x00FF00:0.30:0.12',
-      'despill=green:mix=0.55:expand=0.1',
-      'scale=300:-1',
-      'format=rgba',
-    ].join(','),
-    '-c:v', 'qtrle', // keeps alpha
+    // Tight portrait on her face/shoulders — ~1/3 of the short width, tall enough to read
+    "scale=360:640:force_original_aspect_ratio=increase,crop=360:640,setsar=1,format=yuv420p",
     '-an',
-    keyed,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '18',
+    hostPanel,
   ]);
 
+  // 3) Composite: story full-bleed + host panel bottom-right with white border
   const composited = path.join(TMP, 'composited.mp4');
-  console.log('Compositing reaction layout…');
+  console.log('Compositing story background + corner narrator…');
   run(ffmpegBin(), [
     '-y',
     '-i', bgVideo,
-    '-i', keyed,
+    '-i', hostPanel,
     '-filter_complex',
-    // Bottom-left corner — classic reaction / “pointing at the screen” layout
-    '[0:v][1:v]overlay=16:1280-h-24:format=auto[v]',
+    [
+      // Soft darken bottom-right so host panel pops; white frame around host
+      '[1:v]pad=368:648:4:4:color=white,setsar=1[host]',
+      '[0:v][host]overlay=W-w-16:H-h-28[v]',
+    ].join(';'),
     '-map', '[v]',
     '-an',
     '-c:v', 'libx264',
@@ -208,12 +241,13 @@ async function main() {
 
   fs.writeFileSync(path.join(OUT_DIR, 'reaction-narrator-sample.md'), `# Reaction narrator sample
 
-Viral reaction layout:
-- **Background:** full-screen Lightning Lane news + Seven Dwarfs still
-- **Corner:** solid green-screen host (keyed), talking / pointing at the story
-- **VO + captions:** worth-it takeaway
+- **Background (full screen):** Lightning Lane / park entrance photos playing out
+- **Bottom-right:** consistent 30s white female host panel, narrating the story
+- **VO:** female voice with the worth-it takeaway
 
-Not Gene — stock Mixkit host for format proof.
+Host identity for samples: Mixkit 52184 (stock until Florida Buzz has a permanent on-camera host).
+Not Gene.
+
 Run: \`npm run sample:reaction-narrator\`
 `);
 
@@ -221,8 +255,9 @@ Run: \`npm run sample:reaction-narrator\`
     ok: true,
     master,
     duration,
-    format: 'reaction-narrator-corner',
-    background: bg,
+    format: 'story-background-host-bottom-right',
+    hostIdentity: 'mixkit-52184-female-30s',
+    stills,
     narrator,
     geneOnCamera: false,
   }, null, 2));
