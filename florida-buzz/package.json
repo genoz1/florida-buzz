@@ -14,6 +14,7 @@
     "sample:disney-story": "node scripts/disney-story-sample.js",
     "sample:lightning-lane": "node scripts/lightning-lane-worth-it-sample.js",
     "sample:host-overlay": "node scripts/host-overlay-sample.js",
+    "sample:reaction-narrator": "node scripts/reaction-narrator-sample.js",
     "sample:ai-reenactment": "node scripts/ai-story-reenactment.js",
     "buzz-facebook-sync": "node scripts/sync-facebook-buzz-comments.js",
     "build:launch-inventory": "node scripts/build-buzz-board-launch.js --write",
