@@ -16,6 +16,8 @@ test('question image renderer produces a reusable 1080 square PNG', async () => 
   assert.equal(dimensions.type, 'png');
   assert.equal(dimensions.width, 1080);
   assert.equal(dimensions.height, 1080);
+  // Branded QOTD card — not a bare photo
+  assert.ok(buffer.length > 20_000);
 });
 
 test('bitmap punctuation normalization preserves the complete wording', () => {

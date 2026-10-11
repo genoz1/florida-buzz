@@ -1,8 +1,10 @@
-const { generateValidatedImageResult } = require('./imageGen');
 const { Jimp } = require('jimp');
 const { storeGeneratedImage, supabase } = require('./supabase');
+const { renderBuzzSocialImage } = require('./buzzSocialImage');
 
 const IMAGE_BUCKET = 'article-images';
+// Versioned card filenames so older photorealistic Buzz photos are not reused.
+const CARD_VERSION = 'qotd-v1';
 
 // Facebook-only presentation copy. The underlying Buzz Board questions and
 // records remain untouched; this is the shorter, feed-native framing used by
@@ -191,11 +193,11 @@ const FACEBOOK_PRESENTATIONS = {
 };
 
 function facebookImageFilename(slug) {
-  return `facebook-buzz-${slug}.jpg`;
+  return `facebook-buzz-${CARD_VERSION}-${slug}.png`;
 }
 
 function instagramImageFilename(slug) {
-  return `instagram-buzz-${slug}.jpg`;
+  return `instagram-buzz-${CARD_VERSION}-${slug}.png`;
 }
 
 function presentationFor(discussion) {
@@ -211,22 +213,20 @@ function presentationFor(discussion) {
 }
 
 function buildFacebookCopy(discussion) {
-  return presentationFor(discussion).hook;
+  const presentation = presentationFor(discussion);
+  return `${presentation.hook}\n\nQuestion of the Day — answer on Buzz Board 👇`;
 }
 
 function buildInstagramCopy(discussion, siteUrl = 'https://thefloridabuzz.com') {
   const presentation = presentationFor(discussion);
   const destination = new URL(`/go/ig/${encodeURIComponent(discussion.slug)}`, siteUrl).toString();
-  return `${presentation.hook}\n\nAnswer here or continue the discussion on Buzz Board. Copy this short address into your browser: ${destination}`;
+  return `Question of the Day\n\n${presentation.hook}\n\nAnswer here or continue the discussion on Buzz Board. Copy this short address into your browser: ${destination}`;
 }
 
+/** @deprecated Photorealistic Buzz photos are retired; cards are rendered locally. Kept for tests/compat. */
 function buildFacebookImagePrompt(discussion) {
-  const { imageSubject } = presentationFor(discussion);
-  return `Create a candid, photorealistic editorial travel photograph of ${imageSubject}.
-The image should feel like a real visitor captured the moment for a natural Facebook conversation post, not an advertisement or polished brand campaign.
-No text overlay, caption, border, logo treatment, poster layout, infographic, collage, illustration, or branded social-media card.
-Keep the image accurate to the named destination and exact discussion subject. Do not invent rides, buildings, signs, events, or recognizable characters.
-Keep the primary subject near the center so the photograph also works as a clean square crop for Instagram.`;
+  const presentation = presentationFor(discussion);
+  return `Branded Florida Buzz Question of the Day card for: ${presentation.hook}`;
 }
 
 function plannedFacebookImageUrl(client, slug) {
@@ -236,7 +236,8 @@ function plannedFacebookImageUrl(client, slug) {
 
 async function ensureFacebookBuzzImage(discussion, {
   client = supabase,
-  generateImageResult = generateValidatedImageResult,
+  store = storeGeneratedImage,
+  renderCard = renderBuzzSocialImage,
   generateMissing = true,
 } = {}) {
   if (!client?.storage) throw new Error('Supabase Storage is required for Facebook Buzz Board photos.');
@@ -249,13 +250,13 @@ async function ensureFacebookBuzzImage(discussion, {
   if (!generateMissing) return publicUrl;
 
   const presentation = presentationFor(discussion);
-  const result = await generateImageResult(buildFacebookImagePrompt(discussion), {
-    title: presentation.hook,
-    slug: `facebook-buzz-${discussion.slug}`,
-    subject: presentation.imageSubject,
-    location: discussion.category,
+  const buffer = await renderCard({
+    question: presentation.hook,
+    category: discussion.category,
+    eyebrow: 'QUESTION OF THE DAY',
   });
-  return result?.status === 'accepted' ? result.url : null;
+  const uploaded = await store(buffer, filename, 'image/png');
+  return uploaded || publicUrl;
 }
 
 async function ensureInstagramBuzzImage(discussion, {
@@ -273,19 +274,14 @@ async function ensureInstagramBuzzImage(discussion, {
   if ((data || []).some((entry) => entry.name === filename)) return publicUrl;
   if (!generateMissing) return publicUrl;
 
+  // Cards are already 1080 squares — mirror the Facebook QOTD asset for Instagram.
   const facebookUrl = await ensureFacebookImage(discussion, { client, generateMissing: true });
   if (!facebookUrl) return null;
   const { data: source, error: downloadError } = await bucket.download(facebookImageFilename(discussion.slug));
   if (downloadError || !source) throw new Error(`Could not prepare Instagram Buzz Board photo: ${downloadError?.message || 'photo unavailable'}`);
   const image = await Jimp.read(Buffer.from(await source.arrayBuffer()));
-  const size = Math.min(image.width, image.height);
-  image.crop({
-    x: Math.round((image.width - size) / 2),
-    y: Math.round((image.height - size) / 2),
-    w: size,
-    h: size,
-  }).resize({ w: 1080, h: 1080 });
-  return store(await image.getBuffer('image/jpeg', { quality: 80 }), filename, 'image/jpeg');
+  image.resize({ w: 1080, h: 1080 });
+  return store(await image.getBuffer('image/png'), filename, 'image/png');
 }
 
 function buildFacebookPreview(discussion, siteUrl = 'https://thefloridabuzz.com') {

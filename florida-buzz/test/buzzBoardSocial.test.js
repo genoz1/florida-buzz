@@ -38,23 +38,27 @@ test('Buzz Board social links identify platform, campaign, and discussion withou
   assert.equal(url.search.includes('@'), false);
 });
 
-test('Facebook keeps its clean Florida Buzz redirect and uses a discussion-specific photo asset', () => {
+test('Facebook keeps its clean Florida Buzz redirect and uses a discussion-specific QOTD card asset', () => {
   assert.equal(
     buildShortTrackingUrl('what-universal-does-better-than-disney'),
     'https://thefloridabuzz.com/go/buzz/what-universal-does-better-than-disney'
   );
-  assert.equal(facebookImageFilename('what-universal-does-better-than-disney'), 'facebook-buzz-what-universal-does-better-than-disney.jpg');
+  assert.equal(
+    facebookImageFilename('what-universal-does-better-than-disney'),
+    'facebook-buzz-qotd-v1-what-universal-does-better-than-disney.png'
+  );
 });
 
-test('Instagram keeps its square discussion photo and honest short discussion path', () => {
+test('Instagram keeps its square discussion card and honest short discussion path', () => {
   const slug = 'what-universal-does-better-than-disney';
-  assert.equal(instagramImageFilename(slug), `instagram-buzz-${slug}.jpg`);
+  assert.equal(instagramImageFilename(slug), `instagram-buzz-qotd-v1-${slug}.png`);
   assert.equal(
     buildInstagramShortTrackingUrl(slug),
     `https://thefloridabuzz.com/go/ig/${slug}`
   );
   const copy = buildCopy({ slug, question: 'Do not repeat this question?' }, 'instagram');
   assert.doesNotMatch(copy, /Do not repeat this question/);
+  assert.match(copy, /Question of the Day/);
   assert.match(copy, /Does Universal do theme parks better than Disney now\?/);
   assert.match(copy, /Answer here or continue the discussion on Buzz Board/);
   assert.match(copy, /Copy this short address into your browser/);
@@ -74,20 +78,26 @@ test('every approved launch discussion has an engagement-first hook and exact ph
   }
 });
 
-test('photo prompt explicitly rejects branded cards and keeps the exact discussion subject', () => {
+test('Facebook copy frames Buzz Board posts as Question of the Day', () => {
+  const copy = buildCopy({ slug: 'paid-line-skipping-value-at-disney', question: 'board wording' }, 'facebook');
+  assert.match(copy, /paid line-skipping/i);
+  assert.match(copy, /Question of the Day/);
+  assert.match(copy, /Buzz Board/);
+  assert.doesNotMatch(copy, /board wording/);
+});
+
+test('Buzz Board social image helper builds a branded Question of the Day card prompt label', () => {
   const prompt = buildFacebookImagePrompt({
     slug: 'hollywood-studios-complete-park-day',
     question: 'How would you change Hollywood Studios so it feels like a complete, unhurried park day?',
   });
-  assert.match(prompt, /Hollywood Studios/);
-  assert.match(prompt, /candid, photorealistic/);
-  assert.match(prompt, /No text overlay/);
-  assert.match(prompt, /square crop for Instagram/);
+  assert.match(prompt, /Question of the Day/i);
+  assert.match(prompt, /Hollywood Studios|park day/i);
 });
 
-test('Instagram Buzz Board creative is a 1080-square crop of the reviewed discussion photo', async () => {
-  const sourceImage = new Jimp({ width: 1200, height: 800, color: 0x336699ff });
-  const sourceBuffer = await sourceImage.getBuffer('image/jpeg', { quality: 80 });
+test('Instagram Buzz Board creative mirrors the Facebook QOTD card square', async () => {
+  const sourceImage = new Jimp({ width: 1080, height: 1080, color: 0x336699ff });
+  const sourceBuffer = await sourceImage.getBuffer('image/png');
   let stored;
   const bucket = {
     getPublicUrl: (filename) => ({ data: { publicUrl: `https://storage.example/${filename}` } }),
@@ -97,16 +107,16 @@ test('Instagram Buzz Board creative is a 1080-square crop of the reviewed discus
   const client = { storage: { from: () => bucket } };
   const url = await ensureInstagramBuzzImage({ slug: 'rope-drop-or-slow-disney-morning' }, {
     client,
-    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-rope-drop-or-slow-disney-morning.jpg',
+    ensureFacebookImage: async () => 'https://storage.example/facebook-buzz-qotd-v1-rope-drop-or-slow-disney-morning.png',
     store: async (buffer, filename, contentType) => {
       stored = { buffer, filename, contentType };
       return `https://storage.example/${filename}`;
     },
   });
-  assert.equal(url, 'https://storage.example/instagram-buzz-rope-drop-or-slow-disney-morning.jpg');
-  assert.equal(stored.contentType, 'image/jpeg');
-  assert.equal(stored.filename, 'instagram-buzz-rope-drop-or-slow-disney-morning.jpg');
-  assert.deepEqual(imageSize(stored.buffer), { height: 1080, type: 'jpg', width: 1080 });
+  assert.equal(url, 'https://storage.example/instagram-buzz-qotd-v1-rope-drop-or-slow-disney-morning.png');
+  assert.equal(stored.contentType, 'image/png');
+  assert.equal(stored.filename, 'instagram-buzz-qotd-v1-rope-drop-or-slow-disney-morning.png');
+  assert.deepEqual(imageSize(stored.buffer), { height: 1080, type: 'png', width: 1080 });
 });
 
 test('daily selection is deterministic and rotates approved discussions', () => {
@@ -155,9 +165,12 @@ test('platform copy stays conversation-first and sends readers to the selected d
   };
   const facebook = buildCopy(discussion, 'facebook');
   const instagram = buildCopy(discussion, 'instagram');
-  assert.equal(facebook, 'Hollywood Studios: full-day park or half-day park?');
-  assert.doesNotMatch(facebook, /Join the conversation|https?:\/\//);
-  assert.match(instagram, /^Hollywood Studios: full-day park or half-day park\?/);
+  assert.match(facebook, /^Hollywood Studios: full-day park or half-day park\?/);
+  assert.match(facebook, /Question of the Day/);
+  assert.match(facebook, /Buzz Board/);
+  assert.doesNotMatch(facebook, /https?:\/\//);
+  assert.match(instagram, /Question of the Day/);
+  assert.match(instagram, /Hollywood Studios: full-day park or half-day park\?/);
   assert.doesNotMatch(instagram, /Some guests can stay/);
   assert.match(instagram, /\/go\/ig\/hollywood-studios-complete-park-day$/);
   const preview = buildFacebookPreview(discussion);
@@ -215,7 +228,8 @@ test('dry run exercises both publishers without writing post-log state', async (
   assert.equal(result.facebook, 'dry_run');
   assert.equal(result.instagram, 'dry_run');
   assert.equal(facebookCalls[0].logDetail, logMarker('facebook', 'sample-question'));
-  assert.equal(facebookCalls[0].message, 'Which option is actually worth the tradeoff?');
+  assert.match(facebookCalls[0].message, /Which option is actually worth the tradeoff\?/);
+  assert.match(facebookCalls[0].message, /Question of the Day/);
   assert.equal(facebookCalls[0].link, 'https://thefloridabuzz.com/go/buzz/sample-question');
   assert.equal(facebookCalls[0].imageUrl, 'https://storage.example/facebook-photo.jpg');
 });
