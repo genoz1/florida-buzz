@@ -61,9 +61,10 @@ test('Instagram keeps its square discussion card and honest short discussion pat
   assert.doesNotMatch(copy, /Do not repeat this question/);
   assert.match(copy, /Question of the Day/);
   assert.match(copy, /Does Universal do theme parks better than Disney now\?/);
-  assert.match(copy, /Answer here or continue the discussion on Buzz Board/);
-  assert.match(copy, /Copy this short address into your browser/);
-  assert.match(copy, new RegExp(`/go/ig/${slug}$`));
+  assert.match(copy, /Comment your answer below/);
+  assert.match(copy, /Open Buzz Board/);
+  assert.match(copy, new RegExp(`/go/ig/${slug}`));
+  assert.match(copy, /#DisneyWorld/);
 });
 
 test('every approved launch discussion has an engagement-first hook and exact photo subject', () => {
@@ -83,8 +84,10 @@ test('Facebook copy frames Buzz Board posts as Question of the Day', () => {
   const copy = buildCopy({ slug: 'paid-line-skipping-value-at-disney', question: 'board wording' }, 'facebook');
   assert.match(copy, /paid line-skipping/i);
   assert.match(copy, /Question of the Day/);
-  assert.match(copy, /Buzz Board/);
+  assert.match(copy, /drop your answer in the comments/);
+  assert.doesNotMatch(copy, /Buzz Board/);
   assert.doesNotMatch(copy, /board wording/);
+  assert.doesNotMatch(copy, /https?:\/\//);
 });
 
 test('Buzz Board social image helper builds a branded Question of the Day card prompt label', () => {
@@ -176,12 +179,14 @@ test('platform copy stays conversation-first and sends readers to the selected d
   const instagram = buildCopy(discussion, 'instagram');
   assert.match(facebook, /^Hollywood Studios: full-day park or half-day park\?/);
   assert.match(facebook, /Question of the Day/);
-  assert.match(facebook, /Buzz Board/);
+  assert.match(facebook, /drop your answer in the comments/);
+  assert.doesNotMatch(facebook, /Buzz Board/);
   assert.doesNotMatch(facebook, /https?:\/\//);
   assert.match(instagram, /Question of the Day/);
   assert.match(instagram, /Hollywood Studios: full-day park or half-day park\?/);
   assert.doesNotMatch(instagram, /Some guests can stay/);
-  assert.match(instagram, /\/go\/ig\/hollywood-studios-complete-park-day$/);
+  assert.match(instagram, /\/go\/ig\/hollywood-studios-complete-park-day/);
+  assert.match(instagram, /Comment your answer below/);
   const preview = buildFacebookPreview(discussion);
   assert.equal(preview.unchangedBuzzBoardQuestion, discussion.question);
   assert.equal(preview.destination, 'https://thefloridabuzz.com/go/buzz/hollywood-studios-complete-park-day');

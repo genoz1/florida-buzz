@@ -215,14 +215,16 @@ function presentationFor(discussion) {
 function buildFacebookCopy(discussion) {
   const presentation = presentationFor(discussion);
   const label = discussion?.category === 'disney' ? 'Disney Question of the Day' : 'Question of the Day';
-  return `${presentation.hook}\n\n${label} — answer on Buzz Board 👇`;
+  // Comment-first CTA: Meta rewards early replies. Destination link goes in
+  // the first comment (see linkPlacement: 'first_comment' in buzz-board-social).
+  return `${presentation.hook}\n\n${label} — drop your answer in the comments 👇`;
 }
 
 function buildInstagramCopy(discussion, siteUrl = 'https://thefloridabuzz.com') {
   const presentation = presentationFor(discussion);
   const label = discussion?.category === 'disney' ? 'Disney Question of the Day' : 'Question of the Day';
   const destination = new URL(`/go/ig/${encodeURIComponent(discussion.slug)}`, siteUrl).toString();
-  return `${label}\n\n${presentation.hook}\n\nAnswer here or continue the discussion on Buzz Board. Copy this short address into your browser: ${destination}`;
+  return `${label}\n\n${presentation.hook}\n\nComment your answer below 👇\nWant the full thread? Open Buzz Board: ${destination}\n\n#DisneyWorld #WaltDisneyWorld #DisneyParks #FloridaBuzz`;
 }
 
 /** @deprecated Photorealistic Buzz photos are retired; cards are rendered locally. Kept for tests/compat. */
