@@ -244,7 +244,8 @@ async function main() {
       HOST_KEY,
       'format=rgba',
       'hflip', // plate points right → flip so she points left at the story
-      'scale=360:-1',
+      // ~bottom-right quarter of 720x1280 (≈ half width × half height)
+      'scale=420:-1',
     ].join(','),
     '-c:v', 'qtrle', '-an',
     keyed,
@@ -258,7 +259,7 @@ async function main() {
     '-i', bgVideo,
     '-i', keyed,
     '-filter_complex',
-    '[0:v][1:v]overlay=W-w-10:H-h-18:format=auto[v]',
+    '[0:v][1:v]overlay=W-w-4:H-h-8:format=auto[v]',
     '-map', '[v]',
     '-an',
     '-c:v', 'libx264',
