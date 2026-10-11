@@ -18,7 +18,7 @@ PODCASTS_FAL_TTS_ENDPOINT=fal-ai/gemini-tts
 PODCASTS_FAL_TTS_MODEL=gemini-2.5-pro-tts
 # Host voices (fal-ai/gemini-tts speaker presets; ~30 names in the fal catalog)
 PODCASTS_VOICE_GENA=Aoede
-PODCASTS_VOICE_DIANE=Callirrhoe
+PODCASTS_VOICE_DIANE=Kore
 PODCASTS_TTS_TEMPERATURE=0.85
 PODCASTS_AUDIO_BUCKET=podcast-audio
 PODCASTS_ARTWORK_BUCKET=podcast-artwork
@@ -56,12 +56,14 @@ Defaults come from **public fal.ai documentation** for:
 
 - Endpoint: `fal-ai/gemini-tts`
 - Model: `gemini-2.5-pro-tts`
-- Voices (defaults): Gena=`Aoede` (warm/melodic / breezy), Diane=`Callirrhoe` (easy-going)
-- Demographic lane: both must read as **~mid-30s American moms** (Central Florida friends). Prefer female-leaning easy-going / warm / soft presets; avoid youthful (`Leda`), mature/elderly-leaning (`Gacrux`), male-coded names (`Puck`/`Charon`/`Fenrir`/…), bright assistant-like (`Zephyr`), cartoon, or robotic delivery
-- Why Diane left `Zephyr`: bright/clear next to Aoede read too AI-assistant / not enough mom contrast; `Callirrhoe` stays adult-woman while sounding more relaxed/easy-going
+- Voices (defaults): Gena=`Aoede` (warm/melodic / breezy), Diane=`Kore` (firm — best mom-lane contrast vs Aoede in fal’s short list)
+- Demographic lane: both must read as **~mid-30s American moms** (Central Florida friends). Prefer female-leaning easy-going / warm / soft / firm presets; avoid youthful (`Leda`), mature/elderly-leaning (`Gacrux`), male-coded names (`Puck`/`Charon`/`Fenrir`/…), bright assistant-like (`Zephyr`), cartoon, or robotic delivery
+- Why Diane left `Zephyr`: bright/clear next to Aoede read too AI-assistant
+- Why Diane left `Callirrhoe`: sat too close to Aoede (same easy warm-mom lane); `Kore` is firmer for contrast. fal Gemini TTS still has a **hard catalog limit** (~30 presets) and one shared `style_instructions` string — perfect dual-voice separation is not guaranteed
+- Per-speaker delivery cues in `style_instructions`: Gena slightly brighter/breezier; Diane slightly lower/firmer/grounded
 - Override without code changes: `PODCASTS_VOICE_GENA` / `PODCASTS_VOICE_DIANE` (must be a fal Gemini TTS voice enum value)
 - Catalog limit: fal exposes a fixed ~30-name preset list; contrast is limited to those timbres
-- After changing voices (or deploying a new default), **regenerate episode audio only after deploy** (fal TTS preview) — existing MP3s keep the old voices; script text does not need regeneration
+- After changing **script open** prompts: regenerate **script + audio** (named show intro is in the dialogue). After voice-only changes: regenerate audio only. Existing MP3s keep old voices/opens until regenerated
 - Spelling vs pronunciation: always spell **Gena**; pronounce like **Gina** (JEEN-uh) in TTS
 - Park names: **EPCOT** → EP-cot (two syllables, stress on first) via shared `lib/podcasts/pronunciation.js` in fal `style_instructions` (advisory; fal may still misread)
 - Language: `English (US)`
@@ -77,6 +79,8 @@ Confirm the DigitalOcean app and Supabase project are **Florida Buzz** (`tcrfirz
 ```
 PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=false
+PODCASTS_VOICE_GENA=Aoede
+PODCASTS_VOICE_DIANE=Kore
 FAL_KEY=<set securely in DO; never commit>
 ```
 
@@ -129,6 +133,17 @@ Keep `PODCASTS_GENERATION_ENABLED=false` until this workflow is tested. Without 
 ## Host voices (full episodes)
 
 Gena and Diane are longtime friends — Disney-loving Central Florida moms in their mid-thirties. Geno (Gena) and Michael (Diane) may appear in family/park stories. Scripts must feel like friends exchanging stories and opinions, not presenters summarizing articles.
+
+### Required show open (every full episode)
+
+First spoken lines must be name intros + show welcome **before** any week/weather anecdote:
+
+1. Gena: Hi, I'm Gena.
+2. Diane: And I'm Diane.
+3. Gena: And together — welcome to Florida Buzz: Disney.
+4. Then short catch-up (“how was your week”), brief relate, park bridge from sourced facts, soft Florida Buzz mention, agenda question.
+
+Hard-ban opening with “Okay, how was your week…” (rain/errand banter) without those intros — that was the user’s last bad script open.
 
 Every full episode outline/script should include 2–3 brief topic-linked park anecdotes with reactions/callbacks. Never invent dated news facts, wait times, closures, prices, or policies outside approved weekly sources; use timeless composites when needed.
 

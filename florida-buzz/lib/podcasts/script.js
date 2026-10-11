@@ -32,7 +32,8 @@ function appendContinuation(existing, continuation) {
   if (!next) return base;
   // Drop accidental full restarts that repeat the warm open / episode restart.
   const looksLikeRestart =
-    (/^Gena:\s*(Hey|Hi|Okay,? hey)/i.test(next) && /Florida Buzz/i.test(next.slice(0, 500))) ||
+    (/^Gena:\s*(Hey|Hi|Okay,? hey|Okay,? how was your week)/i.test(next) && /Florida Buzz/i.test(next.slice(0, 500))) ||
+    (/Hi, I'm Gena/i.test(next.slice(0, 200)) && /welcome to Florida Buzz/i.test(next.slice(0, 500))) ||
     (/welcome back to Florida Buzz/i.test(next.slice(0, 400)));
   if (looksLikeRestart) {
     const lines = next.split(/\n+/).filter((line) => line.trim());
@@ -64,8 +65,13 @@ ${HOST_BIBLE}
 Outline rules:
 - Always spell Gena (never Gina).
 - Shape a lively aftershow-style conversation between friends, not a news rundown or article roundup — must feel unscripted / reactive, not written.
-- Segment 1 MUST be a Warm Open (30–90 seconds when spoken): friend hello / life or recent-park catch-up banter — before any topic hook.
-- Warm-open ideas: what they did since last episode, whether they went to a park, kid chaos, Geno/Michael plans, weather, parking, a small funny life detail.
+- Segment 1 MUST be a Warm Open and MUST list these beats explicitly (in order) before any topic hook:
+  1) Name intro — Gena: "Hi, I'm Gena."
+  2) Name intro — Diane: "And I'm Diane."
+  3) Show welcome — Gena: "And together — welcome to Florida Buzz: Disney."
+  4) Short week catch-up (only AFTER the three lines above): how was your week → short real answer → brief relate → bridge to parks from catch-up (sourced facts only).
+  5) Soft Florida Buzz mention + "What else is on the agenda today?" then Topic Hook → Affiliation Disclosure.
+- HARD BAN Segment 1 opening with "Okay, how was your week" / rain-errand banter without name intros + show welcome. Ban the anti-example that skips intros for long umbrella/jacket weather chat then affiliation then EPCOT.
 - After Warm Open: Topic Hook → Affiliation Disclosure → main discussion. Never cold-open on the headline.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
@@ -95,7 +101,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted). Start with Warm Open (30–90s friend hello / life or park banter), then topic hook + affiliation disclosure, then 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. On each main topic segment name a rotating Lead host (Lead: Gena / Lead: Diane) and mark lead/support energy (lead longer points; support short reactions — not tennis-match equal turns for a whole segment). End with a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted). Segment 1 Warm Open MUST explicitly list beats: (1) Hi I'm Gena (2) And I'm Diane (3) welcome to Florida Buzz: Disney (4) short week catch-up only after those lines (5) agenda/topic hook + affiliation — never open with "Okay, how was your week" without names/title. Then 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. On each main topic segment name a rotating Lead host (Lead: Gena / Lead: Diane) and mark lead/support energy (lead longer points; support short reactions — not tennis-match equal turns for a whole segment). End with a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -132,7 +138,14 @@ Conversation requirements:
   - FORBID tidy thesis → example → lesson beats and neat moral wrap-ups after anecdotes.
   - FORBID polished symmetrical essay-dialogue (neat equal-length paragraphs alternating hosts).
   - Cap most support turns under ~40–50 spoken words; lead story/point beats may run longer when the subject needs it.
-- OPEN SHAPE (critical): Start with 30–90 seconds of warm friend hello / life or recent-park banter BEFORE the topic hook. Examples: “hey, how was your week,” whether they went to a park, kid chaos, Geno/Michael, weather, parking. Then transition into the topic hook. Then the unofficial affiliation disclosure. Never cold-open on the news headline (“Okay if you were calling EPCOT…” / “Okay we have resort news…” as line 1).
+- OPEN SHAPE (critical — name intros + show welcome FIRST):
+  - REQUIRED first 3–5 lines (before any week/weather anecdote):
+    Gena: Hi, I'm Gena.
+    Diane: And I'm Diane.
+    Gena: And together — welcome to Florida Buzz: Disney.
+  - Only AFTER those lines: Gena asks how Diane's week was; Diane short real answer; Gena relates briefly; Diane bridges to parks from catch-up (sourced facts only); big natural reactions; soft Florida Buzz mention; then "What else is on the agenda today?"
+  - HARD BAN opening with "Okay, how was your week" (or similar) without name intros + show title. HARD BAN the anti-example: rain/errand/sandals banter → affiliation → EPCOT while skipping "Hi, I'm Gena" / "And I'm Diane" / "welcome to Florida Buzz: Disney".
+  - Then topic hook → unofficial affiliation disclosure. Never cold-open on the news headline (“Okay if you were calling EPCOT…” / “Okay we have resort news…” as line 1).
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
 - Confirm time-sensitive details against approved source notes before stating them as fact; if unsure, speak generally or as opinion.
@@ -148,7 +161,7 @@ Conversation requirements:
 - Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, URLs, or offerings. Use only approved sources and verified Florida Buzz tools.
 - When no factual park notes are available, use timeless composite experiences rather than claiming something happened on a specific date.
 - Always spell Gena (never Gina). Do not write phonetic pronunciations in dialogue.
-- Mention the unofficial-fan affiliation disclosure once near the open — AFTER the warm friend banter and topic hook is fine.
+- Mention the unofficial-fan affiliation disclosure once near the open — AFTER the named show welcome, short catch-up, and topic hook is fine (never before the name intros / welcome).
 - Do not claim a live studio audience, callers, or TV panel format — keep it two hosts talking parks.
 
 Florida Buzz listener guidance (helpful, not ad-read):
@@ -180,7 +193,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Open with 30–90 seconds of warm friend hello/life or park banter before the topic hook — do not return a short teaser or a cold topic open. Honor outline Lead tags: lead host carries longer points; support mostly short reactions; rotate lead by subject — forbid tennis-match equal turns for a whole segment. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). REQUIRED open: first lines must be name intros + "welcome to Florida Buzz: Disney" before any "how was your week" / weather anecdote — ban the rain-errand cold catch-up that skips names and the show title. Do not return a short teaser or a cold topic open. Honor outline Lead tags: lead host carries longer points; support mostly short reactions; rotate lead by subject — forbid tennis-match equal turns for a whole segment. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
