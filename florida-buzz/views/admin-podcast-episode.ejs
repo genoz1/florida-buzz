@@ -44,13 +44,14 @@
       <strong>This is only a short scaffold (~2 minutes), not the full ~20–25 minute episode.</strong>
       The script box below is cleared on purpose so the next click asks AI for a full script.
       Click <strong>Save / generate script</strong> and wait a few minutes — do not Approve or Publish until
-      a long solo Geno script appears in the box, then click <strong>Generate private preview (ElevenLabs TTS)</strong>.
+      a long solo Geno script appears in the box, then click <strong>Generate private preview (ElevenLabs TTS)</strong>
+      (scaffold scripts never auto-generate audio).
     </p>
   <% } else if (notice === 'script-generated') { %>
-    <p class="notice">Full AI script generated. Scroll down to confirm the Conversation script box is filled before generating audio.</p>
+    <p class="notice">Full AI script generated. If auto-preview is on, private audio may already be generating — wait for <code>preview_ready</code>, or click Generate private preview if needed.</p>
   <% } %>
   <p class="notice"><%= show.disclosure %></p>
-  <p class="notice">This is a <strong>standalone</strong> weekly episode (not Part 1/Part 2 of another show). Drafts stay off the public site and RSS until you Approve → Publish. Intended release is <%= intendedDay || 'Tuesday or Friday' %> 6:00 AM ET after manual approval — auto-publish is off. Target length is about 20–25 minutes once the full AI script + audio succeed.</p>
+  <p class="notice">This is a <strong>standalone</strong> weekly episode (not Part 1/Part 2 of another show). With generation enabled, private preview audio usually starts automatically after a full script — listen at <code>preview_ready</code>, then Approve → Publish. Intended release is <%= intendedDay || 'Tuesday or Friday' %> 6:00 AM ET after manual approval — auto-publish is off. Target length is about 20–25 minutes once the full AI script + audio succeed.</p>
 
   <form class="card" method="post" action="/admin/podcasts/episodes/<%= episode.id %>">
     <h2>Episode details</h2>

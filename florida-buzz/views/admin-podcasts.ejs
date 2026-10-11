@@ -23,7 +23,8 @@
   <p class="notice">
     Audio generation is <strong><%= cfg.generation ? 'ENABLED' : 'DISABLED' %></strong>
     (<code>PODCASTS_GENERATION_ENABLED</code>; TTS provider <code><%= cfg.ttsProvider || 'elevenlabs' %></code>, solo Geno).
-    Each scheduled run creates <strong>exactly one</strong> standalone ~20–25 min episode — Tuesday run → Tuesday show, Friday run → Friday show. Never two at once, never Part 1/Part 2. Drafts never auto-publish.
+    Each scheduled run creates <strong>exactly one</strong> standalone ~20–25 min episode — Tuesday run → Tuesday show, Friday run → Friday show. Never two at once, never Part 1/Part 2.
+    When generation is enabled, private preview audio starts automatically after a full script (<code>PODCASTS_AUTO_PREVIEW_ENABLED</code>, default on) — still <strong>never auto-publishes</strong>.
   </p>
   <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
   <% if (typeof error !== 'undefined' && error) { %><p class="error"><%= error %></p><% } %>

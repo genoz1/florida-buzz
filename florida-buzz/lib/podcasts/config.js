@@ -60,6 +60,12 @@ function config(env = process.env) {
     // Paid TTS stays hard-off until PODCASTS_GENERATION_ENABLED=true.
     enabled: env.PODCASTS_ENABLED !== 'false',
     generation: env.PODCASTS_GENERATION_ENABLED === 'true',
+    // After a full script draft, kick private ElevenLabs preview in the background.
+    // Never publishes — review/approve/publish stay manual. Set false to keep TTS click-only.
+    autoPreview:
+      env.PODCASTS_GENERATION_ENABLED === 'true' &&
+      String(env.PODCASTS_AUTO_PREVIEW_ENABLED ?? 'true').toLowerCase() !== 'false' &&
+      String(env.PODCASTS_AUTO_PREVIEW_ENABLED ?? 'true') !== '0',
     weeklyCron: env.PODCASTS_WEEKLY_CRON_ENABLED !== 'false',
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     ownerEmail: env.PODCASTS_OWNER_EMAIL || 'floridabuzzonline@gmail.com',

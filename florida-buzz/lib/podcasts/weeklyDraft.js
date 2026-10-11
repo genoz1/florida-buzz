@@ -631,13 +631,22 @@ async function createWeeklyDraft({
     }
     const created = [freshEpisode];
 
-    // Mark the run ready once scripts exist. Do NOT run ElevenLabs TTS inside this HTTP request.
+    const autoPreview =
+      !!cfg.autoPreview &&
+      !!cfg.generation &&
+      !anyFallback &&
+      typeof pipeline?.generatePreview === 'function' &&
+      String(freshEpisode.script_text || '').trim().length > 200;
+
+    // Mark the run ready once scripts exist. TTS (if enabled) runs in the background —
+    // never inside this HTTP request, and never auto-publishes.
     await store.updateGenerationRun(run.id, {
       status: 'draft_ready',
       episode_id: freshEpisode.id,
       payload: {
         counts: collection.counts,
         audio_generated: false,
+        audio_auto_preview_started: autoPreview,
         generation_enabled: !!cfg.generation,
         used_fallback_script: anyFallback,
         episodes_created: 1,
@@ -654,20 +663,46 @@ async function createWeeklyDraft({
         episode_ids: [freshEpisode.id],
         next_step: anyFallback
           ? 'Clear scaffold script and use Save / generate script on this standalone episode'
-          : `Open the ${slot.label} draft and click Generate private preview (ElevenLabs TTS)`,
+          : autoPreview
+            ? `Private preview TTS started automatically for the ${slot.label} draft — open the episode and wait for preview_ready (publish stays manual)`
+            : `Open the ${slot.label} draft and click Generate private preview (ElevenLabs TTS)`,
       },
       error_detail: null,
     });
 
+    let audioGenerated = false;
     if (anyFallback && cfg.generation) {
       console.warn('[podcasts] skipping ElevenLabs TTS for fallback scaffold script');
+    } else if (autoPreview) {
+      const episodeForPreview = freshEpisode;
+      const scriptForPreview = String(freshEpisode.script_text || '');
+      console.info(
+        `[podcasts] weekly draft ready — 1 standalone ${slot.label} episode; starting background private preview (auto-publish still off)`
+      );
+      setImmediate(() => {
+        Promise.resolve()
+          .then(() => pipeline.generatePreview(episodeForPreview, scriptForPreview))
+          .then(() => {
+            console.info(`[podcasts] auto private preview finished for episode ${episodeForPreview.id}`);
+          })
+          .catch(async (err) => {
+            console.error('[podcasts] auto private preview failed:', err.message);
+            try {
+              await store.updateEpisode(episodeForPreview.id, {
+                status: 'failed',
+                last_error: `Audio generation failed: ${String(err.message || err).slice(0, 500)}`,
+              });
+            } catch (updateErr) {
+              console.error('[podcasts] failed to persist auto-preview error:', updateErr.message);
+            }
+          });
+      });
+      audioGenerated = false; // still generating async
     } else if (cfg.generation && !anyFallback) {
       console.info(
         `[podcasts] weekly draft ready — 1 standalone ${slot.label} episode script; ElevenLabs TTS left for manual Generate private preview`
       );
     }
-
-    const audioGenerated = false;
 
     const notify = await notifyDraftReady({
       episode: freshEpisode,

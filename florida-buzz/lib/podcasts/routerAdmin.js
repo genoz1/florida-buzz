@@ -195,7 +195,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       res.redirect(
         303,
         `/admin/podcasts/episodes/${result.episode.id}?notice=${encodeURIComponent(
-          `weekly-draft-ready — created 1 ${slotLabel} episode (never two at once). Generate private preview when ready.`
+          `weekly-draft-ready — created 1 ${slotLabel} episode. Private preview TTS starts automatically when generation is enabled — listen before Approve/Publish (never auto-publishes).`
         )}`
       );
     })

@@ -44,16 +44,20 @@ FAL_KEY=<set securely in DO>
 PODCASTS_VOICE_FAL_SOLO=Aoede
 ```
 
-`PODCASTS_GENERATION_ENABLED` must still be `true` before any paid TTS runs. Keep it `false` until you are ready to generate private previews from the admin dashboard.
+`PODCASTS_GENERATION_ENABLED` must still be `true` before any paid TTS runs. When generation is on, private preview audio starts automatically after a full weekly script (listen first — publish stays manual).
 
 ## Flags (additive)
 
 ```
 PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=false
+PODCASTS_AUTO_PREVIEW_ENABLED=true
 ```
 
 Set `PODCASTS_ENABLED=false` to unmount public/admin podcast routes.
+
+- `PODCASTS_GENERATION_ENABLED=true` — allows paid ElevenLabs TTS.
+- `PODCASTS_AUTO_PREVIEW_ENABLED` — defaults **on** when generation is enabled. After each successful weekly draft (full AI script, not a scaffold), the server kicks **private** preview TTS in the background. Status moves to `generating_audio` → `preview_ready`. Nothing is published to the site or RSS until you Approve → Publish. Set to `false` / `0` if you want TTS only via the admin **Generate private preview** button.
 
 Other optional overrides:
 
@@ -73,7 +77,7 @@ PODCASTS_FAL_POLL_INTERVAL_MS=2000
 PODCASTS_FAL_SECTION_RETRIES=2
 ```
 
-Each weekly draft run creates **exactly one** standalone ~20–25 minute episode for the current slot (Tuesday run → Tuesday episode, Friday run → Friday episode). Never two episodes in one run, and never Part 1/Part 2 of one show. Generate ElevenLabs TTS separately on that episode from admin.
+Each weekly draft run creates **exactly one** standalone ~20–25 minute episode for the current slot (Tuesday run → Tuesday episode, Friday run → Friday episode). Never two episodes in one run, and never Part 1/Part 2 of one show. With generation + auto-preview on, private audio builds itself so you can listen before publishing.
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `OPENAI_API_KEY`. New path also needs `ELEVENLABS_API_KEY`.
 
@@ -100,13 +104,14 @@ Confirm the DigitalOcean app and Supabase project are **Florida Buzz** (`tcrfirz
 
 ```
 PODCASTS_ENABLED=true
-PODCASTS_GENERATION_ENABLED=true          # only when ready to generate previews
+PODCASTS_GENERATION_ENABLED=true          # enables paid TTS + auto private preview after drafts
+PODCASTS_AUTO_PREVIEW_ENABLED=true        # default; set false for click-only TTS
 ELEVENLABS_API_KEY=sk_***                 # required for ElevenLabs path
 PODCASTS_TTS_PROVIDER=elevenlabs          # or omit for auto-when-key-present
 PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1
 ```
 
-Rotate any ElevenLabs key that was pasted into chat.
+Keep schedule **auto_publish** off in admin while you listen to previews. Rotate any ElevenLabs key that was pasted into chat.
 
 ## Manual setup checklist
 
@@ -125,9 +130,9 @@ Default: **two generate windows**, each creating **one** standalone review draft
 - **Tuesday 7:00 AM Eastern** → create the Tuesday episode (intended publish **Tuesday 6:00 AM ET**)
 - **Friday 7:00 AM Eastern** → create the Friday episode (intended publish **Friday 6:00 AM ET**)
 
-Admin controls (`/admin/podcasts`): enable/disable weekly drafts, review sources, regenerate scripts, Generate private preview, approve/publish.
+Admin controls (`/admin/podcasts`): enable/disable weekly drafts, review sources, regenerate scripts, listen to private previews, approve/publish.
 
-Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. Drafts are never auto-published.
+Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. Drafts are never auto-published. With generation enabled, private preview audio starts after each full script so you can listen first.
 
 ## Host (full episodes)
 
@@ -150,13 +155,12 @@ Naturally reference verified Florida Buzz resources. Say “The Florida Buzz dot
 Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_KEY`, `PODCASTS_TTS_PROVIDER=elevenlabs` or omit for auto, `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1`). Apply the solo-Geno hosts migration (or run `node scripts/podcast-upload-cover.js` so RSS hosts = Geno).
 
 1. Open `https://thefloridabuzz.com/admin/podcasts` (Basic auth).
-2. Click **Run weekly draft now (force)** — creates one standalone draft for today’s/next Tue/Fri slot (script only; no TTS yet).
-3. Open that episode.
-4. If the script box is empty/scaffold: click **Save / generate script** and wait for a full solo Geno script (~3,000+ words).
+2. Turn **weekly drafts** on (and leave auto-publish off). With `PODCASTS_GENERATION_ENABLED=true`, Tue/Fri cron (or **Run weekly draft now**) creates one standalone script and **starts private ElevenLabs preview in the background**.
+3. Open that episode. If status is `generating_audio`, wait — do not need to click Generate private preview unless auto-preview was disabled or TTS failed.
+4. If the script box is empty/scaffold: click **Save / generate script** and wait for a full solo Geno script (~3,000+ words), then click **Generate private preview** (scaffold scripts never auto-TTS).
 5. Confirm Geno Option A open + quick hits + deep dive + CTA (`Geno:` lines only).
-6. Click **Generate private preview (ElevenLabs TTS)** — pipeline chunks the script, synthesizes with Geno voice `bg7PC2IzyIDwYgytMiW1` / `eleven_v4`, prepends announcer bumper from `intro_audio_url`, uploads the master.
-7. Watch the LIVE heartbeat panel until status is `preview_ready`. Preview/download audio.
-8. **Approve audio** → **Publish now** only when satisfied (never auto-publishes).
+6. When status is `preview_ready`, play/download the private audio and listen.
+7. **Approve audio** → **Publish now** only when satisfied (never auto-publishes).
 
 ## ElevenLabs bakeoff scripts
 

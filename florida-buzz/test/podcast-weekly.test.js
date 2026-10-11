@@ -345,6 +345,132 @@ test('cron path on Tuesday generate window creates one Tuesday episode only', as
   assert.equal(result.slotReason, 'generate_slot');
 });
 
+test('autoPreview config is on only when generation enabled and not explicitly disabled', () => {
+  assert.equal(config({ PODCASTS_GENERATION_ENABLED: 'true' }).autoPreview, true);
+  assert.equal(
+    config({ PODCASTS_GENERATION_ENABLED: 'true', PODCASTS_AUTO_PREVIEW_ENABLED: 'false' }).autoPreview,
+    false
+  );
+  assert.equal(
+    config({ PODCASTS_GENERATION_ENABLED: 'true', PODCASTS_AUTO_PREVIEW_ENABLED: '0' }).autoPreview,
+    false
+  );
+  assert.equal(config({ PODCASTS_GENERATION_ENABLED: 'false' }).autoPreview, false);
+});
+
+test('scaffold weekly draft never auto-starts private preview even when generation is on', async () => {
+  const store = createMemoryStore();
+  await store.upsertScheduleSettings('florida-buzz-disney', { weekly_draft_enabled: true });
+
+  let previewCalls = 0;
+  const result = await createWeeklyDraft({
+    store,
+    supabase: mockSupabase(),
+    cfg: config({
+      PODCASTS_GENERATION_ENABLED: 'true',
+      ELEVENLABS_API_KEY: 'test-key',
+    }),
+    aiText: null, // forces short scaffold — must not burn ElevenLabs credits
+    pipeline: {
+      async generatePreview() {
+        previewCalls += 1;
+        return { ok: true };
+      },
+    },
+    sendEmail: null,
+    force: true,
+    now: new Date('2026-10-06T15:00:00.000Z'),
+  });
+
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+
+  assert.equal(result.skipped, false);
+  assert.equal(previewCalls, 0);
+  assert.equal(result.audioGenerated, false);
+  assert.notEqual(result.episode.status, 'published');
+  const runs = await store.listGenerationRuns('florida-buzz-disney', result.weekKey);
+  const ready = runs.find((r) => r.status === 'draft_ready');
+  assert.ok(ready);
+  assert.equal(ready.payload?.audio_auto_preview_started, false);
+  assert.equal(ready.payload?.used_fallback_script, true);
+});
+
+test('full AI script weekly draft auto-starts private preview and never publishes', async () => {
+  const scriptPath = require.resolve('../lib/podcasts/script');
+  const weeklyPath = require.resolve('../lib/podcasts/weeklyDraft');
+  const realScript = require('../lib/podcasts/script');
+  const longScript = [
+    'Geno: [excited] Welcome to Florida Buzz: Disney. I\'m Geno — your unofficial fan host. Let\'s go.',
+    `Geno: ${'Quick hit on park planning and dining tips for guests. '.repeat(30)}`,
+  ].join('\n\n');
+  assert.ok(longScript.length > 200);
+
+  require.cache[scriptPath].exports = {
+    ...realScript,
+    async generateOutline() {
+      return 'Outline: quick hits and one deep dive.';
+    },
+    async generateConversation() {
+      return longScript;
+    },
+  };
+  delete require.cache[weeklyPath];
+  const { createWeeklyDraft: createDraftWithMockScript } = require('../lib/podcasts/weeklyDraft');
+
+  try {
+    const store = createMemoryStore();
+    await store.upsertScheduleSettings('florida-buzz-disney', { weekly_draft_enabled: true });
+
+    let previewCalls = 0;
+    let previewEpisodeId = null;
+    const result = await createDraftWithMockScript({
+      store,
+      supabase: mockSupabase(),
+      cfg: config({
+        PODCASTS_GENERATION_ENABLED: 'true',
+        ELEVENLABS_API_KEY: 'test-key',
+      }),
+      aiText: {
+        async generateText() {
+          return 'TITLE: Tuesday Magic Hours\nDESCRIPTION: Geno covers wait times for a solo Tuesday show.';
+        },
+      },
+      pipeline: {
+        async generatePreview(episode) {
+          previewCalls += 1;
+          previewEpisodeId = episode.id;
+          return { ok: true };
+        },
+      },
+      sendEmail: null,
+      force: true,
+      now: new Date('2026-10-06T15:00:00.000Z'),
+    });
+
+    // Background setImmediate from weeklyDraft
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(result.skipped, false);
+    assert.equal(previewCalls, 1);
+    assert.equal(previewEpisodeId, result.episode.id);
+    assert.equal(result.audioGenerated, false); // still async at return time
+    assert.notEqual(result.episode.status, 'published');
+    assert.notEqual(result.episode.status, 'scheduled');
+    assert.notEqual(result.episode.status, 'approved');
+
+    const runs = await store.listGenerationRuns('florida-buzz-disney', result.weekKey);
+    const ready = runs.find((r) => r.status === 'draft_ready');
+    assert.equal(ready?.payload?.audio_auto_preview_started, true);
+    assert.equal(ready?.payload?.used_fallback_script, false);
+  } finally {
+    require.cache[scriptPath].exports = realScript;
+    delete require.cache[weeklyPath];
+    require('../lib/podcasts/weeklyDraft');
+  }
+});
+
 test('splitSourcesForEpisodes spreads articles across standalone episodes', () => {
   const sources = [
     { source_kind: 'article', title: 'A1' },
