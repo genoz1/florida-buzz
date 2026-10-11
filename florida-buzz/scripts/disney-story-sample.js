@@ -26,13 +26,15 @@ const STORY = {
   id: 'mk-wrong-first-ride',
   title: 'Magic Kingdom: the wrong first ride',
   spoken: `[excited] Magic Kingdom tip that costs people their whole morning. We rope-dropped... and walked the wrong way first. Big Thunder was a walk-on. Seven Dwarfs was already seventy-five minutes. Your first ride sets the day. Don't waste rope drop on the wrong side of the park. Follow Florida Buzz.`,
+  // Caption beats are timed against half/half visuals:
+  // 0–50% Big Thunder still, 50–100% Haunted Mansion still.
   captions: [
-    { start: 0.0, end: 2.6, text: 'Magic Kingdom mistake' },
-    { start: 2.6, end: 6.0, text: 'We rope-dropped...' },
-    { start: 6.0, end: 9.4, text: 'and walked the wrong way' },
-    { start: 9.4, end: 12.8, text: 'Big Thunder: walk-on' },
-    { start: 12.8, end: 16.4, text: 'Seven Dwarfs: 75 minutes' },
-    { start: 16.4, end: 21.0, text: "Don't waste rope drop" },
+    { start: 0.0, end: 2.8, text: 'Magic Kingdom mistake' },
+    { start: 2.8, end: 5.6, text: 'We rope-dropped...' },
+    { start: 5.6, end: 8.4, text: 'walked the wrong way first' },
+    { start: 8.4, end: 10.8, text: 'Big Thunder: walk-on' },
+    { start: 10.8, end: 14.4, text: 'Seven Dwarfs: 75 min' },
+    { start: 14.4, end: 21.0, text: "Don't waste rope drop" },
   ],
   stills: [
     {
