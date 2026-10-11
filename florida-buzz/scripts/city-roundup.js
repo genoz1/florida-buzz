@@ -5,6 +5,7 @@ const { roundup: roundupSchema } = require('../lib/aiSchemas');
 const { validateRoundup } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { postToFacebookPage } = require('../lib/facebook');
+const { isNonArticleFacebookAllowed } = require('../lib/facebookDistribution');
 const { notifyIndexNow } = require('../lib/indexnow');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -229,6 +230,12 @@ async function run() {
       }
       console.log(`  Saved article: /article/${slug}`);
       await notifyIndexNow(`${SITE_URL}/article/${slug}`);
+    }
+
+    const feedGate = isNonArticleFacebookAllowed();
+    if (!feedGate.ok) {
+      console.log(`  [skip] Facebook city roundup: ${feedGate.reason} — ${feedGate.detail}`);
+      continue;
     }
 
     if (postCount > 0) {

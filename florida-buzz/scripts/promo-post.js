@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
 const { postToFacebookPage } = require('../lib/facebook');
+const { isNonArticleFacebookAllowed } = require('../lib/facebookDistribution');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
@@ -66,6 +67,13 @@ async function run() {
   const type = ROTATION[slot];
 
   console.log(`Post type this run: ${type}`);
+
+  const feedGate = isNonArticleFacebookAllowed();
+  if (!feedGate.ok) {
+    console.log(`  [skip] Facebook promo: ${feedGate.reason} — ${feedGate.detail}`);
+    console.log('\n=== Run complete ===');
+    return;
+  }
 
   const post = await buildPost(type);
   if (!post) {

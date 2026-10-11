@@ -367,3 +367,16 @@ if (podcastsCfg.enabled && podcastsCfg.weeklyCron) {
 } else {
   console.log('Podcast weekly draft checker NOT scheduled — podcasts disabled or PODCASTS_WEEKLY_CRON_ENABLED=false.');
 }
+
+// Opt-in: one inexpensive theme-park / cruise Reel per day (Ken Burns + kinetic
+// text). Off until FB_PARK_REEL_ENABLED=true. Actual Meta publish also needs
+// FB_PARK_REEL_PUBLISH=true (otherwise the job only renders).
+if (scheduleFlags.facebookParkReel) {
+  cron.schedule('15 10 * * *', () => {
+    console.log('Running scheduled Facebook park Reel...');
+    runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
+  }, { timezone: 'America/New_York' });
+  console.log('Facebook park Reel scheduled: 10:15am daily (Eastern time). Publishing gated by FB_PARK_REEL_PUBLISH.');
+} else {
+  console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true (plus FB + Supabase credentials) to enable.');
+}

@@ -6,6 +6,7 @@ const { validateGuide, validateTopic } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { postToFacebookPage } = require('../lib/facebook');
+const { decideFacebookDistribution } = require('../lib/facebookDistribution');
 const { normalizePinCopy, toFacebookFeedCaption } = require('../lib/socialCopy');
 const { notifyIndexNow } = require('../lib/indexnow');
 
@@ -550,7 +551,22 @@ async function run() {
   console.log(`Saved guide: /article/${slug}`);
   await notifyIndexNow(`${SITE_URL}/article/${slug}`);
 
-  await postToFacebook({ fb_caption: guide.fb_caption, slug, imageUrl });
+  const fbDecision = await decideFacebookDistribution(
+    {
+      category,
+      title: guide.title,
+      dek: guide.dek,
+      caption: guide.fb_caption,
+      slug,
+    },
+    { client: supabase, postsThisRun: 0 }
+  );
+  if (fbDecision.ok) {
+    await postToFacebook({ fb_caption: guide.fb_caption, slug, imageUrl });
+  } else {
+    console.log(`  [skip] Facebook: ${fbDecision.reason}${fbDecision.detail ? ` — ${fbDecision.detail}` : ''}`);
+  }
+
   await postToPinterest({
     pin_title: guide.pin_title,
     pin_description: guide.pin_description,
@@ -570,4 +586,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, pickTopic, researchAndWriteGuide, pickByline, GUIDE_BYLINE };
+module.exports = { run, pickTopic, researchAndWriteGuide, pickByline, GUIDE_BYLINE, decideFacebookDistribution };

@@ -103,4 +103,16 @@ test('server schedule map enables every configured AI group only with an explici
   assert.equal(flags.diningDirectoryResearch, true);
   assert.equal(flags.featurePromoCaptions, true);
   assert.equal(flags.imageRepair, true);
+  assert.equal(flags.facebookParkReel, false);
+});
+
+test('Facebook park Reel schedule stays off until FB_PARK_REEL_ENABLED=true', () => {
+  const base = {
+    FB_PAGE_ID: 'configured',
+    FB_PAGE_ACCESS_TOKEN: 'configured',
+    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_SERVICE_KEY: 'configured',
+  };
+  assert.equal(getScheduleFlags(base).facebookParkReel, false);
+  assert.equal(getScheduleFlags({ ...base, FB_PARK_REEL_ENABLED: 'true' }).facebookParkReel, true);
 });

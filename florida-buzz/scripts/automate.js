@@ -12,6 +12,10 @@ const { createPost: createInstagramPost } = require('../lib/instagram');
 const { createPost: createThreadsPost } = require('../lib/threads');
 const { postToFacebookPage } = require('../lib/facebook');
 const {
+  decideFacebookDistribution,
+  getFacebookCadenceConfig,
+} = require('../lib/facebookDistribution');
+const {
   normalizePinCopy,
   toFacebookFeedCaption,
   toInstagramCaption,
@@ -39,7 +43,9 @@ const parser = new Parser({
 });
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
-const FB_POST_DELAY_MINUTES = parseInt(process.env.FB_POST_DELAY_MINUTES, 10) || 10;
+// Facebook cadence defaults live in lib/facebookDistribution.js (60 min within-run
+// delay, 4h min spacing, max 1/run and 2/day). Website publishing is unaffected.
+const FB_POST_DELAY_MINUTES = getFacebookCadenceConfig().postDelayMinutes;
 
 // Same mechanism generate-guide.js already uses: the AI writes a placeholder link,
 // and this swaps it for a real Amazon search URL with the affiliate tag attached.
@@ -605,9 +611,16 @@ async function isDuplicateOfRecent(title, category) {
 async function run() {
   console.log(`=== The Florida Buzz automation run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
-  if (!DRY_RUN) console.log(`Posts will be spaced ${FB_POST_DELAY_MINUTES} minute(s) apart across all platforms within this run.\n`);
+  const fbCadence = getFacebookCadenceConfig();
+  if (!DRY_RUN) {
+    console.log(
+      `Facebook: park/cruise topics only; max ${fbCadence.maxPostsPerRun}/run, `
+      + `${fbCadence.maxPostsPerDay}/day, ≥${fbCadence.minHoursBetweenPosts}h apart `
+      + `(within-run FB delay ${fbCadence.postDelayMinutes}m). Website + other social unchanged.\n`
+    );
+  }
 
-  let postCount = 0;
+  let facebookPostsThisRun = 0;
   const retryQueue = createArticleRetryQueue(supabase, { dryRun: DRY_RUN });
   const imageRepairQueue = createImageRepairQueue(supabase);
   const handledGuids = new Set();
@@ -852,11 +865,34 @@ async function run() {
     }
     await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
 
-    if (postCount > 0) {
-      console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before posting this article to all platforms...`);
-      await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
+    // Facebook only for theme-park / cruise stories, and only when cadence allows.
+    // Website save above always happens; Pinterest / Instagram / Threads stay open.
+    const fbDecision = await decideFacebookDistribution(
+      {
+        category: article.category,
+        title: article.title,
+        dek: article.dek,
+        caption: article.fb_caption,
+        slug,
+      },
+      { client: supabase, postsThisRun: facebookPostsThisRun }
+    );
+    if (fbDecision.ok) {
+      if (facebookPostsThisRun > 0 && FB_POST_DELAY_MINUTES > 0) {
+        console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before the next Facebook post...`);
+        await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
+      }
+      const fbOk = await postToFacebook({
+        title: article.title,
+        fb_caption: article.fb_caption,
+        slug,
+        imageUrl: finalImage,
+      });
+      if (fbOk !== false) facebookPostsThisRun += 1;
+    } else {
+      console.log(`  [skip] Facebook: ${fbDecision.reason}${fbDecision.detail ? ` — ${fbDecision.detail}` : ''}`);
     }
-    await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
+
     await postToPinterest({
       pin_title: article.pin_title,
       pin_description: article.pin_description,
@@ -873,7 +909,6 @@ async function run() {
       text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`),
       imageUrl: finalImage,
     });
-    postCount += 1;
     await completeItem(guid);
   }
 
@@ -927,4 +962,5 @@ module.exports = {
   toInstagramCaption,
   toThreadsPost,
   normalizePinCopy,
+  decideFacebookDistribution,
 };

@@ -1,87 +1,121 @@
-# Facebook strategy: Disney article → inexpensive Reels
+# Facebook strategy: park/cruise feed + inexpensive Reels
 
-Operational note for Gene (recommendation + codebase feasibility). **No publishing automation is changed by this doc.**
+Operational note for Gene. **Website publishing is unchanged** — only Facebook distribution is filtered and spaced.
 
-## Verdict
+## What shipped
 
-**Yes — prioritize article → short Reels on Facebook.** Keep website publishing. Treat regular Facebook article/photo link posts as secondary (or pause most of them) until Reels prove reach. Do **not** flood the Page with every article.
+1. **Topic filter** — Facebook article/guide posts only for theme parks + cruises  
+2. **Cadence** — hours apart, capped per run/day (no more 5-in-48-minutes bursts)  
+3. **Non-park feed jobs skipped** — promo / engagement / city roundup / feature-promo Facebook posts off by default  
+4. **Feed packaging** — stronger comment CTAs; link stays in first comment  
+5. **Park Reel path (opt-in)** — Ken Burns + kinetic text from an article still; not fal/guide-reels  
 
-ChatGPT’s Meta read (~61 followers; article posts ~0–3 impressions; promo Reels ~100–150 views) matches what the product should optimize for: short vertical video, not feed link spam.
+## Topic filter
 
-## Cadence (7-day test)
+Module: `lib/facebookDistribution.js`  
+Wired into: `scripts/automate.js`, `scripts/generate-guide.js`
 
-| Channel | Action |
-|--------|--------|
-| Website | Keep automate / guides as today |
-| Facebook Reels | **1 short Disney Reel/day** (manual first, then automate) |
-| Facebook article/photo posts | **Stop bursts.** At most 0–1 spaced feed posts/day during the test, or pause |
-| Promo / engagement FB posts | Keep only if they are already video-style winners; otherwise hold |
-| Buzz Board opinion social | Already paused by default — leave paused |
-| Guide-reels (fal Seedance) | Stay **off** — wrong product for this test |
+**Allowed when either:**
 
-Article bursts happen because `scripts/automate.js` can publish multiple new items per run with only `FB_POST_DELAY_MINUTES` (default **10**) between posts, and `server.js` schedules automate **4×/day** plus guides, promos, etc. That spacing is “within one run,” not a healthy daily Page cadence.
+| Signal | Examples |
+|--------|----------|
+| Category | `theme-parks`, `cruises` (override with `FB_ALLOWED_CATEGORIES`) |
+| Keywords in title/dek/caption/slug | disney, magic kingdom, epcot, hollywood studios, animal kingdom, universal, epic universe, seaworld, legoland, busch gardens, lightning lane, cruise, port canaveral, royal caribbean, … |
 
-## Feasibility in Florida Buzz: **partial → yes with modest work**
+Beaches, space, wildlife, generic food/events, etc. still publish on the **website** (and other social) but **skip Facebook**.
 
-### Already built
+Disable filter (not recommended): `FB_TOPIC_FILTER_ENABLED=false`.
 
-| Piece | Where | Notes |
-|------|--------|------|
-| Facebook Page photo/link posts | `lib/facebook.js`, `scripts/automate.js`, `scripts/generate-guide.js` | Works; link in first comment |
-| Facebook **video** upload | `lib/facebook.js` → `POST /{page-id}/videos` | Page video, **not** the dedicated Facebook Reels publish API |
-| Instagram Reels publish | `lib/instagram.js` (`media_type: 'REELS'`) | Real Reels container flow |
-| Guide → paid AI Reel pipeline | `lib/reels/*`, `docs/guide-reels.md` | fal Seedance + Qwen; **disabled** (emergency quality hold); stops at approval; auto-publish gated |
-| Cheap vertical video samples | `lib/visualNews/*`, `npm run sample:visual-news-ll`, `npm run sample:disney-story` | Ken Burns / stills + ASS captions + ElevenLabs; **no fal** |
-| Social schedules / flags | `lib/scheduleConfig.js`, `server.js` | Article, guide, promo, engagement, Buzz Board knobs |
+## Cadence defaults
 
-### Not built yet (needed for auto Disney article → FB Reels)
+| Knob | Default | Env override |
+|------|---------|--------------|
+| Min hours between FB successes | **4** | `FB_MIN_HOURS_BETWEEN_POSTS` |
+| Max FB posts per calendar-ish 24h | **2** | `FB_MAX_POSTS_PER_DAY` |
+| Max FB posts per automate/guide run | **1** | `FB_MAX_POSTS_PER_RUN` |
+| Within-run wait after an FB post | **60** minutes | `FB_POST_DELAY_MINUTES` (was 10) |
 
-1. **Article picker** — choose 1 Disney/theme-park story/day (not every RSS hit).
-2. **Script + caption beats from the article** — short hook VO or kinetic text only; reuse existing images.
-3. **Production path that is not fal Seedance** — extend `lib/visualNews` (or disney-story sample) to take live article stills.
-4. **Public video URL** — Meta `file_url` needs a reachable HTTPS URL (host/upload step).
-5. **Facebook Reels-specific publish** (optional but preferred) — today’s helper posts Page video; Instagram already has Reels. Confirm whether Page `/videos` is enough or wire Meta’s Reels publishing.
-6. **Separate 1/day schedule + receipts** — do not bolt onto the multi-article automate loop.
+History comes from `post_log` (`platform=facebook`, `status=success`). If Supabase is down, cadence falls back to in-run counters only.
 
-Modest work: reuse visual-news ffmpeg + existing FB/IG credentials; add picker + publish + cadence. Not a greenfield video product.
-
-## Explicitly out of scope (already rejected)
-
-- AI presenter / green-screen / reaction-narrator talking heads  
-- fal Seedance / paid AI clip generation for this growth test  
-- Cheap wallet / money sticker overlay dumps that failed visual-news review  
-- Turning guide-reels schedules on for Facebook growth  
-
-## Manual test path (use now)
-
-Inexpensive Disney-style vertical samples (no fal):
+**Non-park Facebook jobs** (promo, engagement, city roundup FB, feature promo FB) are skipped while `FB_SKIP_NON_PARK_FEED` is not `false`. Re-enable with:
 
 ```bash
-# Ken Burns + captions + ElevenLabs VO (hardcoded Magic Kingdom story)
-ELEVENLABS_API_KEY=… npm run sample:disney-story
-
-# Visual-news Lightning Lane sample (stills + captions + Geno VO; no presenter)
-ELEVENLABS_API_KEY=… npm run sample:visual-news-ll
+FB_SKIP_NON_PARK_FEED=false
 ```
 
-Upload the MP4 **manually** to Facebook Reels for 3 stories over a few days. Caption: hook + soft CTA; put the article URL in the **first comment**, not only in the Reel (Meta often suppresses outbound links in video).
+## Feed packaging
 
-Do **not** use `node scripts/reel-worker.js` / guide-reels for this test (paid fal path, gates off, quality hold).
+`lib/socialCopy.js` → `toFacebookFeedCaption()`:
 
-## Phased plan
+- Strips legacy “Full story ↓” suffixes  
+- Adds a short yes/no or park-day question CTA when missing  
+- Article URL stays in the **first comment** (`linkPlacement: 'first_comment'`)  
 
-1. **Manual 3** — Three Disney article Reels from existing images + ken-burns/kinetic text (or the sample scripts above). Measure 48h reach/followers vs article posts.
-2. **Automate 1/day** — Wire visual-news-style render → public URL → FB (and optionally IG Reels). Hard cap one Reel/day. Throttle or skip FB article flooding.
-3. **Metrics (7 days)** — Reel plays, 3-second views, follows from Reels, profile visits, link clicks from first comment, vs residual article-post impressions. Kill or keep based on that, not vanity post count.
+No hashtag dumps on Facebook.
 
-## Risks
+## Park Reel path (opt-in — not live until you flip flags)
 
-- **Links in Reel captions** — often weak distribution; prefer first comment + on-site CTA in video.  
-- **Instagram** — Reels API is ready if tokens are set; Facebook Page video ≠ guaranteed Reels tab placement until confirmed.  
-- **Volume penalties** — continuing 4×/day article automate + guides + promos will keep burying the Page while testing Reels.  
-- **ElevenLabs cost** — cheap vs fal video, still metered; one short VO/day is fine.  
-- **Image rights** — prefer article-owned / already-published stills; sample refs under `public/reels/references/` are for samples only.
+| Piece | Path |
+|-------|------|
+| Picker + Ken Burns render + optional publish | `lib/facebookParkReel.js` |
+| CLI | `npm run facebook:park-reel` / `npm run facebook:park-reel:dry` |
+| Schedule | `server.js` at **10:15am ET** when enabled |
+
+**Does use:** existing article image, ffmpeg Ken Burns, kinetic ASS captions, Page `/videos` upload helper.  
+**Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
+
+### Turn on in production (Gene)
+
+1. Deploy this branch.  
+2. Confirm article automate + guides still write to the site (no env change required for the filter — it is on by default).  
+3. Optional cadence tweaks on the host, e.g.:
+
+```bash
+FB_MIN_HOURS_BETWEEN_POSTS=4
+FB_MAX_POSTS_PER_DAY=2
+FB_MAX_POSTS_PER_RUN=1
+```
+
+4. **Manual Reel dry run** (render only):
+
+```bash
+DRY_RUN=true npm run facebook:park-reel
+```
+
+5. Confirm the MP4 is under `public/reels/daily/` and reachable at  
+   `https://thefloridabuzz.com/reels/daily/<file>.mp4` after deploy/sync.  
+6. **Publish one Reel**:
+
+```bash
+FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
+```
+
+7. **Schedule daily render/publish** (host env):
+
+```bash
+FB_PARK_REEL_ENABLED=true
+FB_PARK_REEL_PUBLISH=true   # only after a successful manual publish
+```
+
+Until step 7, the daily cron is off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render.
+
+Meta still receives a **Page video** via `/{page-id}/videos` (same helper as before). That is good enough for discovery testing; dedicated Facebook Reels Graph placement can be layered later. Put the article URL in the first comment (already wired).
+
+## Explicitly out of scope (still rejected)
+
+- AI presenter / green-screen / reaction-narrator talking heads  
+- fal Seedance / paid AI clip generation / `scripts/reel-worker.js` for this growth path  
+- Cheap wallet / money sticker overlay dumps  
+- Turning guide-reels schedules on for Facebook growth  
+
+## Manual sample path (still valid)
+
+```bash
+ELEVENLABS_API_KEY=… npm run sample:disney-story
+```
+
+Upload the MP4 manually to Facebook Reels if you want a human QA pass before enabling `FB_PARK_REEL_PUBLISH`.
 
 ## Recommendation summary
 
-Ship the ChatGPT plan with a codebase-aligned twist: **yes to article→Reels**, **use the existing cheap stills+ffmpeg path (not guide-reels/fal)**, **stop Facebook article flooding during the test**, prove with 3 manuals, then automate one Reel per day.
+Ship the ChatGPT plan with codebase reality: **park/cruise-only Facebook**, **spaced feed posts**, **cheap stills→video Reel opt-in**, prove reach, then keep or kill based on plays / follows — not post count.

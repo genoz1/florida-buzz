@@ -2,11 +2,10 @@
 // on the right side of copyright (we summarize + link back, never copy).
 //
 // ORDER MATTERS: sources are checked top-to-bottom each run, and each successful
-// Facebook post adds a 10-minute wait before the next one (see FB_POST_DELAY_MINUTES
-// in automate.js). With enough sources, a long run can get cut short by the next
-// scheduled run or a deploy before reaching the bottom of this list — so priority
-// order is: theme parks first, then the city-specific event feeds, then beaches,
-// then everything else.
+// Facebook only posts theme-park / cruise stories (see lib/facebookDistribution.js)
+// and is cadence-capped, so long source lists no longer stall the run waiting on
+// FB delays. Priority order is still: theme parks first, then city events, then
+// beaches, then everything else.
 
 module.exports = [
   // ── THEME PARKS ─────────────────────────────────────────────────────────
