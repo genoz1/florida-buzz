@@ -224,6 +224,13 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(HOST_BIBLE, /warm friend hello|Warm Open|warm open/i);
   assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open/i);
   assert.match(HOST_BIBLE, /symmetrical essay-dialogue/i);
+  assert.match(HOST_BIBLE, /1–5 word/i);
+  assert.match(HOST_BIBLE, /uneven/i);
+  assert.match(HOST_BIBLE, /mid-thought|unfinished sentences/i);
+  assert.match(HOST_BIBLE, /wait—/);
+  assert.match(HOST_BIBLE, /thesis\s*→\s*example\s*→\s*lesson|thesis → example → lesson/i);
+  assert.match(HOST_BIBLE, /equally polished/i);
+  assert.match(HOST_BIBLE, /mild disagreement/i);
   const show = { title: 'Florida Buzz: Disney' };
   const episode = { title: 'Week in the parks', description: 'News and tips' };
   const sources = [
@@ -242,7 +249,10 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(outline.system, /Warm Open/i);
   assert.match(outline.system, /30–90 seconds/i);
   assert.match(outline.system, /before any topic hook/i);
+  assert.match(outline.system, /Anti-scripted energy|1–5 word reaction/i);
+  assert.match(outline.system, /thesis→example→lesson|thesis → example → lesson/i);
   assert.match(outline.user, /Warm Open/i);
+  assert.match(outline.user, /anti-scripted|uneven turns/i);
   const conversation = buildConversationPrompt({
     show,
     episode,
@@ -267,7 +277,15 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /AFTER the warm friend banter/i);
   assert.match(conversation.system, /symmetrical essay-dialogue/i);
   assert.match(conversation.system, /short punchy|punchier turns/i);
+  assert.match(conversation.system, /ANTI-SCRIPTED HARD RULES/i);
+  assert.match(conversation.system, /1–5 words/i);
+  assert.match(conversation.system, /mid-thought pivots|unfinished sentences/i);
+  assert.match(conversation.system, /equally polished/i);
+  assert.match(conversation.system, /thesis → example → lesson/i);
+  assert.match(conversation.system, /mild disagreement/i);
+  assert.match(conversation.system, /40–50 spoken words/i);
   assert.match(conversation.user, /warm friend hello/i);
+  assert.match(conversation.user, /1–5 word reactions|does not sound scripted/i);
   assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
@@ -468,6 +486,10 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   assert.match(input.style_instructions, /AfterBuzz|aftershow/i);
   assert.match(input.style_instructions, /warm hellos|catch-up banter/i);
   assert.match(input.style_instructions, /symmetrical essay-dialogue/i);
+  assert.match(input.style_instructions, /not hosts reading an essay|not reading an essay|not reading scripted/i);
+  assert.match(input.style_instructions, /Less announcer|more live reaction/i);
+  assert.match(input.style_instructions, /1–5 word|wait—/i);
+  assert.match(input.style_instructions, /uneven pacing|Natural uneven/i);
 });
 
 test('fal TTS style_instructions include EPCOT as EP-cot (shared pronunciation map)', () => {

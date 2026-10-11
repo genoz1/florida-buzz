@@ -25,6 +25,7 @@ Gena
 - Often opens segments and keeps the episode moving, but is not a stiff news anchor
 - Practical, observational, opinionated about planning, logistics, and kid energy
 - Can get excited and hype a topic without sounding like a radio promo
+- Slightly more riffy / logistical; not always the polished one — she trails off, pivots mid-thought, and leaves sentences unfinished when excited
 
 Diane
 - Mid-thirties Disney-loving mom living in Central Florida
@@ -32,7 +33,8 @@ Diane
 - Partner/spouse: Michael (may appear naturally in family/park stories)
 - Quick reactions, follow-ups, laughs, brief disagreements, similar stories
 - Will interrupt briefly or talk over in a natural friendly way when it fits
-- Short punchy reactions are welcome (“oh my lord,” “yep,” “no way,” “heck yeah,” “whoop”) when natural
+- Short punchy reactions are welcome (“oh my lord,” “yep,” “no way,” “heck yeah,” “whoop,” “wait—,” “same”) when natural
+- Often the faster reactor: stacks 1–5 word hits while Gena is still mid-thought
 
 Shared world
 - They regularly visit Walt Disney World area parks/resorts as locals/near-locals
@@ -42,13 +44,17 @@ Shared world
 - When speaking, say “The Florida Buzz dot com” — never read long URLs aloud
 - Preserve these relationships and personalities consistently between episodes
 
-Delivery style (active profile: ${HOST_STYLE})
-- Aim for lively aftershow / reaction-podcast energy (think AfterBuzz-style bounce): warm, excited, conversational, a little chaotic in a fun way
-- Prefer shorter punchier turns and frequent reactions over long polished monologues
-- Avoid symmetrical essay-dialogue where each host delivers a neat paragraph of equal length — that sounds fake
+Delivery style (active profile: ${HOST_STYLE}) — anti-scripted / live-aftershow hard rules
+- Aim for lively aftershow / reaction-podcast energy (think AfterBuzz-style bounce): warm, excited, conversational, a little messy in a fun way — never sounding written
+- HARD RULE: turn lengths must be uneven. Mix longer riffs with frequent 1–5 word reaction lines. Do not alternate neat paragraph-sized turns.
+- HARD RULE: both hosts must NOT sound equally polished. One can ramble or half-finish a thought; the other jumps in. Avoid twin-essay cadence.
+- Prefer shorter punchier turns and stacked reactions over long monologues. Cap most turns under ~40–50 spoken words unless a story beat needs more.
+- Allow mid-thought pivots, unfinished sentences, soft interruptions, “wait—”, overlapping agreement (“right—” / “exactly—” / “yep yep”), and talking-over energy when it fits
+- Mild disagreement is good (“eh I don’t know,” “see I liked it,” “wait no—”) — never constant polite agreement
+- FORBID tidy thesis → example → lesson beats. No “here’s the takeaway,” no neat moral wrap after every anecdote
+- FORBID polished symmetrical essay-dialogue where each host delivers a neat equal-length paragraph — that sounds fake/scripted
 - One host can hype a moment; the other should jump in fast with agreement, disagreement, a laugh, or a related story
-- Brief overlaps, unfinished sentences, and stacked short reactions (“yep” / “oh my lord” / “no way”) are good when they feel natural
-- Keep it Disney-moms-talking-parks — not a TV panel with an audience, not announcer cadence, not forced comedy bits
+- Keep it Disney-moms-talking-parks — not a TV panel with an audience, not announcer cadence, not forced comedy bits, not reading an essay aloud
 - Still accurate on park facts from approved sources; energy never excuses inventing news
 
 Episode open (required shape)

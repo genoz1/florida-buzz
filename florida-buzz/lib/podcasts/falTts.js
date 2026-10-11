@@ -46,7 +46,7 @@ function createFalTts(cfg, fetcher = fetch) {
       temperature: cfg.temperature,
       output_format: cfg.outputFormat,
       style_instructions: [
-        'Lively AfterBuzz-style aftershow energy between two Central Florida moms who are longtime friends — warm hellos and catch-up banter early, then excited park talk. Fast conversational bounce, short punchy reactive turns, soft laughs, brief overlaps, stacked affirmations (“yep,” “oh my lord,” “heck yeah”) OK. Sound engaged and fun like friends reacting live, not polished symmetrical essay-dialogue, not stiff radio presenters. Not chaotic or shouty. No cartoon voices, no heavy accents, no announcer cadence.',
+        'Conversational AfterBuzz-style aftershow between two Central Florida moms who are longtime friends — reactive friends chatting, not hosts reading an essay. Warm hellos and catch-up banter early, then excited park talk. Natural uneven pacing: short punchy reactive turns, 1–5 word affirmations (“yep,” “oh my lord,” “heck yeah,” “wait—”), soft laughs, brief overlaps, mid-thought energy. Less announcer, more live reaction. Sound engaged and slightly messy like friends interrupting each other, not polished symmetrical essay-dialogue, not stiff radio presenters, not reading scripted paragraphs. Not chaotic or shouty. No cartoon voices, no heavy accents, no announcer cadence.',
         pronunciationStyleInstructions(),
       ].join(' '),
       speakers: [
