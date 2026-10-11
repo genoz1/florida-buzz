@@ -58,7 +58,7 @@ async function main() {
   const outDir = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
   const master = result.master;
   const ffmpeg = require('../lib/visualNews/ffmpeg');
-  for (const t of [2, 4, 10, 12, 17]) {
+  for (const t of [2, 4, 7, 10, 12, 17]) {
     const frame = path.join(outDir, `florida-buzz-visual-news-ll-t${t}.jpg`);
     try {
       ffmpeg.run(ffmpeg.ffmpegBin(), [
