@@ -258,8 +258,16 @@ async function collectDigestContent(client = supabase, { now = new Date() } = {}
       || g.category === 'travel-deals'
       || /disney|universal|hotel|itinerary|planner|lightning|park|orlando|cruise|port canaveral/.test(hay);
   });
-  const tipGuide = tipCandidates.find((g) => /disney|hotel|itinerary|rental|universal|planner/.test(`${g.title} ${g.slug}`.toLowerCase()))
-    || tipCandidates[0]
+  const tipScore = (g) => {
+    const hay = `${g.title} ${g.slug}`.toLowerCase();
+    let score = 0;
+    if (/disney/.test(hay)) score += 5;
+    if (/hotel|itinerary|planner|lightning|rope drop|wait/.test(hay)) score += 3;
+    if (/universal/.test(hay)) score += 1;
+    if (g.image_url) score += 1;
+    return score;
+  };
+  const tipGuide = [...tipCandidates].sort((a, b) => tipScore(b) - tipScore(a))[0]
     || (guides || [])[0]
     || null;
 
