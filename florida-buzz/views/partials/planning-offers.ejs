@@ -1,16 +1,38 @@
 <%#
   Soft, high-intent partner CTAs for trip-planning pages.
   Expects: planningOffers (array from lib/affiliates getActiveOffers)
-  Optional: planningOffersVariant ('compact' | 'inline')
+  Optional: planningOffersVariant ('compact' | 'inline' | 'home')
 %>
 <% const offers = typeof planningOffers !== 'undefined' && Array.isArray(planningOffers) ? planningOffers : []; %>
 <% if (offers.length) { %>
-<aside class="planning-offers <%= typeof planningOffersVariant === 'string' ? 'planning-offers--' + planningOffersVariant : '' %>" aria-label="Trip planning partners">
+  <% const variant = typeof planningOffersVariant === 'string' ? planningOffersVariant : ''; %>
+  <% if (variant === 'home') { %>
+<aside class="planning-offers planning-offers--home" aria-label="Trip planning partners">
+  <div class="planning-offers-home-panel">
+    <div class="planning-offers-home-intro">
+      <span class="planning-offer-eyebrow">When you’re ready to book</span>
+      <strong class="planning-offers-home-title">Hotels &amp; park tickets</strong>
+      <p>Compare rates before you lock dates — Florida Buzz affiliate partners. Commissions never raise your price.</p>
+    </div>
+    <div class="planning-offers-home-actions">
+      <% offers.forEach(function (offer, index) { %>
+        <a
+          class="<%= index === 0 ? 'btn' : 'btn btn-outline' %>"
+          href="<%= offer.url %>"
+          target="_blank"
+          rel="nofollow sponsored noopener"
+        ><%= offer.id === 'hotels-com' ? 'Compare hotels →' : (offer.id === 'undercover-tourist' ? 'Compare park tickets →' : offer.cta) %></a>
+      <% }) %>
+    </div>
+  </div>
+</aside>
+  <% } else { %>
+<aside class="planning-offers <%= variant ? 'planning-offers--' + variant : '' %>" aria-label="Trip planning partners">
   <% offers.forEach(function (offer, index) { %>
     <div class="planning-offer <%= offer.soft ? 'planning-offer--soft' : '' %> <%= index === 0 ? 'planning-offer--primary' : 'planning-offer--secondary' %>">
       <div class="planning-offer-copy">
         <span class="planning-offer-eyebrow"><%= offer.eyebrow %></span>
-        <strong><%= offer.partner %></strong>
+        <strong class="planning-offer-partner"><%= offer.partner %></strong>
         <p><%= offer.blurb %></p>
         <p class="planning-offer-disclosure"><%= offer.disclosure %></p>
       </div>
@@ -18,4 +40,5 @@
     </div>
   <% }) %>
 </aside>
+  <% } %>
 <% } %>

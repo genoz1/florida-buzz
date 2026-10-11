@@ -703,16 +703,20 @@ footer a:hover { opacity: 1; }
   max-width: 56ch;
 }
 .planning-offer-eyebrow {
+  display: block;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--teal-700);
 }
+.planning-offer-partner,
 .planning-offer-copy strong {
+  display: block;
   font-family: var(--font-display);
   font-size: 20px;
   color: var(--teal-900);
+  line-height: 1.2;
 }
 .planning-offer-copy p {
   margin: 0;
@@ -727,15 +731,48 @@ footer a:hover { opacity: 1; }
 .planning-offers--compact .planning-offer {
   padding: 14px 16px;
 }
+.planning-offers--compact .planning-offer-partner,
 .planning-offers--compact .planning-offer-copy strong {
   font-size: 18px;
 }
 .planning-offers--home {
   margin-top: 18px;
 }
-.planning-offers--home .planning-offer--primary {
-  /* Match the existing homepage partner strip the user already likes. */
+.planning-offers-home-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 28px;
   padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: linear-gradient(120deg, var(--sand-100) 0%, #fffdf8 55%, #f0f7f4 100%);
+}
+.planning-offers-home-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 48ch;
+}
+.planning-offers-home-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--teal-900);
+  line-height: 1.15;
+}
+.planning-offers-home-intro p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-600);
+  line-height: 1.45;
+}
+.planning-offers-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 .planning-offers--inline .planning-offer {
   text-align: left;
