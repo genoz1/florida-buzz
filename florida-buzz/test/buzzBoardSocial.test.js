@@ -195,6 +195,7 @@ test('platform copy stays conversation-first and sends readers to the selected d
 test('recurring schedule fails closed unless Buzz Board and both existing Meta publishers are configured', () => {
   const base = {
     BUZZ_BOARD_SOCIAL_ENABLED: 'true',
+    BUZZ_BOARD_OPINION_SOCIAL_ENABLED: 'true',
     BUZZ_BOARD_ENABLED: 'true',
     FB_PAGE_ID: 'page',
     FB_PAGE_ACCESS_TOKEN: 'fb-token',
@@ -202,6 +203,22 @@ test('recurring schedule fails closed unless Buzz Board and both existing Meta p
   };
   assert.equal(getScheduleFlags(base).buzzBoardSocial, false);
   assert.equal(getScheduleFlags({ ...base, INSTAGRAM_ACCESS_TOKEN: 'ig-token' }).buzzBoardSocial, true);
+});
+
+test('Buzz Board opinion social stays paused unless BUZZ_BOARD_OPINION_SOCIAL_ENABLED is true', () => {
+  const configured = {
+    BUZZ_BOARD_SOCIAL_ENABLED: 'true',
+    BUZZ_BOARD_ENABLED: 'true',
+    FB_PAGE_ID: 'page',
+    FB_PAGE_ACCESS_TOKEN: 'fb-token',
+    INSTAGRAM_USER_ID: 'ig-user',
+    INSTAGRAM_ACCESS_TOKEN: 'ig-token',
+  };
+  assert.equal(getScheduleFlags(configured).buzzBoardSocial, false);
+  assert.equal(
+    getScheduleFlags({ ...configured, BUZZ_BOARD_OPINION_SOCIAL_ENABLED: 'true' }).buzzBoardSocial,
+    true
+  );
 });
 
 test('dry run exercises both publishers without writing post-log state', async () => {

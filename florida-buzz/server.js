@@ -248,7 +248,7 @@ if (scheduleFlags.buzzBoardSocial) {
   console.log(`Facebook Buzz Board distribution scheduled: ${fbLabels} daily (Eastern time).`);
   console.log('Instagram Buzz Board distribution scheduled: 9:30pm daily (Eastern time).');
 } else {
-  console.log('Buzz Board social distribution NOT scheduled — enable both Buzz Board flags and configure Facebook/Instagram credentials.');
+  console.log('Buzz Board opinion social posts NOT scheduled — paused while short-form video is the engagement focus. Set BUZZ_BOARD_SOCIAL_ENABLED=true and BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true to resume.');
 }
 
 // Repairs a small bounded number of image jobs each night. Technical review

@@ -50,12 +50,13 @@ most likely official path but couldn't confirm they resolve from my end. Once de
 1. Set `DRY_RUN=true` in your environment variables.
 2. Run the automation once (DigitalOcean → Console → `npm run automate:dry`).
 
-Buzz Board organic social distribution is separately gated by
-`BUZZ_BOARD_SOCIAL_ENABLED=true`. It also requires `BUZZ_BOARD_ENABLED=true`
-and the existing Facebook and Instagram credentials. The daily job makes no AI
-calls, rotates through approved Florida Buzz starters, adds source/campaign/topic
-UTM tags, and records per-platform success in `post_log`. Validate safely with
-`npm run buzz-social:dry` before enabling the schedule.
+Buzz Board opinion/QOTD social posts are paused by default while short-form
+video is the engagement focus. To resume them, set both
+`BUZZ_BOARD_SOCIAL_ENABLED=true` and `BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true`,
+plus `BUZZ_BOARD_ENABLED=true` and the existing Facebook/Instagram credentials.
+The daily job makes no AI calls, rotates through approved Florida Buzz starters,
+adds source/campaign/topic UTM tags, and records per-platform success in
+`post_log`. Validate safely with `npm run buzz-social:dry` before enabling.
 3. Check the output — any feed that errors or returns 0 items needs a fix. Usually means
    visiting the source's website and finding their current RSS link (or removing it if they
    don't have one).

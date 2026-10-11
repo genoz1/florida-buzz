@@ -24,7 +24,11 @@ function getScheduleFlags(env = process.env) {
     newsletter: hasRequiredConfig(env, ['RESEND_API_KEY']),
     standardPromo: hasRequiredConfig(env, ['FB_PAGE_ID', 'FB_PAGE_ACCESS_TOKEN']),
     postHealthCheck: hasRequiredConfig(env, ['RESEND_API_KEY', 'ALERT_EMAIL_TO']),
+    // Opinion QOTD social posts are paused by default while short-form video
+    // is the primary engagement channel. Re-enable only with both flags:
+    // BUZZ_BOARD_SOCIAL_ENABLED=true and BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true.
     buzzBoardSocial: env.BUZZ_BOARD_SOCIAL_ENABLED === 'true'
+      && env.BUZZ_BOARD_OPINION_SOCIAL_ENABLED === 'true'
       && env.BUZZ_BOARD_ENABLED === 'true'
       && hasRequiredConfig(env, [
         'FB_PAGE_ID',
