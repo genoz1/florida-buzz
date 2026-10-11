@@ -38,17 +38,19 @@ const INTRO_LOCAL = path.join(
 /** Solo Geno show trailer (~2–3 min spoken at natural pace). No Diane/Gena. */
 const TRAILER_SCRIPT = `[excited] Welcome to Florida Buzz: Disney. I'm Geno — and this is your unofficial Walt Disney World fan podcast from The Florida Buzz.
 
-[conversational] Quick and important up front: this show is not affiliated with, endorsed by, or sponsored by The Walt Disney Company. We're fans. Unofficial. Here for the parks, the planning, and that real family-trip energy.
+[conversational] Quick and important up front: this show is not affiliated with, endorsed by, or sponsored by The Walt Disney Company. We're fans. Unofficial. Here for the parks, the planning, and that real family-trip energy — the kind where somebody still has to pack snacks, check the weather, and figure out which park makes sense tomorrow.
 
 [excited] So what is Florida Buzz: Disney? Every week I dig into park news, wait times, construction updates, resort tips, and practical vacation planning you can actually use on a real Disney day. Magic Kingdom, EPCOT, Hollywood Studios, Animal Kingdom — the stuff that changes your morning when you're on property and trying to keep the whole crew smiling.
 
-[conversational] The format is simple and fast. Quick hits when you need the headlines without the fluff. Then deeper takes when a story deserves more than a scroll — construction timelines, resort tradeoffs, planning moves that save you time and stress. Standalone episodes drop Tuesday and Friday, so you can catch up before the weekend or lock in midweek strategy.
+[conversational] Think ride refurbs, new experiences coming online, crowd patterns that sneak up on you, dining moves worth knowing before you book, and resort updates that matter when you're choosing where to sleep. I live near this world, I go often, and I talk through it like a friend who already did the homework — not like a corporate brochure.
+
+[excited] The format is simple and fast. Quick hits when you need the headlines without the fluff. Then deeper takes when a story deserves more than a scroll — construction timelines, resort tradeoffs, planning moves that save you time and stress. Standalone episodes drop Tuesday and Friday, so you can catch up before the weekend or lock in midweek strategy.
 
 [warm] If you're planning a trip — or you just love staying in the Disney World loop — this is your show. I'll keep it practical, high energy, and focused on what families actually need: where the waits are stacking, what's under construction, which resort moves make sense, and the planning tips from The Florida Buzz that help you spend less time refreshing apps and more time riding.
 
-[excited] Want more between episodes? Hit The Florida Buzz dot com. Check the Buzz Board, pull the guides, watch the wait times, and use the planning tools that back up everything we talk about here. That's thefloridabuzz.com — your home base for park intel and trip prep.
+[conversational] Between episodes, you don't have to guess. Hit The Florida Buzz dot com. Check the Buzz Board for what's buzzing right now. Pull the guides when you're building a day. Watch the wait times when you're deciding whether to rope-drop or reset. Use the planning tools that back up everything we talk about here. That's thefloridabuzz.com — your home base for park intel and trip prep.
 
-[conversational] Follow and subscribe so you never miss a Tuesday or Friday drop. Share it with your trip group if they're the ones asking "what's new at the parks?" I'm Geno — this is Florida Buzz: Disney — unofficial, fan-powered, and ready when you are. Let's go.`;
+[excited] Follow and subscribe so you never miss a Tuesday or Friday drop. Share it with your trip group if they're the ones asking "what's new at the parks?" Hit play on a walk, in the car, or while you're packing. I'm Geno — this is Florida Buzz: Disney — unofficial, fan-powered, and ready when you are. Let's go.`;
 
 const NEW_DESCRIPTION =
   'Meet Geno in this short preview of Florida Buzz: Disney — an unofficial Walt Disney World fan podcast from The Florida Buzz. Weekly park news, wait times, construction, resort tips, and practical family-trip planning. Episodes Tuesday and Friday. Visit https://thefloridabuzz.com for the Buzz Board, guides, and wait times. Not affiliated with The Walt Disney Company.';
@@ -170,7 +172,7 @@ async function main() {
   const withIntro = await prependAudioBuffer(introBuf, bodyBuf, 'ffmpeg');
   const master = await encodePodcastMaster(withIntro, 'ffmpeg', { bitrate: '96k', channels: 1 });
 
-  const masterName = 'florida-buzz-disney-trailer-master-v2-solo-geno.mp3';
+  const masterName = 'florida-buzz-disney-trailer-master-v3-solo-geno.mp3';
   const masterPath = path.join(OUT_DIR, masterName);
   const previewStereo = path.join(OUT_DIR, 'florida-buzz-disney-trailer-solo-geno-preview.mp3');
   await fsp.writeFile(masterPath, master);
@@ -249,7 +251,9 @@ async function main() {
     },
     old_trailer: {
       audio_url: oldAudioUrl,
-      note: 'Left in storage as backup; episode audio_url now points at v2 solo Geno master. Episode stayed published with same slug/guid so RSS itunes:episodeType=trailer swaps enclosure.',
+      original_dual_host_backup:
+        'https://tcrfirzjcjvfmiepgbjh.supabase.co/storage/v1/object/public/podcast-audio/shows/florida-buzz-disney/trailer/florida-buzz-disney-trailer-master-v1.mp3',
+      note: 'Prior masters left in storage as backup. Episode stayed published with same slug/guid so RSS itunes:episodeType=trailer swaps the enclosure URL in place.',
     },
     production: {
       model: MODEL_ID,
