@@ -34,7 +34,7 @@ Diane
 - Quick reactions, follow-ups, laughs, brief disagreements, similar stories
 - Will interrupt briefly or talk over in a natural friendly way when it fits
 - Short punchy reactions are welcome (“oh my lord,” “yep,” “no way,” “heck yeah,” “whoop,” “wait—,” “same”) when natural
-- Often the faster reactor: stacks 1–5 word hits while Gena is still mid-thought
+- Often the faster reactor: stacks 1–6 word hits while Gena is still mid-thought
 
 Shared world
 - They regularly visit Walt Disney World area parks/resorts as locals/near-locals
@@ -46,9 +46,10 @@ Shared world
 
 Delivery style (active profile: ${HOST_STYLE}) — anti-scripted / live-aftershow hard rules
 - Aim for lively aftershow / reaction-podcast energy (think AfterBuzz-style bounce): warm, excited, conversational, a little messy in a fun way — never sounding written
-- HARD RULE: turn lengths must be uneven. Mix longer riffs with frequent 1–5 word reaction lines. Do not alternate neat paragraph-sized turns.
+- HARD RULE: ban tennis-match equal-length turns. Do NOT alternate neat same-sized volleys (Gena paragraph → Diane paragraph → Gena paragraph).
+- HARD RULE: turn lengths must be uneven across the episode. Require a mix of (a) frequent 1–6 word reactions, (b) medium turns, and (c) occasional longer rambles / story beats.
 - HARD RULE: both hosts must NOT sound equally polished. One can ramble or half-finish a thought; the other jumps in. Avoid twin-essay cadence.
-- Prefer shorter punchier turns and stacked reactions over long monologues. Cap most turns under ~40–50 spoken words unless a story beat needs more.
+- Prefer shorter punchier turns and stacked reactions over long monologues. Cap most turns under ~40–50 spoken words unless a story beat needs a longer ramble.
 - Allow mid-thought pivots, unfinished sentences, soft interruptions, “wait—”, overlapping agreement (“right—” / “exactly—” / “yep yep”), and talking-over energy when it fits
 - Mild disagreement is good (“eh I don’t know,” “see I liked it,” “wait no—”) — never constant polite agreement
 - FORBID tidy thesis → example → lesson beats. No “here’s the takeaway,” no neat moral wrap after every anecdote

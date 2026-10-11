@@ -146,6 +146,69 @@ test('prependAudioBuffer puts intro bytes ahead of body audio', async () => {
   }
 });
 
+test('concatMp3Buffers trims section padding and uses varied inter-section gaps', async () => {
+  const {
+    concatMp3Buffers,
+    interSectionGapMs,
+    INTER_SECTION_GAP_MS,
+  } = require('../lib/podcasts/audioPipeline');
+  assert.ok(INTER_SECTION_GAP_MS.length >= 4);
+  assert.notEqual(interSectionGapMs(0), interSectionGapMs(1));
+  assert.notEqual(interSectionGapMs(1), interSectionGapMs(2));
+  const ffmpegPath = (() => {
+    try {
+      return require('ffmpeg-static');
+    } catch {
+      return 'ffmpeg';
+    }
+  })();
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-concat-test-'));
+  try {
+    // Tone with leading+trailing silence — mimics fal section padding.
+    const mkPadded = (file) =>
+      spawnSync(
+        ffmpegPath,
+        [
+          '-y',
+          '-f',
+          'lavfi',
+          '-i',
+          'sine=frequency=660:duration=0.35',
+          '-af',
+          'adelay=250|250,apad=pad_dur=0.25',
+          '-codec:a',
+          'libmp3lame',
+          '-b:a',
+          '96k',
+          '-ac',
+          '1',
+          '-ar',
+          '44100',
+          file,
+        ],
+        { encoding: 'utf8' }
+      );
+    const aPath = path.join(dir, 'a.mp3');
+    const bPath = path.join(dir, 'b.mp3');
+    const cPath = path.join(dir, 'c.mp3');
+    if (mkPadded(aPath).status !== 0 || mkPadded(bPath).status !== 0 || mkPadded(cPath).status !== 0) {
+      console.log('# skip concat gap test — ffmpeg lavfi unavailable');
+      return;
+    }
+    const out = await concatMp3Buffers(
+      [await fsp.readFile(aPath), await fsp.readFile(bPath), await fsp.readFile(cPath)],
+      ffmpegPath
+    );
+    assert.ok(out.length > 1500);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 test('stuck generating_audio can return to script_ready for TTS retry', () => {
   const { assertTransition } = require('../lib/podcasts/validation');
   assert.equal(assertTransition('generating_audio', 'script_ready'), 'script_ready');
@@ -224,7 +287,9 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(HOST_BIBLE, /warm friend hello|Warm Open|warm open/i);
   assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open/i);
   assert.match(HOST_BIBLE, /symmetrical essay-dialogue/i);
-  assert.match(HOST_BIBLE, /1–5 word/i);
+  assert.match(HOST_BIBLE, /1–6 word/i);
+  assert.match(HOST_BIBLE, /tennis-match/i);
+  assert.match(HOST_BIBLE, /longer rambles/i);
   assert.match(HOST_BIBLE, /uneven/i);
   assert.match(HOST_BIBLE, /mid-thought|unfinished sentences/i);
   assert.match(HOST_BIBLE, /wait—/);
@@ -249,10 +314,10 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(outline.system, /Warm Open/i);
   assert.match(outline.system, /30–90 seconds/i);
   assert.match(outline.system, /before any topic hook/i);
-  assert.match(outline.system, /Anti-scripted energy|1–5 word reaction/i);
+  assert.match(outline.system, /Anti-scripted energy|1–6 word reaction|tennis-match/i);
   assert.match(outline.system, /thesis→example→lesson|thesis → example → lesson/i);
   assert.match(outline.user, /Warm Open/i);
-  assert.match(outline.user, /anti-scripted|uneven turns/i);
+  assert.match(outline.user, /tennis-match|1–6 word reactions|anti-scripted/i);
   const conversation = buildConversationPrompt({
     show,
     episode,
@@ -278,14 +343,16 @@ test('full-episode prompts keep host bible and anecdote rules', () => {
   assert.match(conversation.system, /symmetrical essay-dialogue/i);
   assert.match(conversation.system, /short punchy|punchier turns/i);
   assert.match(conversation.system, /ANTI-SCRIPTED HARD RULES/i);
-  assert.match(conversation.system, /1–5 words/i);
+  assert.match(conversation.system, /tennis-match/i);
+  assert.match(conversation.system, /1–6 word/i);
+  assert.match(conversation.system, /longer rambles/i);
   assert.match(conversation.system, /mid-thought pivots|unfinished sentences/i);
   assert.match(conversation.system, /equally polished/i);
   assert.match(conversation.system, /thesis → example → lesson/i);
   assert.match(conversation.system, /mild disagreement/i);
   assert.match(conversation.system, /40–50 spoken words/i);
   assert.match(conversation.user, /warm friend hello/i);
-  assert.match(conversation.user, /1–5 word reactions|does not sound scripted/i);
+  assert.match(conversation.user, /tennis-match|1–6 word reactions|does not sound scripted/i);
   assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
@@ -380,6 +447,22 @@ test('script sections split for long episodes and keep dialogue prefixes', () =>
   const sections = splitScriptIntoSections(lines.join('\n'), 400);
   assert.ok(sections.length > 1);
   assert.match(formatScriptForTts(sections[0]), /^Gena:/m);
+  // Prefer multi-turn chunks (not one line per section) even when soft max is small.
+  assert.ok(sections[0].split('\n').length >= 2);
+  assert.doesNotMatch(formatScriptForTts(sections[0]), /\n\n/);
+});
+
+test('script sections prefer larger multi-turn packs and absorb tiny tails', () => {
+  const lines = [];
+  for (let i = 0; i < 24; i += 1) {
+    lines.push(`Gena: Longer beat ${i} with park talk that fills a bit of space for chunking.`);
+    lines.push(`Diane: Yep ${i}.`);
+  }
+  const sections = splitScriptIntoSections(lines.join('\n'), 900, { minTurns: 6 });
+  assert.ok(sections.length >= 2);
+  for (const section of sections) {
+    assert.ok(section.split('\n').length >= 4, 'sections should keep multi-turn dialogue packs');
+  }
 });
 
 test('RSS omits draft audio and includes published enclosure fields', async () => {
@@ -488,8 +571,16 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   assert.match(input.style_instructions, /symmetrical essay-dialogue/i);
   assert.match(input.style_instructions, /not hosts reading an essay|not reading an essay|not reading scripted/i);
   assert.match(input.style_instructions, /Less announcer|more live reaction/i);
-  assert.match(input.style_instructions, /1–5 word|wait—/i);
+  assert.match(input.style_instructions, /1–6 word|wait—/i);
+  assert.match(input.style_instructions, /tennis-match/i);
   assert.match(input.style_instructions, /uneven pacing|Natural uneven/i);
+  assert.match(input.style_instructions, /metronomic|beat-matched|vary pause/i);
+});
+
+test('podcast TTS defaults use larger multi-turn sections', () => {
+  const cfg = config({});
+  assert.ok(cfg.sectionMaxChars >= 5000);
+  assert.ok(cfg.temperature >= 0.85);
 });
 
 test('fal TTS style_instructions include EPCOT as EP-cot (shared pronunciation map)', () => {

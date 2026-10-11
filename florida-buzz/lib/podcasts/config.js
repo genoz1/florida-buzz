@@ -21,9 +21,10 @@ const EPISODE_STATUSES = Object.freeze([
 const DISNEY_SHOW_SLUG = 'florida-buzz-disney';
 
 function config(env = process.env) {
-  const temperature = Number(env.PODCASTS_TTS_TEMPERATURE ?? 0.85);
-  // Smaller sections are more reliable with fal Pro TTS (fewer section timeouts).
-  const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 2800);
+  const temperature = Number(env.PODCASTS_TTS_TEMPERATURE ?? 0.9);
+  // Larger multi-turn chunks sound less metronomic than many tiny one-volley sections.
+  // fal Pro still times out on huge prompts — ~5600 chars keeps several host exchanges per job.
+  const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 5600);
   const maxUploadMb = Number(env.PODCASTS_MAX_UPLOAD_MB || 80);
   return Object.freeze({
     // Public directory/show/episode/RSS are on unless explicitly disabled.
@@ -38,12 +39,12 @@ function config(env = process.env) {
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,
     falModel: env.PODCASTS_FAL_TTS_MODEL || DEFAULT_FAL_TTS_MODEL,
-    temperature: Number.isFinite(temperature) ? temperature : 0.85,
+    temperature: Number.isFinite(temperature) ? temperature : 0.9,
     languageCode: 'English (US)',
     outputFormat: 'mp3',
     genaVoice: 'Aoede',
     dianeVoice: 'Zephyr',
-    sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 2800,
+    sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 5600,
     // fal Pro multi-speaker chunks can take several minutes; 90×2s was too short.
     falPollAttempts: Number(env.PODCASTS_FAL_POLL_ATTEMPTS || 180),
     falPollIntervalMs: Number(env.PODCASTS_FAL_POLL_INTERVAL_MS || 2000),

@@ -7,6 +7,9 @@ const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const { splitScriptIntoSections, formatScriptForTts } = require('./script');
 
+/** Deterministic uneven join gaps (ms). Avoids identical metronomic section seams. */
+const INTER_SECTION_GAP_MS = Object.freeze([70, 150, 40, 210, 95, 175, 55, 230, 110, 85]);
+
 function runFfmpeg(ffmpegPath, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -22,21 +25,127 @@ function runFfmpeg(ffmpegPath, args) {
   });
 }
 
-async function concatMp3Buffers(buffers, ffmpegPath) {
+function interSectionGapMs(index) {
+  return INTER_SECTION_GAP_MS[index % INTER_SECTION_GAP_MS.length];
+}
+
+/**
+ * Trim only leading/trailing dead air from a fal section.
+ * Gemini multi-speaker chunks often pad both ends with similar silence; leaving
+ * that intact makes every section join feel beat-matched / metronomic.
+ */
+async function trimEdgeSilence(buffer, ffmpegPath) {
+  if (!buffer?.length) throw new Error('Audio section is empty');
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-trim-'));
+  try {
+    const inPath = path.join(dir, 'in.mp3');
+    const outPath = path.join(dir, 'out.mp3');
+    await fsp.writeFile(inPath, buffer);
+    // Reverse-trim pattern: strip start silence, reverse, strip (former) end silence, reverse back.
+    // Keep a short floor so natural breaths at edges are not clipped to zero.
+    await runFfmpeg(ffmpegPath, [
+      '-y',
+      '-i',
+      inPath,
+      '-af',
+      [
+        'silenceremove=start_periods=1:start_silence=0.08:start_threshold=-42dB:detection=peak',
+        'areverse',
+        'silenceremove=start_periods=1:start_silence=0.08:start_threshold=-42dB:detection=peak',
+        'areverse',
+      ].join(','),
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      '96k',
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
+      outPath,
+    ]);
+    const trimmed = await fsp.readFile(outPath);
+    // If trim somehow collapsed the file, keep the original section.
+    return trimmed.length > 500 ? trimmed : buffer;
+  } catch {
+    return buffer;
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function makeSilenceBuffer(ffmpegPath, durationMs) {
+  const seconds = Math.max(0.02, Math.min(0.4, Number(durationMs) / 1000));
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-silence-'));
+  try {
+    const outPath = path.join(dir, 'silence.mp3');
+    await runFfmpeg(ffmpegPath, [
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'anullsrc=channel_layout=mono:sample_rate=44100',
+      '-t',
+      String(seconds),
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      '96k',
+      outPath,
+    ]);
+    return fsp.readFile(outPath);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Join fal TTS sections. Trim identical end-padding from each chunk and insert
+ * short *varied* gaps so section seams do not lock to one metronomic pause.
+ */
+async function concatMp3Buffers(buffers, ffmpegPath, { varySectionGaps = true } = {}) {
   if (!buffers.length) throw new Error('No audio sections to join');
-  if (buffers.length === 1) return buffers[0];
+  if (buffers.length === 1) {
+    return trimEdgeSilence(buffers[0], ffmpegPath);
+  }
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-'));
   try {
     const listPath = path.join(dir, 'list.txt');
     const outPath = path.join(dir, 'master.mp3');
     const parts = [];
     for (let i = 0; i < buffers.length; i += 1) {
+      const trimmed = await trimEdgeSilence(buffers[i], ffmpegPath);
       const part = path.join(dir, `part-${i}.mp3`);
-      await fsp.writeFile(part, buffers[i]);
+      await fsp.writeFile(part, trimmed);
       parts.push(part);
+      if (varySectionGaps && i < buffers.length - 1) {
+        const gapMs = interSectionGapMs(i);
+        const silence = await makeSilenceBuffer(ffmpegPath, gapMs);
+        const gapPath = path.join(dir, `gap-${i}.mp3`);
+        await fsp.writeFile(gapPath, silence);
+        parts.push(gapPath);
+      }
     }
     await fsp.writeFile(listPath, parts.map((p) => `file '${p.replace(/'/g, `'\\''`)}'`).join('\n'));
-    await runFfmpeg(ffmpegPath, ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outPath]);
+    // Re-encode: trimmed parts + generated silence may not share identical MP3 framing.
+    await runFfmpeg(ffmpegPath, [
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      listPath,
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      '96k',
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
+      outPath,
+    ]);
     return fsp.readFile(outPath);
   } finally {
     await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -383,6 +492,10 @@ function createAudioPipeline({ cfg, store, fal, ffmpegPath }) {
 module.exports = {
   createAudioPipeline,
   concatMp3Buffers,
+  trimEdgeSilence,
+  makeSilenceBuffer,
+  interSectionGapMs,
+  INTER_SECTION_GAP_MS,
   prependAudioBuffer,
   encodePodcastMaster,
   loadIntroBuffer,

@@ -74,7 +74,7 @@ Outline rules:
 - Mark anecdote beats clearly (e.g. "Anecdote:") and note a later callback opportunity when natural.
 - Plan 3–5 natural Florida Buzz resource mentions across the episode (not ads): at least one after the warm open / near the early topic, one or more in the main discussion, and a brief CTA near the close.
 - Mark resource beats (e.g. "Resource:") naming only verified tools/articles from the lists below, with a one-line note on how it helps the listener.
-- Anti-scripted energy notes per segment: prefer rapid uneven exchanges, frequent 1–5 word reaction beats, occasional soft interruptions / “wait—” pivots, mild disagreement — forbid tidy thesis→example→lesson segment shapes and equal-length polished host monologues.
+- Anti-scripted energy notes per segment: ban tennis-match equal-length volleys; mix 1–6 word reactions, medium turns, and occasional longer rambles; soft interruptions / “wait—” pivots; mild disagreement — forbid tidy thesis→example→lesson segment shapes and equal-length polished host monologues.
 - Prefer short punchy exchange beats over long equal-length host monologues — avoid polished symmetrical essay-dialogue.
 - Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, or URLs. Those must come from approved source material / verified tools only.
 - When source notes lack a dated park detail, plan timeless composite experiences — do not claim a specific date.
@@ -93,7 +93,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted). Start with Warm Open (30–90s friend hello / life or park banter), then topic hook + affiliation disclosure, then 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. Mark anti-scripted exchange energy (uneven turns / short reactions) on main segments. End with a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute conversation (~3,000–3,800 spoken words when scripted). Start with Warm Open (30–90s friend hello / life or park banter), then topic hook + affiliation disclosure, then 2 topic-linked personal anecdote beats, 2–4 Florida Buzz resource beats, and at least one callback note. Mark anti-scripted exchange energy (no tennis-match equal turns; mix 1–6 word reactions / medium / occasional rambles) on main segments. End with a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -116,13 +116,14 @@ Conversation requirements:
 - Sound like Central Florida moms who regularly visit the parks — not presenters summarizing articles, not reading a written essay aloud.
 - Lean into lively aftershow/reaction energy (AfterBuzz-style bounce): shorter punchier turns, frequent reactions, excited overlap energy between hosts.
 - ANTI-SCRIPTED HARD RULES (critical — listeners complained it still sounds written):
-  - Turn lengths MUST be uneven across the episode. Many lines should be 1–5 words (“yep,” “no way,” “wait—,” “oh my lord,” “same,” “heck yeah”).
+  - HARD BAN tennis-match equal-length turns: never alternate neat same-sized host volleys.
+  - Turn lengths MUST be uneven. Require a mix of (1) frequent 1–6 word reactions (“yep,” “no way,” “wait—,” “oh my lord,” “same,” “heck yeah”), (2) medium turns, and (3) occasional longer rambles / story beats.
   - Include occasional mid-thought pivots, unfinished sentences, soft interruptions, and overlapping agreement energy (“right—” / “exactly—”).
   - Both hosts must NOT sound equally polished — one riffs messier / trails off; the other stacks quick reactions.
   - Allow mild disagreement and talking-over energy; forbid constant tidy agreement.
   - FORBID tidy thesis → example → lesson beats and neat moral wrap-ups after anecdotes.
   - FORBID polished symmetrical essay-dialogue (neat equal-length paragraphs alternating hosts).
-  - Prefer capping most turns under ~40–50 spoken words unless a story beat truly needs a longer riff.
+  - Prefer capping most turns under ~40–50 spoken words unless a story beat truly needs a longer ramble.
 - OPEN SHAPE (critical): Start with 30–90 seconds of warm friend hello / life or recent-park banter BEFORE the topic hook. Examples: “hey, how was your week,” whether they went to a park, kid chaos, Geno/Michael, weather, parking. Then transition into the topic hook. Then the unofficial affiliation disclosure. Never cold-open on the news headline (“Okay if you were calling EPCOT…” / “Okay we have resort news…” as line 1).
 - Cover approved source topics accurately, but weave them into friend talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
@@ -132,7 +133,7 @@ Conversation requirements:
 - Make stories specific and conversational with small believable details; keep each anecdote concise — and let the other host cut in before the story becomes a monologue.
 - The other host must react quickly: ask a follow-up, laugh, disagree, interrupt briefly, drop a short affirmation (“yep,” “oh my lord,” “heck yeah,” “no way,” “wait—”), or relate a similar experience.
 - Prefer many short/medium exchanges over one host speaking for long stretches.
-- Uneven turn lengths are required: one host can riff for a beat while the other fires short reactions, then they flip.
+- Uneven turn lengths are required: one host can ramble for a beat while the other fires 1–6 word reactions, then they flip — never tidy equal volleys.
 - Include at least one natural callback later in the episode to an earlier anecdote or detail.
 - Do not make every anecdote neatly resolve into a scripted lesson.
 - Avoid repeating the same experiences, jokes, family details, or sentence patterns across episodes; invent fresh specifics each time.
@@ -171,7 +172,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Open with 30–90 seconds of warm friend hello/life or park banter before the topic hook — do not return a short teaser or a cold topic open. Keep turns uneven with frequent 1–5 word reactions so it does not sound scripted. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Gena/Diane dialogue only). Open with 30–90 seconds of warm friend hello/life or park banter before the topic hook — do not return a short teaser or a cold topic open. Keep turns uneven (ban tennis-match equal volleys; mix 1–6 word reactions, medium turns, occasional longer rambles) so it does not sound scripted. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
@@ -199,7 +200,7 @@ async function generateConversation({ aiText, show, episode, outline, sources })
 Keep the exact "Gena:" / "Diane:" line format.
 Do not restart the episode or repeat the warm open / hello banter.
 Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
-Preserve host bible anti-scripted aftershow energy (uneven turns, frequent 1–5 word reactions, soft interruptions, mild disagreement — not polished essay-dialogue) and Florida Buzz source accuracy rules.`,
+Preserve host bible anti-scripted aftershow energy (no tennis-match equal turns; mix 1–6 word reactions / medium / occasional rambles; soft interruptions; mild disagreement — not polished essay-dialogue) and Florida Buzz source accuracy rules.`,
         `Spoken words so far: ${words}. Need at least ${CONVERSATION_MIN_WORDS}.
 Continue this script:\n\n${script.slice(-12000)}`,
         CONVERSATION_MAX_OUTPUT_TOKENS,
@@ -221,18 +222,30 @@ Continue this script:\n\n${script.slice(-12000)}`,
   return script;
 }
 
-function splitScriptIntoSections(scriptText, maxChars) {
+/**
+ * Pack dialogue into larger multi-turn TTS chunks.
+ * Prefer keeping several host exchanges together so fal paces a real conversation
+ * instead of many tiny one-line-at-a-time sections with identical seams.
+ */
+function splitScriptIntoSections(scriptText, maxChars, { minTurns = 8 } = {}) {
   const lines = String(scriptText || '')
     .split(/\n+/)
     .map((l) => l.trim())
     .filter(Boolean);
   if (!lines.length) throw new Error('Script is empty');
+  const softMax = Math.max(500, Number(maxChars) || 5600);
+  // Allow a little overflow so we do not cut a short reaction volley off mid-exchange.
+  const hardMax = Math.floor(softMax * 1.2);
+  const minKeep = Math.max(2, Number(minTurns) || 8);
   const sections = [];
   let current = [];
   let size = 0;
   for (const line of lines) {
     const add = line.length + 1;
-    if (current.length && size + add > maxChars) {
+    const wouldExceedSoft = current.length && size + add > softMax;
+    const wouldExceedHard = current.length && size + add > hardMax;
+    const enoughTurns = current.length >= minKeep;
+    if (wouldExceedHard || (wouldExceedSoft && enoughTurns)) {
       sections.push(current.join('\n'));
       current = [line];
       size = add;
@@ -242,11 +255,23 @@ function splitScriptIntoSections(scriptText, maxChars) {
     }
   }
   if (current.length) sections.push(current.join('\n'));
+  // Absorb a tiny trailing section into the previous chunk when possible (fewer seams).
+  if (sections.length >= 2) {
+    const last = sections[sections.length - 1];
+    const prev = sections[sections.length - 2];
+    const lastTurns = last.split('\n').length;
+    if (lastTurns < Math.min(4, minKeep) && prev.length + 1 + last.length <= hardMax) {
+      sections[sections.length - 2] = `${prev}\n${last}`;
+      sections.pop();
+    }
+  }
   return sections;
 }
 
 function formatScriptForTts(sectionText) {
-  // fal multi-speaker expects "SpeakerId: text" prefixes matching speakers[].speaker_id
+  // fal multi-speaker expects "SpeakerId: text" prefixes matching speakers[].speaker_id.
+  // Keep turns on separate lines (required), but do not insert blank lines between them —
+  // blank lines encourage identical dead-air gaps between every host statement.
   return String(sectionText || '')
     .split(/\n+/)
     .map((line) => line.trim())
