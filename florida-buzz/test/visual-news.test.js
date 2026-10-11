@@ -49,7 +49,7 @@ test('ASS writer includes brand, kinetic fade, and CTA', () => {
   assert.match(body, /Follow Florida Buzz/);
   assert.match(body, /&H00FFFF&/);
   assert.equal(stamp(1.5), '0:00:01.50');
-  assert.equal(escapeAssText('a{b}\\c'), 'a b  c');
+  assert.equal(escapeAssText('a{b}\\c'), 'a b c');
 });
 
 test('synthesizeElevenV4 hits ElevenLabs direct URL with eleven_v4 (not fal)', async () => {
