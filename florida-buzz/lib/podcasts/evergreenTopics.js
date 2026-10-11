@@ -4,7 +4,7 @@ const EVERGREEN_TOPICS = Object.freeze([
   {
     slug: 'favorite-resorts',
     title: 'Favorite Walt Disney World resorts for families',
-    summary: 'Which resorts the hosts keep recommending and why location vs value matters.',
+    summary: 'Which resorts Geno keeps recommending and why location vs value matters.',
   },
   {
     slug: 'overrated-attractions',
@@ -39,11 +39,11 @@ const EVERGREEN_TOPICS = Object.freeze([
   {
     slug: 'long-wait-worth-it',
     title: 'Attractions worth a long wait',
-    summary: 'When a long queue is still a yes for the hosts and their families.',
+    summary: 'When a long queue is still a yes for Geno and his crew.',
   },
   {
     slug: 'things-we-would-change',
-    title: 'Things the hosts would change at the parks',
+    title: 'Things Geno would change at the parks',
     summary: 'Opinion segment on guest flow, dining, and family-friendly tweaks.',
   },
 ]);

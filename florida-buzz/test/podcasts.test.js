@@ -726,6 +726,120 @@ test('memory show seed is solo Geno with hosted-by-Geno cover alt', async () => 
   assert.match(show.description, /Geno hosts/i);
 });
 
+test('RSS itunes:author lists Geno (not Gena & Diane)', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const xml = buildRss({
+    site: 'https://thefloridabuzz.com',
+    show,
+    ownerEmail: 'floridabuzzonline@gmail.com',
+    episodes: [],
+  });
+  assert.match(xml, /<itunes:author>Geno<\/itunes:author>/);
+  assert.doesNotMatch(xml, /Gena/);
+  assert.doesNotMatch(xml, /Diane/);
+});
+
+test('generatePreview uses ElevenLabs solo path with section chunking and intro prepend', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  await store.updateShow(show.id, {
+    intro_audio_url: 'https://cdn.example.com/intro-announcer-v7.mp3',
+  });
+  const episode = await store.createEpisode(show.id, {
+    title: 'Eleven path',
+    description: 'desc',
+    slug: 'eleven-path',
+    show_notes_html: '',
+    episode_number: 9,
+  });
+  await store.setStatus(episode.id, 'script_ready');
+
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const ffmpegPath = (() => {
+    try {
+      return require('ffmpeg-static');
+    } catch {
+      return 'ffmpeg';
+    }
+  })();
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-eleven-pipe-'));
+  const tinyMp3 = path.join(dir, 'tiny.mp3');
+  const mk = spawnSync(
+    ffmpegPath,
+    ['-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.4', '-codec:a', 'libmp3lame', '-b:a', '96k', tinyMp3],
+    { encoding: 'utf8' }
+  );
+  if (mk.status !== 0) {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+    return;
+  }
+  const audioBytes = await fsp.readFile(tinyMp3);
+
+  const lines = [];
+  for (let i = 0; i < 40; i += 1) {
+    lines.push(
+      i === 0
+        ? `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`
+        : `Geno: Quick hit ${i} with enough park talk about Magic Kingdom crowds, dining, and wait times to force multiple ElevenLabs sections eventually for chunking across a longer solo script.`
+    );
+  }
+  const scriptText = lines.join('\n');
+
+  let elevenCalls = 0;
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'true',
+    ELEVENLABS_API_KEY: 'sk_test',
+    PODCASTS_TTS_PROVIDER: 'elevenlabs',
+    PODCASTS_TTS_SECTION_CHARS: '700',
+  });
+  const eleven = {
+    async synthesize() {
+      elevenCalls += 1;
+      return { buffer: audioBytes, requestId: `req-${elevenCalls}`, model: cfg.elevenModel, voiceId: cfg.elevenVoiceGeno };
+    },
+  };
+  const pipeline = createAudioPipeline({
+    cfg,
+    store,
+    fal: createFalTts(cfg),
+    eleven,
+    ffmpegPath,
+  });
+  const originalLoad = require('../lib/podcasts/audioPipeline').loadIntroBuffer;
+  // Inject intro via store URL fetch: stub global fetch for intro download only.
+  const prevFetch = global.fetch;
+  global.fetch = async (url) => {
+    if (String(url).includes('intro-announcer')) {
+      return {
+        ok: true,
+        arrayBuffer: async () => audioBytes,
+        headers: { get: () => null },
+      };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+  try {
+    const saved = await pipeline.generatePreview(episode, scriptText);
+    assert.ok(elevenCalls >= 2, 'long script should synthesize in multiple ElevenLabs sections');
+    assert.ok(saved.buffer.length > 500);
+    const fresh = await store.getEpisodeById(episode.id);
+    assert.equal(fresh.status, 'preview_ready');
+    assert.ok(fresh.audio_url);
+    const jobs = await store.listJobs(episode.id);
+    assert.equal(jobs[0].status, 'complete');
+    assert.equal(jobs[0].result.tts_provider, 'elevenlabs');
+    assert.equal(jobs[0].result.intro_attached, true);
+    assert.equal(jobs[0].result.eleven_voice, DEFAULT_ELEVEN_VOICE_GENO);
+  } finally {
+    global.fetch = prevFetch;
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+    void originalLoad;
+  }
+});
+
 function listen(app) {
   return new Promise((resolve) => {
     const server = app.listen(0, '127.0.0.1', () => {

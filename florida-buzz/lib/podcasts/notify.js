@@ -54,7 +54,7 @@ async function notifyDraftReady({
     </ul>
     <ul>${episodeRows}</ul>
     <p><a href="${adminUrl}">Review in podcast admin</a></p>
-    <p>Nothing was published to the website or RSS feed. Generate fal TTS when ready. Tuesday and Friday each get their own separate run.</p>
+    <p>Nothing was published to the website or RSS feed. Open the episode and click Generate private preview (ElevenLabs TTS) when ready. Tuesday and Friday each get their own separate run.</p>
   `;
 
   await sendEmail({

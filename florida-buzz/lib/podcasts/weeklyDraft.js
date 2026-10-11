@@ -631,7 +631,7 @@ async function createWeeklyDraft({
     }
     const created = [freshEpisode];
 
-    // Mark the run ready once scripts exist. Do NOT run fal TTS inside this HTTP request.
+    // Mark the run ready once scripts exist. Do NOT run ElevenLabs TTS inside this HTTP request.
     await store.updateGenerationRun(run.id, {
       status: 'draft_ready',
       episode_id: freshEpisode.id,
@@ -654,16 +654,16 @@ async function createWeeklyDraft({
         episode_ids: [freshEpisode.id],
         next_step: anyFallback
           ? 'Clear scaffold script and use Save / generate script on this standalone episode'
-          : `Open the ${slot.label} draft and click Generate private preview (fal TTS)`,
+          : `Open the ${slot.label} draft and click Generate private preview (ElevenLabs TTS)`,
       },
       error_detail: null,
     });
 
     if (anyFallback && cfg.generation) {
-      console.warn('[podcasts] skipping fal TTS for fallback scaffold script');
+      console.warn('[podcasts] skipping ElevenLabs TTS for fallback scaffold script');
     } else if (cfg.generation && !anyFallback) {
       console.info(
-        `[podcasts] weekly draft ready — 1 standalone ${slot.label} episode script; fal TTS left for manual Generate private preview`
+        `[podcasts] weekly draft ready — 1 standalone ${slot.label} episode script; ElevenLabs TTS left for manual Generate private preview`
       );
     }
 

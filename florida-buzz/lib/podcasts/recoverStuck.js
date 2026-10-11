@@ -5,7 +5,7 @@
  * - generation_runs stuck at "running" with no episode link
  * - episodes stuck at "generating_audio" with no finished master
  *
- * Recover those so admin can open the episode and retry fal TTS manually.
+ * Recover those so admin can open the episode and retry ElevenLabs TTS manually.
  */
 
 async function recoverStuckPodcastWork(store, {

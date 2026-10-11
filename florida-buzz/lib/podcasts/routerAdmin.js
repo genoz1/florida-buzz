@@ -439,7 +439,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       if (!cfg.generation) {
         return res.redirect(
           303,
-          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Audio generation is disabled (PODCASTS_GENERATION_ENABLED!=true). No fal call was made.')}`
+          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Audio generation is disabled (PODCASTS_GENERATION_ENABLED!=true). No TTS call was made.')}`
         );
       }
       const script = episode.script_text || (await store.latestScript(episode.id, 'conversation'))?.content_text;
@@ -449,7 +449,7 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       if (/scaffold for review|not for publication until approved/i.test(script)) {
         return res.redirect(
           303,
-          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Refusing fal TTS on scaffold script. Generate a full AI script first.')}`
+          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Refusing ElevenLabs TTS on scaffold script. Generate a full AI script first.')}`
         );
       }
       const existingJobs = await store.listJobs(episode.id);

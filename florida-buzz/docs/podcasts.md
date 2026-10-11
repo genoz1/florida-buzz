@@ -147,11 +147,16 @@ Naturally reference verified Florida Buzz resources. Say “The Florida Buzz dot
 
 ## Admin dashboard steps (after deploy)
 
-1. Open `/admin/podcasts` → pick an episode.
-2. **Save / generate script** (wait for a full solo Geno script — not the short scaffold).
-3. Confirm the script box has Geno Option A open + quick hits + deep dive + CTA.
-4. Click **Generate private preview (ElevenLabs TTS)**.
-5. Preview/download the private master (announcer bumper + Geno body). Approve only when satisfied.
+Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_KEY`, `PODCASTS_TTS_PROVIDER=elevenlabs` or omit for auto, `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1`). Apply the solo-Geno hosts migration (or run `node scripts/podcast-upload-cover.js` so RSS hosts = Geno).
+
+1. Open `https://thefloridabuzz.com/admin/podcasts` (Basic auth).
+2. Click **Run weekly draft now (force)** — creates one standalone draft for today’s/next Tue/Fri slot (script only; no TTS yet).
+3. Open that episode.
+4. If the script box is empty/scaffold: click **Save / generate script** and wait for a full solo Geno script (~3,000+ words).
+5. Confirm Geno Option A open + quick hits + deep dive + CTA (`Geno:` lines only).
+6. Click **Generate private preview (ElevenLabs TTS)** — pipeline chunks the script, synthesizes with Geno voice `bg7PC2IzyIDwYgytMiW1` / `eleven_v4`, prepends announcer bumper from `intro_audio_url`, uploads the master.
+7. Watch the LIVE heartbeat panel until status is `preview_ready`. Preview/download audio.
+8. **Approve audio** → **Publish now** only when satisfied (never auto-publishes).
 
 ## ElevenLabs bakeoff scripts
 
