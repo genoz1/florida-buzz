@@ -31,7 +31,7 @@ function seedShow() {
     explicit: false,
     cover_asset_id: null,
     cover_url: '/img/podcasts/florida-buzz-disney-cover.jpg',
-    cover_alt: 'Florida Buzz: Disney podcast cover — original Florida Buzz artwork, not affiliated with Disney',
+    cover_alt: 'Florida Buzz Disney Podcast cover — hosted by Gene Zentko',
     intro_audio_url: null,
     outro_audio_url: null,
     created_at: now(),
