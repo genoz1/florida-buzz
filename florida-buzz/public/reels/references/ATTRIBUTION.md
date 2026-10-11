@@ -21,3 +21,9 @@ letterboxed images in the finished Reel.
 - `big-thunder-lightning-lane.jpg` from File:Big Thunder Mountain Lightning Lane.jpg; license CC BY-SA 4.0; artist/source metadata on Commons.
 
 - `host-overlay.png` circular crop from File:Smiling woman with a phone (Unsplash).jpg; Unsplash/Commons license as listed on file page.
+
+## Slideshow stills (visual news)
+- `empty-wallet.jpg` from File:Aarong leather wallet.jpg (Wikimedia Commons).
+- `long-line.jpg` from File:Queue, Belfast Mela, August 2010 (01).JPG (Wikimedia Commons).
+- `disney-queue.jpg` from File:Radiator Springs Racers Queue, Cars Land, Disney California Adventure, Anaheim, California (17188625737).jpg (Wikimedia Commons).
+- `tron-mk.jpg` / `splash-mk.jpg` optional Magic Kingdom stills from Commons (unused in default slideshow).

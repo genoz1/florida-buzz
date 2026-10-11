@@ -16,20 +16,10 @@ const { generateOverlayAssets, lightningLaneOverlayPlan } = require('./overlays'
 
 /**
  * Create a Florida Buzz visual news short:
- * - ElevenLabs eleven_v4 voiceover (direct API; never fal) — default Geno voice
- * - Local ffmpeg Ken Burns stills + kinetic ASS captions + brand overlays
- * - Optional premium price callout when story.moneyOverlays (no sticker dump)
+ * - ElevenLabs eleven_v4 voiceover (direct API; never fal) — default Geno
+ * - Local ffmpeg static slideshow stills + large ASS captions
+ * - No stacked sticker overlays by default
  * - No AI presenter
- *
- * @param {object} options
- * @param {string} [options.storyId='lightning-lane-worth-it']
- * @param {object} [options.story] full story override
- * @param {string} [options.outDir='/opt/cursor/artifacts']
- * @param {string} [options.tmpDir]
- * @param {string} [options.outputName]
- * @param {string} [options.voicePath] reuse existing mp3 (skips TTS)
- * @param {object} [options.env]
- * @param {typeof fetch} [options.fetcher]
  */
 async function createFloridaBuzzVisualVideo(options = {}) {
   const cfg = loadConfig(options.env || process.env);
@@ -88,11 +78,52 @@ async function createFloridaBuzzVisualVideo(options = {}) {
 
   const rawDuration = audioDuration(voiceMp3) + 0.35;
   const duration = Math.min(Math.max(rawDuration, cfg.minDurationS), cfg.maxDurationS);
-  const captions = (story.captions || []).map((c, i, arr) => {
-    if (i !== arr.length - 1) return c;
-    // Hold last caption until the CTA overlay window.
-    return { ...c, end: Math.max(c.start + 0.4, duration - 3.3) };
-  });
+
+  // Build still clip lengths first so captions can lock to each slide.
+  const totalFrames = Math.round(duration * cfg.fps);
+  const weights = story.stills.map((s) => s.weight || 1 / story.stills.length);
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  let allocated = 0;
+  const clipFrameCounts = [];
+  for (let i = 0; i < story.stills.length; i++) {
+    const frames =
+      i === story.stills.length - 1
+        ? totalFrames - allocated
+        : Math.max(1, Math.floor((totalFrames * weights[i]) / weightSum));
+    allocated += frames;
+    clipFrameCounts.push(frames);
+  }
+
+  // Align captions to slide boundaries when caption count matches still count.
+  // Extra captions (tip lines) share the last slides.
+  let captions = story.captions || [];
+  if (captions.length && story.stills.length) {
+    const slideEnds = [];
+    let acc = 0;
+    for (const f of clipFrameCounts) {
+      acc += f;
+      slideEnds.push(acc / cfg.fps);
+    }
+    const n = Math.min(captions.length, slideEnds.length);
+    const aligned = [];
+    let prev = 0;
+    for (let i = 0; i < n; i++) {
+      const end = i === captions.length - 1 ? Math.max(slideEnds[i], duration - 3.3) : slideEnds[i];
+      aligned.push({ ...captions[i], start: prev, end });
+      prev = slideEnds[i];
+    }
+    // Any leftover captions after stills: pack into remaining time before CTA.
+    for (let i = n; i < captions.length; i++) {
+      const start = prev;
+      const end =
+        i === captions.length - 1
+          ? Math.max(start + 0.4, duration - 3.3)
+          : start + (duration - 3.3 - start) / Math.max(1, captions.length - n);
+      aligned.push({ ...captions[i], start, end });
+      prev = end;
+    }
+    captions = aligned;
+  }
 
   const assPath = path.join(tmpDir, 'captions.ass');
   writeAss({
@@ -107,36 +138,28 @@ async function createFloridaBuzzVisualVideo(options = {}) {
     accents: story.accents || [],
   });
 
+  // Explicit opt-in only — slideshow stories set moneyOverlays: false.
   let overlays = [];
-  if (story.moneyOverlays !== false && (story.moneyOverlays || story.id === LIGHTNING_LANE_WORTH_IT.id)) {
+  if (story.moneyOverlays === true) {
     const overlayDir = path.join(tmpDir, 'overlays');
     const assets = generateOverlayAssets(overlayDir);
     overlays = lightningLaneOverlayPlan(assets).filter((o) => o.start < duration);
   }
 
-  const totalFrames = Math.round(duration * cfg.fps);
-  const weights = story.stills.map((s) => s.weight || 1 / story.stills.length);
-  const weightSum = weights.reduce((a, b) => a + b, 0);
-  let allocated = 0;
   const clips = [];
-
   for (let i = 0; i < story.stills.length; i++) {
     const still = story.stills[i];
-    const frames =
-      i === story.stills.length - 1
-        ? totalFrames - allocated
-        : Math.max(1, Math.floor((totalFrames * weights[i]) / weightSum));
-    allocated += frames;
     const clipPath = path.join(tmpDir, `clip-${i}.mp4`);
     kenBurnsClip({
       input: still.path,
       output: clipPath,
-      frames,
-      zoomEnd: still.zoomEnd || 1.12,
+      frames: clipFrameCounts[i],
+      zoomEnd: still.static ? 1.0 : still.zoomEnd || 1.12,
       width: cfg.width,
       height: cfg.height,
       fps: cfg.fps,
-      pan: still.pan || (i % 2 === 0 ? 'right' : 'left'),
+      pan: still.pan || 'center',
+      static: still.static !== false, // default static slideshow
     });
     clips.push(clipPath);
   }
@@ -158,19 +181,17 @@ async function createFloridaBuzzVisualVideo(options = {}) {
   const voiceLine =
     ttsMeta.voiceId || cfg.elevenVoiceId
       ? `**Voice:** Geno (\`${ttsMeta.voiceId || cfg.elevenVoiceId}\`) — ElevenLabs direct`
-      : '**Voice:** Geno (reused local ElevenLabs mp3; voice id bg7PC2IzyIDwYgytMiW1)';
-  const overlayDesc = overlays.length
-    ? 'brand pill + single premium $229 callout (no wallet/$$$$ stickers)'
-    : 'none';
+      : '**Voice:** Geno (local mp3)';
   fs.writeFileSync(
     readmePath,
     `# ${story.title}
 
-**Pipeline:** ElevenLabs \`${ttsMeta.model}\` (direct API) + local ffmpeg  
+**Pipeline:** ElevenLabs \`${ttsMeta.model}\` (direct API) + local ffmpeg slideshow  
 ${voiceLine}  
-**No fal.ai** — no FAL_KEY, no fal image/ffmpeg/ElevenLabs proxy  
+**No fal.ai**  
 **No AI presenter**  
-**Overlays:** ${overlayDesc}
+**Format:** static full-frame stills in sequence (no stacked sticker overlays)  
+**Overlays:** ${overlays.length ? `${overlays.length} PNG overlays` : 'none — captions only'}
 
 ## Script
 
@@ -197,6 +218,7 @@ ${credits}
     presenter: false,
     usesFal: false,
     overlayCount: overlays.length,
+    slideCount: story.stills.length,
     tts: ttsMeta,
   };
 }

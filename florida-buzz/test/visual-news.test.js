@@ -36,8 +36,8 @@ test('Lightning Lane story has no presenter, multi-still cuts, and Florida Buzz 
   assert.match(LIGHTNING_LANE_WORTH_IT.spoken, /two hundred twenty-nine|wallet/i);
   for (const s of LIGHTNING_LANE_WORTH_IT.stills) {
     assert.ok(fs.existsSync(s.path), `missing still ${s.file}`);
+    assert.doesNotMatch(s.file, /wallet|empty-wallet/i);
   }
-  // Captions stay short (social-news beats, not paragraphs)
   for (const c of LIGHTNING_LANE_WORTH_IT.captions) {
     assert.ok(c.text.split(/\s+/).length <= 6, `caption too wordy: ${c.text}`);
   }
@@ -67,11 +67,12 @@ test('ASS writer uses clean caption size, brand, kinetic fade, and CTA', () => {
   assert.equal(escapeAssText('a{b}\\c'), 'a b c');
 });
 
-test('overlay assets are a single premium price callout + brand pill', () => {
+test('overlay assets are a single premium price callout + brand pill + scrim', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-vn-ov-'));
   const assets = generateOverlayAssets(dir);
   assert.ok(fs.existsSync(assets.priceCallout));
   assert.ok(fs.existsSync(assets.brandPill));
+  assert.ok(fs.existsSync(assets.captionScrim));
   assert.equal(assets.wallet, undefined);
   assert.equal(assets.dollars, undefined);
   const plan = lightningLaneOverlayPlan(assets);

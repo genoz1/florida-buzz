@@ -18,7 +18,7 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   location: 'Magic Kingdom',
   // No AI presenter. Story-specific park stills only.
   presenter: false,
-  // Geno-style delivery tags (ElevenLabs v4 audio tags).
+  // Keep in sync with baked Geno VO at /tmp/fb-visual-news-ll/voice.mp3
   spoken: `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth emptying the wallet? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`,
   // Fewer words per beat. Gap during $229 callout so the badge owns that moment.
   captions: [
@@ -31,7 +31,8 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
     { start: 17.0, end: 22.0, text: 'NOT AN AUTO YES', highlight: 'AUTO YES' },
   ],
   accents: [],
-  // Disney Magic Kingdom stills only (no Universal Express Entry plate).
+  // Magic Kingdom stills + one real MK queue plate for the wait beat.
+  // No wallet photos, no Universal Express Entry, no California Adventure.
   stills: [
     {
       file: 'big-thunder-lightning-lane.jpg',
@@ -39,7 +40,7 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
       credit: 'Big Thunder Mountain Lightning Lane, CC BY-SA 4.0, Wikimedia Commons',
       pan: 'up',
       zoomEnd: 1.2,
-      weight: 0.2,
+      weight: 0.18,
     },
     {
       file: 'seven-dwarfs-mine-train.jpg',
@@ -47,15 +48,23 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
       credit: 'Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons',
       pan: 'right',
       zoomEnd: 1.22,
-      weight: 0.28,
+      weight: 0.26,
+    },
+    {
+      file: 'tron-mk.jpg',
+      path: path.join(REFS, 'tron-mk.jpg'),
+      credit: 'Magic Kingdom queue / TRON area standby crowd still',
+      pan: 'left',
+      zoomEnd: 1.14,
+      weight: 0.2,
     },
     {
       file: 'magic-kingdom-big-thunder.jpg',
       path: path.join(REFS, 'magic-kingdom-big-thunder.jpg'),
       credit: 'Magic Kingdom - Big Thunder Mountain, CC BY-SA 2.0, Wikimedia Commons',
-      pan: 'left',
+      pan: 'up',
       zoomEnd: 1.18,
-      weight: 0.24,
+      weight: 0.18,
     },
     {
       file: 'seven-dwarfs-mine-train.jpg',
@@ -63,7 +72,7 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
       credit: 'Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons',
       pan: 'down',
       zoomEnd: 1.24,
-      weight: 0.28,
+      weight: 0.18,
     },
   ],
   ctaSpoken: CTA_SPOKEN,
@@ -72,7 +81,7 @@ const LIGHTNING_LANE_WORTH_IT = Object.freeze({
   notes: [
     'Visual system: clean kinetic captions + one premium $229 callout (no wallet/$$$$ stickers).',
     'No AI presenter / host cutout.',
-    'Visuals: Magic Kingdom stills only, stronger Ken Burns cut rhythm, bottom caption scrim.',
+    'Visuals: Magic Kingdom stills + queue plate, stronger Ken Burns cut rhythm, bottom caption scrim.',
     'Voice: Geno (ElevenLabs bg7PC2IzyIDwYgytMiW1).',
   ],
 });

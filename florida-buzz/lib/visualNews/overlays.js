@@ -51,10 +51,8 @@ cd.rounded_rectangle((24, 8, bw - 14, 11), radius=1, fill=(255, 255, 255, 40))
 
 eyebrow_f = font(24)
 price_f = font(84)
-eyebrow = "SINGLE PASS"
-price = "$229"
-cd.text((40, 22), eyebrow, font=eyebrow_f, fill=(255, 190, 150, 255))
-cd.text((36, 52), price, font=price_f, fill=(255, 255, 255, 255))
+cd.text((40, 22), "SINGLE PASS", font=eyebrow_f, fill=(255, 190, 150, 255))
+cd.text((36, 52), "$229", font=price_f, fill=(255, 255, 255, 255))
 
 chip = "UP TO"
 cf = font(20)
@@ -77,16 +75,17 @@ bb = pd.textbbox((0, 0), bt, font=bf)
 pd.text((20, (ph - (bb[3] - bb[1])) // 2 - 1), bt, font=bf, fill=(245, 248, 255, 255))
 save(pill, "brand-pill.png")
 
-# Bottom caption scrim — soft gradient so type reads without covering mid-frame faces
+# Bottom caption scrim
 sw, sh = 720, 360
-scrim = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+alpha = Image.new("L", (sw, sh), 0)
+ad = ImageDraw.Draw(alpha)
 for y in range(sh):
-    # Transparent at top → soft dark at bottom
     t = y / (sh - 1)
     a = int(195 * (t ** 1.55))
-    for x in range(sw):
-        scrim.putpixel((x, y), (8, 10, 16, a))
-save(scrim, "caption-scrim.png")
+    ad.line([(0, y), (sw, y)], fill=a)
+base = Image.new("RGBA", (sw, sh), (8, 10, 16, 255))
+base.putalpha(alpha)
+save(base, "caption-scrim.png")
 `;
 
 function generateOverlayAssets(outDir) {
