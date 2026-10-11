@@ -6,7 +6,13 @@ const http = require('node:http');
 const express = require('express');
 const path = require('node:path');
 
-const { config, DEFAULT_FAL_TTS_ENDPOINT, DEFAULT_FAL_TTS_MODEL } = require('../lib/podcasts/config');
+const {
+  config,
+  DEFAULT_FAL_TTS_ENDPOINT,
+  DEFAULT_FAL_TTS_MODEL,
+  DEFAULT_GENA_VOICE,
+  DEFAULT_DIANE_VOICE,
+} = require('../lib/podcasts/config');
 const { createMemoryStore } = require('../lib/podcasts/memoryStore');
 const { buildRss } = require('../lib/podcasts/rss');
 const { assertTransition, validateEpisodeFields, slugify } = require('../lib/podcasts/validation');
@@ -40,9 +46,21 @@ test('podcast public routes default on; generation stays off', () => {
   assert.equal(config({ PODCASTS_ENABLED: 'true' }).enabled, true);
   assert.equal(cfg.falEndpoint, DEFAULT_FAL_TTS_ENDPOINT);
   assert.equal(cfg.falModel, DEFAULT_FAL_TTS_MODEL);
+  assert.equal(cfg.genaVoice, DEFAULT_GENA_VOICE);
+  assert.equal(cfg.dianeVoice, DEFAULT_DIANE_VOICE);
   assert.equal(cfg.genaVoice, 'Aoede');
-  assert.equal(cfg.dianeVoice, 'Zephyr');
+  assert.equal(cfg.dianeVoice, 'Callirrhoe');
   assert.equal(cfg.falConfigVerifiedInRepo, false);
+});
+
+test('podcast host voices override via PODCASTS_VOICE_* env', () => {
+  const cfg = config({
+    PODCASTS_VOICE_GENA: 'Kore',
+    PODCASTS_VOICE_DIANE: 'Sulafat',
+  });
+  assert.equal(cfg.genaVoice, 'Kore');
+  assert.equal(cfg.dianeVoice, 'Sulafat');
+  assert.equal(config({ PODCASTS_VOICE_DIANE: '  ' }).dianeVoice, DEFAULT_DIANE_VOICE);
 });
 
 test('encodePodcastMaster recompresses audio under a smaller bitrate', async () => {
@@ -600,6 +618,9 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   const fal = createFalTts(cfg);
   const input = fal.buildInput('Gena: Hello\nDiane: Hi');
   assert.equal(input.speakers[0].speaker_id, 'Gena');
+  assert.equal(input.speakers[0].voice, 'Aoede');
+  assert.equal(input.speakers[1].speaker_id, 'Diane');
+  assert.equal(input.speakers[1].voice, 'Callirrhoe');
   assert.match(input.style_instructions, /pronounced like Gina/i);
   assert.match(input.style_instructions, /JEEN-uh/);
   assert.match(input.style_instructions, /AfterBuzz|aftershow/i);

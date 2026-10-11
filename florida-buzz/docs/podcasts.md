@@ -16,6 +16,9 @@ Optional overrides:
 ```
 PODCASTS_FAL_TTS_ENDPOINT=fal-ai/gemini-tts
 PODCASTS_FAL_TTS_MODEL=gemini-2.5-pro-tts
+# Host voices (fal-ai/gemini-tts speaker presets; ~30 names in the fal catalog)
+PODCASTS_VOICE_GENA=Aoede
+PODCASTS_VOICE_DIANE=Callirrhoe
 PODCASTS_TTS_TEMPERATURE=0.85
 PODCASTS_AUDIO_BUCKET=podcast-audio
 PODCASTS_ARTWORK_BUCKET=podcast-artwork
@@ -53,7 +56,10 @@ Defaults come from **public fal.ai documentation** for:
 
 - Endpoint: `fal-ai/gemini-tts`
 - Model: `gemini-2.5-pro-tts`
-- Voices: Gena=`Aoede`, Diane=`Zephyr`
+- Voices (defaults): Gena=`Aoede` (warm/melodic), Diane=`Callirrhoe` (easy-going — clearer contrast than former `Zephyr`, which sounded bright/assistant-like next to Aoede)
+- Override without code changes: `PODCASTS_VOICE_GENA` / `PODCASTS_VOICE_DIANE` (must be a fal Gemini TTS voice enum value)
+- Catalog limit: fal exposes a fixed ~30-name preset list; contrast is limited to those timbres
+- After changing voices (or deploying a new default), **regenerate episode audio** (fal TTS preview) — existing MP3s keep the old voices; script text does not need regeneration
 - Spelling vs pronunciation: always spell **Gena**; pronounce like **Gina** (JEEN-uh) in TTS
 - Park names: **EPCOT** → EP-cot (two syllables, stress on first) via shared `lib/podcasts/pronunciation.js` in fal `style_instructions` (advisory; fal may still misread)
 - Language: `English (US)`
