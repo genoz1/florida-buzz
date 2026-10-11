@@ -573,6 +573,7 @@ test('fal TTS keeps Gena spelling with Gina pronunciation guidance', () => {
   assert.match(input.style_instructions, /Less announcer|more live reaction/i);
   assert.match(input.style_instructions, /1–6 word|wait—/i);
   assert.match(input.style_instructions, /tennis-match/i);
+  assert.match(input.style_instructions, /Lead\/support|carry a longer point|mostly reacts/i);
   assert.match(input.style_instructions, /uneven pacing|Natural uneven/i);
   assert.match(input.style_instructions, /metronomic|beat-matched|vary pause/i);
 });
