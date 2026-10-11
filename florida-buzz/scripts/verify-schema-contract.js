@@ -11,7 +11,7 @@ const migrationSql = fs.readdirSync(path.join(root, 'supabase', 'migrations'))
 
 const expectedColumns = {
   article_generation_queue: ['guid', 'source_url', 'payload', 'status', 'attempts', 'last_error', 'last_attempt_at', 'created_at', 'updated_at'],
-  articles: ['id', 'slug', 'title', 'dek', 'body_html', 'category', 'source_name', 'source_url', 'image_url', 'fb_caption', 'published_at', 'is_evergreen', 'meta_title', 'city', 'is_review', 'review_type', 'review_subject', 'review_rating'],
+  articles: ['id', 'slug', 'title', 'dek', 'body_html', 'category', 'source_name', 'source_url', 'image_url', 'fb_caption', 'fb_posted', 'published_at', 'is_evergreen', 'meta_title', 'city', 'is_review', 'review_type', 'review_subject', 'review_rating'],
   engagement_posts: ['topic', 'message', 'posted_at'],
   feature_promo_images: ['topic', 'image_url'],
   feature_promo_posts: ['topic', 'message', 'posted_at'],

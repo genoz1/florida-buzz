@@ -13,6 +13,10 @@ const {
   isNonArticleFacebookAllowed,
   PARK_CRUISE_KEYWORDS,
 } = require('../lib/facebookDistribution');
+const {
+  applyFacebookFeedDecision,
+  isFacebookCadenceDeferral,
+} = require('../lib/facebookFeedQueue');
 
 test('topic filter allows theme-parks and cruises by category', () => {
   assert.equal(isFacebookTopicAllowed({ category: 'theme-parks', title: 'Hours update' }).ok, true);
@@ -59,19 +63,20 @@ test('FB_ALLOWED_CATEGORIES overrides the default allowlist', () => {
   assert.equal(isFacebookTopicAllowed({ category: 'cruises', title: 'Sail tip' }, env).ok, true);
 });
 
-test('cadence defaults favor spaced park posts, not bursts', () => {
+test('cadence defaults space posts without a tight daily drop-cap', () => {
   const config = getFacebookCadenceConfig({});
-  assert.equal(config.minHoursBetweenPosts, 4);
-  assert.equal(config.maxPostsPerDay, 2);
+  assert.equal(config.minHoursBetweenPosts, 3);
+  assert.equal(config.maxPostsPerDay, 0);
   assert.equal(config.maxPostsPerRun, 1);
   assert.equal(config.postDelayMinutes, 60);
-  assert.ok(config.postDelayMinutes >= 60);
+  assert.ok(config.minHoursBetweenPosts >= 2 && config.minHoursBetweenPosts <= 4);
 });
 
 test('cadence blocks a second Facebook post in the same run', () => {
   const blocked = evaluateFacebookCadence({ postsThisRun: 1, recentSuccesses: [] }, {});
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'max_per_run');
+  assert.equal(isFacebookCadenceDeferral(blocked.reason), true);
 });
 
 test('cadence blocks when last Facebook success was too recent', () => {
@@ -80,25 +85,47 @@ test('cadence blocks when last Facebook success was too recent', () => {
   const blocked = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'min_spacing');
+  assert.equal(isFacebookCadenceDeferral(blocked.reason), true);
 });
 
 test('cadence allows a post after the minimum gap', () => {
   const now = new Date('2026-10-11T20:00:00.000Z');
-  const recent = [{ created_at: '2026-10-11T15:00:00.000Z' }]; // 5h ago
+  const recent = [{ created_at: '2026-10-11T16:00:00.000Z' }]; // 4h ago (> default 3h)
   const ok = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
   assert.equal(ok.ok, true);
   assert.equal(ok.reason, 'cadence_ok');
 });
 
-test('cadence blocks after max posts in 24h', () => {
+test('default daily max is off so many park posts are not hard-dropped', () => {
+  const now = new Date('2026-10-11T20:00:00.000Z');
+  const recent = [
+    { created_at: '2026-10-11T08:00:00.000Z' },
+    { created_at: '2026-10-11T11:00:00.000Z' },
+    { created_at: '2026-10-11T14:00:00.000Z' },
+    { created_at: '2026-10-11T17:00:00.000Z' },
+  ];
+  // Last success was 3h ago — spacing ok, and no daily cap by default.
+  const ok = evaluateFacebookCadence(
+    { postsThisRun: 0, recentSuccesses: recent, now },
+    {}
+  );
+  assert.equal(ok.ok, true);
+});
+
+test('optional FB_MAX_POSTS_PER_DAY still defers rather than implying a permanent skip', () => {
   const now = new Date('2026-10-11T20:00:00.000Z');
   const recent = [
     { created_at: '2026-10-11T10:00:00.000Z' },
     { created_at: '2026-10-11T15:00:00.000Z' },
   ];
-  const blocked = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
+  const blocked = evaluateFacebookCadence(
+    { postsThisRun: 0, recentSuccesses: recent, now },
+    { FB_MAX_POSTS_PER_DAY: '2' }
+  );
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'max_per_day');
+  assert.equal(isFacebookCadenceDeferral(blocked.reason), true);
+  assert.match(blocked.detail, /queued/i);
 });
 
 test('decideFacebookDistribution combines topic + cadence', async () => {
@@ -121,6 +148,50 @@ test('decideFacebookDistribution combines topic + cadence', async () => {
   assert.equal(filtered.reason, 'topic_filtered');
 });
 
+test('applyFacebookFeedDecision skips topics permanently and defers cadence', async () => {
+  const updates = [];
+  const client = {
+    from() {
+      return {
+        update(payload) {
+          updates.push(payload);
+          return {
+            eq() {
+              return { error: null };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const skip = await applyFacebookFeedDecision(
+    client,
+    'beach-shells',
+    { ok: false, reason: 'topic_filtered', detail: 'not park' },
+    { logger: { log() {}, error() {} } }
+  );
+  assert.equal(skip.action, 'skipped');
+  assert.deepEqual(updates[0], { fb_posted: true });
+
+  const defer = await applyFacebookFeedDecision(
+    client,
+    'magic-kingdom-tip',
+    { ok: false, reason: 'min_spacing', detail: 'wait' },
+    { logger: { log() {}, error() {} } }
+  );
+  assert.equal(defer.action, 'deferred');
+  assert.equal(updates.length, 1, 'cadence deferral must not mark fb_posted');
+
+  const post = await applyFacebookFeedDecision(
+    client,
+    'epic-universe-tip',
+    { ok: true, reason: 'allowed' },
+    { logger: { log() {}, error() {} } }
+  );
+  assert.equal(post.action, 'post');
+});
+
 test('non-article Facebook jobs are skipped by default', () => {
   assert.equal(isNonArticleFacebookAllowed({}).ok, false);
   assert.equal(isNonArticleFacebookAllowed({ FB_SKIP_NON_PARK_FEED: 'false' }).ok, true);
@@ -132,11 +203,28 @@ test('keyword list documents Disney/Universal/cruise coverage', () => {
   assert.ok(PARK_CRUISE_KEYWORDS.includes('cruise') || PARK_CRUISE_KEYWORDS.includes('port canaveral'));
 });
 
-test('automate and guide scripts wire the Facebook distribution gate', () => {
+test('automate and guide scripts queue Facebook posts instead of permanently skipping cadence', () => {
   const automate = fs.readFileSync(path.join(__dirname, '../scripts/automate.js'), 'utf8');
   const guide = fs.readFileSync(path.join(__dirname, '../scripts/generate-guide.js'), 'utf8');
+  const docs = fs.readFileSync(path.join(__dirname, '../docs/facebook-reels-strategy.md'), 'utf8');
   assert.match(automate, /decideFacebookDistribution/);
   assert.match(automate, /facebookPostsThisRun/);
+  assert.match(automate, /loadPendingFacebookFeedPosts/);
+  assert.match(automate, /applyFacebookFeedDecision/);
+  assert.match(automate, /markFacebookFeedResolved/);
   assert.match(guide, /decideFacebookDistribution/);
+  assert.match(guide, /loadPendingFacebookFeedPosts/);
+  assert.match(guide, /applyFacebookFeedDecision/);
+  assert.match(docs, /every theme-park and cruise article and guide still posts/i);
+  assert.match(docs, /spaced hours apart/i);
   assert.doesNotMatch(automate, /Posts will be spaced \$\{FB_POST_DELAY_MINUTES\} minute\(s\) apart across all platforms/);
+});
+
+test('fb_posted backfill migration prevents re-queuing the back catalog', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, '../supabase/migrations/20261012010000_facebook_feed_queue_backfill.sql'),
+    'utf8'
+  );
+  assert.match(migration, /update public\.articles/i);
+  assert.match(migration, /fb_posted\s*=\s*true/i);
 });

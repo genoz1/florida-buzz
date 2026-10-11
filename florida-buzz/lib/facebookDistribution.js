@@ -12,11 +12,15 @@
  * Env overrides (all optional):
  *   FB_TOPIC_FILTER_ENABLED=false     disable topic filter (not recommended)
  *   FB_ALLOWED_CATEGORIES=theme-parks,cruises
- *   FB_MIN_HOURS_BETWEEN_POSTS=4      default 4
- *   FB_MAX_POSTS_PER_DAY=2            default 2
- *   FB_MAX_POSTS_PER_RUN=1            default 1
+ *   FB_MIN_HOURS_BETWEEN_POSTS=3      default 3 (spread posts through the day)
+ *   FB_MAX_POSTS_PER_DAY=0            default 0 = no daily hard cap (queue/spacing only)
+ *   FB_MAX_POSTS_PER_RUN=1            default 1 (extras stay queued for later runs)
  *   FB_POST_DELAY_MINUTES=60          within-run wait after an FB post (default 60)
  *   FB_SKIP_NON_PARK_FEED=false       allow promo/engagement/city FB again
+ *
+ * Cadence never permanently drops park/cruise articles or guides. When spacing
+ * (or max-per-run) blocks a post, articles.fb_posted stays false and a later
+ * automate/guide run posts it. Only non-park topics are skipped for Facebook.
  */
 
 const DEFAULT_ALLOWED_CATEGORIES = ['theme-parks', 'cruises'];
@@ -97,8 +101,12 @@ function skipNonParkFeedPosts(env = process.env) {
 
 function getFacebookCadenceConfig(env = process.env) {
   return {
-    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 4),
-    maxPostsPerDay: positiveInt(env.FB_MAX_POSTS_PER_DAY, 2),
+    // Prefer hours-apart spacing over a tight daily cap so every park/cruise
+    // article and guide still reaches Facebook — just not in a burst.
+    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 3),
+    // 0 = unlimited (default). A positive value is a soft ceiling for the day;
+    // blocked park/cruise items remain queued (fb_posted=false) for later runs.
+    maxPostsPerDay: positiveInt(env.FB_MAX_POSTS_PER_DAY, 0),
     maxPostsPerRun: positiveInt(env.FB_MAX_POSTS_PER_RUN, 1),
     // Raised from the old automate.js default of 10 minutes — only used when
     // more than one Facebook post is allowed in a single run.
@@ -193,11 +201,12 @@ function evaluateFacebookCadence(state = {}, env = process.env) {
     return Number.isFinite(t) && now.getTime() - t < dayMs;
   }).length;
 
-  if (postsToday >= config.maxPostsPerDay) {
+  // maxPostsPerDay === 0 means no daily hard cap (spacing + max-per-run only).
+  if (config.maxPostsPerDay > 0 && postsToday >= config.maxPostsPerDay) {
     return {
       ok: false,
       reason: 'max_per_day',
-      detail: `Already ${postsToday} Facebook success(es) in the last 24h (max ${config.maxPostsPerDay})`,
+      detail: `Already ${postsToday} Facebook success(es) in the last 24h (max ${config.maxPostsPerDay}); park/cruise items stay queued`,
       config,
     };
   }
