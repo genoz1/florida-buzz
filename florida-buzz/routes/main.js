@@ -487,8 +487,9 @@ router.get('/article/:slug', async (req, res) => {
     process.env.BUZZ_BOARD_ENABLED === 'true'
   );
 
-  const showPlanningOffers =
-    article.category === 'theme-parks' || article.is_evergreen === true;
+  // High-intent only: theme-park news + Disney/park evergreen guides.
+  // Avoid pitching tickets on beaches/wildlife/etc. evergreen pages.
+  const showPlanningOffers = article.category === 'theme-parks';
   res.render('article', {
     article,
     buzzDiscussion,
