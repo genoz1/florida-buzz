@@ -253,7 +253,7 @@ async function main() {
         'https://tcrfirzjcjvfmiepgbjh.supabase.co/storage/v1/object/public/podcast-audio/shows/florida-buzz-disney/trailer/florida-buzz-disney-trailer-master-v3-solo-geno.mp3',
       original_dual_host_backup:
         'https://tcrfirzjcjvfmiepgbjh.supabase.co/storage/v1/object/public/podcast-audio/shows/florida-buzz-disney/trailer/florida-buzz-disney-trailer-master-v1.mp3',
-      note: 'Replaces sibling solo trailer (v3) with exact 50-year story-beat master (v4). Prior masters left in storage. Episode stayed published with same slug/guid so RSS itunes:episodeType=trailer swaps the enclosure URL in place.',
+      note: 'Replaces sibling solo trailer (v3) with exact 50-year story-beat master (v5). Prior masters left in storage. Episode stayed published with same slug/guid so RSS itunes:episodeType=trailer swaps the enclosure URL in place.',
     },
     production: {
       model: MODEL_ID,
