@@ -7,6 +7,15 @@
 const DEFAULT_FAL_TTS_ENDPOINT = 'fal-ai/gemini-tts';
 const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
 
+// Multi-speaker voice presets from fal-ai/gemini-tts (same enum on speakers[].voice).
+// Catalog is finite (~30 names). Popular female labels from fal/Google docs:
+//   Aoede = warm/melodic (breezy), Zephyr = bright/clear, Callirrhoe = easy-going,
+//   Kore = firm, Sulafat = warm, Gacrux = mature, Achernar = soft.
+// Defaults: Gena=Aoede; Diane=Callirrhoe (easy-going contrast vs Aoede — less
+// bright/assistant-like than Zephyr, which users heard as too similar / AI-ish).
+const DEFAULT_GENA_VOICE = 'Aoede';
+const DEFAULT_DIANE_VOICE = 'Callirrhoe';
+
 const EPISODE_STATUSES = Object.freeze([
   'draft',
   'script_ready',
@@ -20,12 +29,19 @@ const EPISODE_STATUSES = Object.freeze([
 
 const DISNEY_SHOW_SLUG = 'florida-buzz-disney';
 
+function normalizeVoice(raw, fallback) {
+  const voice = String(raw || '').trim();
+  return voice || fallback;
+}
+
 function config(env = process.env) {
   const temperature = Number(env.PODCASTS_TTS_TEMPERATURE ?? 0.9);
   // Larger multi-turn chunks sound less metronomic than many tiny one-volley sections.
   // fal Pro still times out on huge prompts — ~5600 chars keeps several host exchanges per job.
   const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || 5600);
   const maxUploadMb = Number(env.PODCASTS_MAX_UPLOAD_MB || 80);
+  const genaVoice = normalizeVoice(env.PODCASTS_VOICE_GENA, DEFAULT_GENA_VOICE);
+  const dianeVoice = normalizeVoice(env.PODCASTS_VOICE_DIANE, DEFAULT_DIANE_VOICE);
   return Object.freeze({
     // Public directory/show/episode/RSS are on unless explicitly disabled.
     // Paid fal TTS stays hard-off until PODCASTS_GENERATION_ENABLED=true.
@@ -42,8 +58,8 @@ function config(env = process.env) {
     temperature: Number.isFinite(temperature) ? temperature : 0.9,
     languageCode: 'English (US)',
     outputFormat: 'mp3',
-    genaVoice: 'Aoede',
-    dianeVoice: 'Zephyr',
+    genaVoice,
+    dianeVoice,
     sectionMaxChars: Number.isFinite(maxChars) && maxChars > 500 ? maxChars : 5600,
     // fal Pro multi-speaker chunks can take several minutes; 90×2s was too short.
     falPollAttempts: Number(env.PODCASTS_FAL_POLL_ATTEMPTS || 180),
@@ -55,7 +71,7 @@ function config(env = process.env) {
     defaultShowSlug: DISNEY_SHOW_SLUG,
     falConfigVerifiedInRepo: false,
     falConfigSource:
-      'Public fal.ai docs for fal-ai/gemini-tts (model gemini-2.5-pro-tts, voices Aoede/Zephyr). No in-repo approved-trailer verification found.',
+      `Public fal.ai docs for fal-ai/gemini-tts (model gemini-2.5-pro-tts, voices ${genaVoice}/${dianeVoice}). No in-repo approved-trailer verification found.`,
   });
 }
 
@@ -65,4 +81,6 @@ module.exports = {
   DISNEY_SHOW_SLUG,
   DEFAULT_FAL_TTS_ENDPOINT,
   DEFAULT_FAL_TTS_MODEL,
+  DEFAULT_GENA_VOICE,
+  DEFAULT_DIANE_VOICE,
 };

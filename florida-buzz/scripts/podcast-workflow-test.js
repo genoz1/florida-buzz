@@ -225,7 +225,7 @@ async function main() {
       http_ok: audioHead.ok,
       content_type: audioHead.headers.get('content-type'),
       note:
-        'PODCASTS_GENERATION_ENABLED=false and FAL_KEY absent — used approved trailer master bytes for private draft plumbing only; Gena (Aoede) / Diane (Zephyr) TTS not regenerated this run',
+        'PODCASTS_GENERATION_ENABLED=false and FAL_KEY absent — used approved trailer master bytes for private draft plumbing only; Gena (Aoede) / Diane (Callirrhoe) TTS not regenerated this run',
     };
   }
 
