@@ -16,19 +16,21 @@ const {
   undercoverTouristDestinationUrl,
 } = require('../lib/affiliates/undercoverTourist');
 
-test('getActiveOffers always includes soft Undercover Tourist CTA', () => {
-  const offers = getActiveOffers({}, { placement: 'wait-times' });
-  assert.equal(offers.length, 1);
-  assert.equal(offers[0].id, 'undercover-tourist');
-  assert.equal(offers[0].soft, true);
-  assert.match(offers[0].url, /jdoqocy\.com\/click-101851476-15733832/);
+test('getActiveOffers includes Hotels.com primary + soft Undercover Tourist CTA', () => {
+  const offers = getActiveOffers({}, { placement: 'wait-times', limit: 5 });
+  assert.equal(offers[0].id, 'hotels-com');
+  assert.equal(offers.some((o) => o.id === 'undercover-tourist'), true);
+  const uct = offers.find((o) => o.id === 'undercover-tourist');
+  assert.equal(uct.soft, true);
+  assert.match(uct.url, /jdoqocy\.com\/click-101851476-15733832/);
+  assert.match(offers[0].url, /\/go\/hotels|jdoqocy\.com\/click-101851476-15734399/);
   assert.match(offers[0].disclosure, /commission/i);
 });
 
 test('optional offers appear only when env URLs are configured', () => {
   const empty = getActiveOffers({}, { placement: 'planner', limit: 5 });
-  assert.equal(empty.every((o) => o.id === 'undercover-tourist' || !OPTIONAL_OFFER_ENV.some((d) => d.id === o.id)), true);
-  assert.equal(empty.length, 1);
+  assert.equal(empty.every((o) => o.id === 'undercover-tourist' || o.id === 'hotels-com' || !OPTIONAL_OFFER_ENV.some((d) => d.id === o.id)), true);
+  assert.equal(empty.length, 2);
 
   const withExtras = getActiveOffers(
     {

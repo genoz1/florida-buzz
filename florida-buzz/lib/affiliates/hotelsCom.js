@@ -3,7 +3,8 @@
 /**
  * Hotels.com affiliate helper.
  *
- * Set HOTELS_COM_URL to your full tracked affiliate URL (required to show CTAs).
+ * Default CJ evergreen click URL for The Florida Buzz (publisher 101851476).
+ * Override with HOTELS_COM_URL if the link ID rotates.
  * Optional destination overrides:
  *   HOTELS_COM_URL_DISNEY
  *   HOTELS_COM_URL_UNIVERSAL
@@ -14,6 +15,8 @@
  */
 
 const PARTNER_NAME = 'Hotels.com';
+/** CJ evergreen Hotels.com link — The Florida Buzz (101851476). */
+const CJ_EVERGREEN_HOTELS = 'https://www.jdoqocy.com/click-101851476-15734399';
 const AFFILIATE_DISCLOSURE_SHORT =
   'Hotels.com is an affiliate partner. If you book through our link, we may earn a commission at no extra cost to you.';
 
@@ -45,7 +48,7 @@ function isHttpUrl(value) {
 }
 
 function hotelsComBaseUrl(env = process.env) {
-  const url = String(env.HOTELS_COM_URL || '').trim();
+  const url = String(env.HOTELS_COM_URL || CJ_EVERGREEN_HOTELS).trim();
   return isHttpUrl(url) ? url : null;
 }
 
@@ -86,6 +89,7 @@ function normalizeHotelsDest(raw) {
 module.exports = {
   PARTNER_NAME,
   AFFILIATE_DISCLOSURE_SHORT,
+  CJ_EVERGREEN_HOTELS,
   DESTINATIONS,
   hotelsComBaseUrl,
   hotelsComConfigured,

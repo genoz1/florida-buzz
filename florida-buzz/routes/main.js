@@ -94,12 +94,6 @@ router.get('/go/ig/:slug', (req, res) => {
 });
 
 function redirectHotelsAffiliate(req, res, destKey) {
-  if (!hotelsComConfigured(process.env)) {
-    // Soft fallback: ticket/hotel packages until Hotels.com env is set.
-    const fallback = undercoverTouristUrl(process.env);
-    res.set('Cache-Control', 'no-store');
-    return res.redirect(302, fallback);
-  }
   const url = hotelsComUrl(process.env, destKey);
   if (!url) return render404(req, res);
   res.set('Cache-Control', 'no-store');

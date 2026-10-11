@@ -24,7 +24,7 @@ const GENERIC_DISCLOSURE =
  * never invent network IDs or placeholder affiliate programs.
  *
  * Supported env vars:
- *   HOTELS_COM_URL         – full tracked Hotels.com affiliate URL (preferred hotel CTA)
+ *   HOTELS_COM_URL         – optional override; defaults to CJ evergreen Hotels.com link
  *   HOTELS_COM_URL_DISNEY / _UNIVERSAL / _PORT_CANAVERAL / _ORLANDO – optional overrides
  *   TRAVEL_INSURANCE_URL  – full tracked URL for travel insurance
  *   AIRPORT_TRANSFER_URL  – full tracked URL for airport transfers / shuttles

@@ -15,9 +15,10 @@ const {
   articleShowsPlanningOffers,
 } = require('../lib/affiliates');
 
-test('hotelsCom helpers require a real HOTELS_COM_URL', () => {
-  assert.equal(hotelsComConfigured({}), false);
-  assert.equal(hotelsComUrl({}), null);
+test('hotelsCom helpers default to Florida Buzz CJ evergreen link', () => {
+  const { CJ_EVERGREEN_HOTELS } = require('../lib/affiliates/hotelsCom');
+  assert.equal(hotelsComConfigured({}), true);
+  assert.equal(hotelsComUrl({}), CJ_EVERGREEN_HOTELS);
   assert.equal(
     hotelsComUrl({ HOTELS_COM_URL: 'https://www.hotels.com/?affcid=test' }),
     'https://www.hotels.com/?affcid=test'
