@@ -1,0 +1,35 @@
+<%# Delayed newsletter capture modal — dismissed state stored in localStorage. %>
+<div
+  class="nl-popup"
+  id="nl-popup"
+  hidden
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="nl-popup-title"
+  aria-describedby="nl-popup-dek"
+>
+  <div class="nl-popup-backdrop" data-nl-close tabindex="-1"></div>
+  <div class="nl-popup-card">
+    <button type="button" class="nl-popup-close" data-nl-close aria-label="Close newsletter signup">&times;</button>
+    <p class="nl-popup-kicker">Free daily email</p>
+    <h2 id="nl-popup-title" class="nl-popup-title">Get the Florida Buzz roundup</h2>
+    <p id="nl-popup-dek" class="nl-popup-dek">
+      News, original planning guides, travel discounts, and the tools we use for Disney &amp; Florida trips — one email a day.
+    </p>
+    <ul class="nl-popup-points">
+      <li>Daily Florida news worth reading</li>
+      <li>Planning guides &amp; park tips</li>
+      <li>Travel deals when they’re real</li>
+    </ul>
+    <form class="nl-popup-form" action="/subscribe" method="POST">
+      <input type="email" name="email" placeholder="you@email.com" required autocomplete="email" aria-label="Email address">
+      <input type="text" name="website" class="nl-popup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <input type="hidden" name="form_rendered_at" value="<%= Date.now() %>">
+      <input type="hidden" name="return_to" value="<%= typeof canonicalPath === 'string' && canonicalPath ? canonicalPath : '/' %>">
+      <input type="hidden" name="source" value="popup">
+      <button type="submit" class="btn">Send me the daily Buzz</button>
+    </form>
+    <p class="nl-popup-fine">Unsubscribe anytime. We don’t sell your email.</p>
+  </div>
+</div>
+<script src="/js/newsletter-popup.js?v=20261011-1" defer></script>

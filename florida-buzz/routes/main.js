@@ -627,10 +627,26 @@ router.get('/unsubscribe', async (req, res) => {
   res.render('unsubscribe', { message });
 });
 
+function subscribeReturnPath(returnTo) {
+  const raw = String(returnTo || '/').trim() || '/';
+  // Only allow same-site relative paths (block open redirects).
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/';
+  return raw.split('?')[0].slice(0, 200) || '/';
+}
+
+function redirectAfterSubscribe(res, returnTo, status) {
+  const path = subscribeReturnPath(returnTo);
+  const joiner = path.includes('?') ? '&' : '?';
+  if (status === '1') {
+    res.cookie('fb_newsletter', '1', { maxAge: 31536000 * 1000, sameSite: 'lax', path: '/' });
+  }
+  return res.redirect(`${path}${joiner}subscribed=${status}`);
+}
+
 router.post('/subscribe', async (req, res) => {
-  const { email, website, form_rendered_at } = req.body;
+  const { email, website, form_rendered_at, return_to: returnTo } = req.body;
   if (!email || !email.includes('@')) {
-    return res.redirect('/?subscribed=error');
+    return redirectAfterSubscribe(res, returnTo, 'error');
   }
 
   // Anti-bot checks. Both fail silently with the normal "success" redirect —
@@ -640,7 +656,7 @@ router.post('/subscribe', async (req, res) => {
   const renderedAt = parseInt(form_rendered_at, 10) || 0;
   const submittedTooFast = renderedAt > 0 && Date.now() - renderedAt < 3000;
   if (honeypotFilled || submittedTooFast) {
-    return res.redirect('/?subscribed=1');
+    return redirectAfterSubscribe(res, returnTo, '1');
   }
 
   const normalizedEmail = email.toLowerCase().trim();
@@ -651,7 +667,7 @@ router.post('/subscribe', async (req, res) => {
     );
     if (error) {
       console.error('Newsletter signup error:', error.message);
-      return res.redirect('/?subscribed=error');
+      return redirectAfterSubscribe(res, returnTo, 'error');
     }
   }
 
@@ -660,7 +676,7 @@ router.post('/subscribe', async (req, res) => {
     console.error('Welcome email error:', err.message);
   });
 
-  res.redirect('/?subscribed=1');
+  return redirectAfterSubscribe(res, returnTo, '1');
 });
 
 function escapeXml(str) {
