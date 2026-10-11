@@ -44,15 +44,11 @@ test('ASS writer uses clean caption size, brand, kinetic fade, and CTA', () => {
   assert.equal(escapeAssText('a{b}\\c'), 'a b c');
 });
 
-test('overlay assets are a single premium price callout + brand pill + scrim', () => {
+test('overlay plan is empty (sticker overlays disabled)', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-vn-ov-'));
   const assets = generateOverlayAssets(dir);
-  assert.ok(fs.existsSync(assets.priceCallout));
-  assert.ok(fs.existsSync(assets.brandPill));
-  assert.ok(fs.existsSync(assets.captionScrim));
   const plan = lightningLaneOverlayPlan(assets);
-  assert.ok(plan.some((p) => p.path === assets.priceCallout));
-  assert.ok(!plan.some((p) => /wallet|dollars|spike/i.test(p.path)));
+  assert.deepEqual(plan, []);
 });
 
 test('synthesizeElevenV4 hits ElevenLabs direct URL with eleven_v4 (not fal)', async () => {

@@ -76,7 +76,7 @@ const STORY = {
       text: 'Would you still pay extra\\Nto {\\c&H00FFFF&}skip the line{\\c&HFFFFFF&}?',
     },
   ],
-  bgStill: 'priority-access-entrance.jpg',
+  bgStill: 'universal-express-entry-NOT-DISNEY.jpg',
 };
 
 function ffmpegBin() {
