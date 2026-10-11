@@ -1,10 +1,6 @@
 'use strict';
 
-/**
- * Slideshow visual-news stories set moneyOverlays: false.
- * Kept as a no-op API so callers/tests can import without sticker dumps.
- */
-
+/** Visual-news overlays disabled — no sticker dumps, no Universal assets. */
 const fs = require('node:fs');
 
 function generateOverlayAssets(outDir) {
@@ -12,11 +8,8 @@ function generateOverlayAssets(outDir) {
   return { dir: outDir };
 }
 
-function lightningLaneOverlayPlan(_assets) {
+function lightningLaneOverlayPlan() {
   return [];
 }
 
-module.exports = {
-  generateOverlayAssets,
-  lightningLaneOverlayPlan,
-};
+module.exports = { generateOverlayAssets, lightningLaneOverlayPlan };

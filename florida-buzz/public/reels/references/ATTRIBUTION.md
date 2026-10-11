@@ -22,8 +22,7 @@ letterboxed images in the finished Reel.
 
 - `host-overlay.png` circular crop from File:Smiling woman with a phone (Unsplash).jpg; Unsplash/Commons license as listed on file page.
 
-## Slideshow stills (visual news)
-- `empty-wallet.jpg` from File:Aarong leather wallet.jpg (Wikimedia Commons).
-- `long-line.jpg` from File:Queue, Belfast Mela, August 2010 (01).JPG (Wikimedia Commons).
-- `disney-queue.jpg` from File:Radiator Springs Racers Queue, Cars Land, Disney California Adventure, Anaheim, California (17188625737).jpg (Wikimedia Commons).
-- `tron-mk.jpg` / `splash-mk.jpg` optional Magic Kingdom stills from Commons (unused in default slideshow).
+## Park stills note
+- `universal-express-entry-NOT-DISNEY.jpg` is Universal Express Entry — **never use in Disney / Lightning Lane videos**.
+- Do not use wallet prop photos for Disney Lightning Lane stories.
+- `tron-mk.jpg` / `splash-mk.jpg` are Magic Kingdom Commons stills.
