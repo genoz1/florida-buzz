@@ -271,6 +271,39 @@ function appendUndercoverTouristBox(html, category, contextText) {
   return insertBoxMidContent(html, buildUndercoverTouristBox(key, variant));
 }
 
+function detectHotelsDest(text) {
+  const t = (text || '').toLowerCase();
+  if (/port canaveral|cruise port|cape canaveral/.test(t)) return 'port-canaveral';
+  if (/universal|epic universe|islands of adventure/.test(t)) return 'universal';
+  if (/disney|magic kingdom|epcot|hollywood studios|animal kingdom|disney springs/.test(t)) return 'disney';
+  if (/orlando|where to stay|hotel|resort/.test(t)) return 'orlando';
+  return null;
+}
+
+function buildHotelsComBox(dest) {
+  const siteUrl = (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  const path = dest ? `${siteUrl}/go/hotels/${dest}` : `${siteUrl}/go/hotels`;
+  const labels = {
+    disney: 'hotels near Disney World',
+    universal: 'hotels near Universal Orlando',
+    'port-canaveral': 'hotels near Port Canaveral',
+    orlando: 'Orlando hotels',
+  };
+  const label = labels[dest] || 'Florida hotels';
+  return `\n<div class="shop-box">\n  <div class="shop-box-text">\n    <p class="shop-box-eyebrow">Where to Stay</p>\n    <p>Compare current rates for ${label} on Hotels.com — a Florida Buzz affiliate partner. If you book through our link, we may earn a commission at no extra cost to you.</p>\n  </div>\n  <a href="${path}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">Compare Hotels.com rates</a>\n</div>\n`;
+}
+
+function appendHotelsComBox(html, category, contextText) {
+  if (!html) return html;
+  const hotelIntent = category === 'theme-parks'
+    || category === 'cruises'
+    || category === 'travel-deals'
+    || /\bhotel\b|where to stay|resort|port canaveral|cruise/.test((contextText || '').toLowerCase());
+  if (!hotelIntent) return html;
+  const dest = detectHotelsDest(contextText);
+  return insertBoxMidContent(html, buildHotelsComBox(dest));
+}
+
 async function pickTopic(category, existingGuides) {
   const sameCategory = existingGuides.filter((g) => g.category === category).map((g) => g.title);
   const otherTitles = existingGuides.filter((g) => g.category !== category).map((g) => g.title);
@@ -373,7 +406,12 @@ Working title idea: ${workingTitle}`;
   guide.body_html = stripCitationTags(guide.body_html);
   guide.body_html = convertAffiliateLinks(guide.body_html);
   guide.body_html = convertUndercoverTouristLinks(guide.body_html);
-  guide.body_html = appendUndercoverTouristBox(guide.body_html, category, `${topic} ${workingTitle} ${guide.title}`);
+  const contextText = `${topic} ${workingTitle} ${guide.title}`;
+  // Hotels.com lodging box first for stay-intent guides; UCT still covers tickets/packages.
+  if (detectBoxVariant(contextText) === 'hotel' || /where to stay|port canaveral|cruise hotel/.test(contextText.toLowerCase())) {
+    guide.body_html = appendHotelsComBox(guide.body_html, category, contextText);
+  }
+  guide.body_html = appendUndercoverTouristBox(guide.body_html, category, contextText);
   return guide;
 }
 

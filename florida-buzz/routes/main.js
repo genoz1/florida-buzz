@@ -11,7 +11,14 @@ const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
 const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
-const { undercoverTouristUrl, getActiveOffers } = require('../lib/affiliates');
+const {
+  undercoverTouristUrl,
+  getActiveOffers,
+  articleShowsPlanningOffers,
+  hotelsComUrl,
+  hotelsComConfigured,
+} = require('../lib/affiliates');
+const { normalizeHotelsDest } = require('../lib/affiliates/hotelsCom');
 const { afterSubscribeWelcome } = require('../lib/email/welcomeSeries');
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
@@ -84,6 +91,27 @@ router.get('/go/ig/:slug', (req, res) => {
   destination.searchParams.set('utm_content', slug);
   res.set('Cache-Control', 'no-store');
   return res.redirect(302, `${destination.pathname}${destination.search}`);
+});
+
+function redirectHotelsAffiliate(req, res, destKey) {
+  if (!hotelsComConfigured(process.env)) {
+    // Soft fallback: ticket/hotel packages until Hotels.com env is set.
+    const fallback = undercoverTouristUrl(process.env);
+    res.set('Cache-Control', 'no-store');
+    return res.redirect(302, fallback);
+  }
+  const url = hotelsComUrl(process.env, destKey);
+  if (!url) return render404(req, res);
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, url);
+}
+
+router.get('/go/hotels', (req, res) => redirectHotelsAffiliate(req, res, null));
+
+router.get('/go/hotels/:dest', (req, res) => {
+  const dest = normalizeHotelsDest(req.params.dest);
+  if (!dest) return render404(req, res);
+  return redirectHotelsAffiliate(req, res, dest);
 });
 
 router.get('/images/buzz-board-social/:slug.png', async (req, res) => {
@@ -401,7 +429,10 @@ router.get('/', async (req, res) => {
     guides,
     tools,
     undercoverTouristUrl: undercoverTouristUrl(),
-    planningOffers: getActiveOffers(process.env, { placement: 'home', limit: 1 }),
+    planningOffers: getActiveOffers(process.env, {
+      placement: 'home',
+      limit: hotelsComConfigured(process.env) ? 2 : 1,
+    }),
     podcastShow,
     podcastLatest,
     podcastRecent,
@@ -487,16 +518,27 @@ router.get('/article/:slug', async (req, res) => {
     process.env.BUZZ_BOARD_ENABLED === 'true'
   );
 
-  // High-intent only: theme-park news + Disney/park evergreen guides.
-  // Avoid pitching tickets on beaches/wildlife/etc. evergreen pages.
-  const showPlanningOffers = article.category === 'theme-parks';
+  // High-intent categories only (parks, cruises, travel deals).
+  // Avoid pitching lodging/tickets on beaches/wildlife/etc. evergreen pages.
+  const showPlanningOffers = articleShowsPlanningOffers(article.category);
+  const hotelDest = /port canaveral|cruise/i.test(`${article.title} ${article.dek || ''}`)
+    ? 'port-canaveral'
+    : /universal/i.test(`${article.title} ${article.dek || ''}`)
+      ? 'universal'
+      : /disney/i.test(`${article.title} ${article.dek || ''}`)
+        ? 'disney'
+        : null;
   res.render('article', {
     article,
     buzzDiscussion,
     related,
     ticker,
     planningOffers: showPlanningOffers
-      ? getActiveOffers(process.env, { placement: 'article', limit: 2 })
+      ? getActiveOffers(process.env, {
+        placement: 'article',
+        limit: hotelsComConfigured(process.env) ? 3 : 2,
+        dest: hotelDest,
+      })
       : [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,

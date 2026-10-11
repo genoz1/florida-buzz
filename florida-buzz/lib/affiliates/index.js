@@ -7,6 +7,14 @@ const {
   undercoverTouristTrackedUrl,
   escapeHtml,
 } = require('./undercoverTourist');
+const {
+  PARTNER_NAME: HOTELS_PARTNER_NAME,
+  AFFILIATE_DISCLOSURE_SHORT: HOTELS_DISCLOSURE,
+  hotelsComConfigured,
+  hotelsComSitePath,
+  hotelsComUrl,
+  normalizeHotelsDest,
+} = require('./hotelsCom');
 
 const GENERIC_DISCLOSURE =
   'Some links are partner/affiliate links. If you book or buy through them, we may earn a commission at no extra cost to you.';
@@ -16,6 +24,8 @@ const GENERIC_DISCLOSURE =
  * never invent network IDs or placeholder affiliate programs.
  *
  * Supported env vars:
+ *   HOTELS_COM_URL         – full tracked Hotels.com affiliate URL (preferred hotel CTA)
+ *   HOTELS_COM_URL_DISNEY / _UNIVERSAL / _PORT_CANAVERAL / _ORLANDO – optional overrides
  *   TRAVEL_INSURANCE_URL  – full tracked URL for travel insurance
  *   AIRPORT_TRANSFER_URL  – full tracked URL for airport transfers / shuttles
  *   PARKING_DEALS_URL     – full tracked URL for parking / transportation deals
@@ -30,7 +40,7 @@ const OPTIONAL_OFFER_ENV = [
     eyebrow: 'Protect the trip',
     blurb: 'Compare trip protection before you finalize flights and park tickets.',
     cta: 'Compare travel insurance →',
-    placements: ['planner', 'article', 'email', 'newsletter'],
+    placements: ['planner', 'article', 'email', 'newsletter', 'home'],
   },
   {
     id: 'airport-transfer',
@@ -66,6 +76,66 @@ function isHttpUrl(value) {
   return /^https?:\/\//i.test(String(value || '').trim());
 }
 
+function hotelsOffer(env = process.env, { placement = 'default', dest = null } = {}) {
+  if (!hotelsComConfigured(env)) return null;
+  const resolvedDest = normalizeHotelsDest(dest)
+    || (placement === 'wait-times' || placement === 'planner' ? 'disney' : null);
+  // Prefer stable site redirect in emails/newsletter/home so links survive URL rotation.
+  const useSitePath = ['home', 'email', 'newsletter', 'article', 'planner', 'wait-times'].includes(placement);
+  const url = useSitePath
+    ? hotelsComSitePath(resolvedDest, env.SITE_URL)
+    : hotelsComUrl(env, resolvedDest);
+
+  const copyByPlacement = {
+    'wait-times': {
+      eyebrow: 'Where to stay',
+      blurb: 'Compare Orlando hotel rates near the parks before you lock dates around a busy wait-time week.',
+      cta: 'Compare hotels on Hotels.com →',
+    },
+    planner: {
+      eyebrow: 'Book the hotel',
+      blurb: 'Building park days? Compare hotel rates near Disney and Universal so lodging matches your itinerary.',
+      cta: 'Find hotels on Hotels.com →',
+    },
+    article: {
+      eyebrow: 'Ready to book a room?',
+      blurb: 'Compare current hotel rates near Disney, Universal, and Port Canaveral before you commit.',
+      cta: 'Compare hotels on Hotels.com →',
+    },
+    email: {
+      eyebrow: 'Hotel booking',
+      blurb: 'When you are ready to book lodging, compare rates on Hotels.com — a Florida Buzz affiliate partner.',
+      cta: 'Browse Orlando hotels →',
+    },
+    newsletter: {
+      eyebrow: 'Hotel deals',
+      blurb: 'Compare hotel rates near Florida’s parks and cruise ports when you are ready to book.',
+      cta: 'See Hotels.com rates →',
+    },
+    home: {
+      eyebrow: 'Book hotels',
+      blurb: 'Compare hotel rates near Disney World, Universal Orlando, and Port Canaveral before you lock dates.',
+      cta: 'Compare hotels on Hotels.com →',
+    },
+    default: {
+      eyebrow: 'Hotels',
+      blurb: 'Compare Florida hotel rates with our Hotels.com partner link.',
+      cta: 'Compare hotels →',
+    },
+  };
+
+  const copy = copyByPlacement[placement] || copyByPlacement.default;
+  return {
+    id: 'hotels-com',
+    partner: HOTELS_PARTNER_NAME,
+    url,
+    disclosure: HOTELS_DISCLOSURE,
+    soft: true,
+    dest: resolvedDest,
+    ...copy,
+  };
+}
+
 function undercoverOffer(env = process.env, { placement = 'default', variant = 'tickets' } = {}) {
   const key = placement === 'wait-times' || placement === 'planner' ? 'disney-world' : 'disney';
   const url =
@@ -80,33 +150,33 @@ function undercoverOffer(env = process.env, { placement = 'default', variant = '
       cta: 'Compare Disney tickets →',
     },
     planner: {
-      eyebrow: 'Tickets & hotels',
-      blurb: 'Building a park day? Soft-check ticket and hotel package prices before you lock lodging.',
-      cta: 'Check ticket & hotel deals →',
+      eyebrow: 'Park tickets',
+      blurb: 'Building a park day? Soft-check ticket prices (and hotel+ticket packages) before you lock the itinerary.',
+      cta: 'Check ticket deals →',
     },
     article: {
-      eyebrow: 'Planning a trip?',
-      blurb: 'Compare current Disney ticket and hotel deals before you book.',
-      cta: 'Check deals at Undercover Tourist →',
+      eyebrow: 'Park tickets',
+      blurb: 'Compare current Disney and Universal ticket deals before you buy at the gate.',
+      cta: 'Compare tickets at Undercover Tourist →',
     },
     email: {
-      eyebrow: 'Optional booking help',
-      blurb: 'When you are ready to book, our partner Undercover Tourist lists Disney tickets and hotel deals.',
+      eyebrow: 'Optional ticket help',
+      blurb: 'When you are ready to buy park tickets, our partner Undercover Tourist lists current deals.',
       cta: 'Browse Disney ticket deals →',
     },
     newsletter: {
-      eyebrow: 'Trip booking',
-      blurb: 'Compare Disney tickets and hotels with our booking partner when you are ready.',
-      cta: 'See current deals →',
+      eyebrow: 'Park tickets',
+      blurb: 'Compare Disney and Universal tickets with our booking partner when you are ready.',
+      cta: 'See ticket deals →',
     },
     home: {
-      eyebrow: 'Book tickets & hotels',
-      blurb: 'Compare Disney World ticket and hotel deals before you lock in dates — a Florida Buzz planning partner.',
-      cta: 'Check deals at Undercover Tourist →',
+      eyebrow: 'Park tickets',
+      blurb: 'Compare Disney World and Universal ticket deals before you lock in dates — a Florida Buzz planning partner.',
+      cta: 'Check ticket deals →',
     },
     default: {
-      eyebrow: 'Tickets & hotels',
-      blurb: 'Compare Disney ticket and hotel deals with our booking partner.',
+      eyebrow: 'Park tickets',
+      blurb: 'Compare Disney ticket deals with our booking partner.',
       cta: 'Check deals →',
     },
   };
@@ -144,16 +214,30 @@ function optionalOffers(env = process.env, { placement = 'default' } = {}) {
 }
 
 /**
- * Active offers for a placement. UCT is always included (soft secondary CTA).
+ * Active offers for a placement.
+ * Hotels.com leads when HOTELS_COM_URL is set (higher-intent lodging).
+ * Undercover Tourist stays as the soft ticket/package CTA.
  * Extra partners appear only when their env URL is set.
  */
-function getActiveOffers(env = process.env, { placement = 'default', limit = 3 } = {}) {
-  const offers = [undercoverOffer(env, { placement }), ...optionalOffers(env, { placement })];
+function getActiveOffers(env = process.env, { placement = 'default', limit = 3, dest = null } = {}) {
+  const hotels = hotelsOffer(env, { placement, dest });
+  const offers = [
+    ...(hotels ? [hotels] : []),
+    undercoverOffer(env, { placement }),
+    ...optionalOffers(env, { placement }),
+  ];
   return offers.slice(0, Math.max(1, limit));
 }
 
 function getPrimaryOffer(env = process.env, options = {}) {
   return getActiveOffers(env, { ...options, limit: 1 })[0] || null;
+}
+
+/** Categories where end-of-article planning offers belong (booking intent). */
+const PLANNING_OFFER_CATEGORIES = new Set(['theme-parks', 'cruises', 'travel-deals']);
+
+function articleShowsPlanningOffers(category) {
+  return PLANNING_OFFER_CATEGORIES.has(String(category || ''));
 }
 
 function siteTools(siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
@@ -223,10 +307,16 @@ function newsletterMonetizationHtml(env = process.env, { siteUrl } = {}) {
 module.exports = {
   GENERIC_DISCLOSURE,
   OPTIONAL_OFFER_ENV,
+  PLANNING_OFFER_CATEGORIES,
   amazonAssociatesTag,
   amazonSearchUrl,
   getActiveOffers,
   getPrimaryOffer,
+  articleShowsPlanningOffers,
+  hotelsOffer,
+  hotelsComConfigured,
+  hotelsComUrl,
+  hotelsComSitePath,
   siteTools,
   offerEmailHtml,
   toolsEmailHtml,

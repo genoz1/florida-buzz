@@ -43,10 +43,19 @@ test('optional offers appear only when env URLs are configured', () => {
   assert.equal(withExtras.some((o) => o.id === 'parking-deals'), false);
 });
 
-test('getPrimaryOffer returns UCT for high-intent placements', () => {
+test('getPrimaryOffer returns UCT when Hotels.com is not configured', () => {
   const offer = getPrimaryOffer({}, { placement: 'article' });
   assert.equal(offer.partner, 'Undercover Tourist');
   assert.match(offer.cta, /Undercover Tourist|deals|ticket/i);
+});
+
+test('getPrimaryOffer prefers Hotels.com when HOTELS_COM_URL is set', () => {
+  const offer = getPrimaryOffer(
+    { HOTELS_COM_URL: 'https://www.hotels.com/?affcid=x', SITE_URL: 'https://thefloridabuzz.com' },
+    { placement: 'article' }
+  );
+  assert.equal(offer.partner, 'Hotels.com');
+  assert.match(offer.url, /\/go\/hotels/);
 });
 
 test('newsletter monetization block includes tools + partner disclosure', () => {
