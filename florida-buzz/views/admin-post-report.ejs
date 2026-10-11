@@ -83,6 +83,18 @@
       </table>
     </div>
 
+    <% const pinterestAuthFailures = recentFailures.filter(f => f.platform === 'pinterest' && /authentication failed|invalid.?access.?token|re-authorize at/i.test(String(f.detail || ''))); %>
+    <% if (pinterestAuthFailures.length) { %>
+      <div style="margin-top:24px; background:#fff4e5; border:1px solid #f0c36d; border-radius:8px; padding:14px 16px; font-size:13px; color:#7a4b00;">
+        <strong>Pinterest auth broken:</strong> recent failures are authentication errors (expired/invalid access token).
+        Fix: open <a href="/admin/pinterest-auth?key=<%= adminKey %>">/admin/pinterest-auth</a>,
+        paste the new <code>PINTEREST_ACCESS_TOKEN</code> + <code>PINTEREST_REFRESH_TOKEN</code> into DigitalOcean,
+        confirm <code>PINTEREST_APP_ID</code>/<code>PINTEREST_APP_SECRET</code>/<code>PINTEREST_BOARD_ID</code>,
+        keep <code>PINTEREST_USE_SANDBOX</code> unset/false, redeploy, then
+        <a href="/admin/test-pinterest?key=<%= adminKey %>">test one pin</a>.
+      </div>
+    <% } %>
+
     <% if (recentFailures.length) { %>
       <div style="margin-top:32px;">
         <h2 style="font-size:16px; color:var(--teal-900);">Recent Failures (last 7 days)</h2>
@@ -91,7 +103,7 @@
             <div style="background:#fdecea; border-radius:6px; padding:10px 14px; font-size:13px;">
               <strong style="text-transform:capitalize;"><%= f.platform %></strong>
               — <%= new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }) %> ET
-              <div style="color:#7a2018; margin-top:4px;"><%= f.detail || '(no detail)' %></div>
+              <div style="color:#7a2018; margin-top:4px; word-break:break-word;"><%= f.detail || '(no detail)' %></div>
             </div>
           <% }) %>
         </div>

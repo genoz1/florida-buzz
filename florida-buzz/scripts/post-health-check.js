@@ -69,6 +69,22 @@ function buildEmail(summary) {
     .map((p) => `<p><strong>${p} errors:</strong><br>${summary[p].failures.slice(0, 5).map((f) => `&bull; ${f}`).join('<br>')}</p>`)
     .join('');
 
+  const pinterestAuthIssue = (summary.pinterest.failures || []).some((f) =>
+    /authentication failed|invalid.?access.?token|re-authorize at/i.test(String(f || ''))
+  );
+  const siteUrl = (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  const adminKey = process.env.ADMIN_PASSWORD || 'ADMIN_PASSWORD';
+  const pinterestFix = pinterestAuthIssue
+    ? `<div style="margin-top:16px; padding:12px 14px; background:#fff4e5; border:1px solid #f0c36d; border-radius:8px; font-size:13px; color:#7a4b00;">
+        <strong>Pinterest auth fix:</strong> Access token expired/invalid.
+        Open <a href="${siteUrl}/admin/pinterest-auth?key=${adminKey}">${siteUrl}/admin/pinterest-auth</a>,
+        copy the new <code>PINTEREST_ACCESS_TOKEN</code> + <code>PINTEREST_REFRESH_TOKEN</code> into DigitalOcean App env vars,
+        confirm <code>PINTEREST_APP_ID</code>/<code>PINTEREST_APP_SECRET</code>/<code>PINTEREST_BOARD_ID</code> are set,
+        leave <code>PINTEREST_USE_SANDBOX</code> unset/false, redeploy, then hit
+        <a href="${siteUrl}/admin/test-pinterest?key=${adminKey}">/admin/test-pinterest</a>.
+      </div>`
+    : '';
+
   const html = `
     <div style="font-family:sans-serif; max-width:520px; margin:0 auto;">
       <h2 style="color:#0d3b3e;">Daily Posting Health Check</h2>
@@ -85,6 +101,7 @@ function buildEmail(summary) {
         <tbody>${rows}</tbody>
       </table>
       ${failureDetails ? `<div style="margin-top:16px; font-size:13px; color:#b3261e;">${failureDetails}</div>` : ''}
+      ${pinterestFix}
       <p style="margin-top:20px; font-size:12px; color:#999;">Full report: <a href="${process.env.SITE_URL || 'https://thefloridabuzz.com'}/admin/post-report?key=${process.env.ADMIN_PASSWORD || ''}">View live dashboard</a></p>
     </div>`;
 

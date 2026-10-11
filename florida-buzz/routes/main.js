@@ -828,14 +828,20 @@ router.get('/admin/pinterest-callback', async (req, res) => {
     }
     res.send(`
       <pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">
-Success! Update these two env vars in DigitalOcean, then redeploy:
+Success! Update these env vars in DigitalOcean App Platform, then redeploy:
 
 PINTEREST_ACCESS_TOKEN=${data.access_token}
 PINTEREST_REFRESH_TOKEN=${data.refresh_token}
 
+Also confirm these stay set (needed for auto-renew + posting):
+PINTEREST_APP_ID / PINTEREST_APP_SECRET / PINTEREST_BOARD_ID
+PINTEREST_USE_SANDBOX must be unset or false for the live board.
+
 (access_token expires in ~${Math.round((data.expires_in || 0) / 86400)} days, but once
-PINTEREST_REFRESH_TOKEN is set, the app will auto-renew the access token on
-its own going forward — you shouldn't need to do this again.)
+PINTEREST_REFRESH_TOKEN + APP_ID + APP_SECRET are set, the app auto-renews
+the access token each run — you shouldn't need to do this again.)
+
+After redeploy, verify with /admin/test-pinterest?key=...
       </pre>
     `);
   } catch (err) {
