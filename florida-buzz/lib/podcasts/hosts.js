@@ -11,9 +11,25 @@ const AFFILIATION_DISCLOSURE =
  */
 const HOST_STYLE = 'solo_energetic';
 
-/** Canonical Geno Option A named open (after the announcer bumper on intro_audio_url). */
+/**
+ * Canonical Geno Option A named open (after the announcer bumper on intro_audio_url).
+ * Square-bracket cues are ElevenLabs eleven_v3/eleven_v4 audio tags for TTS delivery.
+ */
 const GENO_NAMED_OPEN_OPTION_A =
-  "Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host bringing park news and real planning from The Florida Buzz. Not affiliated with Disney — just a fan who lives this stuff. Today we're locking in that park-day energy and cutting through the noise. Let's go.";
+  "[excited] Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host bringing park news and real planning from The Florida Buzz. [warmly] Not affiliated with Disney — just a fan who lives this stuff. Today we're locking in that park-day energy and cutting through the noise. Let's go.";
+
+/** Preferred ElevenLabs v3/v4 audio tags for solo Geno scripts (sparse–moderate use). */
+const ELEVENLABS_AUDIO_TAGS_GUIDANCE = `
+ElevenLabs audio tags (REQUIRED — sparse to moderate; eleven_v3 / eleven_v4 TTS):
+- Put ONE short square-bracket tag at the start of a spoken beat when delivery should shift: Geno: [tag] spoken text
+- Prefer these natural tags: [warmly], [excited], [chuckles], [laughs], [sighs], [conversational], [upbeat], [nostalgic]
+- Also fine when natural: [curious], [happy], [surprised], [thoughtful]
+- Named Open MUST keep Option A's [excited] / [warmly] cues (or equally warm equivalents)
+- Use tags on roughly every few lines / at emotional turns — NOT on every single line
+- HARD BAN stacking many tags on one line (no "[excited] [upbeat] [laughs] …")
+- HARD BAN inventing stage directions that are not auditory (no "[camera pans]", no "[smiles]")
+- Tags stay in the script text and are sent to ElevenLabs TTS — do not strip or spell them out as words
+`.trim();
 
 /** Stable host bible for script/outline generation. Preserve across episodes. */
 const HOST_BIBLE = `
@@ -45,6 +61,8 @@ Delivery style (active profile: ${HOST_STYLE})
 - FORBID tidy thesis → example → lesson beats and neat moral wraps after every anecdote
 - Still accurate on park facts from approved sources; energy never excuses inventing news
 
+${ELEVENLABS_AUDIO_TAGS_GUIDANCE}
+
 Episode open (required shape — HARD RULE)
 - Production cold open: announcer-only bumper is already on podcast_shows.intro_audio_url and is prepended in the audio pipeline — do NOT script the announcer bumper
 - REQUIRED first spoken Geno line(s) after that bumper = Geno Option A named open BEFORE any week/weather essay or topic hook:
@@ -69,5 +87,6 @@ module.exports = {
   HOST_STYLE,
   HOST_BIBLE,
   GENO_NAMED_OPEN_OPTION_A,
+  ELEVENLABS_AUDIO_TAGS_GUIDANCE,
   ensureShowNotesDisclosures,
 };

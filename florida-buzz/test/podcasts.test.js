@@ -303,10 +303,12 @@ test('show notes always receive unofficial affiliation disclosure', () => {
 
 test('assertScriptOpenShape requires Geno Option A named open', () => {
   const good = [
-    `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`,
-    'Geno: Quick hits first, then one deeper dive.',
+    `Geno: ${GENO_NAMED_OPEN_OPTION_A}`,
+    'Geno: [conversational] Quick hits first, then one deeper dive.',
   ].join('\n');
   assert.doesNotThrow(() => assertScriptOpenShape(good));
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /\[excited\]/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /\[warmly\]/i);
 
   const weatherColdOpen = [
     'Geno: Okay, how was your week? Rain everywhere and sandals were a mistake.',
@@ -364,6 +366,12 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /HARD BAN/i);
   assert.match(HOST_BIBLE, /Gena|Diane/);
   assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open|do NOT cold-open/i);
+  assert.match(HOST_BIBLE, /ElevenLabs audio tags/i);
+  assert.match(HOST_BIBLE, /\[warmly\]/);
+  assert.match(HOST_BIBLE, /\[excited\]/);
+  assert.match(HOST_BIBLE, /\[chuckles\]/);
+  assert.match(HOST_BIBLE, /\[nostalgic\]/);
+  assert.match(HOST_BIBLE, /sparse to moderate|sparse-to-moderate/i);
   const show = { title: 'Florida Buzz: Disney' };
   const episode = { title: 'Week in the parks', description: 'News and tips' };
   const sources = [
@@ -383,6 +391,7 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(outline.system, /I'm Geno|I\'m Geno/i);
   assert.match(outline.system, /welcome to Florida Buzz: Disney/i);
   assert.match(outline.system, /solo/i);
+  assert.match(outline.system, /ElevenLabs audio tags|audio tags/i);
   assert.doesNotMatch(outline.system, /Lead: Diane/);
   assert.match(outline.user, /solo Geno|Geno Option A/i);
   const conversation = buildConversationPrompt({
@@ -404,6 +413,11 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /I'm Geno|I\'m Geno/i);
   assert.match(conversation.system, /welcome to Florida Buzz: Disney/i);
   assert.match(conversation.system, /HARD BAN dual-host/i);
+  assert.match(conversation.system, /ElevenLabs audio tags/i);
+  assert.match(conversation.system, /\[warmly\]/);
+  assert.match(conversation.system, /\[chuckles\]/);
+  assert.match(conversation.system, /sparse-to-moderate|sparse to moderate/i);
+  assert.match(conversation.system, /Trailer-style expressiveness|audio tags so eleven_v4/i);
   assert.match(conversation.user, /quick hits \+ one deep dive/i);
   assert.match(outline.system, /ONE standalone episode/i);
   assert.match(outline.system, /Resource:/);
@@ -432,6 +446,8 @@ test('outline and conversation prompts require solo Geno structure', () => {
   assert.match(conversation.system, /Geno:/);
   assert.doesNotMatch(conversation.system, /Support host mostly short comments/);
   assert.match(HOST_BIBLE, /solo energetic/i);
+  assert.match(conversation.system, /\[excited\]/);
+  assert.match(conversation.system, /\[upbeat\]/);
 });
 
 test('conversation token budget supports a ~20–25 minute script', () => {
@@ -457,7 +473,7 @@ test('short AI scripts are rejected and continuations can append', async () => {
   assert.match(merged, /We start here/);
   assert.match(merged, /Magic Kingdom crowds/);
 
-  const namedOpen = `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`;
+  const namedOpen = `Geno: ${GENO_NAMED_OPEN_OPTION_A}`;
 
   let calls = 0;
   const aiText = {
@@ -465,9 +481,9 @@ test('short AI scripts are rejected and continuations can append', async () => {
       calls += 1;
       assert.ok(maxTokens >= 12000);
       if (calls === 1) {
-        return `${namedOpen}\n\nGeno: Short open only.`;
+        return `${namedOpen}\n\nGeno: [conversational] Short open only.`;
       }
-      return 'Geno: A little more but still not enough words overall.';
+      return 'Geno: [upbeat] A little more but still not enough words overall.';
     },
   };
   await assert.rejects(
@@ -490,7 +506,7 @@ test('continuation recovers a full-length script after a short first pass', asyn
     for (let i = 0; i < n; i += 1) words.push(`word${i}`);
     return `${label}: ${words.join(' ')}`;
   };
-  const namedOpen = `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`;
+  const namedOpen = `Geno: ${GENO_NAMED_OPEN_OPTION_A}`;
   let calls = 0;
   const aiText = {
     async generateText(_system, _user, maxTokens) {
@@ -524,6 +540,47 @@ test('script sections split for long episodes and strip Geno prefixes for TTS', 
   assert.match(formatScriptForTts(sections[0]), /Point number/i);
   assert.ok(sections[0].split('\n').length >= 2);
   assert.doesNotMatch(formatScriptForTts(sections[0]), /\n\n/);
+});
+
+test('formatScriptForTts and ElevenLabs client preserve emotion audio tags', async () => {
+  const tagged = [
+    `Geno: ${GENO_NAMED_OPEN_OPTION_A}`,
+    'Geno: [chuckles] Okay, this one is a classic park-day trap.',
+    'Geno: [nostalgic] Reminds me of our last Magic Kingdom morning.',
+    'Geno: [upbeat] Hit The Florida Buzz dot com for the planner.',
+  ].join('\n');
+  const formatted = formatScriptForTts(tagged);
+  assert.doesNotMatch(formatted, /^Geno:/m);
+  assert.match(formatted, /\[excited\]/);
+  assert.match(formatted, /\[warmly\]/);
+  assert.match(formatted, /\[chuckles\]/);
+  assert.match(formatted, /\[nostalgic\]/);
+  assert.match(formatted, /\[upbeat\]/);
+  assert.doesNotMatch(formatted, /Geno:/);
+
+  let capturedBody = null;
+  const cfg = config({
+    PODCASTS_GENERATION_ENABLED: 'true',
+    ELEVENLABS_API_KEY: 'sk_test',
+    PODCASTS_ELEVEN_VOICE_GENO: 'voice_geno_test',
+  });
+  const eleven = createElevenTts(cfg, async (_url, opts) => {
+    capturedBody = JSON.parse(opts.body);
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => 'req-test' },
+      arrayBuffer: async () => Buffer.from('fake-mp3'),
+    };
+  });
+  await eleven.synthesize(tagged);
+  assert.ok(capturedBody);
+  assert.match(capturedBody.text, /\[excited\]/);
+  assert.match(capturedBody.text, /\[warmly\]/);
+  assert.match(capturedBody.text, /\[chuckles\]/);
+  assert.match(capturedBody.text, /\[nostalgic\]/);
+  assert.doesNotMatch(capturedBody.text, /^Geno:/m);
+  assert.equal(capturedBody.model_id, cfg.elevenModel);
 });
 
 test('script sections prefer larger multi-turn packs and absorb tiny tails', () => {
@@ -782,8 +839,8 @@ test('generatePreview uses ElevenLabs solo path with section chunking and intro 
   for (let i = 0; i < 40; i += 1) {
     lines.push(
       i === 0
-        ? `Geno: [excited] ${GENO_NAMED_OPEN_OPTION_A}`
-        : `Geno: Quick hit ${i} with enough park talk about Magic Kingdom crowds, dining, and wait times to force multiple ElevenLabs sections eventually for chunking across a longer solo script.`
+        ? `Geno: ${GENO_NAMED_OPEN_OPTION_A}`
+        : `Geno: ${i % 5 === 0 ? '[upbeat] ' : ''}Quick hit ${i} with enough park talk about Magic Kingdom crowds, dining, and wait times to force multiple ElevenLabs sections eventually for chunking across a longer solo script.`
     );
   }
   const scriptText = lines.join('\n');

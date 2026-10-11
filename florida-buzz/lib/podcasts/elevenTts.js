@@ -3,6 +3,10 @@
 // Isolated ElevenLabs v4 solo TTS client for podcasts.
 // Never call when PODCASTS_GENERATION_ENABLED is not true.
 // Default production path: Geno Instant Voice Clone via text-to-speech.
+//
+// Audio tags: pass script text through with square-bracket cues intact
+// ([excited], [warmly], [chuckles], …). eleven_v3 / eleven_v4 read these as
+// delivery directions. Do NOT strip [...] before the API call.
 
 const { formatScriptForTts } = require('./script');
 const { pronunciationStyleInstructions } = require('./pronunciation');
@@ -11,6 +15,7 @@ const TTS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 
 function createElevenTts(cfg, fetcher = fetch) {
   function buildBody(text) {
+    // `text` must retain ElevenLabs audio tags; no bracket-stripping here.
     return {
       text,
       model_id: cfg.elevenModel,
@@ -28,6 +33,7 @@ function createElevenTts(cfg, fetcher = fetch) {
     if (!cfg.generation) throw new Error('Podcast audio generation is disabled');
     if (!cfg.elevenApiKey) throw new Error('ELEVENLABS_API_KEY is required for podcast TTS');
     if (!cfg.elevenVoiceGeno) throw new Error('PODCASTS_ELEVEN_VOICE_GENO is required');
+    // Preserve [audio tags] verbatim — only trim outer whitespace.
     const trimmed = String(text || '').trim();
     if (!trimmed) throw new Error('ElevenLabs TTS text is empty');
 
