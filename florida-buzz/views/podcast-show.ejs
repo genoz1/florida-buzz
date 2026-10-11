@@ -36,34 +36,44 @@
           <%= latest.published_at ? new Date(latest.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' %>
           <% if (latest.duration_seconds) { %> · <%= Math.round(latest.duration_seconds / 60) %> min<% } %>
         </p>
+        <p><%= latest.description %></p>
         <%- include('partials/podcast-player', { audioUrl: latest.audio_url }) %>
       </section>
     <% } %>
 
-    <section class="podcast-episode-list">
-      <h2>Episodes</h2>
+    <section class="podcast-episode-list" id="episode-archive">
+      <h2>Episode archive<% if (episodes && episodes.length) { %> <span class="podcast-meta">(<%= episodes.length %>)</span><% } %></h2>
       <% if (!episodes || !episodes.length) { %>
         <p class="podcast-empty">No published episodes yet.</p>
       <% } else { %>
+        <p class="podcast-meta" style="margin-bottom:12px;">Every published episode, newest first — including the trailer and prior weeks.</p>
         <ul>
           <% episodes.forEach(ep => { %>
-            <li class="podcast-episode-row">
+            <li class="podcast-episode-row<%= latest && ep.id === latest.id ? ' is-latest' : '' %>">
               <div class="podcast-episode-row-art">
                 <img src="<%= ep.artwork_url || show.cover_url || '/img/podcasts/florida-buzz-disney-cover.jpg' %>" alt="<%= ep.artwork_alt || ep.title %>" width="96" height="96" loading="lazy">
               </div>
               <div class="podcast-episode-row-body">
-                <h3><a href="/podcasts/<%= show.slug %>/<%= ep.slug %>"><%= ep.title %></a></h3>
+                <h3>
+                  <a href="/podcasts/<%= show.slug %>/<%= ep.slug %>"><%= ep.title %></a>
+                  <% if (latest && ep.id === latest.id) { %><span class="podcast-badge">Latest</span><% } %>
+                </h3>
                 <p class="podcast-meta">
                   <% if (ep.episode_number) { %>Episode <%= ep.episode_number %> · <% } %>
                   <%= ep.published_at ? new Date(ep.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' %>
                   <% if (ep.duration_seconds) { %> · <%= Math.round(ep.duration_seconds / 60) %> min<% } %>
                 </p>
                 <p><%= ep.description %></p>
-                <%- include('partials/podcast-player', { audioUrl: ep.audio_url }) %>
+                <% if (ep.audio_url) { %>
+                  <%- include('partials/podcast-player', { audioUrl: ep.audio_url }) %>
+                <% } %>
               </div>
             </li>
           <% }) %>
         </ul>
+        <% if (previousEpisodes && previousEpisodes.length === 0 && episodes.length === 1) { %>
+          <p class="podcast-empty">More episodes will appear here as new shows are published.</p>
+        <% } %>
       <% } %>
     </section>
   </article>

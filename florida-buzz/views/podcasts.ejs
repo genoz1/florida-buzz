@@ -26,14 +26,34 @@
             <p><%= card.show.description %></p>
             <p class="podcast-disclosure"><%= card.show.disclosure %></p>
             <% if (card.latest && card.latest.audio_url) { %>
-              <p class="podcast-latest-label">Listen to the latest episode</p>
+              <p class="podcast-latest-label">Latest episode<% if (card.episodeCount > 1) { %> · <%= card.episodeCount %> published<% } %></p>
               <p class="podcast-latest-title"><a href="/podcasts/<%= card.show.slug %>/<%= card.latest.slug %>"><%= card.latest.title %></a></p>
               <%- include('partials/podcast-player', { audioUrl: card.latest.audio_url }) %>
             <% } else { %>
               <p class="podcast-empty">No published episodes yet.</p>
             <% } %>
+
+            <% if (card.recent && card.recent.length > 1) { %>
+              <div class="podcast-directory-archive">
+                <p class="podcast-latest-label">Episode archive</p>
+                <ul>
+                  <% card.recent.forEach(ep => { %>
+                    <li>
+                      <a href="/podcasts/<%= card.show.slug %>/<%= ep.slug %>"><%= ep.title %></a>
+                      <% if (ep.published_at) { %>
+                        <span class="podcast-meta"><%= new Date(ep.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></span>
+                      <% } %>
+                    </li>
+                  <% }) %>
+                </ul>
+                <% if (card.episodeCount > card.recent.length) { %>
+                  <p class="podcast-meta"><a href="/podcasts/<%= card.show.slug %>">See all <%= card.episodeCount %> episodes →</a></p>
+                <% } %>
+              </div>
+            <% } %>
+
             <p class="podcast-links">
-              <a class="btn" href="/podcasts/<%= card.show.slug %>">Show page</a>
+              <a class="btn" href="/podcasts/<%= card.show.slug %>">Show page &amp; full archive</a>
               <a class="btn btn-outline" href="/podcasts/<%= card.show.slug %>/rss.xml">RSS feed</a>
             </p>
           </div>

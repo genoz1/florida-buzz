@@ -329,14 +329,17 @@ async function getArticles({ category, city, limit, evergreenOnly, excludeEvergr
 }
 
 router.get('/', async (req, res) => {
-  const all = await getArticles({ limit: 30 });
-  const featured = all[0];
-  const secondary = all.slice(1, 4);
+  // News feed excludes evergreen guides so the homepage can showcase guides separately.
+  const news = await getArticles({ excludeEvergreen: true, limit: 30 });
+  const tickerPool = await getArticles({ limit: 8 });
+  const featured = news[0];
+  const secondary = news.slice(1, 4);
+  const guides = (await getArticles({ evergreenOnly: true, author: 'Gene Zentko', limit: 6 })).slice(0, 3);
 
   const byCategory = {};
   await Promise.all(
     CATEGORY_ORDER.map(async (cat) => {
-      const categoryArticles = await getArticles({ category: cat, limit: 6 });
+      const categoryArticles = await getArticles({ category: cat, excludeEvergreen: true, limit: 6 });
       // Exclude anything already shown in the featured/secondary slots above,
       // so the same article doesn't appear twice on the homepage.
       const usedSlugs = new Set([featured, ...secondary].filter(Boolean).map((a) => a.slug));
@@ -344,11 +347,61 @@ router.get('/', async (req, res) => {
     })
   );
 
+  let podcastShow = null;
+  let podcastLatest = null;
+  let podcastRecent = [];
+  try {
+    const podcasts = require('../lib/podcasts');
+    if (podcasts.config(process.env).enabled !== false) {
+      const { store } = podcasts.production(process.env);
+      podcastShow = await store.getShow(podcasts.config(process.env).defaultShowSlug || 'florida-buzz-disney');
+      if (podcastShow) {
+        const published = await store.listPublishedEpisodes(podcastShow.id);
+        podcastLatest = published[0] || null;
+        podcastRecent = published.slice(0, 5);
+      }
+    }
+  } catch (err) {
+    console.error('[home] podcast section skipped:', err.message);
+  }
+
+  const tools = [
+    {
+      href: '/wait-times',
+      kicker: 'Live',
+      title: 'Wait times',
+      blurb: 'Disney World & Universal ride waits, updated every few minutes.',
+    },
+    {
+      href: '/planner',
+      kicker: 'Plan',
+      title: 'Day planner',
+      blurb: 'Build a park day around what matters for your group.',
+    },
+    {
+      href: '/dining',
+      kicker: 'Eat',
+      title: 'Dining guides',
+      blurb: 'Filterable restaurant directories for Disney & Universal parks.',
+    },
+    {
+      href: '/buzz',
+      kicker: 'Talk',
+      title: 'Buzz Board',
+      blurb: 'Ask questions and share Florida park & travel tips with readers.',
+    },
+  ];
+
   res.render('home', {
     featured,
     secondary,
     byCategory,
-    ticker: all.slice(0, 8),
+    guides,
+    tools,
+    podcastShow,
+    podcastLatest,
+    podcastRecent,
+    ticker: tickerPool,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
     thumbUrl,

@@ -1,24 +1,118 @@
-<%- include('partials/header', { pageTitle: 'The Florida Buzz — Florida Theme Parks, Beaches, Space & More', category: null, tickerItems: ticker, canonicalPath: '/' }) %>
+<%- include('partials/header', { pageTitle: 'The Florida Buzz — Florida Theme Parks, Beaches, Space & More', pageDescription: 'Florida travel news, original guides by Gene Zentko, Disney planning tools, and the Florida Buzz: Disney podcast hosted by Geno.', category: null, tickerItems: ticker, canonicalPath: '/' }) %>
+<%# Previous news-feed layout saved at views/home-news-feed-backup.ejs — see docs/homepage-restore.md %>
+<link rel="stylesheet" href="/css/podcasts.css">
 
 <main class="wrap">
 
-  <% if (featured) { %>
-  <section class="hero">
-    <a href="/article/<%= featured.slug %>" class="hero-image">
-      <img src="<%= featured.image_url || placeholderImg(featured.category) %>" alt="<%= featured.title %>" width="800" height="600" loading="eager" onerror="this.onerror=null;this.src='<%= placeholderImg(featured.category) %>';">
-    </a>
-    <div>
-      <span class="eyebrow"><%= categoryLabels[featured.category] %></span>
-      <a href="/article/<%= featured.slug %>"><h1><%= featured.title %></h1></a>
-      <p class="dek"><%= featured.dek %></p>
-      <p class="byline">Sourced from <%= featured.source_name %> &middot; <%= timeAgo(featured.published_at) %></p>
+  <section class="home-intro">
+    <p class="eyebrow">The Florida Buzz</p>
+    <h1 class="home-intro-title">Florida news, planning tools, and original guides</h1>
+    <p class="home-intro-dek">Timely Sunshine State updates plus practical Disney tools, Gene Zentko’s evergreen guides, the Buzz Board, and Geno’s Florida Buzz: Disney podcast.</p>
+  </section>
+
+  <section class="section home-tools">
+    <div class="section-head">
+      <span class="section-title">Planning tools</span>
+      <a href="/wait-times">Open wait times &rarr;</a>
+    </div>
+    <div class="home-tools-grid">
+      <% tools.forEach(tool => { %>
+        <a class="home-tool-card" href="<%= tool.href %>">
+          <span class="home-tool-kicker"><%= tool.kicker %></span>
+          <strong><%= tool.title %></strong>
+          <span><%= tool.blurb %></span>
+        </a>
+      <% }) %>
+    </div>
+  </section>
+
+  <% if (guides && guides.length) { %>
+  <section class="section home-guides">
+    <div class="section-head">
+      <span class="section-title">Original guides</span>
+      <a href="/guides">All guides &rarr;</a>
+    </div>
+    <p class="home-section-lede">In-depth Florida planning pages researched and bylined by <a href="/gene-zentko">Gene Zentko</a>.</p>
+    <div class="grid">
+      <% guides.forEach(g => { %>
+        <a href="/article/<%= g.slug %>" class="card">
+          <div class="card-image"><img src="<%= thumbUrl(g.image_url) || placeholderImg(g.category) %>" alt="<%= g.title %>" width="480" height="300" loading="lazy" onerror="this.onerror=null;this.src='<%= placeholderImg(g.category) %>';"></div>
+          <span class="tag"><%= categoryLabels[g.category] || 'Guide' %></span>
+          <h3><%= g.title %></h3>
+          <p class="dek-sm"><%= g.dek %></p>
+          <p class="byline">By Gene Zentko</p>
+        </a>
+      <% }) %>
     </div>
   </section>
   <% } %>
 
-  <% if (secondary && secondary.length) { %>
-  <section class="section">
-    <div class="grid">
+  <% if (podcastShow) { %>
+  <section class="section home-podcast">
+    <div class="section-head">
+      <span class="section-title">Podcast</span>
+      <a href="/podcasts/<%= podcastShow.slug %>">Show &amp; episode archive &rarr;</a>
+    </div>
+    <div class="home-podcast-panel">
+      <a class="home-podcast-art" href="/podcasts/<%= podcastShow.slug %>">
+        <img src="<%= podcastShow.cover_url || '/img/podcasts/florida-buzz-disney-cover.jpg' %>" alt="<%= podcastShow.cover_alt || (podcastShow.title + ' cover art') %>" width="220" height="220" loading="lazy">
+      </a>
+      <div>
+        <p class="eyebrow">Hosted by Geno</p>
+        <h2 class="home-podcast-title"><a href="/podcasts/<%= podcastShow.slug %>"><%= podcastShow.title %></a></h2>
+        <p class="home-section-lede"><%= podcastShow.description %></p>
+        <% if (podcastLatest) { %>
+          <p class="podcast-latest-label">Latest episode</p>
+          <p class="home-podcast-ep"><a href="/podcasts/<%= podcastShow.slug %>/<%= podcastLatest.slug %>"><%= podcastLatest.title %></a></p>
+          <% if (podcastLatest.audio_url) { %>
+            <%- include('partials/podcast-player', { audioUrl: podcastLatest.audio_url }) %>
+          <% } %>
+        <% } %>
+        <% if (podcastRecent && podcastRecent.length) { %>
+          <p class="podcast-latest-label" style="margin-top:18px;">Recent episodes</p>
+          <ul class="home-podcast-archive">
+            <% podcastRecent.forEach(ep => { %>
+              <li>
+                <a href="/podcasts/<%= podcastShow.slug %>/<%= ep.slug %>"><%= ep.title %></a>
+                <% if (ep.published_at) { %>
+                  <span class="byline"><%= new Date(ep.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %></span>
+                <% } %>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+        <p class="podcast-links" style="margin-top:16px;">
+          <a class="btn" href="/podcasts/<%= podcastShow.slug %>">Browse all episodes</a>
+          <a class="btn btn-outline" href="/podcasts">Podcast directory</a>
+        </p>
+      </div>
+    </div>
+  </section>
+  <% } %>
+
+  <section class="section home-news">
+    <div class="section-head">
+      <span class="section-title">Latest Florida news</span>
+      <a href="/category/theme-parks">Browse topics &rarr;</a>
+    </div>
+    <p class="home-section-lede">Short, timely updates — each one should point you back to our guides and tools when you need the deeper plan.</p>
+
+    <% if (featured) { %>
+    <section class="hero home-news-hero">
+      <a href="/article/<%= featured.slug %>" class="hero-image">
+        <img src="<%= featured.image_url || placeholderImg(featured.category) %>" alt="<%= featured.title %>" width="800" height="600" loading="eager" onerror="this.onerror=null;this.src='<%= placeholderImg(featured.category) %>';">
+      </a>
+      <div>
+        <span class="eyebrow"><%= categoryLabels[featured.category] %></span>
+        <a href="/article/<%= featured.slug %>"><h2 class="home-news-feature-title"><%= featured.title %></h2></a>
+        <p class="dek"><%= featured.dek %></p>
+        <p class="byline">Sourced from <%= featured.source_name %> &middot; <%= timeAgo(featured.published_at) %></p>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (secondary && secondary.length) { %>
+    <div class="grid" style="margin-top:28px;">
       <% secondary.forEach(a => { %>
         <a href="/article/<%= a.slug %>" class="card">
           <div class="card-image"><img src="<%= thumbUrl(a.image_url) || placeholderImg(a.category) %>" alt="<%= a.title %>" width="480" height="300" loading="lazy" onerror="this.onerror=null;this.src='<%= placeholderImg(a.category) %>';"></div>
@@ -28,18 +122,7 @@
         </a>
       <% }) %>
     </div>
-  </section>
-  <% } %>
-
-  <section class="section" style="padding-top:0;">
-    <a href="/wait-times" style="display:flex; align-items:center; justify-content:space-between; gap:16px; background:var(--teal-900); color:#fff; border-radius:12px; padding:20px 24px; text-decoration:none; flex-wrap:wrap;">
-      <div>
-        <span style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#ffb37a;">🎢 Live Right Now</span>
-        <div style="font-family:var(--font-display); font-size:22px; margin-top:4px;">Check Current Disney &amp; Universal Wait Times</div>
-        <p style="color:#c9dedd; font-size:14px; margin-top:4px;">Real-time ride waits for all 7 major Orlando parks, updated every few minutes.</p>
-      </div>
-      <span style="background:#fff; color:var(--teal-900); font-weight:700; padding:10px 20px; border-radius:24px; white-space:nowrap;">View Wait Times →</span>
-    </a>
+    <% } %>
   </section>
 
   <% Object.keys(byCategory).forEach(cat => { %>

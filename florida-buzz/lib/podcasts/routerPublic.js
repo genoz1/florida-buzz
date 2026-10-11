@@ -14,7 +14,12 @@ function createPublicRouter({ store, cfg }) {
       const cards = [];
       for (const show of shows) {
         const episodes = await store.listPublishedEpisodes(show.id);
-        cards.push({ show, latest: episodes[0] || null, episodeCount: episodes.length });
+        cards.push({
+          show,
+          latest: episodes[0] || null,
+          recent: episodes.slice(0, 8),
+          episodeCount: episodes.length,
+        });
       }
       res.render('podcasts', {
         pageTitle: 'Podcasts — The Florida Buzz',
@@ -50,6 +55,10 @@ function createPublicRouter({ store, cfg }) {
       if (!show) return res.status(404).render('404');
       const episodes = await store.listPublishedEpisodes(show.id);
       const links = await store.listPlatformLinks(show.id);
+      const latest = episodes[0] || null;
+      // Full archive stays visible under Latest — past episodes (trailer, prior weeks)
+      // must not disappear just because a newer episode is featured.
+      const previousEpisodes = episodes.slice(1);
       res.render('podcast-show', {
         pageTitle: `${show.title} — The Florida Buzz`,
         pageDescription: show.description,
@@ -60,8 +69,9 @@ function createPublicRouter({ store, cfg }) {
         pageImage: show.cover_url && show.cover_url.startsWith('http') ? show.cover_url : `${cfg.site}${show.cover_url || ''}`,
         show,
         episodes,
+        previousEpisodes,
         links,
-        latest: episodes[0] || null,
+        latest,
         siteUrl: cfg.site,
         rssPath: `/podcasts/${show.slug}/rss.xml`,
       });

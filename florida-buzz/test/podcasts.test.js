@@ -968,6 +968,22 @@ test('public player renders for published episodes and hides drafts', async () =
   });
   await store.updateEpisode(draft.id, { audio_url: 'https://cdn.example.com/hidden.mp3' });
 
+  const trailer = await store.createEpisode(show.id, {
+    title: 'Show Trailer',
+    description: 'trailer desc',
+    slug: 'trailer-archive',
+    show_notes_html: '<p>Trailer</p>',
+    episode_number: 0,
+  });
+  await store.updateEpisode(trailer.id, {
+    status: 'approved',
+    audio_url: 'https://cdn.example.com/trailer.mp3',
+    audio_byte_size: 1024,
+    duration_seconds: 90,
+    published_at: '2026-10-01T12:00:00.000Z',
+  });
+  await store.setStatus(trailer.id, 'published');
+
   const live = await store.createEpisode(show.id, {
     title: 'Live Episode',
     description: 'live desc',
@@ -980,6 +996,7 @@ test('public player renders for published episodes and hides drafts', async () =
     audio_url: 'https://cdn.example.com/live.mp3',
     audio_byte_size: 2048,
     duration_seconds: 60,
+    published_at: '2026-10-11T12:00:00.000Z',
   });
   await store.setStatus(live.id, 'published');
 
@@ -994,10 +1011,19 @@ test('public player renders for published episodes and hides drafts', async () =
     const showPage = await request(port, 'GET', '/podcasts/florida-buzz-disney');
     assert.equal(showPage.status, 200);
     assert.match(showPage.body, /Live Episode/);
+    assert.match(showPage.body, /Show Trailer/);
+    assert.match(showPage.body, /Episode archive/);
     assert.match(showPage.body, /<audio controls/);
     assert.match(showPage.body, /cdn\.example\.com\/live\.mp3/);
+    assert.match(showPage.body, /cdn\.example\.com\/trailer\.mp3/);
     assert.doesNotMatch(showPage.body, /Hidden Draft/);
     assert.match(showPage.body, /unofficial fan podcast/i);
+
+    const directory = await request(port, 'GET', '/podcasts');
+    assert.equal(directory.status, 200);
+    assert.match(directory.body, /Episode archive/);
+    assert.match(directory.body, /Live Episode/);
+    assert.match(directory.body, /Show Trailer/);
 
     const draftPage = await request(port, 'GET', '/podcasts/florida-buzz-disney/hidden-draft');
     assert.equal(draftPage.status, 404);
