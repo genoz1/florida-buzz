@@ -7,8 +7,10 @@ const {
   CJ_EVERGREEN_BASE,
   undercoverTouristUrl,
   undercoverTouristTrackedUrl,
+  undercoverTouristSitePath,
   partnerShowNotesHtml,
   partnerDescriptionBlurb,
+  rewritePartnerDescriptionLink,
 } = require('../lib/affiliates/undercoverTourist');
 
 test('undercoverTouristUrl uses CJ evergreen base with Disney destination by default', () => {
@@ -28,17 +30,28 @@ test('undercoverTouristUrl uses UNDERCOVER_TOURIST_LINK base when set', () => {
   assert.match(url, /^https:\/\/www\.jdoqocy\.com\/click-custom-base\?url=/);
 });
 
-test('partner show notes and description include disclosure + tracked link', () => {
+test('partner show notes and description use short /go/undercover link', () => {
   const html = partnerShowNotesHtml({});
   assert.match(html, /Undercover Tourist/);
   assert.match(html, /nofollow sponsored/);
   assert.match(html, /commission/i);
-  assert.match(html, /jdoqocy\.com\/click-101851476-15733832/);
+  assert.match(html, /thefloridabuzz\.com\/go\/undercover/);
+  assert.doesNotMatch(html, /jdoqocy\.com/);
 
   const blurb = partnerDescriptionBlurb({});
   assert.match(blurb, /Undercover Tourist/);
-  assert.match(blurb, /jdoqocy\.com\/click-101851476-15733832/);
+  assert.match(blurb, /thefloridabuzz\.com\/go\/undercover/);
+  assert.doesNotMatch(blurb, /jdoqocy\.com/);
   assert.match(blurb, /commission|partner/i);
+  assert.equal(undercoverTouristSitePath('https://thefloridabuzz.com'), 'https://thefloridabuzz.com/go/undercover');
+});
+
+test('rewritePartnerDescriptionLink replaces raw CJ UCT URLs', () => {
+  const raw =
+    'Geno covers parks. Partner: Undercover Tourist for Disney tickets & hotels — https://www.jdoqocy.com/click-101851476-15733832?url=https%3A%2F%2Fwww.undercovertourist.com%2Fdisney%2F. Undercover Tourist is a Florida Buzz partner.';
+  const fixed = rewritePartnerDescriptionLink(raw);
+  assert.match(fixed, /thefloridabuzz\.com\/go\/undercover/);
+  assert.doesNotMatch(fixed, /jdoqocy\.com/);
 });
 
 test('undercoverTouristTrackedUrl can prefer ready URL or deep-link by key', () => {

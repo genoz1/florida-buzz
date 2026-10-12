@@ -300,7 +300,7 @@ test('show notes always receive affiliation disclosure', () => {
   assert.doesNotMatch(withAffiliation, /unofficial/i);
   assert.doesNotMatch(withAffiliation, /AI-generated hosts/i);
   assert.match(withAffiliation, /Undercover Tourist/i);
-  assert.match(withAffiliation, /jdoqocy\.com\/click-101851476-15733832/);
+  assert.match(withAffiliation, /thefloridabuzz\.com\/go\/undercover/);
   assert.equal(ensureShowNotesDisclosures(withAffiliation), withAffiliation);
 });
 
