@@ -15,8 +15,9 @@
  * FB_PARK_REEL_PUBLISH=true and a publicly reachable HTTPS MP4 URL.
  *
  * Env:
- *   FB_PARK_REEL_ENABLED=true          schedule 10:30am + 7:00pm ET (+ catch-up)
+ *   FB_PARK_REEL_ENABLED=true          schedule 10:30am tip + 7:00pm Disney news (+ catch-up)
  *   FB_PARK_REEL_PUBLISH=true          actually call Facebook video API
+ *   FB_PARK_REEL_MODE=tip|disney-news  morning tip/guide vs evening Disney news
  *   FB_PARK_REEL_WITH_VOICE=false      disable VO (default: on when key set)
  *   ELEVENLABS_API_KEY                 Geno VO via visualNews/elevenTts
  *   PODCASTS_ELEVEN_VOICE_GENO         optional override (default Geno clone)
@@ -39,15 +40,44 @@ const {
 
 /**
  * Daily park Reel slots in America/New_York (must match server.js crons).
+ * Morning = theme-park tip/guide; evening = Disney news.
  * Catch-up expects one success per slot that has already passed today.
  */
+const PARK_REEL_MODE_TIP = 'tip';
+const PARK_REEL_MODE_DISNEY_NEWS = 'disney-news';
 const PARK_REEL_SLOTS_ET = Object.freeze([
-  { id: 'morning', hour: 10, minute: 30, label: '10:30am' },
-  { id: 'evening', hour: 19, minute: 0, label: '7:00pm' },
+  {
+    id: 'morning',
+    hour: 10,
+    minute: 30,
+    label: '10:30am tip',
+    mode: PARK_REEL_MODE_TIP,
+  },
+  {
+    id: 'evening',
+    hour: 19,
+    minute: 0,
+    label: '7:00pm Disney news',
+    mode: PARK_REEL_MODE_DISNEY_NEWS,
+  },
 ]);
 /** @deprecated use PARK_REEL_SLOTS_ET[0] — kept for older tests/imports */
 const PARK_REEL_ET_HOUR = PARK_REEL_SLOTS_ET[0].hour;
 const PARK_REEL_ET_MINUTE = PARK_REEL_SLOTS_ET[0].minute;
+
+function normalizeParkReelMode(raw) {
+  const m = String(raw || PARK_REEL_MODE_TIP).trim().toLowerCase();
+  if (
+    m === PARK_REEL_MODE_DISNEY_NEWS
+    || m === 'disney_news'
+    || m === 'disney'
+    || m === 'news'
+    || m === 'evening'
+  ) {
+    return PARK_REEL_MODE_DISNEY_NEWS;
+  }
+  return PARK_REEL_MODE_TIP;
+}
 
 const ROOT = path.join(__dirname, '..');
 
@@ -159,22 +189,43 @@ function isTipsOrGuideContent(article = {}) {
   return /\b(tips?|tricks?|how[\s-]?to|guide|hack|planning|itinerary|etiquette)\b/.test(hay);
 }
 
-/** Higher = better for discovery Reels (tips/guides first, then tippy news). */
-function scoreParkReelCandidate(article = {}) {
-  let score = 0;
-  if (article.is_evergreen === true) score += 100;
+function isDisneyBrandArticle(article = {}) {
+  const id = parkBrandFromArticle(article).id;
+  return id === 'disney' || id === 'disney-cruise';
+}
+
+/**
+ * Higher = better for the active Reel mode.
+ * tip → guides/tips first; disney-news → recent non-evergreen Disney stories.
+ */
+function scoreParkReelCandidate(article = {}, mode = PARK_REEL_MODE_TIP) {
+  const normalized = normalizeParkReelMode(mode);
   const hay = [
     article.slug,
     article.title,
     article.dek,
     article.fb_caption,
   ].filter(Boolean).join(' ').toLowerCase();
+  const cat = String(article.category || '').toLowerCase();
+
+  if (normalized === PARK_REEL_MODE_DISNEY_NEWS) {
+    let score = 0;
+    if (!isDisneyBrandArticle(article)) return -1000;
+    score += 100;
+    if (article.is_evergreen === true) score -= 90;
+    if (isTipsOrGuideContent(article)) score -= 25;
+    if (cat === 'theme-parks') score += 10;
+    if (cat === 'cruises') score += 6;
+    if (/\b(announc|debut|opens?|new|breaking|update|reveal)\b/.test(hay)) score += 15;
+    return score;
+  }
+
+  let score = 0;
+  if (article.is_evergreen === true) score += 100;
   if (/\btips?\b/.test(hay)) score += 50;
   if (/\btricks?\b/.test(hay)) score += 40;
   if (/\bguide\b/.test(hay)) score += 35;
   if (/\b(how[\s-]?to|hack|planning|itinerary|etiquette)\b/.test(hay)) score += 25;
-  // Prefer park categories slightly over keyword-only matches.
-  const cat = String(article.category || '').toLowerCase();
   if (cat === 'theme-parks') score += 10;
   if (cat === 'cruises') score += 8;
   return score;
@@ -254,20 +305,30 @@ function parkBrandFromArticle(article = {}) {
   return { id: 'theme-park', label: 'theme park' };
 }
 
-/** Cold open: "Here's another Disney tip from The Florida Buzz." */
-function parkReelSpokenOpener(article = {}) {
+/**
+ * Cold open by mode:
+ * tip → "Here's another Disney tip from The Florida Buzz."
+ * disney-news → "Here's the latest Disney news from The Florida Buzz."
+ */
+function parkReelSpokenOpener(article = {}, mode = PARK_REEL_MODE_TIP) {
+  if (normalizeParkReelMode(mode) === PARK_REEL_MODE_DISNEY_NEWS) {
+    return 'Here\'s the latest Disney news from The Florida Buzz.';
+  }
   const { label } = parkBrandFromArticle(article);
   return `Here's another ${label} tip from The Florida Buzz.`;
 }
 
-function spokenScriptFromArticle(article) {
+function spokenScriptFromArticle(article, mode = PARK_REEL_MODE_TIP) {
   if (article?.spoken) return ensureSiteCtaSpoken(article.spoken);
   const title = String(article?.title || 'Florida theme parks').trim();
   const dek = String(article?.dek || '').trim();
-  const tip = dek || 'Worth knowing before your next park day.';
-  const opener = parkReelSpokenOpener(article);
-  // Park named first, then the tip — mute-friendly captions follow this script.
-  return ensureSiteCtaSpoken(`[curious] ${opener} ${title}. ${tip}`);
+  const body = dek || (
+    normalizeParkReelMode(mode) === PARK_REEL_MODE_DISNEY_NEWS
+      ? 'Here is what park fans need to know.'
+      : 'Worth knowing before your next park day.'
+  );
+  const opener = parkReelSpokenOpener(article, mode);
+  return ensureSiteCtaSpoken(`[curious] ${opener} ${title}. ${body}`);
 }
 
 // Mute-friendly full-script captions: complete phrases, never keyword hooks.
@@ -425,8 +486,8 @@ function captionBeatsFromSpoken(spoken, durationSec) {
 }
 
 /** Legacy silent-path captions (kept for tests / FB_PARK_REEL_WITH_VOICE=false). */
-function captionBeatsFromArticle(article, durationSec) {
-  return captionBeatsFromSpoken(spokenScriptFromArticle(article), durationSec);
+function captionBeatsFromArticle(article, durationSec, mode = PARK_REEL_MODE_TIP) {
+  return captionBeatsFromSpoken(spokenScriptFromArticle(article, mode), durationSec);
 }
 
 function scaleCaptionBeats(captions, durationSec) {
@@ -581,11 +642,19 @@ function allowedParkReelCandidate(row) {
   }).ok;
 }
 
-function rankParkReelCandidates(candidates, usedSlugs = new Set()) {
+function slugFromParkReelLogDetail(detail) {
+  const raw = String(detail || '');
+  const typed = raw.match(/^park-reel:(?:tip|disney-news):(.+)$/i);
+  if (typed) return typed[1];
+  return raw.replace(/^park-reel:/i, '');
+}
+
+function rankParkReelCandidates(candidates, usedSlugs = new Set(), mode = PARK_REEL_MODE_TIP) {
+  const normalized = normalizeParkReelMode(mode);
   const scored = (candidates || []).map((row) => ({
     row,
     used: usedSlugs.has(row.slug),
-    score: scoreParkReelCandidate(row),
+    score: scoreParkReelCandidate(row, normalized),
     publishedAt: Date.parse(row.published_at || '') || 0,
   }));
   scored.sort((a, b) => {
@@ -596,13 +665,32 @@ function rankParkReelCandidates(candidates, usedSlugs = new Set()) {
   return scored.map((entry) => entry.row);
 }
 
+function filterCandidatesForMode(candidates, mode = PARK_REEL_MODE_TIP) {
+  const normalized = normalizeParkReelMode(mode);
+  const list = candidates || [];
+  if (normalized === PARK_REEL_MODE_DISNEY_NEWS) {
+    const disneyNews = list.filter(
+      (row) => isDisneyBrandArticle(row) && row.is_evergreen !== true
+    );
+    if (disneyNews.length) return disneyNews;
+    const anyDisney = list.filter((row) => isDisneyBrandArticle(row));
+    return anyDisney.length ? anyDisney : list;
+  }
+  const tips = list.filter((row) => isTipsOrGuideContent(row));
+  return tips.length ? tips : list;
+}
+
 /**
- * Prefer theme-park / cruise **guides** (evergreen) and tips/tricks posts with
- * an image. Falls back to other allowlisted park/cruise articles. Skips slugs
- * already used for a park Reel when post_log is available.
+ * tip mode: theme-park/cruise guides + tips/tricks.
+ * disney-news mode: recent non-evergreen Disney stories.
+ * Skips slugs already used for a park Reel when post_log is available.
  */
-async function pickParkCruiseArticle(client, { limit = 80 } = {}) {
+async function pickParkCruiseArticle(client, {
+  limit = 80,
+  mode = PARK_REEL_MODE_TIP,
+} = {}) {
   if (!client) throw new Error('Supabase client required to pick a park Reel article');
+  const normalized = normalizeParkReelMode(mode);
   const select = 'id, slug, title, dek, category, image_url, fb_caption, published_at, is_evergreen';
 
   const [recentRes, guidesRes] = await Promise.all([
@@ -629,10 +717,17 @@ async function pickParkCruiseArticle(client, { limit = 80 } = {}) {
   }
 
   const bySlug = new Map();
-  for (const row of [...(guidesRes.data || []), ...(recentRes.data || [])]) {
+  // Tip mode leans on guides; news mode prefers the recent (non-evergreen) pool first.
+  const mergeOrder = normalized === PARK_REEL_MODE_DISNEY_NEWS
+    ? [...(recentRes.data || []), ...(guidesRes.data || [])]
+    : [...(guidesRes.data || []), ...(recentRes.data || [])];
+  for (const row of mergeOrder) {
     if (!bySlug.has(row.slug)) bySlug.set(row.slug, row);
   }
-  const candidates = [...bySlug.values()].filter(allowedParkReelCandidate);
+  const candidates = filterCandidatesForMode(
+    [...bySlug.values()].filter(allowedParkReelCandidate),
+    normalized
+  );
   if (!candidates.length) return null;
 
   let used = new Set();
@@ -644,21 +739,23 @@ async function pickParkCruiseArticle(client, { limit = 80 } = {}) {
       .eq('status', 'success')
       .like('detail', 'park-reel:%')
       .limit(200);
-    used = new Set((logs || []).map((row) => String(row.detail || '').replace(/^park-reel:/, '')));
+    used = new Set((logs || []).map((row) => slugFromParkReelLogDetail(row.detail)));
   } catch {
     used = new Set();
   }
 
-  const ranked = rankParkReelCandidates(candidates, used);
+  const ranked = rankParkReelCandidates(candidates, used, normalized);
   return ranked[0] || null;
 }
 
-function buildReelCaption(article) {
+function buildReelCaption(article, mode = PARK_REEL_MODE_TIP) {
   const base = toFacebookFeedCaption(
     article.fb_caption || `${article.title}. ${article.dek || ''}`.trim()
   );
+  if (normalizeParkReelMode(mode) === PARK_REEL_MODE_DISNEY_NEWS) {
+    return `${base}\n\nHere's the latest Disney news from The Florida Buzz — would you use this tip on your next trip?\n\nMore at thefloridabuzz.com`;
+  }
   const { label } = parkBrandFromArticle(article);
-  // Discovery packaging — name the park; story URL in first comment.
   return `${base}\n\nHere's another ${label} tip from The Florida Buzz — save this for your next trip.\n\nMore at thefloridabuzz.com`;
 }
 
@@ -669,8 +766,11 @@ function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://th
 }
 
 /** First-comment body with the specific story/guide link (required on every Reel). */
-function parkReelFirstComment(article, siteUrl) {
+function parkReelFirstComment(article, siteUrl, mode = PARK_REEL_MODE_TIP) {
   const link = articlePermalink(article, siteUrl);
+  if (normalizeParkReelMode(mode) === PARK_REEL_MODE_DISNEY_NEWS) {
+    return `Read the full Disney story on TheFloridaBuzz.com:\n${link}`;
+  }
   if (isTipsOrGuideContent(article)) {
     return `Full tips and tricks on TheFloridaBuzz.com:\n${link}`;
   }
@@ -693,9 +793,11 @@ async function renderParkReelFromArticle(article, {
   spoken = null,
   voicePath = null,
   withVoice = null,
+  mode = PARK_REEL_MODE_TIP,
   env = process.env,
   fetcher = fetch,
 } = {}) {
+  const reelMode = normalizeParkReelMode(mode);
   const sources = Array.isArray(imagePaths) && imagePaths.length
     ? imagePaths
     : [article?.localImagePath || article?.image_url].filter(Boolean);
@@ -711,7 +813,7 @@ async function renderParkReelFromArticle(article, {
   const masterName = masterFileName || `${slugSafe}-${Date.now().toString(36)}.mp4`;
   const masterPath = path.join(outDir, masterName);
 
-  const spokenText = ensureSiteCtaSpoken(spoken || spokenScriptFromArticle(article));
+  const spokenText = ensureSiteCtaSpoken(spoken || spokenScriptFromArticle(article, reelMode));
   const wantVoice = withVoice == null ? (Boolean(voicePath) || parkReelVoiceEnabled(env)) : Boolean(withVoice);
 
   let voiceMeta = null;
@@ -815,7 +917,8 @@ async function renderParkReelFromArticle(article, {
     spoken: spokenText,
     captions: beats,
     voice: voiceMeta,
-    caption: buildReelCaption(article),
+    mode: reelMode,
+    caption: buildReelCaption(article, reelMode),
     articleUrl: `${String(siteUrl).replace(/\/$/, '')}/article/${article.slug}`,
   };
 }
@@ -831,10 +934,12 @@ async function publishParkReel({
   videoUrl,
   caption,
   articleUrl,
+  mode = PARK_REEL_MODE_TIP,
   dryRun = process.env.DRY_RUN === 'true',
   publish = process.env.FB_PARK_REEL_PUBLISH === 'true',
   asReel = process.env.FB_PARK_REEL_AS_REEL !== 'false',
 } = {}) {
+  const reelMode = normalizeParkReelMode(mode);
   if (!publish && !dryRun) {
     return {
       ok: false,
@@ -844,9 +949,9 @@ async function publishParkReel({
     };
   }
 
-  const message = caption || buildReelCaption(article);
+  const message = caption || buildReelCaption(article, reelMode);
   const link = articleUrl || articlePermalink(article);
-  const firstCommentText = parkReelFirstComment(article);
+  const firstCommentText = parkReelFirstComment(article, undefined, reelMode);
 
   const result = await postToFacebookPage({
     message,
@@ -856,7 +961,7 @@ async function publishParkReel({
     linkPlacement: 'first_comment',
     linkCommentKind: 'article',
     firstCommentText,
-    logDetail: `park-reel:${article.slug}`,
+    logDetail: `park-reel:${reelMode}:${article.slug}`,
     returnResult: true,
     asReel,
     reelTitle: String(article?.title || 'Florida Buzz').slice(0, 255),
@@ -870,6 +975,7 @@ async function publishParkReel({
     link,
     firstCommentText,
     asReel,
+    mode: reelMode,
   };
 }
 
@@ -978,6 +1084,7 @@ async function shouldRunParkReelCatchUp(client, { now = new Date() } = {}) {
     posted,
     slot: missingSlot.id,
     label: missingSlot.label,
+    mode: missingSlot.mode,
   };
 }
 
@@ -1012,21 +1119,31 @@ async function runParkReelJob({
   client,
   dryRun = process.env.DRY_RUN === 'true',
   publish = process.env.FB_PARK_REEL_PUBLISH === 'true',
+  mode = process.env.FB_PARK_REEL_MODE || PARK_REEL_MODE_TIP,
   article = null,
 } = {}) {
-  const picked = article || await pickParkCruiseArticle(client);
+  const reelMode = normalizeParkReelMode(mode);
+  const picked = article || await pickParkCruiseArticle(client, { mode: reelMode });
   if (!picked) {
-    return { ok: false, reason: 'no_candidate', detail: 'No theme-park/cruise article with an image' };
+    return {
+      ok: false,
+      reason: 'no_candidate',
+      mode: reelMode,
+      detail: reelMode === PARK_REEL_MODE_DISNEY_NEWS
+        ? 'No Disney news article with an image'
+        : 'No theme-park tip/guide with an image',
+    };
   }
 
-  const kind = isTipsOrGuideContent(picked)
-    ? (picked.is_evergreen ? 'guide' : 'tips')
-    : 'park-news';
+  const kind = reelMode === PARK_REEL_MODE_DISNEY_NEWS
+    ? 'disney-news'
+    : (picked.is_evergreen ? 'guide' : (isTipsOrGuideContent(picked) ? 'tips' : 'park-news'));
   console.log(
-    `Park Reel candidate (${kind}, score ${scoreParkReelCandidate(picked)}): `
+    `Park Reel candidate [${reelMode}] (${kind}, score ${scoreParkReelCandidate(picked, reelMode)}): `
     + `${picked.title} (/article/${picked.slug})`
   );
-  const rendered = await renderParkReelFromArticle(picked);
+  console.log(`Opener: ${parkReelSpokenOpener(picked, reelMode)}`);
+  const rendered = await renderParkReelFromArticle(picked, { mode: reelMode });
   console.log(`Rendered: ${rendered.masterPath}`);
   if (rendered.voice) {
     console.log(`Voice: Geno ${rendered.voice.voiceId} (${rendered.voice.model})`);
@@ -1050,12 +1167,14 @@ async function runParkReelJob({
     videoUrl,
     caption: rendered.caption,
     articleUrl: rendered.articleUrl,
+    mode: reelMode,
     dryRun,
     publish,
   });
 
   return {
     ok: true,
+    mode: reelMode,
     article: { slug: picked.slug, title: picked.title, category: picked.category },
     rendered,
     published,
@@ -1072,6 +1191,8 @@ module.exports = {
   SITE_CTA_SPOKEN,
   PARK_REEL_ET_HOUR,
   PARK_REEL_ET_MINUTE,
+  PARK_REEL_MODE_DISNEY_NEWS,
+  PARK_REEL_MODE_TIP,
   PARK_REEL_SLOTS_ET,
   articlePermalink,
   buildReelCaption,
@@ -1081,9 +1202,12 @@ module.exports = {
   easternDateString,
   ensureSiteCtaSpoken,
   expectedParkReelCountEt,
+  filterCandidatesForMode,
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
+  isDisneyBrandArticle,
   isTipsOrGuideContent,
+  normalizeParkReelMode,
   parkBrandFromArticle,
   parkReelFirstComment,
   parkReelPostedOnEasternDay,
@@ -1098,6 +1222,7 @@ module.exports = {
   runParkReelJob,
   scoreParkReelCandidate,
   shouldRunParkReelCatchUp,
+  slugFromParkReelLogDetail,
   slowZoomPanStill,
   phraseChunksFromSpoken,
   splitCaptionChunk,

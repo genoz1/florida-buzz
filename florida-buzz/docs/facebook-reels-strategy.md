@@ -79,9 +79,13 @@ No hashtag dumps on Facebook.
 | Picker + slow zoom/pan render + optional publish | `lib/facebookParkReel.js` |
 | CLI | `npm run facebook:park-reel` / `npm run facebook:park-reel:dry` |
 | Sample (Lightning Lane, for Gene to watch) | `npm run sample:facebook-park-reel` |
-| Schedule | `server.js` at **10:30am + 7:00pm ET** when enabled (+ startup / 2pm / 8pm ET catch-up if a slot was missed) |
+| Schedule | `server.js` at **10:30am tip + 7:00pm Disney news ET** when enabled (+ startup / 2pm / 8pm ET catch-up if a slot was missed) |
 
-**What each Reel looks like:** preferably a **tips/tricks post or evergreen guide** (park/cruise), camera slowly zooms/pans, **Geno ElevenLabs VO** that opens with the park name — e.g. “Here's another Disney tip from The Florida Buzz” (Universal, SeaWorld, Disney Cruise, etc.) — then the tip, with big white captions matching the spoken beats. FB caption echoes the same park opener; first comment still points to the full tips/guide. Falls back to other park/cruise news only when no unused tip/guide is available. No AI host, no green screen, no wallet stickers.
+**Morning (10:30am ET) — theme-park tip:** prefers evergreen **guides** and tips/tricks. VO opens with the park name — e.g. “Here's another Disney tip from The Florida Buzz.”  
+
+**Evening (7:00pm ET) — Disney news:** prefers recent non-evergreen **Disney** stories. VO opens with “Here's the latest Disney news from The Florida Buzz.”  
+
+Same render path either way: still photo, slow zoom/pan, Geno VO, mute-friendly captions, Supabase MP4 host, `/video_reels` publish, story link in first comment. No AI host / fal / wallet stickers.
 
 **Does use:** existing article image, ffmpeg slow zoom/pan (cover-crop + `setsar=1` so landscape stills stay true 9:16), Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, upload to **public Supabase** `article-images/park-reels/…` for Meta’s `file_url`, Page **`/video_reels`** publish helper (not legacy `/videos`, which letterboxed vertical files in feed).  
 **Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
@@ -98,8 +102,8 @@ No hashtag dumps on Facebook.
 
 | Already in code | Needs Gene in DigitalOcean / host env |
 |-----------------|----------------------------------------|
-| Cron slots `30 10 * * *` + `0 19 * * *` America/New_York | `FB_PARK_REEL_ENABLED=true` |
-| Startup + 2pm / 8pm ET catch-up if a slot is short | `FB_PARK_REEL_PUBLISH=true` |
+| Cron `30 10` tip + `0 19` Disney news (America/New_York) | `FB_PARK_REEL_ENABLED=true` |
+| Startup + 2pm / 8pm ET catch-up (correct mode per missed slot) | `FB_PARK_REEL_PUBLISH=true` |
 | Render → `public/reels/daily/*.mp4` + upload `article-images/park-reels/` | Existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
 | Topic picker for park/cruise articles | Same `ELEVENLABS_API_KEY` as podcasts |
 | Geno VO when `ELEVENLABS_API_KEY` is set (default on) | optional `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1` |
@@ -120,18 +124,19 @@ ELEVENLABS_API_KEY=<same Geno key as podcasts>
 Keep existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SITE_URL=https://thefloridabuzz.com`.
 
 3. **Save and redeploy** (or Force Rebuild). Within ~90 seconds of boot you should see either:
-   - `Facebook park Reel scheduled: 10:30am + 7:00pm daily...` and then  
-   - `Running Facebook park Reel catch-up (startup)` if an overdue slot is short (e.g. afternoon with 0 posts, or after 7pm with only 1), or  
+   - `Facebook park Reel scheduled: 10:30am tip + 7:00pm Disney news...` and then  
+   - `Running Facebook park Reel catch-up (startup) … mode=tip|disney-news` if an overdue slot is short, or  
    - `catch-up skipped … morning_already_posted` / `already_posted_today` when that day’s quota is filled.
-4. Confirm in Runtime Logs: `Park Reel candidate:…`, `Public URL (Supabase…`, and a Facebook success / `park-reel:<slug>` in `post_log`.  
+4. Confirm in Runtime Logs: `Park Reel candidate [mode]…`, `Opener:…`, `Public URL (Supabase…`, and `park-reel:<mode>:<slug>` in `post_log`.  
 5. **Manual test — use the admin URL, not DigitalOcean Console.**  
    Console sandboxes often die mid-ffmpeg (`WaitPID EOF`) even when production is fine. Open (replace `YOUR_ADMIN_PASSWORD`):
 
 ```text
-https://thefloridabuzz.com/admin/facebook-park-reel?key=YOUR_ADMIN_PASSWORD
+https://thefloridabuzz.com/admin/facebook-park-reel?key=YOUR_ADMIN_PASSWORD&mode=tip
+https://thefloridabuzz.com/admin/facebook-park-reel?key=YOUR_ADMIN_PASSWORD&mode=disney-news
 ```
 
-Dry run (no Meta post): add `&dryRun=true`. Then watch **Runtime Logs** (not Console) for `Park Reel candidate…` → `Public URL (Supabase…` → run complete. Success also shows in `post_log` as `park-reel:<slug>`.
+Dry run (no Meta post): add `&dryRun=true`. Then watch **Runtime Logs** (not Console) for `Park Reel candidate…` → `Public URL (Supabase…` → run complete. Success also shows in `post_log` as `park-reel:<mode>:<slug>`.
 
 Until step 2–3, the Reel crons are off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render. With the key present, Reels mux Geno VO and scale captions to the spoken script. Story URL goes in the first comment.
 

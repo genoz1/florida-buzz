@@ -982,11 +982,11 @@ are no longer PNGs, so they get automatically skipped on any future run.
 });
 
 // Kick a Facebook park Reel in the **main app process** (same path as the
-// 10:30am / 7:00pm cron). Prefer this over DigitalOcean Console — console
-// sandboxes often die mid-ffmpeg with WaitPID EOF even when production works.
-// Watch Runtime Logs for progress; check post_log for park-reel:<slug> success.
+// 10:30am tip / 7:00pm Disney-news cron). Prefer this over DigitalOcean Console.
+// Watch Runtime Logs for progress; check post_log for park-reel:<mode>:<slug>.
+// Optional: ?mode=tip (default) or ?mode=disney-news
 router.get('/admin/facebook-park-reel', (req, res) => {
-  const { key, dryRun } = req.query;
+  const { key, dryRun, mode } = req.query;
   if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
     return render404(req, res);
   }
@@ -997,6 +997,8 @@ router.get('/admin/facebook-park-reel', (req, res) => {
     return res.status(500).type('text').send('Supabase is not configured.');
   }
 
+  const { normalizeParkReelMode } = require('../lib/facebookParkReel');
+  const reelMode = normalizeParkReelMode(mode || 'tip');
   const publish = dryRun === 'true' ? 'false' : 'true';
   const scriptPath = path.join(__dirname, '..', 'scripts', 'facebook-park-reel.js');
   const child = spawn('node', [scriptPath], {
@@ -1004,6 +1006,7 @@ router.get('/admin/facebook-park-reel', (req, res) => {
       ...process.env,
       DRY_RUN: dryRun === 'true' ? 'true' : 'false',
       FB_PARK_REEL_PUBLISH: publish,
+      FB_PARK_REEL_MODE: reelMode,
     },
     detached: true,
     stdio: 'inherit',
@@ -1012,18 +1015,19 @@ router.get('/admin/facebook-park-reel', (req, res) => {
 
   res.send(`
     <pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">
-Started Facebook park Reel in the background${dryRun === 'true' ? ' (DRY RUN — render only, no Meta post)' : ' (PUBLISH to Facebook)'}.
+Started Facebook park Reel in the background
+  mode=${reelMode}${dryRun === 'true' ? ' (DRY RUN — render only, no Meta post)' : ' (PUBLISH to Facebook)'}
 
-This runs in the live app (same as the 10:30am / 7:00pm cron) — not the DO Console sandbox.
+This runs in the live app (same as the 10:30am tip / 7:00pm Disney news cron) — not the DO Console sandbox.
 
 Watch DigitalOcean → Runtime Logs for:
-  Park Reel candidate…
-  Here's another … tip…
+  Park Reel candidate [mode]…
+  Opener: Here's another … / Here's the latest Disney news…
   Public URL (Supabase…
   === Run complete ===
 
-Success also lands in post_log as park-reel:&lt;slug&gt;.
-Safe to re-run; unused tip/guide candidates are preferred next.
+Success also lands in post_log as park-reel:${reelMode}:&lt;slug&gt;.
+Use ?mode=tip or ?mode=disney-news.
     </pre>
   `);
 });

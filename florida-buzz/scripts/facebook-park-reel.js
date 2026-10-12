@@ -9,23 +9,27 @@
  *
  * Usage:
  *   DRY_RUN=true node scripts/facebook-park-reel.js
- *   FB_PARK_REEL_PUBLISH=true node scripts/facebook-park-reel.js
+ *   FB_PARK_REEL_PUBLISH=true FB_PARK_REEL_MODE=tip node scripts/facebook-park-reel.js
+ *   FB_PARK_REEL_PUBLISH=true FB_PARK_REEL_MODE=disney-news node scripts/facebook-park-reel.js
  *
- * Publish requires the rendered MP4 to be reachable at SITE_URL/reels/daily/...
- * (files are written under public/reels/daily/).
+ * Publish requires the rendered MP4 to be reachable (Supabase public URL preferred).
  *
- * Daily schedule (server.js): set FB_PARK_REEL_ENABLED=true plus FB + Supabase
- * credentials. Live posting also needs FB_PARK_REEL_PUBLISH=true.
- * MP4 is uploaded to public Supabase (article-images/park-reels/) for Meta.
- * Twice daily: 10:30am + 7:00pm ET. Missed slots catch up on startup and at 2pm/8pm ET.
+ * Daily schedule (server.js):
+ *   10:30am ET → FB_PARK_REEL_MODE=tip (guides / tips & tricks)
+ *   7:00pm ET  → FB_PARK_REEL_MODE=disney-news
+ * Missed slots catch up on startup and at 2pm/8pm ET.
  */
 
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
-const { runParkReelJob } = require('../lib/facebookParkReel');
+const {
+  normalizeParkReelMode,
+  runParkReelJob,
+} = require('../lib/facebookParkReel');
 
 async function main() {
-  console.log(`=== Facebook park Reel — ${new Date().toISOString()} ===`);
+  const mode = normalizeParkReelMode(process.env.FB_PARK_REEL_MODE || 'tip');
+  console.log(`=== Facebook park Reel [${mode}] — ${new Date().toISOString()} ===`);
   if (!supabase) {
     console.error('[error] Supabase not configured — cannot pick an article.');
     process.exit(1);
@@ -35,6 +39,7 @@ async function main() {
     client: supabase,
     dryRun: process.env.DRY_RUN === 'true',
     publish: process.env.FB_PARK_REEL_PUBLISH === 'true',
+    mode,
   });
 
   console.log(JSON.stringify(result, null, 2));

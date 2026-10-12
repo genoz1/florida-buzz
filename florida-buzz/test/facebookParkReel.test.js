@@ -16,6 +16,8 @@ const {
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
   isTipsOrGuideContent,
+  PARK_REEL_MODE_DISNEY_NEWS,
+  PARK_REEL_MODE_TIP,
   parkBrandFromArticle,
   parkReelFirstComment,
   parkReelPostedOnEasternDay,
@@ -70,12 +72,12 @@ describe('facebookParkReel voice + captions', () => {
     assert.equal(parkReelVoiceEnabled({}), false);
   });
 
-  it('opens spoken script with the park name tip line + site CTA', () => {
+  it('opens tip Reels with park name and news Reels with Disney news line', () => {
     const spoken = spokenScriptFromArticle({
       title: 'Lightning Lane hit record highs — worth it?',
       dek: 'Pay only if that wait would wreck your Magic Kingdom morning',
       category: 'theme-parks',
-    });
+    }, PARK_REEL_MODE_TIP);
     const plain = stripAudioTags(spoken);
     assert.match(plain, /^Here's another Disney tip from The Florida Buzz\./i);
     assert.match(spoken, /Lightning Lane hit record highs/i);
@@ -83,11 +85,18 @@ describe('facebookParkReel voice + captions', () => {
     assert.match(spoken, /\[[^\]]+\]/);
     assert.equal(ensureSiteCtaSpoken(spoken), spoken);
 
+    const news = stripAudioTags(spokenScriptFromArticle({
+      title: 'Disney Believe features announced for 2027',
+      dek: 'New venues and stage shows are coming',
+      category: 'cruises',
+    }, PARK_REEL_MODE_DISNEY_NEWS));
+    assert.match(news, /^Here's the latest Disney news from The Florida Buzz\./i);
+
     assert.equal(parkBrandFromArticle({ title: 'Epic Universe tip' }).label, 'Universal');
     assert.equal(parkBrandFromArticle({ title: 'Sesame Street Land at SeaWorld' }).label, 'SeaWorld');
     assert.equal(parkBrandFromArticle({ title: 'Disney Cruise transfers', category: 'cruises' }).label, 'Disney Cruise');
     assert.match(
-      parkReelSpokenOpener({ title: 'Universal Orlando VIP Experience' }),
+      parkReelSpokenOpener({ title: 'Universal Orlando VIP Experience' }, PARK_REEL_MODE_TIP),
       /Here's another Universal tip from The Florida Buzz\./i
     );
   });
@@ -113,7 +122,7 @@ describe('facebookParkReel voice + captions', () => {
     );
   });
 
-  it('ranks evergreen guides and tip posts ahead of plain park news', () => {
+  it('ranks tip mode for guides and disney-news mode for recent Disney stories', () => {
     const news = {
       slug: 'disney-believe-features',
       title: 'Disney Believe features announced',
@@ -136,14 +145,22 @@ describe('facebookParkReel voice + captions', () => {
     assert.equal(isTipsOrGuideContent(guide), true);
     assert.equal(isTipsOrGuideContent(tip), true);
     assert.equal(isTipsOrGuideContent(news), false);
-    assert.ok(scoreParkReelCandidate(guide) > scoreParkReelCandidate(tip));
-    assert.ok(scoreParkReelCandidate(tip) > scoreParkReelCandidate(news));
-    const ranked = rankParkReelCandidates([news, tip, guide], new Set());
-    assert.deepEqual(ranked.map((r) => r.slug), [
+    assert.ok(
+      scoreParkReelCandidate(guide, PARK_REEL_MODE_TIP)
+      > scoreParkReelCandidate(tip, PARK_REEL_MODE_TIP)
+    );
+    assert.ok(
+      scoreParkReelCandidate(news, PARK_REEL_MODE_DISNEY_NEWS)
+      > scoreParkReelCandidate(guide, PARK_REEL_MODE_DISNEY_NEWS)
+    );
+    const tipRanked = rankParkReelCandidates([news, tip, guide], new Set(), PARK_REEL_MODE_TIP);
+    assert.deepEqual(tipRanked.map((r) => r.slug), [
       'disney-world-trip-itinerary-framework',
       'disney-world-boat-transportation-tips-for-strollers',
       'disney-believe-features',
     ]);
+    const newsRanked = rankParkReelCandidates([news, tip, guide], new Set(), PARK_REEL_MODE_DISNEY_NEWS);
+    assert.equal(newsRanked[0].slug, 'disney-believe-features');
   });
 
   it('aligns kinetic captions to spoken beats across the audio duration', () => {
@@ -263,6 +280,7 @@ describe('facebookParkReel daily catch-up', () => {
     });
     assert.equal(morningMiss.run, true);
     assert.equal(morningMiss.reason, 'missed_morning');
+    assert.equal(morningMiss.mode, PARK_REEL_MODE_TIP);
     assert.equal(morningMiss.expected, 1);
 
     const onePosted = {
@@ -295,6 +313,7 @@ describe('facebookParkReel daily catch-up', () => {
     });
     assert.equal(eveningMiss.run, true);
     assert.equal(eveningMiss.reason, 'missed_evening');
+    assert.equal(eveningMiss.mode, PARK_REEL_MODE_DISNEY_NEWS);
     assert.equal(eveningMiss.expected, 2);
     assert.equal(eveningMiss.posted, 1);
   });
