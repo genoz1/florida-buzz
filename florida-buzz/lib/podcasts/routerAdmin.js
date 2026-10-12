@@ -7,6 +7,7 @@ const {
   validateEpisodeFields,
   validateSourceInput,
   assertAudioUpload,
+  assertRecordingUpload,
   assertArtworkUpload,
   slugify,
 } = require('./validation');
@@ -542,6 +543,73 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       assertAudioUpload(req.file, cfg.maxUploadBytes);
       await pipeline.attachUploadedAudio(episode, req.file.buffer, req.file.originalname);
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=audio-uploaded`);
+    })
+  );
+
+  /**
+   * Human Geno take → ElevenLabs Voice Isolator (noise cleanup) → optional intro → preview_ready.
+   * Keeps the real voice; does not clone or replace it. Runs in background like TTS generate.
+   */
+  router.post(
+    '/episodes/:id/clean-recording',
+    upload.single('recording'),
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!cfg.elevenApiKey) {
+        return res.redirect(
+          303,
+          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent(
+            'ELEVENLABS_API_KEY is required to clean human recordings'
+          )}`
+        );
+      }
+      if (typeof pipeline.attachCleanedRecording !== 'function') {
+        return res.redirect(
+          303,
+          `/admin/podcasts/episodes/${episode.id}?error=${encodeURIComponent('Cleaned recording pipeline is unavailable')}`
+        );
+      }
+      assertRecordingUpload(req.file, cfg.maxUploadBytes);
+      const fileBuffer = Buffer.from(req.file.buffer);
+      const originalName = req.file.originalname || 'recording.m4a';
+      const prependRaw = req.body.prepend_intro;
+      const prependValues = Array.isArray(prependRaw) ? prependRaw : [prependRaw];
+      const prependIntro = prependValues.map(String).includes('1');
+      const existingJobs = await store.listJobs(episode.id);
+      const current = describeAudioProgress({ episode, jobs: existingJobs });
+      if (current.state === 'live') {
+        return res.redirect(
+          303,
+          `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent(
+            'Audio work is already LIVE — wait for it to finish before uploading a recording.'
+          )}`
+        );
+      }
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent(
+          'cleaning-started — ElevenLabs is isolating your voice. Watch the LIVE status panel.'
+        )}`
+      );
+      setImmediate(() => {
+        Promise.resolve()
+          .then(() =>
+            pipeline.attachCleanedRecording(episode, fileBuffer, originalName, { prependIntro })
+          )
+          .catch(async (err) => {
+            console.error('[podcasts] cleaned recording failed:', err.message);
+            try {
+              await store.updateEpisode(episode.id, {
+                status: episode.status === 'generating_audio' ? 'script_ready' : episode.status || 'script_ready',
+                last_error: `Recording cleanup failed: ${String(err.message || err).slice(0, 500)}`,
+              });
+            } catch (updateErr) {
+              console.error('[podcasts] failed to persist cleanup error:', updateErr.message);
+            }
+          });
+      });
     })
   );
 

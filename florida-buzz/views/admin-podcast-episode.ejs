@@ -171,6 +171,19 @@
       <label>Upload replacement MP3 <input type="file" name="audio" accept="audio/mpeg,.mp3" required></label>
       <button class="btn btn-secondary" type="submit">Upload audio</button>
     </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/clean-recording" enctype="multipart/form-data" style="margin-top:16px;padding:16px;border:1px solid #d5dde2;border-radius:8px;background:#f7fafb">
+      <h3 style="margin-top:0">Record yourself → AI cleanup</h3>
+      <p style="margin:0 0 12px;color:#3d4a52">Upload your phone or mic take (M4A, WAV, MP3, etc.). ElevenLabs Voice Isolator removes room noise and keeps <strong>your real voice</strong> — it does not clone or replace it. Then we encode the master and optionally prepend the announcer intro.</p>
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <label style="display:block;margin-bottom:8px">Your Geno recording <input type="file" name="recording" accept="audio/*,video/mp4,video/quicktime,.m4a,.mp3,.wav,.aac,.flac,.ogg,.mp4,.mov,.webm" required></label>
+      <input type="hidden" name="prepend_intro" value="0">
+      <label style="display:block;margin-bottom:12px">
+        <input type="checkbox" name="prepend_intro" value="1" checked>
+        Prepend announcer intro bumper
+      </label>
+      <button class="btn" type="submit" <%= cfg.elevenApiKey ? '' : 'disabled' %>>Clean recording &amp; set as preview</button>
+      <% if (!cfg.elevenApiKey) { %><p style="color:#8a3b12;margin:8px 0 0">Needs <code>ELEVENLABS_API_KEY</code> on the server.</p><% } %>
+    </form>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/upload-artwork" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <label>Upload episode artwork <input type="file" name="artwork" accept="image/jpeg,image/png,image/webp" required></label>
