@@ -7,8 +7,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const {
+  SITE_CTA_SPOKEN,
   captionBeatsFromSpoken,
+  ensureSiteCtaSpoken,
   formatCaptionLines,
+  parkReelFirstComment,
   parkReelVoiceEnabled,
   renderParkReelFromArticle,
   slowZoomPanStill,
@@ -56,14 +59,26 @@ describe('facebookParkReel voice + captions', () => {
     assert.equal(parkReelVoiceEnabled({}), false);
   });
 
-  it('builds a spoken Geno script from article title/dek', () => {
+  it('builds a spoken Geno script from article title/dek with site CTA', () => {
     const spoken = spokenScriptFromArticle({
       title: 'Lightning Lane hit record highs — worth it?',
       dek: 'Pay only if that wait would wreck your Magic Kingdom morning',
     });
     assert.match(spoken, /Lightning Lane hit record highs/i);
-    assert.match(spoken, /Follow Florida Buzz/i);
+    assert.match(stripAudioTags(spoken), /Florida Buzz dot com/i);
     assert.match(spoken, /\[[^\]]+\]/);
+    assert.equal(ensureSiteCtaSpoken(spoken), spoken);
+  });
+
+  it('always appends the Florida Buzz dot com CTA and first-comment story link', () => {
+    const withFollow = ensureSiteCtaSpoken('[curious] Lightning Lane hit highs. Follow Florida Buzz.');
+    assert.match(stripAudioTags(withFollow), /Florida Buzz dot com/i);
+    assert.doesNotMatch(stripAudioTags(withFollow), /Follow Florida Buzz\.?\s*$/i);
+    assert.match(SITE_CTA_SPOKEN, /Florida Buzz dot com/i);
+
+    const comment = parkReelFirstComment({ slug: 'lightning-lane-record-highs-worth-it' });
+    assert.match(comment, /thefloridabuzz\.com\/article\/lightning-lane-record-highs-worth-it/i);
+    assert.match(comment, /Read this story/i);
   });
 
   it('aligns kinetic captions to spoken beats across the audio duration', () => {
@@ -100,9 +115,9 @@ describe('facebookParkReel voice + captions', () => {
   });
 
   it('burns the entire spoken script into captions (mute-friendly, not keyword hooks)', () => {
-    const spoken = `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`;
+    const spoken = ensureSiteCtaSpoken(`[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes.`);
     const plain = stripAudioTags(spoken);
-    const beats = captionBeatsFromSpoken(spoken, 23);
+    const beats = captionBeatsFromSpoken(spoken, 26);
     const normalize = (s) => String(s)
       .replace(/\\N/g, ' ')
       .replace(/[—–…$-]/g, ' ')
@@ -118,7 +133,7 @@ describe('facebookParkReel voice + captions', () => {
     assert.match(joined, /two hundred twenty nine/);
     assert.match(joined, /wreck your morning/);
     assert.match(joined, /automatic yes/);
-    assert.match(joined, /follow florida buzz/);
+    assert.match(joined, /florida buzz dot com/);
   });
 });
 

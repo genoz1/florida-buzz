@@ -16,6 +16,9 @@ const { spawnSync } = require('node:child_process');
 const {
   renderParkReelFromArticle,
   stripAudioTags,
+  parkReelFirstComment,
+  articlePermalink,
+  SITE_CTA_SPOKEN,
 } = require('../lib/facebookParkReel');
 const { DEFAULT_ELEVEN_VOICE_GENO } = require('../lib/visualNews/config');
 
@@ -24,7 +27,7 @@ const REFS = path.join(ROOT, 'public', 'reels', 'references');
 const OUT_DIR = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
 const TMP = process.env.SAMPLE_TMP_DIR || '/tmp/fb-park-reel-sample';
 
-const SPOKEN = `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`;
+const SPOKEN = `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. [upbeat] Find this story and more at the Florida Buzz dot com.`;
 
 const ARTICLE = {
   slug: 'lightning-lane-record-highs-worth-it',
@@ -105,7 +108,12 @@ function verifyFullScriptCaptions(spoken, captions) {
   }
   // Reject keyword-only style (must include full money phrase + rule sentence bits).
   const joined = actual.join(' ');
-  for (const must of ['two hundred twenty nine', 'wreck your morning', 'automatic yes', 'follow florida buzz']) {
+  for (const must of [
+    'two hundred twenty nine',
+    'wreck your morning',
+    'automatic yes',
+    'florida buzz dot com',
+  ]) {
     if (!joined.includes(must)) {
       throw new Error(`Caption verification FAILED — missing full phrase "${must}"`);
     }
@@ -147,6 +155,16 @@ async function main() {
   const verify = verifyFullScriptCaptions(SPOKEN, rendered.captions);
   console.log('Caption verification:', verify);
 
+  const firstComment = parkReelFirstComment(ARTICLE);
+  const storyLink = articlePermalink(ARTICLE);
+  if (!firstComment.includes(storyLink)) {
+    throw new Error(`First-comment verification FAILED — missing story link ${storyLink}`);
+  }
+  if (!/florida buzz dot com/i.test(stripAudioTags(rendered.spoken))) {
+    throw new Error(`Spoken CTA verification FAILED — expected site CTA: ${SITE_CTA_SPOKEN}`);
+  }
+  console.log('First comment (would post on Facebook):', firstComment);
+
   // One frame at the midpoint of EVERY caption beat — must review before shipping.
   const frames = [];
   for (let i = 0; i < rendered.captions.length; i += 1) {
@@ -184,6 +202,11 @@ ${rendered.captions.map((c, i) => `${i + 1}. [${c.start.toFixed(2)}–${c.end.to
 ## Verification
 
 - Word coverage: **PASS** (${verify.wordCount} spoken words present across ${verify.beatCount} beats)
+- Site CTA spoken + captioned: **PASS** (“${SITE_CTA_SPOKEN}”)
+- First comment story link: **PASS**
+\`\`\`
+${firstComment}
+\`\`\`
 - Master: \`720x1280\` SAR 1:1 DAR 9:16
 - Audio: Geno ElevenLabs \`eleven_v4\`
 
@@ -199,6 +222,9 @@ ${rendered.captions.map((c, i) => `${i + 1}. [${c.start.toFixed(2)}–${c.end.to
     duration: rendered.duration,
     voice: rendered.voice,
     captions: rendered.captions,
+    spoken: rendered.spoken,
+    firstComment,
+    storyLink,
     verify,
     frames,
     mdPath,

@@ -112,12 +112,30 @@ function stripAudioTags(text) {
     .trim();
 }
 
+/** Spoken + on-screen CTA — every Reel must end with the site mention. */
+const SITE_CTA_SPOKEN = 'Find this story and more at the Florida Buzz dot com.';
+const SITE_CTA_PATTERN = /florida\s*buzz\s*dot\s*com|thefloridabuzz\.com/i;
+
+function ensureSiteCtaSpoken(spoken) {
+  const text = String(spoken || '').trim();
+  if (!text) {
+    return `[upbeat] ${SITE_CTA_SPOKEN}`;
+  }
+  if (SITE_CTA_PATTERN.test(stripAudioTags(text))) return text;
+  // Drop a bare "Follow Florida Buzz." ending so we don't double-CTA.
+  const cleaned = text
+    .replace(/\s*\[(?:upbeat|serious|curious)\]\s*Follow Florida Buzz\.?\s*$/i, '')
+    .replace(/\s*Follow Florida Buzz\.?\s*$/i, '')
+    .trim();
+  return `${cleaned} [upbeat] ${SITE_CTA_SPOKEN}`;
+}
+
 function spokenScriptFromArticle(article) {
-  if (article?.spoken) return String(article.spoken).trim();
+  if (article?.spoken) return ensureSiteCtaSpoken(article.spoken);
   const title = String(article?.title || 'Florida theme parks').trim();
   const dek = String(article?.dek || '').trim();
   const tip = dek || 'Worth knowing before your next park day.';
-  return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
+  return ensureSiteCtaSpoken(`[curious] ${title}. ${tip}`);
 }
 
 // Mute-friendly full-script captions: complete phrases, never keyword hooks.
@@ -468,8 +486,20 @@ function buildReelCaption(article) {
   const base = toFacebookFeedCaption(
     article.fb_caption || `${article.title}. ${article.dek || ''}`.trim()
   );
-  // Light discovery packaging — no hashtag dump.
-  return `${base}\n\nPark tip from Florida Buzz — would you use this?`;
+  // Light discovery packaging — no hashtag dump. Story URL goes in first comment.
+  return `${base}\n\nPark tip from Florida Buzz — would you use this?\n\nMore at thefloridabuzz.com`;
+}
+
+function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
+  const base = String(siteUrl || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  const slug = String(article?.slug || '').replace(/^\/+/, '');
+  return `${base}/article/${slug}`;
+}
+
+/** First-comment body with the specific story link (required on every Reel post). */
+function parkReelFirstComment(article, siteUrl) {
+  const link = articlePermalink(article, siteUrl);
+  return `Read this story on TheFloridaBuzz.com:\n${link}`;
 }
 
 /**
@@ -506,7 +536,7 @@ async function renderParkReelFromArticle(article, {
   const masterName = masterFileName || `${slugSafe}-${Date.now().toString(36)}.mp4`;
   const masterPath = path.join(outDir, masterName);
 
-  const spokenText = String(spoken || spokenScriptFromArticle(article)).trim();
+  const spokenText = ensureSiteCtaSpoken(spoken || spokenScriptFromArticle(article));
   const wantVoice = withVoice == null ? (Boolean(voicePath) || parkReelVoiceEnabled(env)) : Boolean(withVoice);
 
   let voiceMeta = null;
@@ -640,7 +670,8 @@ async function publishParkReel({
   }
 
   const message = caption || buildReelCaption(article);
-  const link = articleUrl || `${(process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '')}/article/${article.slug}`;
+  const link = articleUrl || articlePermalink(article);
+  const firstCommentText = parkReelFirstComment(article);
 
   const result = await postToFacebookPage({
     message,
@@ -649,6 +680,7 @@ async function publishParkReel({
     dryRun: dryRun || !publish,
     linkPlacement: 'first_comment',
     linkCommentKind: 'article',
+    firstCommentText,
     logDetail: `park-reel:${article.slug}`,
     returnResult: true,
     asReel,
@@ -661,6 +693,7 @@ async function publishParkReel({
     videoUrl,
     message,
     link,
+    firstCommentText,
     asReel,
   };
 }
@@ -708,10 +741,14 @@ function parkReelScheduleEnabled(env = process.env) {
 }
 
 module.exports = {
+  SITE_CTA_SPOKEN,
+  articlePermalink,
   buildReelCaption,
   captionBeatsFromArticle,
   captionBeatsFromSpoken,
+  ensureSiteCtaSpoken,
   formatCaptionLines,
+  parkReelFirstComment,
   parkReelScheduleEnabled,
   parkReelVoiceEnabled,
   pickParkCruiseArticle,
