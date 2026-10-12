@@ -2,13 +2,51 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const {
+  SITE_CTA_SPOKEN,
   captionBeatsFromSpoken,
+  ensureSiteCtaSpoken,
+  formatCaptionLines,
+  parkReelFirstComment,
   parkReelVoiceEnabled,
+  renderParkReelFromArticle,
+  slowZoomPanStill,
   spokenScriptFromArticle,
   stripAudioTags,
 } = require('../lib/facebookParkReel');
 const { DEFAULT_ELEVEN_VOICE_GENO } = require('../lib/visualNews/config');
+
+function ffprobeBin() {
+  try {
+    return require('ffprobe-static').path;
+  } catch {
+    return 'ffprobe';
+  }
+}
+
+function ffmpegBin() {
+  try {
+    return require('ffmpeg-static');
+  } catch {
+    return 'ffmpeg';
+  }
+}
+
+function probeVideo(file) {
+  const result = spawnSync(ffprobeBin(), [
+    '-v', 'error',
+    '-select_streams', 'v:0',
+    '-show_entries', 'stream=width,height,sample_aspect_ratio,display_aspect_ratio',
+    '-of', 'json',
+    file,
+  ], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout).streams[0];
+}
 
 describe('facebookParkReel voice + captions', () => {
   it('defaults Geno voice id to the podcast clone', () => {
@@ -21,14 +59,26 @@ describe('facebookParkReel voice + captions', () => {
     assert.equal(parkReelVoiceEnabled({}), false);
   });
 
-  it('builds a spoken Geno script from article title/dek', () => {
+  it('builds a spoken Geno script from article title/dek with site CTA', () => {
     const spoken = spokenScriptFromArticle({
       title: 'Lightning Lane hit record highs — worth it?',
       dek: 'Pay only if that wait would wreck your Magic Kingdom morning',
     });
     assert.match(spoken, /Lightning Lane hit record highs/i);
-    assert.match(spoken, /Follow Florida Buzz/i);
+    assert.match(stripAudioTags(spoken), /Florida Buzz dot com/i);
     assert.match(spoken, /\[[^\]]+\]/);
+    assert.equal(ensureSiteCtaSpoken(spoken), spoken);
+  });
+
+  it('always appends the Florida Buzz dot com CTA and first-comment story link', () => {
+    const withFollow = ensureSiteCtaSpoken('[curious] Lightning Lane hit highs. Follow Florida Buzz.');
+    assert.match(stripAudioTags(withFollow), /Florida Buzz dot com/i);
+    assert.doesNotMatch(stripAudioTags(withFollow), /Follow Florida Buzz\.?\s*$/i);
+    assert.match(SITE_CTA_SPOKEN, /Florida Buzz dot com/i);
+
+    const comment = parkReelFirstComment({ slug: 'lightning-lane-record-highs-worth-it' });
+    assert.match(comment, /thefloridabuzz\.com\/article\/lightning-lane-record-highs-worth-it/i);
+    assert.match(comment, /Read this story/i);
   });
 
   it('aligns kinetic captions to spoken beats across the audio duration', () => {
@@ -43,5 +93,96 @@ describe('facebookParkReel voice + captions', () => {
     for (let i = 1; i < beats.length; i += 1) {
       assert.ok(beats[i].start >= beats[i - 1].start);
     }
+  });
+
+  it('wraps captions into short lines without mid-sentence ellipsis', () => {
+    const lines = formatCaptionLines("Disney Cruise Line's Disney Believe will debut an Encanto stage show");
+    assert.match(lines, /\\N/);
+    assert.doesNotMatch(lines, /…$/);
+    assert.ok(lines.split('\\N').length <= 3);
+
+    const beats = captionBeatsFromSpoken(
+      "[curious] Disney Cruise Line's Disney Believe will debut an Encanto stage show. [upbeat] Follow Florida Buzz.",
+      10
+    );
+    const joined = beats.map((b) => b.text.replace(/\\N/g, ' ')).join(' ');
+    assert.match(joined, /Disney Cruise/i);
+    assert.match(joined, /Believe/i);
+    assert.match(joined, /Encanto/i);
+    assert.match(joined, /stage show/i);
+    assert.doesNotMatch(joined, /Believe will \.\.\./);
+    assert.doesNotMatch(joined, /…/);
+  });
+
+  it('burns the entire spoken script into captions (mute-friendly, not keyword hooks)', () => {
+    const spoken = ensureSiteCtaSpoken(`[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes.`);
+    const plain = stripAudioTags(spoken);
+    const beats = captionBeatsFromSpoken(spoken, 26);
+    const normalize = (s) => String(s)
+      .replace(/\\N/g, ' ')
+      .replace(/[—–…$-]/g, ' ')
+      .replace(/[^\w\s']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    const joined = normalize(beats.map((b) => b.text).join(' '));
+    const expectedWords = normalize(plain).split(' ').filter(Boolean);
+    const missing = expectedWords.filter((w) => !joined.includes(w));
+    assert.deepEqual(missing, [], `missing spoken words in captions: ${missing.join(', ')}`);
+    // Full phrases — not keyword-only hooks like "Up to $229".
+    assert.match(joined, /two hundred twenty nine/);
+    assert.match(joined, /wreck your morning/);
+    assert.match(joined, /automatic yes/);
+    assert.match(joined, /florida buzz dot com/);
+  });
+});
+
+describe('facebookParkReel vertical render', () => {
+  it('cover-crops landscape stills to 720x1280 with square pixels (DAR 9:16)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'park-reel-sar-'));
+    const still = path.join(dir, 'landscape.jpg');
+    const out = path.join(dir, 'out.mp4');
+    const made = spawnSync(ffmpegBin(), [
+      '-y', '-f', 'lavfi', '-i', 'color=c=orange:s=1920x1080:d=1', '-frames:v', '1', still,
+    ], { encoding: 'utf8' });
+    assert.equal(made.status, 0, made.stderr);
+
+    slowZoomPanStill(still, out, 30);
+    const stream = probeVideo(out);
+    assert.equal(stream.width, 720);
+    assert.equal(stream.height, 1280);
+    assert.equal(stream.sample_aspect_ratio, '1:1');
+    assert.equal(stream.display_aspect_ratio, '9:16');
+  });
+
+  it('final silent master keeps 9:16 DAR after ASS burn from landscape still', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'park-reel-master-'));
+    const still = path.join(dir, 'landscape.jpg');
+    const made = spawnSync(ffmpegBin(), [
+      '-y', '-f', 'lavfi', '-i', 'color=c=navy:s=1600x900:d=1', '-frames:v', '1', still,
+    ], { encoding: 'utf8' });
+    assert.equal(made.status, 0, made.stderr);
+
+    const rendered = await renderParkReelFromArticle({
+      slug: 'cruise-sar-check',
+      title: "Disney Cruise Line's Disney Believe will debut Encanto",
+      dek: 'Fort Lauderdale ship update',
+      category: 'cruises',
+      spoken: "[curious] Disney Cruise Line's Disney Believe will debut Encanto. Follow Florida Buzz.",
+    }, {
+      outDir: dir,
+      tmpDir: path.join(dir, 'tmp'),
+      imagePaths: [still],
+      masterFileName: 'master.mp4',
+      withVoice: false,
+      durationSec: 6,
+    });
+
+    const stream = probeVideo(rendered.masterPath);
+    assert.equal(stream.width, 720);
+    assert.equal(stream.height, 1280);
+    assert.equal(stream.sample_aspect_ratio, '1:1');
+    assert.equal(stream.display_aspect_ratio, '9:16');
+    assert.ok(rendered.captions.every((c) => !String(c.text).endsWith('…')));
   });
 });

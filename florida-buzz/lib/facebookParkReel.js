@@ -4,8 +4,10 @@
  * Inexpensive Disney / theme-park Reel path for Facebook discovery.
  *
  * NOT the fal Seedance guide-reels pipeline. Uses article/park still photos
- * with a slow zoom/pan, Geno ElevenLabs VO (eleven_v4), and kinetic captions
- * aligned to the spoken script. No AI presenter / green screen / fal.
+ * with a slow zoom/pan (cover-crop + setsar=1 → true 720x1280 / 9:16 even when
+ * the article still is landscape), Geno ElevenLabs VO (eleven_v4), and kinetic
+ * captions aligned to the spoken script. No AI presenter / green screen / fal.
+ * Publishes via Meta /video_reels (not letterboxing Page /videos).
  *
  * Status: daily cron is wired in server.js when FB_PARK_REEL_ENABLED=true
  * (plus FB + Supabase credentials). Actual Meta posting also needs
@@ -110,61 +112,184 @@ function stripAudioTags(text) {
     .trim();
 }
 
+/** Spoken + on-screen CTA — every Reel must end with the site mention. */
+const SITE_CTA_SPOKEN = 'Find this story and more at the Florida Buzz dot com.';
+const SITE_CTA_PATTERN = /florida\s*buzz\s*dot\s*com|thefloridabuzz\.com/i;
+
+function ensureSiteCtaSpoken(spoken) {
+  const text = String(spoken || '').trim();
+  if (!text) {
+    return `[upbeat] ${SITE_CTA_SPOKEN}`;
+  }
+  if (SITE_CTA_PATTERN.test(stripAudioTags(text))) return text;
+  // Drop a bare "Follow Florida Buzz." ending so we don't double-CTA.
+  const cleaned = text
+    .replace(/\s*\[(?:upbeat|serious|curious)\]\s*Follow Florida Buzz\.?\s*$/i, '')
+    .replace(/\s*Follow Florida Buzz\.?\s*$/i, '')
+    .trim();
+  return `${cleaned} [upbeat] ${SITE_CTA_SPOKEN}`;
+}
+
 function spokenScriptFromArticle(article) {
-  if (article?.spoken) return String(article.spoken).trim();
+  if (article?.spoken) return ensureSiteCtaSpoken(article.spoken);
   const title = String(article?.title || 'Florida theme parks').trim();
   const dek = String(article?.dek || '').trim();
   const tip = dek || 'Worth knowing before your next park day.';
-  return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
+  return ensureSiteCtaSpoken(`[curious] ${title}. ${tip}`);
 }
 
-function shortenCaption(text, max = 42) {
+// Mute-friendly full-script captions: complete phrases, never keyword hooks.
+// 3 short lines fit complete clauses in the FB safe area without mid-word cuts.
+const CAPTION_MAX_LINE = 26;
+const CAPTION_MAX_LINES = 3;
+const CAPTION_CHUNK_CHARS = CAPTION_MAX_LINE * CAPTION_MAX_LINES; // 78
+const CAPTION_MIN_BEAT_SEC = 1.5;
+
+/**
+ * Wrap caption copy into at most maxLines ASS lines.
+ * Caller must pass chunks that fit; never truncates with ellipsis.
+ */
+function formatCaptionLines(text, {
+  maxLine = CAPTION_MAX_LINE,
+  maxLines = CAPTION_MAX_LINES,
+} = {}) {
+  const words = String(text || '')
+    .replace(/[{}\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+  if (!words.length) return 'Florida Buzz';
+
+  const lines = [];
+  let cur = '';
+  for (const word of words) {
+    // Keep whole words; oversize tokens wrap alone rather than being sliced.
+    const token = word;
+    const next = cur ? `${cur} ${token}` : token;
+    if (next.length <= maxLine || !cur) {
+      cur = next;
+      continue;
+    }
+    lines.push(cur);
+    cur = token;
+  }
+  if (cur) lines.push(cur);
+
+  if (lines.length <= maxLines) return lines.join('\\N');
+
+  // Too many lines for one beat — pack into maxLines without dropping words
+  // by joining overflow back into the last allowed line (caller should chunk).
+  const head = lines.slice(0, maxLines - 1);
+  const tail = lines.slice(maxLines - 1).join(' ');
+  return [...head, tail].join('\\N');
+}
+
+/** Split a long spoken fragment into beat-sized chunks at word boundaries. */
+function splitCaptionChunk(text, maxChars = CAPTION_CHUNK_CHARS) {
   const t = String(text || '').trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
+  if (!t) return [];
+  if (t.length <= maxChars) return [t];
+  const words = t.split(/\s+/);
+  const chunks = [];
+  let cur = '';
+  for (const word of words) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (next.length <= maxChars) {
+      cur = next;
+    } else {
+      if (cur) chunks.push(cur);
+      cur = word;
+    }
+  }
+  if (cur) chunks.push(cur);
+  return chunks;
 }
 
 /**
- * Split spoken copy into kinetic caption beats and scale them to audio duration.
- * Caption text matches what Geno says (audio tags stripped).
+ * Split spoken text into complete readable phrases (comma / sentence boundaries).
+ * Avoids mid-clause cuts like ending a beat on "we're" or "wreck".
  */
-function captionBeatsFromSpoken(spoken, durationSec) {
-  const plain = stripAudioTags(spoken);
-  let parts = plain
-    .split(/(?<=[.!?…])\s+|\s+[—–]\s+|\s+So\.\.\.\s+/i)
+function phraseChunksFromSpoken(spoken) {
+  const plain = stripAudioTags(spoken)
+    .replace(/\s*[—–]\s*/g, ', ')
+    .replace(/\s+So\.\.\.\s*/gi, ' So ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return ['Florida Buzz'];
+
+  // Split into clause-sized phrases; keep trailing punctuation with the phrase.
+  const rawParts = plain
+    .split(/(?<=[,.!?])\s+/)
     .map((p) => p.trim())
     .filter(Boolean);
 
-  // Keep Reels readable: merge tiny fragments, split very long ones.
-  const normalized = [];
-  for (const part of parts) {
-    if (normalized.length && (part.length < 12 || normalized[normalized.length - 1].length < 18)) {
-      normalized[normalized.length - 1] = `${normalized[normalized.length - 1]} ${part}`.trim();
-    } else if (part.length > 48) {
-      const mid = part.lastIndexOf(' ', Math.floor(part.length / 2));
-      if (mid > 12) {
-        normalized.push(part.slice(0, mid).trim());
-        normalized.push(part.slice(mid).trim());
+  const parts = [];
+  for (const part of rawParts) {
+    if (part.length <= CAPTION_CHUNK_CHARS) {
+      // Merge tiny openers into the previous phrase when safe.
+      if (parts.length && part.length < 16 && !/[.!?]$/.test(parts[parts.length - 1])) {
+        parts[parts.length - 1] = `${parts[parts.length - 1]} ${part}`.trim();
       } else {
-        normalized.push(part);
+        parts.push(part);
       }
+      continue;
+    }
+    // Long clause: prefer natural breaks before word-wrapping.
+    const soft = part.split(/(?<=:)\s+|\s+(?=and\s)|(?<=morning,)\s+/i).map((p) => p.trim()).filter(Boolean);
+    if (soft.length > 1 && soft.every((p) => p.length <= CAPTION_CHUNK_CHARS)) {
+      parts.push(...soft);
     } else {
-      normalized.push(part);
+      parts.push(...splitCaptionChunk(part, CAPTION_CHUNK_CHARS));
     }
   }
-  parts = normalized.length ? normalized : [plain || 'Florida Buzz'];
 
-  const weights = parts.map((p) => Math.max(p.length, 8));
+  // Merge dangling fragments that end with weak words (we're / and / to / a …).
+  const WEAK_END = /(?:^|\s)(a|an|the|to|of|and|or|for|with|we're|you're|it's|that's|here's)$/i;
+  const merged = [];
+  for (const part of parts) {
+    if (merged.length && WEAK_END.test(merged[merged.length - 1].replace(/[,.!?]+$/, ''))) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${part}`.trim();
+    } else if (merged.length && part.length < 14) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${part}`.trim();
+    } else {
+      merged.push(part);
+    }
+  }
+
+  // Final pass: anything still over budget gets word-split.
+  const finalParts = [];
+  for (const piece of (merged.length ? merged : [plain])) {
+    if (piece.length <= CAPTION_CHUNK_CHARS) finalParts.push(piece);
+    else finalParts.push(...splitCaptionChunk(piece, CAPTION_CHUNK_CHARS));
+  }
+  return finalParts.length ? finalParts : [plain];
+}
+
+/**
+ * Full mute-friendly captions: every spoken word appears on screen as
+ * complete phrases timed to the VO (not keyword hooks).
+ */
+function captionBeatsFromSpoken(spoken, durationSec) {
+  const parts = phraseChunksFromSpoken(spoken);
+
+  const weights = parts.map((p) => Math.max(p.length, 12));
   const weightSum = weights.reduce((a, b) => a + b, 0);
   const usable = Math.max(durationSec - 0.12, 1);
   let t = 0;
-  return parts.map((text, i) => {
+  const beats = parts.map((text, i) => {
     const share = weights[i] / weightSum;
     const start = t;
-    const end = i === parts.length - 1 ? usable : Math.min(usable, t + share * usable);
-    t = end;
-    return { start, end, text: shortenCaption(text) };
+    let end = i === parts.length - 1 ? usable : Math.min(usable, t + share * usable);
+    if (i < parts.length - 1 && end - start < CAPTION_MIN_BEAT_SEC) {
+      end = Math.min(usable - (parts.length - i - 1) * 0.8, start + CAPTION_MIN_BEAT_SEC);
+    }
+    t = Math.max(end, start + 0.35);
+    return { start, end: t, text: formatCaptionLines(text) };
   });
+
+  if (beats.length) beats[beats.length - 1].end = usable;
+  return beats;
 }
 
 /** Legacy silent-path captions (kept for tests / FB_PARK_REEL_WITH_VOICE=false). */
@@ -182,21 +307,26 @@ function scaleCaptionBeats(captions, durationSec) {
     const end = i === arr.length - 1
       ? durationSec - 0.05
       : Math.max(start + 0.2, (Number(c.end) || 0) * scale);
-    return { ...c, start, end, text: String(c.text || '').trim() };
+    const raw = String(c.text || '').trim();
+    // Keep explicit \\N from callers; otherwise wrap into short readable lines.
+    const text = raw.includes('\\N') ? raw : formatCaptionLines(raw);
+    return { ...c, start, end, text };
   });
 }
 
 function writeAss(captions, duration, outPath) {
+  // BorderStyle 3 = opaque box behind text so full phrases stay readable on busy stills.
+  // Font 46 + 2 lines keeps complete clauses in the FB safe area.
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: 720
 PlayResY: 1280
-WrapStyle: 0
+WrapStyle: 2
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,54,&H00FFFFFF,&H00FFFFFF,&H00101010,&H8C000000,-1,0,0,0,100,100,0,0,1,3,1,2,36,36,240,1
-Style: Brand,DejaVu Sans,28,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,28,28,42,1
+Style: Caption,DejaVu Sans,42,&H00FFFFFF,&H00FFFFFF,&H00000000,&HC0000000,-1,0,0,0,100,100,0,0,3,4,0,2,36,36,240,1
+Style: Brand,DejaVu Sans,32,&H00F4F7FF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,56,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
@@ -204,7 +334,10 @@ Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
   for (const c of captions) {
     const end = Math.min(c.end, duration - 0.05);
     if (end <= c.start) continue;
-    const text = String(c.text).replace(/[{}\\\r\n]/g, ' ');
+    const text = String(c.text)
+      .replace(/\r?\n/g, '\\N')
+      .replace(/[{}]/g, ' ')
+      .trim();
     ass += `Dialogue: 1,${stamp(c.start)},${stamp(end)},Caption,,0,0,0,,${text}\n`;
   }
   fs.writeFileSync(outPath, ass);
@@ -226,7 +359,14 @@ async function resolveStillImage(source, destPath) {
   throw new Error(`Article image not found: ${source}`);
 }
 
-/** Slow zoom + slight pan on a still photo (vertical 720x1280). */
+/**
+ * Slow zoom + slight pan on a still photo → true 720x1280 (9:16).
+ *
+ * Cover-crop landscape/portrait stills (no letterbox/pillarbox). Force
+ * setsar=1 — landscape article photos otherwise leave SAR≈256:81 / DAR=16:9
+ * on a 720x1280 pixel buffer, and Facebook plays that as a letterboxed
+ * landscape video (Gene's cruise Reel screenshot).
+ */
 function slowZoomPanStill(input, output, frames, { zoomEnd = 1.12, pan = 'up' } = {}) {
   const fps = 30;
   const panExpr = pan === 'down'
@@ -237,12 +377,14 @@ function slowZoomPanStill(input, output, frames, { zoomEnd = 1.12, pan = 'up' } 
     '-loop', '1',
     '-i', input,
     '-vf',
-    `scale=900:1600,zoompan=z='min(1+0.0012*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':${panExpr}:d=1:s=720x1280:fps=${fps},format=yuv420p`,
+    // Cover into a tall work canvas, then Ken Burns → exact 720x1280 square pixels.
+    `scale=900:1600:force_original_aspect_ratio=increase,crop=900:1600,zoompan=z='min(1+0.0012*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':${panExpr}:d=1:s=720x1280:fps=${fps},setsar=1,setdar=9/16,format=yuv420p`,
     '-frames:v', String(frames),
     '-an',
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-crf', '20',
+    '-aspect', '9:16',
     output,
   ]);
 }
@@ -344,8 +486,20 @@ function buildReelCaption(article) {
   const base = toFacebookFeedCaption(
     article.fb_caption || `${article.title}. ${article.dek || ''}`.trim()
   );
-  // Light discovery packaging — no hashtag dump.
-  return `${base}\n\nPark tip from Florida Buzz — would you use this?`;
+  // Light discovery packaging — no hashtag dump. Story URL goes in first comment.
+  return `${base}\n\nPark tip from Florida Buzz — would you use this?\n\nMore at thefloridabuzz.com`;
+}
+
+function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
+  const base = String(siteUrl || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  const slug = String(article?.slug || '').replace(/^\/+/, '');
+  return `${base}/article/${slug}`;
+}
+
+/** First-comment body with the specific story link (required on every Reel post). */
+function parkReelFirstComment(article, siteUrl) {
+  const link = articlePermalink(article, siteUrl);
+  return `Read this story on TheFloridaBuzz.com:\n${link}`;
 }
 
 /**
@@ -382,7 +536,7 @@ async function renderParkReelFromArticle(article, {
   const masterName = masterFileName || `${slugSafe}-${Date.now().toString(36)}.mp4`;
   const masterPath = path.join(outDir, masterName);
 
-  const spokenText = String(spoken || spokenScriptFromArticle(article)).trim();
+  const spokenText = ensureSiteCtaSpoken(spoken || spokenScriptFromArticle(article));
   const wantVoice = withVoice == null ? (Boolean(voicePath) || parkReelVoiceEnabled(env)) : Boolean(withVoice);
 
   let voiceMeta = null;
@@ -438,15 +592,18 @@ async function renderParkReelFromArticle(article, {
   }
 
   const assEscaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+  // Re-assert square pixels + 9:16 after ASS burn (ass filter can inherit SAR).
+  const burnVf = `ass=${assEscaped},setsar=1,setdar=9/16,format=yuv420p`;
   if (wantVoice && fs.existsSync(voiceMp3)) {
     runFfmpeg([
       '-y',
       '-i', videoOnly,
       '-i', voiceMp3,
-      '-vf', `ass=${assEscaped},format=yuv420p`,
+      '-vf', burnVf,
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '20',
+      '-aspect', '9:16',
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ar', '44100',
@@ -461,10 +618,11 @@ async function renderParkReelFromArticle(article, {
       '-i', videoOnly,
       '-f', 'lavfi',
       '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-      '-vf', `ass=${assEscaped},format=yuv420p`,
+      '-vf', burnVf,
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '20',
+      '-aspect', '9:16',
       '-c:a', 'aac',
       '-b:a', '128k',
       '-shortest',
@@ -488,7 +646,9 @@ async function renderParkReelFromArticle(article, {
 }
 
 /**
- * Publish a rendered park Reel to Facebook as a Page video with link in first comment.
+ * Publish a rendered park Reel to Facebook as a vertical Reel (video_reels API)
+ * with the article link in the first comment. Falls back only if explicitly
+ * disabled via FB_PARK_REEL_AS_REEL=false (legacy /videos path — letterboxes).
  * Requires FB_PARK_REEL_PUBLISH=true (or publish:true) and a reachable videoUrl.
  */
 async function publishParkReel({
@@ -498,6 +658,7 @@ async function publishParkReel({
   articleUrl,
   dryRun = process.env.DRY_RUN === 'true',
   publish = process.env.FB_PARK_REEL_PUBLISH === 'true',
+  asReel = process.env.FB_PARK_REEL_AS_REEL !== 'false',
 } = {}) {
   if (!publish && !dryRun) {
     return {
@@ -509,7 +670,8 @@ async function publishParkReel({
   }
 
   const message = caption || buildReelCaption(article);
-  const link = articleUrl || `${(process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '')}/article/${article.slug}`;
+  const link = articleUrl || articlePermalink(article);
+  const firstCommentText = parkReelFirstComment(article);
 
   const result = await postToFacebookPage({
     message,
@@ -518,8 +680,11 @@ async function publishParkReel({
     dryRun: dryRun || !publish,
     linkPlacement: 'first_comment',
     linkCommentKind: 'article',
+    firstCommentText,
     logDetail: `park-reel:${article.slug}`,
     returnResult: true,
+    asReel,
+    reelTitle: String(article?.title || 'Florida Buzz').slice(0, 255),
   });
 
   return {
@@ -528,6 +693,8 @@ async function publishParkReel({
     videoUrl,
     message,
     link,
+    firstCommentText,
+    asReel,
   };
 }
 
@@ -574,9 +741,14 @@ function parkReelScheduleEnabled(env = process.env) {
 }
 
 module.exports = {
+  SITE_CTA_SPOKEN,
+  articlePermalink,
   buildReelCaption,
   captionBeatsFromArticle,
   captionBeatsFromSpoken,
+  ensureSiteCtaSpoken,
+  formatCaptionLines,
+  parkReelFirstComment,
   parkReelScheduleEnabled,
   parkReelVoiceEnabled,
   pickParkCruiseArticle,
@@ -585,6 +757,8 @@ module.exports = {
   resolveStillImage,
   runParkReelJob,
   slowZoomPanStill,
+  phraseChunksFromSpoken,
+  splitCaptionChunk,
   spokenScriptFromArticle,
   stripAudioTags,
   synthesizeParkReelVoice,
