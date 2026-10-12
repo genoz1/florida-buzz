@@ -435,8 +435,8 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /ElevenLabs audio tags/i);
   assert.match(conversation.system, /\[warmly\]/);
   assert.match(conversation.system, /\[chuckles\]/);
-  assert.match(conversation.system, /Sparse calm audio tags|sparse calm/i);
-  assert.match(conversation.system, /audio tags so eleven_v4|Breath groups/i);
+  assert.match(conversation.system, /Moderate calm audio tags|moderate calm|every other Geno/i);
+  assert.match(conversation.system, /audio tags so eleven_v4|Breath groups|every other/i);
   assert.match(conversation.system, /Partner mid-roll/i);
   assert.match(conversation.system, /Undercover Tourist/i);
   assert.match(conversation.system, /REQUIRED mid-episode partner mention/i);

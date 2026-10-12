@@ -124,7 +124,7 @@ Outline rules:
   3) Been going since eighteen months old — over fifty years ago
   4) Park news / real planning from The Florida Buzz
   5) Here's what we're locking in today / Let's go
-- Plan sparse ElevenLabs audio tags (Named Open keeps [conversational]/[warmly]; a few Quick Hits / Deep Dive / CTA lines may use [chuckles], [nostalgic], [thoughtful], [conversational] where natural). Prefer calm tags — avoid [excited]/[upbeat].
+- Plan moderate ElevenLabs audio tags across the episode (Named Open keeps [conversational]/[warmly]; Quick Hits / Deep Dive / CTA should keep tagging roughly every other Geno line with [chuckles], [nostalgic], [thoughtful], [conversational], [warmly], [sighs] where natural). Prefer calm tags — avoid [excited]/[upbeat]. Untagged stretches of many lines in a row are a failure mode.
 - After Named Open: Quick Hits (several short sourced topics) → short ${PARTNER_NAME} partner mid-roll → one Deep Dive → CTA / close with Florida Buzz resources + soft ${PARTNER_NAME} show-notes reminder.
 - HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + eighteen months / fifty years + Let's go.
 - HARD BAN outlining spoken “unofficial” or stating Geno's age in years.
@@ -177,7 +177,7 @@ Conversation requirements:
 - Sound like a Central Florida park-day dad talking casually — not a presenter summarizing articles, not reading a written essay, not an announcer.
 - Casual wording: “ok / look / so / yeah / here's the thing…” when natural. Start thoughts the way people talk.
 - Breath groups: FEWER, LONGER Geno: lines (one breath / one thought). Do not split every sentence onto its own line. Use … and — inside lines for micro-pauses.
-- Sparse calm audio tags so eleven_v4 has delivery cues (not a flat monologue with zero tags; not a tag on every line). Prefer [conversational], [warmly], [chuckles], [nostalgic], [thoughtful]. Avoid [excited] / [upbeat].
+- Moderate calm audio tags so eleven_v4 has delivery cues: tag roughly every other Geno: line (more when emotion shifts). Prefer [conversational], [warmly], [chuckles], [nostalgic], [thoughtful], [sighs], [curious]. Avoid [excited] / [upbeat]. A long run of untagged lines sounds flat — that is a script failure.
 - SOLO STRUCTURE (critical):
   1) Named Open — Geno Option A (exact intent; wording may match closely; keep audio tags):
      Geno: ${GENO_NAMED_OPEN_OPTION_A}
@@ -190,6 +190,7 @@ Conversation requirements:
 - HARD BAN saying “unofficial” anywhere in the spoken script.
 - HARD BAN stating Geno's age in years (no “I'm fifty-three”, no “mid-thirties”).
 - HARD BAN writing a full episode with no square-bracket audio tags after the open.
+- HARD BAN long untagged stretches — after the open, keep calm tags coming on about every other line so TTS does not flatten.
 - Cover approved source topics accurately, but weave them into calm host talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
 - When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer Geno's take, and invite listeners to visit the Buzz Board.
@@ -252,7 +253,7 @@ async function generateConversation({ aiText, show, episode, outline, sources })
       await aiText.generateText(
         `You continue an unfinished Florida Buzz: Disney solo podcast script.
 Keep the exact "Geno:" line format.
-Keep sparse calm ElevenLabs audio tags where natural (e.g. Geno: [chuckles] …, Geno: [conversational] …). Prefer [warmly], [conversational], [chuckles], [laughs], [sighs], [nostalgic], [thoughtful]. Avoid [excited] / [upbeat]. Do not stack tags.
+Keep moderate calm ElevenLabs audio tags (roughly every other Geno line; e.g. Geno: [chuckles] …, Geno: [conversational] …). Prefer [warmly], [conversational], [chuckles], [laughs], [sighs], [nostalgic], [thoughtful]. Avoid [excited] / [upbeat]. Do not stack tags. Do not continue with long untagged stretches.
 Write fewer, longer breath-group lines with … and — for micro-pauses. Casual dad-talk wording — no announcer polish, never say “unofficial,” never state Geno's age in years.
 Do not restart the episode or repeat the named open.
 Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
