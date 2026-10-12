@@ -49,7 +49,7 @@ function createFalTts(cfg, fetcher = fetch) {
       output_format: cfg.outputFormat,
       voice: cfg.falSoloVoice || cfg.genaVoice || 'Aoede',
       style_instructions: [
-        'Solo energetic Central Florida park-day host (Geno) — warm, punchy, conversational aftershow energy. Mid-30s American male host energy preferred when the preset allows; never cartoon, never robotic AI assistant, never dual-host banter. Named welcome first (I\'m Geno / Florida Buzz: Disney / unofficial / Let\'s go), then quick hits, one deep dive, CTA. Prefer big reactive moments over polished narration. Natural uneven pacing. Less announcer, more live solo briefing.',
+        'Solo casual Central Florida park-day host (Geno) — calm dad-talk, warm, conversational. Been going to Walt Disney World since eighteen months old / over fifty years ago — never state age in years, never say unofficial. Never cartoon, never robotic AI assistant, never dual-host banter, never radio announcer polish. Named welcome first (I\'m Geno / Florida Buzz: Disney / eighteen months / fifty years / Let\'s go), then quick hits, one deep dive, CTA. Longer breath groups, uneven pacing, micro-pauses. Less announcer, more real conversation.',
         pronunciationStyleInstructions(),
       ].join(' '),
     };

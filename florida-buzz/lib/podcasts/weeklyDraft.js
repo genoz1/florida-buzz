@@ -343,7 +343,7 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   const evergreen = sources.find((s) => s.source_kind === 'evergreen_topic' && s.included !== false);
   const turns = [];
   turns.push(
-    `Geno: [excited] Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host bringing park news and real planning from The Florida Buzz. Not affiliated with Disney — just a fan who lives this stuff. Today we're locking in that park-day energy and cutting through the noise. Let's go.`
+    `Geno: [conversational] Ok, welcome to Florida Buzz: Disney. I'm Geno. I've been going to Walt Disney World since I was eighteen months old — over fifty years ago — and I'm here with park news and real planning from The Florida Buzz. [warmly] Here's what we're locking in today. Let's go.`
   );
   turns.push(`Geno: This week’s draft focus is ${copy.title}. Quick hits first, then one deeper dive.`);
   turns.push('Geno: Exact facts still come from The Florida Buzz — articles, guides, and the Buzz Board.');

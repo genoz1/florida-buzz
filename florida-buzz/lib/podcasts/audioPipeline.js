@@ -7,8 +7,8 @@ const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const { splitScriptIntoSections, formatScriptForTts } = require('./script');
 
-/** Deterministic uneven join gaps (ms). Avoids identical metronomic section seams. */
-const INTER_SECTION_GAP_MS = Object.freeze([70, 150, 40, 210, 95, 175, 55, 230, 110, 85]);
+/** Deterministic uneven join gaps (ms). Wider breath spacing between sections. */
+const INTER_SECTION_GAP_MS = Object.freeze([140, 220, 160, 280, 180, 240, 150, 300, 190, 170]);
 
 function runFfmpeg(ffmpegPath, args) {
   return new Promise((resolve, reject) => {
@@ -75,7 +75,7 @@ async function trimEdgeSilence(buffer, ffmpegPath) {
 }
 
 async function makeSilenceBuffer(ffmpegPath, durationMs) {
-  const seconds = Math.max(0.02, Math.min(0.4, Number(durationMs) / 1000));
+  const seconds = Math.max(0.02, Math.min(0.55, Number(durationMs) / 1000));
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-silence-'));
   try {
     const outPath = path.join(dir, 'silence.mp3');
@@ -307,6 +307,9 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
     for (let i = 0; i < sections.length; i += 1) {
       let buffer = null;
       let lastSectionError = null;
+      const prevPlain = i > 0 ? formatScriptForTts(sections[i - 1], { keepSpeakerPrefix: false }) : null;
+      const nextPlain =
+        i < sections.length - 1 ? formatScriptForTts(sections[i + 1], { keepSpeakerPrefix: false }) : null;
       for (let attempt = 1; attempt <= sectionRetries && !buffer; attempt += 1) {
         jobResult = {
           ...jobResult,
@@ -317,12 +320,16 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
         };
         await store.updateJob(job.id, { section_index: i, status: 'running', result: jobResult });
         try {
-          const synthesized = await eleven.synthesize(sections[i]);
+          const synthesized = await eleven.synthesize(sections[i], {
+            previousText: prevPlain,
+            nextText: nextPlain,
+          });
           buffer = synthesized.buffer;
           jobResult = {
             ...jobResult,
             [`section_${i}_request`]: synthesized.requestId,
             [`section_${i}_attempt_${attempt}`]: synthesized.requestId,
+            [`section_${i}_speed`]: synthesized.speed,
             heartbeat_at: new Date().toISOString(),
             phase: 'download',
             section: i + 1,

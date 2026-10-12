@@ -13,7 +13,7 @@ function now() {
 }
 
 const DEFAULT_DISCLOSURE =
-  'This is an unofficial fan podcast and is not affiliated with, endorsed by, or sponsored by The Walt Disney Company.';
+  'Florida Buzz: Disney is a fan podcast and is not affiliated with, endorsed by, or sponsored by The Walt Disney Company.';
 
 function seedShow() {
   return {
@@ -22,7 +22,7 @@ function seedShow() {
     title: 'Florida Buzz: Disney',
     publisher: 'The Florida Buzz',
     description:
-      'Geno hosts Florida Buzz: Disney — an unofficial fan podcast with park news, attractions, food, resorts, events, and Disney World vacation planning. Energetic solo coverage of Magic Kingdom, EPCOT, Disney’s Animal Kingdom, Hollywood Studios, wait times, dining, and practical trip tips. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.',
+      'Geno hosts Florida Buzz: Disney — a fan podcast with park news, attractions, food, resorts, events, and Disney World vacation planning. Calm conversational coverage of Magic Kingdom, EPCOT, Disney’s Animal Kingdom, Hollywood Studios, wait times, dining, and practical trip tips. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.',
     hosts: [{ name: 'Geno', role: 'host' }],
     disclosure: DEFAULT_DISCLOSURE,
     language: 'en-us',

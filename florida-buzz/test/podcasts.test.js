@@ -294,9 +294,10 @@ test('show notes sanitizer strips scripts and unsafe urls', () => {
   assert.match(clean, /https:\/\/example\.com/);
 });
 
-test('show notes always receive unofficial affiliation disclosure', () => {
+test('show notes always receive affiliation disclosure', () => {
   const withAffiliation = ensureShowNotesDisclosures('<p>Episode notes</p>');
   assert.match(withAffiliation, /not affiliated with/i);
+  assert.doesNotMatch(withAffiliation, /unofficial/i);
   assert.doesNotMatch(withAffiliation, /AI-generated hosts/i);
   assert.match(withAffiliation, /Undercover Tourist/i);
   assert.match(withAffiliation, /jdoqocy\.com\/click-101851476-15733832/);
@@ -309,8 +310,11 @@ test('assertScriptOpenShape requires Geno Option A named open', () => {
     'Geno: [conversational] Quick hits first, then one deeper dive.',
   ].join('\n');
   assert.doesNotThrow(() => assertScriptOpenShape(good));
-  assert.match(GENO_NAMED_OPEN_OPTION_A, /\[excited\]/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /\[conversational\]/i);
   assert.match(GENO_NAMED_OPEN_OPTION_A, /\[warmly\]/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /eighteen months/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /fifty years/i);
+  assert.doesNotMatch(GENO_NAMED_OPEN_OPTION_A, /unofficial/i);
 
   const weatherColdOpen = [
     'Geno: Okay, how was your week? Rain everywhere and sandals were a mistake.',
@@ -326,9 +330,14 @@ test('assertScriptOpenShape requires Geno Option A named open', () => {
   assert.throws(() => assertScriptOpenShape(dualHost), /dual-host|Geno:/i);
 
   const missingLetsGo = [
-    "Geno: Welcome to Florida Buzz: Disney. I'm Geno — unofficial fan host from The Florida Buzz.",
+    "Geno: Welcome to Florida Buzz: Disney. I'm Geno. I've been going since I was eighteen months old — over fifty years ago.",
   ].join('\n');
   assert.throws(() => assertScriptOpenShape(missingLetsGo), /Let's go/i);
+
+  const saysUnofficial = [
+    "Geno: Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host. I've been going since I was eighteen months old — over fifty years ago. Let's go.",
+  ].join('\n');
+  assert.throws(() => assertScriptOpenShape(saysUnofficial), /unofficial/i);
 });
 
 test('generateConversation rejects scripts that skip the named show open', async () => {
@@ -355,13 +364,14 @@ test('generateConversation rejects scripts that skip the named show open', async
 });
 
 test('full-episode prompts keep solo Geno host bible and structure', () => {
-  assert.equal(HOST_STYLE, 'solo_energetic');
+  assert.equal(HOST_STYLE, 'solo_casual');
   assert.match(HOST_BIBLE, /Geno/);
-  assert.match(HOST_BIBLE, /mid-thirties/i);
+  assert.match(HOST_BIBLE, /eighteen months/i);
+  assert.match(HOST_BIBLE, /fifty years/i);
   assert.match(HOST_BIBLE, /solo/i);
   assert.match(HOST_BIBLE, /I'm Geno/i);
   assert.match(HOST_BIBLE, /welcome to Florida Buzz: Disney/i);
-  assert.match(HOST_BIBLE, /unofficial/i);
+  assert.match(HOST_BIBLE, /FORBID saying “unofficial”|never say “unofficial”|HARD BAN saying “unofficial”/i);
   assert.match(HOST_BIBLE, /Let's go/i);
   assert.match(HOST_BIBLE, /Quick Hits|quick hits/i);
   assert.match(HOST_BIBLE, /Deep Dive|deep dive/i);
@@ -370,10 +380,10 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open|do NOT cold-open/i);
   assert.match(HOST_BIBLE, /ElevenLabs audio tags/i);
   assert.match(HOST_BIBLE, /\[warmly\]/);
-  assert.match(HOST_BIBLE, /\[excited\]/);
+  assert.match(HOST_BIBLE, /\[conversational\]/);
   assert.match(HOST_BIBLE, /\[chuckles\]/);
   assert.match(HOST_BIBLE, /\[nostalgic\]/);
-  assert.match(HOST_BIBLE, /sparse to moderate|sparse-to-moderate/i);
+  assert.match(HOST_BIBLE, /breath groups|Breath groups/i);
   assert.match(HOST_BIBLE, /Undercover Tourist/i);
   assert.match(HOST_BIBLE, /partner mid-roll/i);
   assert.match(HOST_BIBLE, /show notes/i);
@@ -425,8 +435,8 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /ElevenLabs audio tags/i);
   assert.match(conversation.system, /\[warmly\]/);
   assert.match(conversation.system, /\[chuckles\]/);
-  assert.match(conversation.system, /sparse-to-moderate|sparse to moderate/i);
-  assert.match(conversation.system, /Trailer-style expressiveness|audio tags so eleven_v4/i);
+  assert.match(conversation.system, /Sparse calm audio tags|sparse calm/i);
+  assert.match(conversation.system, /audio tags so eleven_v4|Breath groups/i);
   assert.match(conversation.system, /Partner mid-roll/i);
   assert.match(conversation.system, /Undercover Tourist/i);
   assert.match(conversation.system, /REQUIRED mid-episode partner mention/i);
@@ -460,9 +470,10 @@ test('outline and conversation prompts require solo Geno structure', () => {
   assert.match(conversation.system, /SOLO STRUCTURE/i);
   assert.match(conversation.system, /Geno:/);
   assert.doesNotMatch(conversation.system, /Support host mostly short comments/);
-  assert.match(HOST_BIBLE, /solo energetic/i);
-  assert.match(conversation.system, /\[excited\]/);
-  assert.match(conversation.system, /\[upbeat\]/);
+  assert.match(HOST_BIBLE, /solo casual|solo_casual|calm casual/i);
+  assert.match(conversation.system, /\[conversational\]/);
+  assert.match(conversation.system, /breath groups|Breath groups/i);
+  assert.match(conversation.system, /HARD BAN saying “unofficial”/i);
 });
 
 test('conversation token budget supports a ~20–25 minute script', () => {
@@ -566,7 +577,7 @@ test('formatScriptForTts and ElevenLabs client preserve emotion audio tags', asy
   ].join('\n');
   const formatted = formatScriptForTts(tagged);
   assert.doesNotMatch(formatted, /^Geno:/m);
-  assert.match(formatted, /\[excited\]/);
+  assert.match(formatted, /\[conversational\]/);
   assert.match(formatted, /\[warmly\]/);
   assert.match(formatted, /\[chuckles\]/);
   assert.match(formatted, /\[nostalgic\]/);
@@ -590,12 +601,17 @@ test('formatScriptForTts and ElevenLabs client preserve emotion audio tags', asy
   });
   await eleven.synthesize(tagged);
   assert.ok(capturedBody);
-  assert.match(capturedBody.text, /\[excited\]/);
+  assert.match(capturedBody.text, /\[conversational\]/);
   assert.match(capturedBody.text, /\[warmly\]/);
   assert.match(capturedBody.text, /\[chuckles\]/);
   assert.match(capturedBody.text, /\[nostalgic\]/);
   assert.doesNotMatch(capturedBody.text, /^Geno:/m);
   assert.equal(capturedBody.model_id, cfg.elevenModel);
+  assert.equal(capturedBody.voice_settings.style, 0);
+  assert.equal(capturedBody.voice_settings.use_speaker_boost, false);
+  assert.ok(capturedBody.voice_settings.stability <= 0.35);
+  assert.ok(capturedBody.voice_settings.speed >= 0.7);
+  assert.ok(capturedBody.voice_settings.speed <= 1.2);
 });
 
 test('script sections prefer larger multi-turn packs and absorb tiny tails', () => {
@@ -655,7 +671,9 @@ test('RSS omits draft audio and includes published enclosure fields', async () =
   assert.match(xml, /itunes:duration>2:05/);
   assert.doesNotMatch(xml, /Draft Only/);
   assert.doesNotMatch(xml, /secret\.mp3/);
-  assert.match(xml, /unofficial fan podcast/i);
+  assert.match(xml, /fan podcast/i);
+  assert.match(xml, /not affiliated with/i);
+  assert.doesNotMatch(xml, /unofficial/i);
   assert.doesNotMatch(xml, /AI-generated hosts/i);
   assert.match(xml, /floridabuzzonline@gmail\.com/);
 });
@@ -719,10 +737,12 @@ test('fal fallback builds solo Geno single-speaker input', () => {
   assert.equal(input.voice, 'Aoede');
   assert.doesNotMatch(input.prompt, /^Geno:/m);
   assert.match(input.prompt, /Hello from the parks/);
-  assert.match(input.style_instructions, /Solo energetic|solo energetic/i);
+  assert.match(input.style_instructions, /Solo casual|solo casual/i);
   assert.match(input.style_instructions, /Geno/);
   assert.match(input.style_instructions, /quick hits/i);
   assert.match(input.style_instructions, /deep dive/i);
+  assert.match(input.style_instructions, /eighteen months|fifty years/i);
+  assert.match(input.style_instructions, /never say unofficial/i);
 });
 
 test('elevenlabs TTS refuses when generation disabled', async () => {
@@ -1032,7 +1052,9 @@ test('public player renders for published episodes and hides drafts', async () =
     assert.match(showPage.body, /cdn\.example\.com\/live\.mp3/);
     assert.match(showPage.body, /cdn\.example\.com\/trailer\.mp3/);
     assert.doesNotMatch(showPage.body, /Hidden Draft/);
-    assert.match(showPage.body, /unofficial fan podcast/i);
+    assert.match(showPage.body, /fan podcast/i);
+    assert.match(showPage.body, /not affiliated with/i);
+    assert.doesNotMatch(showPage.body, /unofficial/i);
 
     const directory = await request(port, 'GET', '/podcasts');
     assert.equal(directory.status, 200);
