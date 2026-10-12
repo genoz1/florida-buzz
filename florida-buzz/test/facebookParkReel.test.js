@@ -8,16 +8,20 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const {
   SITE_CTA_SPOKEN,
+  buildReelCaption,
   captionBeatsFromSpoken,
   easternDateString,
   ensureSiteCtaSpoken,
   expectedParkReelCountEt,
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
+  isTipsOrGuideContent,
   parkReelFirstComment,
   parkReelPostedOnEasternDay,
   parkReelVoiceEnabled,
+  rankParkReelCandidates,
   renderParkReelFromArticle,
+  scoreParkReelCandidate,
   shouldRunParkReelCatchUp,
   slowZoomPanStill,
   spokenScriptFromArticle,
@@ -64,18 +68,26 @@ describe('facebookParkReel voice + captions', () => {
     assert.equal(parkReelVoiceEnabled({}), false);
   });
 
-  it('builds a spoken Geno script from article title/dek with site CTA', () => {
+  it('builds a spoken Geno script with tips-and-tricks framing + site CTA', () => {
     const spoken = spokenScriptFromArticle({
       title: 'Lightning Lane hit record highs — worth it?',
       dek: 'Pay only if that wait would wreck your Magic Kingdom morning',
     });
     assert.match(spoken, /Lightning Lane hit record highs/i);
+    assert.match(stripAudioTags(spoken), /Tips and tricks from Florida Buzz/i);
     assert.match(stripAudioTags(spoken), /Florida Buzz dot com/i);
     assert.match(spoken, /\[[^\]]+\]/);
     assert.equal(ensureSiteCtaSpoken(spoken), spoken);
+
+    const guideSpoken = spokenScriptFromArticle({
+      title: 'Disney World Trip Itinerary Framework',
+      dek: 'A calm plan you can actually follow',
+      is_evergreen: true,
+    });
+    assert.match(stripAudioTags(guideSpoken), /Florida Buzz tips and tricks/i);
   });
 
-  it('always appends the Florida Buzz dot com CTA and first-comment story link', () => {
+  it('always appends the Florida Buzz dot com CTA and tips-first first comment', () => {
     const withFollow = ensureSiteCtaSpoken('[curious] Lightning Lane hit highs. Follow Florida Buzz.');
     assert.match(stripAudioTags(withFollow), /Florida Buzz dot com/i);
     assert.doesNotMatch(stripAudioTags(withFollow), /Follow Florida Buzz\.?\s*$/i);
@@ -83,7 +95,47 @@ describe('facebookParkReel voice + captions', () => {
 
     const comment = parkReelFirstComment({ slug: 'lightning-lane-record-highs-worth-it' });
     assert.match(comment, /thefloridabuzz\.com\/article\/lightning-lane-record-highs-worth-it/i);
-    assert.match(comment, /Read this story/i);
+    assert.match(comment, /Tips and tricks/i);
+
+    const guideComment = parkReelFirstComment({
+      slug: 'disney-world-trip-itinerary-framework',
+      is_evergreen: true,
+    });
+    assert.match(guideComment, /Full tips and tricks/i);
+    assert.match(buildReelCaption({ title: 'Boat tips', dek: 'Keep docks moving' }), /Tips and tricks from Florida Buzz/i);
+  });
+
+  it('ranks evergreen guides and tip posts ahead of plain park news', () => {
+    const news = {
+      slug: 'disney-believe-features',
+      title: 'Disney Believe features announced',
+      category: 'cruises',
+      published_at: '2026-10-12T12:00:00.000Z',
+    };
+    const tip = {
+      slug: 'disney-world-boat-transportation-tips-for-strollers',
+      title: '3 Boat Tips to Keep Disney World Docks Moving',
+      category: 'theme-parks',
+      published_at: '2026-09-01T12:00:00.000Z',
+    };
+    const guide = {
+      slug: 'disney-world-trip-itinerary-framework',
+      title: 'Disney World Trip Itinerary Framework',
+      category: 'theme-parks',
+      is_evergreen: true,
+      published_at: '2026-08-01T12:00:00.000Z',
+    };
+    assert.equal(isTipsOrGuideContent(guide), true);
+    assert.equal(isTipsOrGuideContent(tip), true);
+    assert.equal(isTipsOrGuideContent(news), false);
+    assert.ok(scoreParkReelCandidate(guide) > scoreParkReelCandidate(tip));
+    assert.ok(scoreParkReelCandidate(tip) > scoreParkReelCandidate(news));
+    const ranked = rankParkReelCandidates([news, tip, guide], new Set());
+    assert.deepEqual(ranked.map((r) => r.slug), [
+      'disney-world-trip-itinerary-framework',
+      'disney-world-boat-transportation-tips-for-strollers',
+      'disney-believe-features',
+    ]);
   });
 
   it('aligns kinetic captions to spoken beats across the audio duration', () => {

@@ -3,10 +3,11 @@
 /**
  * Inexpensive Disney / theme-park Reel path for Facebook discovery.
  *
+ * Prefers evergreen guides + tips/tricks posts (still park/cruise only).
  * NOT the fal Seedance guide-reels pipeline. Uses article/park still photos
  * with a slow zoom/pan (cover-crop + setsar=1 → true 720x1280 / 9:16 even when
- * the article still is landscape), Geno ElevenLabs VO (eleven_v4), and kinetic
- * captions aligned to the spoken script. No AI presenter / green screen / fal.
+ * the article still is landscape), Geno ElevenLabs VO (eleven_v4) that mentions
+ * tips and tricks, and kinetic captions aligned to the spoken script.
  * Publishes via Meta /video_reels (not letterboxing Page /videos).
  *
  * Status: daily cron is wired in server.js when FB_PARK_REEL_ENABLED=true
@@ -143,12 +144,56 @@ function ensureSiteCtaSpoken(spoken) {
   return `${cleaned} [upbeat] ${SITE_CTA_SPOKEN}`;
 }
 
+/**
+ * Guides (`is_evergreen`) and tip/trick-style park posts — preferred Reel source.
+ */
+function isTipsOrGuideContent(article = {}) {
+  if (article.is_evergreen === true) return true;
+  const hay = [
+    article.slug,
+    article.title,
+    article.dek,
+    article.fb_caption,
+    article.category,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return /\b(tips?|tricks?|how[\s-]?to|guide|hack|planning|itinerary|etiquette)\b/.test(hay);
+}
+
+/** Higher = better for discovery Reels (tips/guides first, then tippy news). */
+function scoreParkReelCandidate(article = {}) {
+  let score = 0;
+  if (article.is_evergreen === true) score += 100;
+  const hay = [
+    article.slug,
+    article.title,
+    article.dek,
+    article.fb_caption,
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (/\btips?\b/.test(hay)) score += 50;
+  if (/\btricks?\b/.test(hay)) score += 40;
+  if (/\bguide\b/.test(hay)) score += 35;
+  if (/\b(how[\s-]?to|hack|planning|itinerary|etiquette)\b/.test(hay)) score += 25;
+  // Prefer park categories slightly over keyword-only matches.
+  const cat = String(article.category || '').toLowerCase();
+  if (cat === 'theme-parks') score += 10;
+  if (cat === 'cruises') score += 8;
+  return score;
+}
+
 function spokenScriptFromArticle(article) {
   if (article?.spoken) return ensureSiteCtaSpoken(article.spoken);
   const title = String(article?.title || 'Florida theme parks').trim();
   const dek = String(article?.dek || '').trim();
   const tip = dek || 'Worth knowing before your next park day.';
-  return ensureSiteCtaSpoken(`[curious] ${title}. ${tip}`);
+  // Tips & tricks framing — big draw on Reels; guides get the fuller line.
+  if (isTipsOrGuideContent(article)) {
+    return ensureSiteCtaSpoken(
+      `[curious] Florida Buzz tips and tricks. ${title}. ${tip}`
+    );
+  }
+  return ensureSiteCtaSpoken(
+    `[curious] Tips and tricks from Florida Buzz. ${title}. ${tip}`
+  );
 }
 
 // Mute-friendly full-script captions: complete phrases, never keyword hooks.
@@ -451,34 +496,72 @@ async function synthesizeParkReelVoice({
   };
 }
 
-/**
- * Pick the newest theme-park / cruise article with an image that passes the
- * Facebook topic allowlist and has not already been used for a park Reel
- * (detail marker in post_log when client is provided).
- */
-async function pickParkCruiseArticle(client, { limit = 40 } = {}) {
-  if (!client) throw new Error('Supabase client required to pick a park Reel article');
-  const { data, error } = await client
-    .from('articles')
-    .select('id, slug, title, dek, category, image_url, fb_caption, published_at')
-    .not('image_url', 'is', null)
-    .order('published_at', { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(`Could not load articles for park Reel: ${error.message}`);
+function allowedParkReelCandidate(row) {
+  if (!row?.image_url) return false;
+  return isFacebookTopicAllowed({
+    category: row.category,
+    title: row.title,
+    dek: row.dek,
+    caption: row.fb_caption,
+    slug: row.slug,
+  }).ok;
+}
 
-  const candidates = (data || []).filter((row) => {
-    if (!row.image_url) return false;
-    return isFacebookTopicAllowed({
-      category: row.category,
-      title: row.title,
-      dek: row.dek,
-      caption: row.fb_caption,
-      slug: row.slug,
-    }).ok;
+function rankParkReelCandidates(candidates, usedSlugs = new Set()) {
+  const scored = (candidates || []).map((row) => ({
+    row,
+    used: usedSlugs.has(row.slug),
+    score: scoreParkReelCandidate(row),
+    publishedAt: Date.parse(row.published_at || '') || 0,
+  }));
+  scored.sort((a, b) => {
+    if (a.used !== b.used) return a.used ? 1 : -1;
+    if (b.score !== a.score) return b.score - a.score;
+    return b.publishedAt - a.publishedAt;
   });
+  return scored.map((entry) => entry.row);
+}
 
+/**
+ * Prefer theme-park / cruise **guides** (evergreen) and tips/tricks posts with
+ * an image. Falls back to other allowlisted park/cruise articles. Skips slugs
+ * already used for a park Reel when post_log is available.
+ */
+async function pickParkCruiseArticle(client, { limit = 80 } = {}) {
+  if (!client) throw new Error('Supabase client required to pick a park Reel article');
+  const select = 'id, slug, title, dek, category, image_url, fb_caption, published_at, is_evergreen';
+
+  const [recentRes, guidesRes] = await Promise.all([
+    client
+      .from('articles')
+      .select(select)
+      .not('image_url', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(limit),
+    client
+      .from('articles')
+      .select(select)
+      .eq('is_evergreen', true)
+      .in('category', ['theme-parks', 'cruises'])
+      .not('image_url', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(40),
+  ]);
+  if (recentRes.error) {
+    throw new Error(`Could not load articles for park Reel: ${recentRes.error.message}`);
+  }
+  if (guidesRes.error) {
+    console.error(`[warn] park Reel guide fetch failed: ${guidesRes.error.message}`);
+  }
+
+  const bySlug = new Map();
+  for (const row of [...(guidesRes.data || []), ...(recentRes.data || [])]) {
+    if (!bySlug.has(row.slug)) bySlug.set(row.slug, row);
+  }
+  const candidates = [...bySlug.values()].filter(allowedParkReelCandidate);
   if (!candidates.length) return null;
 
+  let used = new Set();
   try {
     const { data: logs } = await client
       .from('post_log')
@@ -487,20 +570,21 @@ async function pickParkCruiseArticle(client, { limit = 40 } = {}) {
       .eq('status', 'success')
       .like('detail', 'park-reel:%')
       .limit(200);
-    const used = new Set((logs || []).map((row) => String(row.detail || '').replace(/^park-reel:/, '')));
-    const fresh = candidates.find((row) => !used.has(row.slug));
-    return fresh || candidates[0];
+    used = new Set((logs || []).map((row) => String(row.detail || '').replace(/^park-reel:/, '')));
   } catch {
-    return candidates[0];
+    used = new Set();
   }
+
+  const ranked = rankParkReelCandidates(candidates, used);
+  return ranked[0] || null;
 }
 
 function buildReelCaption(article) {
   const base = toFacebookFeedCaption(
     article.fb_caption || `${article.title}. ${article.dek || ''}`.trim()
   );
-  // Light discovery packaging — no hashtag dump. Story URL goes in first comment.
-  return `${base}\n\nPark tip from Florida Buzz — would you use this?\n\nMore at thefloridabuzz.com`;
+  // Discovery packaging — lead with tips & tricks; story URL in first comment.
+  return `${base}\n\nTips and tricks from Florida Buzz — save this for your next trip.\n\nMore at thefloridabuzz.com`;
 }
 
 function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
@@ -509,10 +593,13 @@ function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://th
   return `${base}/article/${slug}`;
 }
 
-/** First-comment body with the specific story link (required on every Reel post). */
+/** First-comment body with the specific story/guide link (required on every Reel). */
 function parkReelFirstComment(article, siteUrl) {
   const link = articlePermalink(article, siteUrl);
-  return `Read this story on TheFloridaBuzz.com:\n${link}`;
+  if (isTipsOrGuideContent(article)) {
+    return `Full tips and tricks on TheFloridaBuzz.com:\n${link}`;
+  }
+  return `Tips and tricks + the full story on TheFloridaBuzz.com:\n${link}`;
 }
 
 /**
@@ -857,7 +944,13 @@ async function runParkReelJob({
     return { ok: false, reason: 'no_candidate', detail: 'No theme-park/cruise article with an image' };
   }
 
-  console.log(`Park Reel candidate: ${picked.title} (/article/${picked.slug})`);
+  const kind = isTipsOrGuideContent(picked)
+    ? (picked.is_evergreen ? 'guide' : 'tips')
+    : 'park-news';
+  console.log(
+    `Park Reel candidate (${kind}, score ${scoreParkReelCandidate(picked)}): `
+    + `${picked.title} (/article/${picked.slug})`
+  );
   const rendered = await renderParkReelFromArticle(picked);
   console.log(`Rendered: ${rendered.masterPath}`);
   if (rendered.voice) {
@@ -915,15 +1008,18 @@ module.exports = {
   expectedParkReelCountEt,
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
+  isTipsOrGuideContent,
   parkReelFirstComment,
   parkReelPostedOnEasternDay,
   parkReelScheduleEnabled,
   parkReelVoiceEnabled,
   pickParkCruiseArticle,
   publishParkReel,
+  rankParkReelCandidates,
   renderParkReelFromArticle,
   resolveStillImage,
   runParkReelJob,
+  scoreParkReelCandidate,
   shouldRunParkReelCatchUp,
   slowZoomPanStill,
   phraseChunksFromSpoken,
