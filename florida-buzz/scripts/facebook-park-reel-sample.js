@@ -41,13 +41,13 @@ const ARTICLE = {
 
 /** Caption beats match the spoken script (scaled to real audio duration). */
 const CAPTIONS = [
-  { start: 0.0, end: 3.2, text: 'Lightning Lane hit new highs' },
+  { start: 0.0, end: 3.2, text: 'Lightning Lane\\Nhit new highs' },
   { start: 3.2, end: 6.4, text: 'Up to $229' },
-  { start: 6.4, end: 9.6, text: 'Seven Dwarfs Mine Train' },
-  { start: 9.6, end: 12.4, text: 'Standby: 50 minutes' },
-  { start: 12.4, end: 15.2, text: 'So… is it worth it?' },
-  { start: 15.2, end: 19.0, text: 'Pay only if it saves your morning' },
-  { start: 19.0, end: 23.0, text: 'Record price ≠ automatic yes' },
+  { start: 6.4, end: 9.6, text: 'Seven Dwarfs\\NMine Train' },
+  { start: 9.6, end: 12.4, text: 'Standby:\\N50 minutes' },
+  { start: 12.4, end: 15.2, text: 'So… is it\\Nworth it?' },
+  { start: 15.2, end: 19.0, text: 'Pay only if it\\Nsaves your morning' },
+  { start: 19.0, end: 23.0, text: 'Record price ≠\\Nautomatic yes' },
 ];
 
 const STILLS = [

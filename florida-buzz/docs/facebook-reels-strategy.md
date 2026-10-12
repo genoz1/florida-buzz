@@ -83,8 +83,10 @@ No hashtag dumps on Facebook.
 
 **What each Reel looks like:** park article photo(s), camera slowly zooms/pans, **Geno ElevenLabs VO** (`eleven_v4`, voice `bg7PC2IzyIDwYgytMiW1`), and big white captions that match the spoken beats. Florida Buzz brand label. No AI host, no green screen, no wallet stickers.
 
-**Does use:** existing article image, ffmpeg slow zoom/pan, Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, Page `/videos` upload helper.  
+**Does use:** existing article image, ffmpeg slow zoom/pan (cover-crop + `setsar=1` so landscape stills stay true 9:16), Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, Page **`/video_reels`** publish helper (not legacy `/videos`, which letterboxed vertical files in feed).  
 **Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
+
+**Render invariants:** master is always **720×1280**, `SAR=1:1`, `DAR=9:16`. Landscape article photos are cover-cropped (no black bars). Captions are large, short-line, high-contrast — never truncated mid-sentence with `…`.
 
 ### Code vs production secrets
 

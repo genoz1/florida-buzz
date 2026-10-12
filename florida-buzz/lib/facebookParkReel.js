@@ -4,8 +4,10 @@
  * Inexpensive Disney / theme-park Reel path for Facebook discovery.
  *
  * NOT the fal Seedance guide-reels pipeline. Uses article/park still photos
- * with a slow zoom/pan, Geno ElevenLabs VO (eleven_v4), and kinetic captions
- * aligned to the spoken script. No AI presenter / green screen / fal.
+ * with a slow zoom/pan (cover-crop + setsar=1 → true 720x1280 / 9:16 even when
+ * the article still is landscape), Geno ElevenLabs VO (eleven_v4), and kinetic
+ * captions aligned to the spoken script. No AI presenter / green screen / fal.
+ * Publishes via Meta /video_reels (not letterboxing Page /videos).
  *
  * Status: daily cron is wired in server.js when FB_PARK_REEL_ENABLED=true
  * (plus FB + Supabase credentials). Actual Meta posting also needs
@@ -118,10 +120,57 @@ function spokenScriptFromArticle(article) {
   return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
 }
 
-function shortenCaption(text, max = 42) {
+/**
+ * Wrap caption copy into short ASS lines (no mid-sentence ellipsis).
+ * Prefer more kinetic beats over truncating words Gene actually speaks.
+ */
+function formatCaptionLines(text, { maxLine = 22, maxLines = 2 } = {}) {
+  const words = String(text || '')
+    .replace(/[{}\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+  if (!words.length) return 'Florida Buzz';
+
+  const lines = [];
+  let cur = '';
+  for (const word of words) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (next.length <= maxLine) {
+      cur = next;
+      continue;
+    }
+    if (cur) lines.push(cur);
+    cur = word.length > maxLine ? `${word.slice(0, maxLine - 1)}…` : word;
+    if (lines.length >= maxLines) {
+      cur = '';
+      break;
+    }
+  }
+  if (cur && lines.length < maxLines) lines.push(cur);
+  return lines.join('\\N') || 'Florida Buzz';
+}
+
+/** Split a long spoken fragment into beat-sized chunks at word boundaries. */
+function splitCaptionChunk(text, maxChars = 40) {
   const t = String(text || '').trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
+  if (!t) return [];
+  if (t.length <= maxChars) return [t];
+  const words = t.split(/\s+/);
+  const chunks = [];
+  let cur = '';
+  for (const word of words) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (next.length <= maxChars) {
+      cur = next;
+    } else {
+      if (cur) chunks.push(cur);
+      cur = word;
+    }
+  }
+  if (cur) chunks.push(cur);
+  return chunks;
 }
 
 /**
@@ -135,21 +184,13 @@ function captionBeatsFromSpoken(spoken, durationSec) {
     .map((p) => p.trim())
     .filter(Boolean);
 
-  // Keep Reels readable: merge tiny fragments, split very long ones.
+  // Keep Reels readable: merge tiny fragments, split long ones at words (no "…").
   const normalized = [];
   for (const part of parts) {
     if (normalized.length && (part.length < 12 || normalized[normalized.length - 1].length < 18)) {
       normalized[normalized.length - 1] = `${normalized[normalized.length - 1]} ${part}`.trim();
-    } else if (part.length > 48) {
-      const mid = part.lastIndexOf(' ', Math.floor(part.length / 2));
-      if (mid > 12) {
-        normalized.push(part.slice(0, mid).trim());
-        normalized.push(part.slice(mid).trim());
-      } else {
-        normalized.push(part);
-      }
     } else {
-      normalized.push(part);
+      normalized.push(...splitCaptionChunk(part, 40));
     }
   }
   parts = normalized.length ? normalized : [plain || 'Florida Buzz'];
@@ -163,7 +204,7 @@ function captionBeatsFromSpoken(spoken, durationSec) {
     const start = t;
     const end = i === parts.length - 1 ? usable : Math.min(usable, t + share * usable);
     t = end;
-    return { start, end, text: shortenCaption(text) };
+    return { start, end, text: formatCaptionLines(text) };
   });
 }
 
@@ -182,11 +223,15 @@ function scaleCaptionBeats(captions, durationSec) {
     const end = i === arr.length - 1
       ? durationSec - 0.05
       : Math.max(start + 0.2, (Number(c.end) || 0) * scale);
-    return { ...c, start, end, text: String(c.text || '').trim() };
+    const raw = String(c.text || '').trim();
+    // Keep explicit \\N from callers; otherwise wrap into short readable lines.
+    const text = raw.includes('\\N') ? raw : formatCaptionLines(raw);
+    return { ...c, start, end, text };
   });
 }
 
 function writeAss(captions, duration, outPath) {
+  // Large type + thick outline for phone screens; MarginV keeps copy above FB UI.
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: 720
@@ -195,8 +240,8 @@ WrapStyle: 0
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,54,&H00FFFFFF,&H00FFFFFF,&H00101010,&H8C000000,-1,0,0,0,100,100,0,0,1,3,1,2,36,36,240,1
-Style: Brand,DejaVu Sans,28,&H00F4F7FF,&H00FFFFFF,&H00101010,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,8,28,28,42,1
+Style: Caption,DejaVu Sans,68,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,5,3,2,48,48,290,1
+Style: Brand,DejaVu Sans,34,&H00F4F7FF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,56,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
@@ -204,7 +249,10 @@ Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
   for (const c of captions) {
     const end = Math.min(c.end, duration - 0.05);
     if (end <= c.start) continue;
-    const text = String(c.text).replace(/[{}\\\r\n]/g, ' ');
+    const text = String(c.text)
+      .replace(/\r?\n/g, '\\N')
+      .replace(/[{}]/g, ' ')
+      .trim();
     ass += `Dialogue: 1,${stamp(c.start)},${stamp(end)},Caption,,0,0,0,,${text}\n`;
   }
   fs.writeFileSync(outPath, ass);
@@ -226,7 +274,14 @@ async function resolveStillImage(source, destPath) {
   throw new Error(`Article image not found: ${source}`);
 }
 
-/** Slow zoom + slight pan on a still photo (vertical 720x1280). */
+/**
+ * Slow zoom + slight pan on a still photo → true 720x1280 (9:16).
+ *
+ * Cover-crop landscape/portrait stills (no letterbox/pillarbox). Force
+ * setsar=1 — landscape article photos otherwise leave SAR≈256:81 / DAR=16:9
+ * on a 720x1280 pixel buffer, and Facebook plays that as a letterboxed
+ * landscape video (Gene's cruise Reel screenshot).
+ */
 function slowZoomPanStill(input, output, frames, { zoomEnd = 1.12, pan = 'up' } = {}) {
   const fps = 30;
   const panExpr = pan === 'down'
@@ -237,12 +292,14 @@ function slowZoomPanStill(input, output, frames, { zoomEnd = 1.12, pan = 'up' } 
     '-loop', '1',
     '-i', input,
     '-vf',
-    `scale=900:1600,zoompan=z='min(1+0.0012*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':${panExpr}:d=1:s=720x1280:fps=${fps},format=yuv420p`,
+    // Cover into a tall work canvas, then Ken Burns → exact 720x1280 square pixels.
+    `scale=900:1600:force_original_aspect_ratio=increase,crop=900:1600,zoompan=z='min(1+0.0012*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':${panExpr}:d=1:s=720x1280:fps=${fps},setsar=1,setdar=9/16,format=yuv420p`,
     '-frames:v', String(frames),
     '-an',
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-crf', '20',
+    '-aspect', '9:16',
     output,
   ]);
 }
@@ -438,15 +495,18 @@ async function renderParkReelFromArticle(article, {
   }
 
   const assEscaped = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+  // Re-assert square pixels + 9:16 after ASS burn (ass filter can inherit SAR).
+  const burnVf = `ass=${assEscaped},setsar=1,setdar=9/16,format=yuv420p`;
   if (wantVoice && fs.existsSync(voiceMp3)) {
     runFfmpeg([
       '-y',
       '-i', videoOnly,
       '-i', voiceMp3,
-      '-vf', `ass=${assEscaped},format=yuv420p`,
+      '-vf', burnVf,
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '20',
+      '-aspect', '9:16',
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ar', '44100',
@@ -461,10 +521,11 @@ async function renderParkReelFromArticle(article, {
       '-i', videoOnly,
       '-f', 'lavfi',
       '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-      '-vf', `ass=${assEscaped},format=yuv420p`,
+      '-vf', burnVf,
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '20',
+      '-aspect', '9:16',
       '-c:a', 'aac',
       '-b:a', '128k',
       '-shortest',
@@ -488,7 +549,9 @@ async function renderParkReelFromArticle(article, {
 }
 
 /**
- * Publish a rendered park Reel to Facebook as a Page video with link in first comment.
+ * Publish a rendered park Reel to Facebook as a vertical Reel (video_reels API)
+ * with the article link in the first comment. Falls back only if explicitly
+ * disabled via FB_PARK_REEL_AS_REEL=false (legacy /videos path — letterboxes).
  * Requires FB_PARK_REEL_PUBLISH=true (or publish:true) and a reachable videoUrl.
  */
 async function publishParkReel({
@@ -498,6 +561,7 @@ async function publishParkReel({
   articleUrl,
   dryRun = process.env.DRY_RUN === 'true',
   publish = process.env.FB_PARK_REEL_PUBLISH === 'true',
+  asReel = process.env.FB_PARK_REEL_AS_REEL !== 'false',
 } = {}) {
   if (!publish && !dryRun) {
     return {
@@ -520,6 +584,8 @@ async function publishParkReel({
     linkCommentKind: 'article',
     logDetail: `park-reel:${article.slug}`,
     returnResult: true,
+    asReel,
+    reelTitle: String(article?.title || 'Florida Buzz').slice(0, 255),
   });
 
   return {
@@ -528,6 +594,7 @@ async function publishParkReel({
     videoUrl,
     message,
     link,
+    asReel,
   };
 }
 
@@ -577,6 +644,7 @@ module.exports = {
   buildReelCaption,
   captionBeatsFromArticle,
   captionBeatsFromSpoken,
+  formatCaptionLines,
   parkReelScheduleEnabled,
   parkReelVoiceEnabled,
   pickParkCruiseArticle,
@@ -585,6 +653,7 @@ module.exports = {
   resolveStillImage,
   runParkReelJob,
   slowZoomPanStill,
+  splitCaptionChunk,
   spokenScriptFromArticle,
   stripAudioTags,
   synthesizeParkReelVoice,

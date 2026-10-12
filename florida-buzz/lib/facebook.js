@@ -43,6 +43,80 @@ function firstCommentMessage(link, kind = 'article') {
   return `Full story:\n${link}`;
 }
 
+/**
+ * Publish a vertical MP4 as a Facebook Reel (not a regular Page /videos post).
+ * Regular /videos uploads of 9:16 files often show letterboxed in feed; Reels
+ * stay full-bleed. Uses Meta's 3-step video_reels + rupload file_url flow.
+ * @see https://developers.facebook.com/docs/video-api/guides/reels-publishing/
+ */
+async function publishFacebookReel({
+  videoUrl,
+  description,
+  title = null,
+  accessToken = process.env.FB_PAGE_ACCESS_TOKEN,
+  pageId = process.env.FB_PAGE_ID,
+}) {
+  if (!pageId || !accessToken) {
+    throw new Error('FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN required for Reel publish');
+  }
+  if (!videoUrl) throw new Error('videoUrl required for Reel publish');
+
+  const startRes = await fetch(`${GRAPH_BASE}/${pageId}/video_reels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      upload_phase: 'start',
+      access_token: accessToken,
+    }),
+  });
+  const startPayload = await startRes.json().catch(() => ({}));
+  if (!startRes.ok || startPayload.error || !startPayload.video_id) {
+    throw new Error(`Facebook Reel start failed: ${JSON.stringify(startPayload)}`);
+  }
+
+  const videoId = startPayload.video_id;
+  const uploadUrl = startPayload.upload_url
+    || `https://rupload.facebook.com/video-upload/v19.0/${videoId}`;
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `OAuth ${accessToken}`,
+      file_url: videoUrl,
+    },
+  });
+  const uploadPayload = await uploadRes.json().catch(() => ({}));
+  if (!uploadRes.ok || uploadPayload.error || uploadPayload.success === false) {
+    throw new Error(`Facebook Reel upload failed: ${JSON.stringify(uploadPayload)}`);
+  }
+
+  const finishBody = {
+    upload_phase: 'finish',
+    video_id: videoId,
+    video_state: 'PUBLISHED',
+    description: description || '',
+    access_token: accessToken,
+  };
+  if (title) finishBody.title = title;
+
+  const finishRes = await fetch(`${GRAPH_BASE}/${pageId}/video_reels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(finishBody),
+  });
+  const finishPayload = await finishRes.json().catch(() => ({}));
+  if (!finishRes.ok || finishPayload.error) {
+    throw new Error(`Facebook Reel finish failed: ${JSON.stringify(finishPayload)}`);
+  }
+
+  return {
+    id: videoId,
+    postId: finishPayload.post_id || videoId,
+    videoId,
+    finish: finishPayload,
+  };
+}
+
 async function postToFacebookPage({
   message,
   link,
@@ -54,6 +128,9 @@ async function postToFacebookPage({
   linkPlacement = 'caption',
   linkCommentKind = 'article',
   firstCommentText = null,
+  /** When true + videoUrl, publish via /video_reels (vertical Reel) instead of /videos. */
+  asReel = false,
+  reelTitle = null,
 }) {
   const putLinkInFirstComment = linkPlacement === 'first_comment' && Boolean(link);
   const resolveFirstComment = () => firstCommentText || firstCommentMessage(link, linkCommentKind);
@@ -62,30 +139,53 @@ async function postToFacebookPage({
     const linkNote = putLinkInFirstComment
       ? ` (link in first comment: ${link})`
       : (link ? ` (link: ${link})` : '');
-    console.log(`  [dry-run] Would post to Facebook: "${message}"${linkNote}${videoUrl ? ` (video: ${videoUrl})` : imageUrl ? ` (image: ${imageUrl})` : ''}`);
-    return returnResult ? { ok: true, dryRun: true, linkPlacement } : true;
+    const videoNote = videoUrl
+      ? ` (${asReel ? 'reel' : 'video'}: ${videoUrl})`
+      : imageUrl ? ` (image: ${imageUrl})` : '';
+    console.log(`  [dry-run] Would post to Facebook: "${message}"${linkNote}${videoNote}`);
+    return returnResult ? { ok: true, dryRun: true, linkPlacement, asReel: Boolean(asReel && videoUrl) } : true;
   }
 
   if (videoUrl) {
     const description = putLinkInFirstComment
       ? message
       : (link ? `${message}\n\n${link}` : message);
-    const res = await fetch(`${GRAPH_BASE}/${process.env.FB_PAGE_ID}/videos`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_url: videoUrl, description, access_token: process.env.FB_PAGE_ACCESS_TOKEN }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok || payload.error) {
-      const errText = JSON.stringify(payload);
-      await logPost({ platform: 'facebook', status: 'failed', detail: errText });
-      throw new Error(`Facebook video post failed: ${errText}`);
+
+    let payload;
+    if (asReel) {
+      try {
+        payload = await publishFacebookReel({
+          videoUrl,
+          description,
+          title: reelTitle,
+        });
+      } catch (err) {
+        const errText = err.message || String(err);
+        await logPost({ platform: 'facebook', status: 'failed', detail: errText });
+        throw err;
+      }
+    } else {
+      const res = await fetch(`${GRAPH_BASE}/${process.env.FB_PAGE_ID}/videos`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_url: videoUrl, description, access_token: process.env.FB_PAGE_ACCESS_TOKEN }),
+      });
+      payload = await res.json().catch(() => ({}));
+      if (!res.ok || payload.error) {
+        const errText = JSON.stringify(payload);
+        await logPost({ platform: 'facebook', status: 'failed', detail: errText });
+        throw new Error(`Facebook video post failed: ${errText}`);
+      }
     }
+
+    const postId = payload.postId || payload.id || null;
     let commentId = null;
-    if (putLinkInFirstComment && payload.id) {
-      commentId = await commentOnFacebookPost(payload.id, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
+    if (putLinkInFirstComment && postId) {
+      commentId = await commentOnFacebookPost(postId, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
     }
     await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
-    return returnResult ? { ok: true, postId: payload.id, commentId, linkPlacement } : true;
+    return returnResult
+      ? { ok: true, postId, commentId, linkPlacement, asReel: Boolean(asReel), videoId: payload.videoId || payload.id || null }
+      : true;
   }
   if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
     console.log('  [skip] FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN not set — skipping Facebook post.');
@@ -172,4 +272,9 @@ async function postToFacebookPage({
   return returnResult ? { ok: true, postId: payload.id, photoId: null, commentId, linkPlacement } : true;
 }
 
-module.exports = { postToFacebookPage, commentOnFacebookPost, firstCommentMessage };
+module.exports = {
+  postToFacebookPage,
+  publishFacebookReel,
+  commentOnFacebookPost,
+  firstCommentMessage,
+};
