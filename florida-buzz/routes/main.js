@@ -981,6 +981,53 @@ are no longer PNGs, so they get automatically skipped on any future run.
   `);
 });
 
+// Kick a Facebook park Reel in the **main app process** (same path as the
+// 10:30am / 7:00pm cron). Prefer this over DigitalOcean Console — console
+// sandboxes often die mid-ffmpeg with WaitPID EOF even when production works.
+// Watch Runtime Logs for progress; check post_log for park-reel:<slug> success.
+router.get('/admin/facebook-park-reel', (req, res) => {
+  const { key, dryRun } = req.query;
+  if (!process.env.ADMIN_PASSWORD || key !== process.env.ADMIN_PASSWORD) {
+    return render404(req, res);
+  }
+  if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
+    return res.status(500).type('text').send('FB_PAGE_ID / FB_PAGE_ACCESS_TOKEN are not configured.');
+  }
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+    return res.status(500).type('text').send('Supabase is not configured.');
+  }
+
+  const publish = dryRun === 'true' ? 'false' : 'true';
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'facebook-park-reel.js');
+  const child = spawn('node', [scriptPath], {
+    env: {
+      ...process.env,
+      DRY_RUN: dryRun === 'true' ? 'true' : 'false',
+      FB_PARK_REEL_PUBLISH: publish,
+    },
+    detached: true,
+    stdio: 'inherit',
+  });
+  child.unref();
+
+  res.send(`
+    <pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">
+Started Facebook park Reel in the background${dryRun === 'true' ? ' (DRY RUN — render only, no Meta post)' : ' (PUBLISH to Facebook)'}.
+
+This runs in the live app (same as the 10:30am / 7:00pm cron) — not the DO Console sandbox.
+
+Watch DigitalOcean → Runtime Logs for:
+  Park Reel candidate…
+  Here's another … tip…
+  Public URL (Supabase…
+  === Run complete ===
+
+Success also lands in post_log as park-reel:&lt;slug&gt;.
+Safe to re-run; unused tip/guide candidates are preferred next.
+    </pre>
+  `);
+});
+
 // Generate OpenAI article images for evergreen guides that were saved without one
 // (e.g. bulk-seeded intent guides). Safe to re-run — skips guides that already
 // have image_url set.
