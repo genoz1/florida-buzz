@@ -8,7 +8,8 @@ Default audio generation is **solo Geno** via ElevenLabs `eleven_v4` text-to-spe
 
 - Host: Geno Instant Voice Clone `bg7PC2IzyIDwYgytMiW1`
 - Script shape: Named Open (Geno Option A) → Quick Hits → one Deep Dive → CTA
-- Named open (after announcer bumper on `intro_audio_url`): welcome / I'm Geno / unofficial / let's go
+- Named open (after announcer bumper on `intro_audio_url`): welcome / I'm Geno / eighteen months old · over fifty years / let's go (never say “unofficial”; never state age in years)
+- TTS: calm Geno settings (low stability, style 0, no speaker boost) + per-section variable speed + wider breath gaps between sections
 - Announcer-only bumper v7 stays on `podcast_shows.intro_audio_url` and is prepended by the existing audio pipeline
 
 ### DigitalOcean App Platform env (thefloridabuzz.com)
@@ -136,19 +137,19 @@ Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`.
 
 ## Host (full episodes)
 
-**Geno** is the solo energetic host. Scripts use `Geno:` lines only.
+**Geno** is the solo casual host. Scripts use `Geno:` lines only. Delivery is calm conversational (not announcer/hype).
 
 ### Required show open (every full episode)
 
 After the announcer bumper, first spoken lines must be Geno Option A:
 
-> Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host bringing park news and real planning from The Florida Buzz. Not affiliated with Disney — just a fan who lives this stuff. Today we're locking in that park-day energy and cutting through the noise. Let's go.
+> Ok, welcome to Florida Buzz: Disney. I'm Geno. I've been going to Walt Disney World since I was eighteen months old — over fifty years ago — and I'm here with park news and real planning from The Florida Buzz. Here's what we're locking in today. Let's go.
 
 Then: quick hits → one deep dive → Florida Buzz CTA / close.
 
 ### Drive listeners to TheFloridaBuzz.com
 
-Naturally reference verified Florida Buzz resources. Say “The Florida Buzz dot com” aloud — never long URLs. Show notes include tracked links and the unofficial Disney affiliation disclosure.
+Naturally reference verified Florida Buzz resources. Say “The Florida Buzz dot com” aloud — never long URLs. Show notes include tracked links and a written “not affiliated with Disney” disclosure (do not say “unofficial” on air).
 
 ## Admin dashboard steps (after deploy)
 

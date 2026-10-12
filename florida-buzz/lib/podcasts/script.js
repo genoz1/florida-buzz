@@ -66,8 +66,16 @@ function assertScriptOpenShape(scriptText) {
   if (!/welcome to Florida Buzz(?::?\s*Disney)?/i.test(headText)) {
     throw new Error('Script open must welcome listeners to Florida Buzz: Disney');
   }
-  if (!/unofficial/i.test(earlyText)) {
-    throw new Error('Script open must mention this is an unofficial fan show');
+  if (!/(eighteen|18)\s+months?/i.test(earlyText) || !/(fifty|50)\s+years?/i.test(earlyText)) {
+    throw new Error(
+      'Script open must mention going since eighteen months old / over fifty years ago (no age in years)'
+    );
+  }
+  if (/unofficial/i.test(earlyText)) {
+    throw new Error('Script open must not say “unofficial” — listeners already know');
+  }
+  if (/\bI['’]?m\s+\d{2,}\b|\bmid[- ]thirties\b|\bfifty[- ]three\b|\b53\b/i.test(earlyText)) {
+    throw new Error('Script open must not state Geno\'s age in years');
   }
   if (!/let['’]?s go/i.test(earlyText)) {
     throw new Error('Script open must end the named open with Let\'s go (Geno Option A)');
@@ -109,16 +117,17 @@ ${HOST_BIBLE}
 
 Outline rules:
 - Always spell Geno. Solo host only — never outline Gena/Diane dual-host segments.
-- Shape a lively solo energetic briefing, not a news rundown or dual-host chat — must feel unscripted / reactive, not written.
+- Shape a calm casual solo briefing, not a news rundown, dual-host chat, or hype reel — must feel unscripted / reactive, not written.
 - Segment 1 MUST be Named Open and MUST list Geno Option A beats explicitly before any topic hook:
   1) Welcome to Florida Buzz: Disney
-  2) I'm Geno — unofficial fan host from The Florida Buzz
-  3) Not affiliated with Disney — just a fan
-  4) Lock in park-day energy / cut through the noise
-  5) Let's go
-- Plan sparse-to-moderate ElevenLabs audio tags on spoken beats across the episode (Named Open keeps [excited]/[warmly]; mark a few Quick Hits / Deep Dive / CTA lines with [chuckles], [upbeat], [nostalgic], [conversational], etc. where natural).
-- After Named Open: Quick Hits (several short sourced topics) → short ${PARTNER_NAME} partner mid-roll → one Deep Dive → CTA / close with Florida Buzz resources + soft ${PARTNER_NAME} show-notes reminder + affiliation if needed.
-- HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + unofficial + Let's go.
+  2) I'm Geno
+  3) Been going since eighteen months old — over fifty years ago
+  4) Park news / real planning from The Florida Buzz
+  5) Here's what we're locking in today / Let's go
+- Plan sparse ElevenLabs audio tags (Named Open keeps [conversational]/[warmly]; a few Quick Hits / Deep Dive / CTA lines may use [chuckles], [nostalgic], [thoughtful], [conversational] where natural). Prefer calm tags — avoid [excited]/[upbeat].
+- After Named Open: Quick Hits (several short sourced topics) → short ${PARTNER_NAME} partner mid-roll → one Deep Dive → CTA / close with Florida Buzz resources + soft ${PARTNER_NAME} show-notes reminder.
+- HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + eighteen months / fifty years + Let's go.
+- HARD BAN outlining spoken “unofficial” or stating Geno's age in years.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
 - Plan exactly 1–2 brief "recent park experience" anecdote beats tied to the deep dive (or one quick hit).
@@ -141,7 +150,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be Geno Option A (welcome / I'm Geno / unofficial / let's go). Then Quick Hits, a short ${PARTNER_NAME} partner mid-roll, one Deep Dive, Florida Buzz resource beats, a soft ${PARTNER_NAME} show-notes reminder, and a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be Geno Option A (welcome / I'm Geno / eighteen months / over fifty years / let's go — never “unofficial”). Then Quick Hits, a short ${PARTNER_NAME} partner mid-roll, one Deep Dive, Florida Buzz resource beats, a soft ${PARTNER_NAME} show-notes reminder, and a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -155,7 +164,7 @@ function buildConversationPrompt({ show, episode, outline, sources }) {
 Format every spoken line as:
 Geno: ...
 or with an ElevenLabs audio tag at the start of the spoken beat:
-Geno: [excited] Welcome to Florida Buzz: Disney. I'm Geno...
+Geno: [conversational] Ok, welcome to Florida Buzz: Disney. I'm Geno...
 Geno: [chuckles] Okay, this next one's a classic park-day trap...
 
 ${HOST_BIBLE}
@@ -165,24 +174,28 @@ ${ELEVENLABS_AUDIO_TAGS_GUIDANCE}
 Conversation requirements:
 - Target roughly 20–25 minutes of natural solo talk (~3,000–3,800 spoken words; substantive, not rushed; not padded filler).
 - Write a FULL episode script in one pass when possible — do not stop after a short open or a few topics.
-- Sound like a Central Florida park-day host who regularly visits the parks — not a presenter summarizing articles, not reading a written essay aloud.
-- Trailer-style expressiveness: the spoken script MUST include sparse-to-moderate ElevenLabs audio tags so eleven_v4 TTS has delivery cues (not a flat dense monologue with zero tags).
+- Sound like a Central Florida park-day dad talking casually — not a presenter summarizing articles, not reading a written essay, not an announcer.
+- Casual wording: “ok / look / so / yeah / here's the thing…” when natural. Start thoughts the way people talk.
+- Breath groups: FEWER, LONGER Geno: lines (one breath / one thought). Do not split every sentence onto its own line. Use … and — inside lines for micro-pauses.
+- Sparse calm audio tags so eleven_v4 has delivery cues (not a flat monologue with zero tags; not a tag on every line). Prefer [conversational], [warmly], [chuckles], [nostalgic], [thoughtful]. Avoid [excited] / [upbeat].
 - SOLO STRUCTURE (critical):
   1) Named Open — Geno Option A (exact intent; wording may match closely; keep audio tags):
      Geno: ${GENO_NAMED_OPEN_OPTION_A}
   2) Quick Hits — several short sourced topics with punchy takes (tag a few lines where energy shifts)
   3) Partner mid-roll — SHORT (~15–25 seconds): ${PODCAST_MIDROLL_DIRECTION}
   4) One Deep Dive — longer planning opinion + one brief park anecdote (use [nostalgic]/[sighs]/[chuckles] where natural)
-  5) CTA / close — The Florida Buzz dot com resources + soft ${PARTNER_NAME} show-notes reminder + warm goodbye ([warmly] / [upbeat] near the close is good)
+  5) CTA / close — The Florida Buzz dot com resources + soft ${PARTNER_NAME} show-notes reminder + warm goodbye ([warmly] near the close is good)
 - HARD BAN dual-host dialogue (no Gena:/Diane: lines, no cohost reactions).
-- HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + unofficial + Let's go.
+- HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + eighteen months / fifty years + Let's go.
+- HARD BAN saying “unofficial” anywhere in the spoken script.
+- HARD BAN stating Geno's age in years (no “I'm fifty-three”, no “mid-thirties”).
 - HARD BAN writing a full episode with no square-bracket audio tags after the open.
-- Cover approved source topics accurately, but weave them into energetic host talk, opinions, and reactions.
+- Cover approved source topics accurately, but weave them into calm host talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
 - When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer Geno's take, and invite listeners to visit the Buzz Board.
 - Include one or two brief recent-park-experience stories connected directly to the episode topics.
 - Uneven pacing is good: mix short punchy hits with longer deep-dive stretches; allow mid-thought pivots and unfinished sentences.
-- Mention the unofficial-fan affiliation in the named open (Option A already covers it); do not bury the show identity.
+- Show identity is in Option A (eighteen months / over fifty years + Florida Buzz) — do not add an “unofficial” disclaimer speech.
 - Do not claim a live studio audience, callers, or TV panel format.
 
 Florida Buzz listener guidance (helpful, not ad-read):
@@ -202,7 +215,7 @@ Return ONLY the dialogue script.`,
     user: `Episode: ${episode.title}
 Description: ${episode.description}
 Release framing: ${episode.release_label || 'standalone'} episode — complete on its own (not Part 1 or Part 2 of a larger show).
-Affiliation disclosure (already woven into Geno Option A open; keep consistent): ${AFFILIATION_DISCLOSURE}
+Written affiliation disclosure (show notes / RSS only — do NOT speak the word “unofficial”): ${AFFILIATION_DISCLOSURE}
 Partner mid-roll direction: ${PODCAST_MIDROLL_DIRECTION}
 Partner soft outro direction: ${PODCAST_OUTRO_DIRECTION}
 
@@ -215,7 +228,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: Geno Option A — welcome / I'm Geno / unofficial / let's go — before quick hits. Structure: quick hits + short ${PARTNER_NAME} mid-roll + one deep dive + CTA with soft ${PARTNER_NAME} show-notes reminder. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: Geno Option A — welcome / I'm Geno / eighteen months / over fifty years / let's go — before quick hits. Never say “unofficial.” Structure: quick hits + short ${PARTNER_NAME} mid-roll + one deep dive + CTA with soft ${PARTNER_NAME} show-notes reminder. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
@@ -239,10 +252,11 @@ async function generateConversation({ aiText, show, episode, outline, sources })
       await aiText.generateText(
         `You continue an unfinished Florida Buzz: Disney solo podcast script.
 Keep the exact "Geno:" line format.
-Keep sparse-to-moderate ElevenLabs audio tags on spoken beats where natural (e.g. Geno: [chuckles] …, Geno: [upbeat] …). Prefer [warmly], [excited], [chuckles], [laughs], [sighs], [conversational], [upbeat], [nostalgic]. Do not stack many tags on one line.
+Keep sparse calm ElevenLabs audio tags where natural (e.g. Geno: [chuckles] …, Geno: [conversational] …). Prefer [warmly], [conversational], [chuckles], [laughs], [sighs], [nostalgic], [thoughtful]. Avoid [excited] / [upbeat]. Do not stack tags.
+Write fewer, longer breath-group lines with … and — for micro-pauses. Casual dad-talk wording — no announcer polish, never say “unofficial,” never state Geno's age in years.
 Do not restart the episode or repeat the named open.
 Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
-Preserve solo energetic host style (quick hits + deep dive + CTA) and Florida Buzz source accuracy rules.
+Preserve solo casual host style (quick hits + deep dive + CTA) and Florida Buzz source accuracy rules.
 Never introduce Gena/Diane dual-host lines.`,
         `Spoken words so far: ${words}. Need at least ${CONVERSATION_MIN_WORDS}.
 Continue this script:\n\n${script.slice(-12000)}`,
@@ -273,7 +287,7 @@ Continue this script:\n\n${script.slice(-12000)}`,
  * Pack solo host lines into TTS chunks.
  * Prefer keeping several beats together so seams stay natural.
  */
-function splitScriptIntoSections(scriptText, maxChars, { minTurns = 6 } = {}) {
+function splitScriptIntoSections(scriptText, maxChars, { minTurns = 8 } = {}) {
   const lines = String(scriptText || '')
     .split(/\n+/)
     .map((l) => l.trim())
@@ -315,8 +329,8 @@ function splitScriptIntoSections(scriptText, maxChars, { minTurns = 6 } = {}) {
 /**
  * Format a script section for TTS.
  * ElevenLabs solo: strip Geno:/Gena:/Diane: prefixes only.
- * CRITICAL: preserve ElevenLabs square-bracket audio tags ([excited], [warmly],
- * [chuckles], etc.) — never strip [...] before sending to the TTS API.
+ * CRITICAL: preserve ElevenLabs square-bracket audio tags ([conversational],
+ * [warmly], [chuckles], etc.) — never strip [...] before sending to the TTS API.
  * fal multi-speaker fallback may still want SpeakerId prefixes — pass keepSpeakerPrefix.
  */
 function formatScriptForTts(sectionText, { keepSpeakerPrefix = false } = {}) {

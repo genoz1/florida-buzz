@@ -416,7 +416,7 @@ test('full AI script weekly draft auto-starts private preview and never publishe
   const weeklyPath = require.resolve('../lib/podcasts/weeklyDraft');
   const realScript = require('../lib/podcasts/script');
   const longScript = [
-    'Geno: [excited] Welcome to Florida Buzz: Disney. I\'m Geno — your unofficial fan host. Let\'s go.',
+    'Geno: [conversational] Ok, welcome to Florida Buzz: Disney. I\'m Geno. I\'ve been going to Walt Disney World since I was eighteen months old — over fifty years ago. Let\'s go.',
     `Geno: ${'Quick hit on park planning and dining tips for guests. '.repeat(30)}`,
   ].join('\n\n');
   assert.ok(longScript.length > 200);
