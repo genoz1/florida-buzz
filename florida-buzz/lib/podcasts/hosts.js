@@ -27,13 +27,15 @@ const HOST_STYLE = 'solo_casual';
 const GENO_NAMED_OPEN_OPTION_A =
   "[conversational] Ok, welcome to Florida Buzz: Disney. I'm Geno. I've been going to Walt Disney World since I was eighteen months old — over fifty years ago — and I'm here with park news and real planning from The Florida Buzz. [warmly] Here's what we're locking in today. Let's go.";
 
-/** Preferred ElevenLabs v3/v4 audio tags for solo Geno scripts (sparse use; calm, not hype). */
+/** Preferred ElevenLabs v3/v4 audio tags for solo Geno scripts (moderate density; calm, not hype). */
 const ELEVENLABS_AUDIO_TAGS_GUIDANCE = `
-ElevenLabs audio tags (REQUIRED — sparse; eleven_v3 / eleven_v4 TTS):
-- Put ONE short square-bracket tag at the start of a spoken beat when delivery should shift: Geno: [tag] spoken text
+ElevenLabs audio tags (REQUIRED — moderate density; eleven_v3 / eleven_v4 TTS):
+- Put ONE short square-bracket tag at the start of most spoken beats: Geno: [tag] spoken text
 - Prefer calm natural tags: [conversational], [warmly], [chuckles], [laughs], [sighs], [thoughtful], [curious], [nostalgic]
 - Named Open MUST keep Option A's [conversational] / [warmly] cues (or equally calm equivalents)
-- Use tags only at real turns — NOT on every line; never stack tags
+- Target roughly every other Geno line tagged (or more when the emotion shifts) — TTS needs delivery cues; a long stretch of untagged lines sounds flat
+- Vary tags across the episode; do not reuse the same tag ten times in a row
+- Never stack multiple tags on one line
 - HARD BAN hype / announcer tags: [excited], [upbeat], [happy] as the default energy
 - HARD BAN inventing stage directions that are not auditory (no "[camera pans]", no "[smiles]")
 - Tags stay in the script text and are sent to ElevenLabs TTS — do not strip or spell them out as words
@@ -66,6 +68,7 @@ Delivery style (active profile: ${HOST_STYLE})
 - HARD RULE — episode structure: (1) Named Open, (2) Quick Hits, (3) short partner mid-roll, (4) one Deep Dive, (5) CTA / soft partner reminder + close
 - Breath groups: write FEWER, LONGER spoken lines (one thought per Geno: line). Do not chop every sentence into its own turn.
 - Inside lines, use … and — for micro-pauses; vary rhythm (slow on reveals / reflective bits; a little quicker on short reactions)
+- Emotion tags are NOT optional decoration — eleven_v4 needs them. Keep calm tags on roughly every other line so delivery does not go flat
 - Quick hits: several sourced topics with punchy takes (not tennis-match dual-host dialogue)
 - Partner mid-roll (REQUIRED, ~15–25 seconds spoken): ${PODCAST_MIDROLL_DIRECTION}
 - Deep dive: one longer subject where Geno goes deeper with planning opinion + one brief park anecdote
