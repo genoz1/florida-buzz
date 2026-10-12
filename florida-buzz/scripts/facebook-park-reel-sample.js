@@ -141,6 +141,8 @@ A short vertical Reel about **Lightning Lane at Magic Kingdom** — park photos 
 
 **Motion in plain English:** the camera slowly zooms in and drifts across still photos while Geno narrates and large captions change with the spoken beats.
 
+**Technical check:** master is \`720x1280\`, \`SAR=1:1\`, \`DAR=9:16\` (landscape article stills are cover-cropped — no letterbox). Publish path uses Meta \`/video_reels\`, not Page \`/videos\`.
+
 ## Script
 
 ${SPOKEN}
