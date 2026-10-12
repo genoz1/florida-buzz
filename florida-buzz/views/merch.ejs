@@ -1,0 +1,76 @@
+<%- include('partials/header', {
+  pageTitle: typeof pageTitle !== 'undefined' ? pageTitle : 'Buzz Merch — The Florida Buzz',
+  category: null,
+  tickerItems: [],
+  canonicalPath: '/merch',
+  isMerchPage: true,
+}) %>
+<link rel="stylesheet" href="/css/merch.css">
+
+<main class="merch-page">
+  <section class="merch-hero">
+    <div class="wrap merch-hero-inner">
+      <p class="merch-eyebrow">Florida Buzz Merch</p>
+      <h1>Wear the Buzz</h1>
+      <p class="merch-lede">Official Florida Buzz shirts and gear — printed on demand. You shop on our Printify store; they handle checkout, print, and shipping.</p>
+      <% if (merch.storeUrl) { %>
+        <p class="merch-cta-row">
+          <a class="btn" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Shop the store</a>
+        </p>
+      <% } else if (!merch.products.length) { %>
+        <p class="merch-setup">Merch is almost ready — the Printify store link still needs to be connected on the server.</p>
+      <% } %>
+    </div>
+  </section>
+
+  <% if (merch.products.length) { %>
+    <section class="wrap merch-catalog" aria-label="Featured merch">
+      <% merch.products.forEach((product, i) => { %>
+        <article class="merch-product<%= i === 0 ? ' merch-product-featured' : '' %>">
+          <a class="merch-product-media" href="<%= product.url %>" target="_blank" rel="noopener noreferrer">
+            <% if (product.imageUrl) { %>
+              <img src="<%= product.imageUrl %>" alt="<%= product.title %>" width="720" height="720" loading="<%= i === 0 ? 'eager' : 'lazy' %>" decoding="async">
+            <% } else { %>
+              <div class="merch-product-placeholder" aria-hidden="true">Florida Buzz</div>
+            <% } %>
+          </a>
+          <div class="merch-product-body">
+            <h2><a href="<%= product.url %>" target="_blank" rel="noopener noreferrer"><%= product.title %></a></h2>
+            <% if (product.price) { %><p class="merch-price"><%= product.price %></p><% } %>
+            <% if (product.description) { %><p class="merch-product-dek"><%= product.description %></p><% } %>
+            <p class="merch-cta-row">
+              <a class="btn" href="<%= product.url %>" target="_blank" rel="noopener noreferrer">Buy on Printify</a>
+              <% if (merch.storeUrl) { %>
+                <a class="btn btn-outline" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Browse all</a>
+              <% } %>
+            </p>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  <% } else if (merch.storeUrl) { %>
+    <section class="wrap merch-catalog">
+      <article class="merch-product merch-product-featured merch-product-store-only">
+        <div class="merch-product-body">
+          <h2>Visit the Florida Buzz store</h2>
+          <p class="merch-product-dek">See the latest shirts and designs on our Printify Pop-Up Store. New drops show up there first.</p>
+          <p class="merch-cta-row">
+            <a class="btn" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Open store</a>
+          </p>
+        </div>
+      </article>
+    </section>
+  <% } %>
+
+  <section class="wrap merch-how">
+    <h2>How ordering works</h2>
+    <ol>
+      <li>Pick a design on this page or in the full store.</li>
+      <li>Checkout on Printify — they take payment securely.</li>
+      <li>Your item is printed on demand and shipped to you.</li>
+    </ol>
+    <p class="merch-note">Florida Buzz earns from merch sold through our Printify store. Printify handles payment processing, production, shipping, and order support.</p>
+  </section>
+</main>
+
+<%- include('partials/footer') %>
