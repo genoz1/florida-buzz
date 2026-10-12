@@ -4,15 +4,8 @@
 /**
  * Watchable sample of the daily Facebook park Reel path.
  *
- * Disney / Lightning Lane only. Uses Magic Kingdom stills already in
- * public/reels/references/ — slow zoom/pan + Geno ElevenLabs VO + captions
- * aligned to the spoken script. No AI host, no fal, no wallet stickers.
- *
- * Usage:
- *   npm run sample:facebook-park-reel
- *
- * Prefers live Geno TTS when ELEVENLABS_API_KEY is set. Otherwise reuses a
- * prebaked Geno mp3 (same voice id bg7PC2IzyIDwYgytMiW1) if present.
+ * Full mute-friendly captions = every spoken word on screen in timed phrases.
+ * Usage: npm run sample:facebook-park-reel
  */
 
 require('dotenv').config();
@@ -20,7 +13,10 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { renderParkReelFromArticle } = require('../lib/facebookParkReel');
+const {
+  renderParkReelFromArticle,
+  stripAudioTags,
+} = require('../lib/facebookParkReel');
 const { DEFAULT_ELEVEN_VOICE_GENO } = require('../lib/visualNews/config');
 
 const ROOT = path.join(__dirname, '..');
@@ -84,6 +80,47 @@ function resolveVoicePath() {
   );
 }
 
+function normalizeWords(text) {
+  return String(text || '')
+    .replace(/\\N/g, ' ')
+    .toLowerCase()
+    .replace(/[—–…$,]/g, ' ')
+    .replace(/[^\w\s']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+}
+
+function verifyFullScriptCaptions(spoken, captions) {
+  const expected = normalizeWords(stripAudioTags(spoken));
+  const actual = normalizeWords(captions.map((c) => c.text).join(' '));
+  const missing = expected.filter((w) => !actual.includes(w));
+  if (missing.length) {
+    throw new Error(
+      `Caption verification FAILED — spoken words missing on screen: ${missing.join(', ')}\n`
+      + `Expected: ${expected.join(' ')}\n`
+      + `Got:      ${actual.join(' ')}`
+    );
+  }
+  // Reject keyword-only style (must include full money phrase + rule sentence bits).
+  const joined = actual.join(' ');
+  for (const must of ['two hundred twenty nine', 'wreck your morning', 'automatic yes', 'follow florida buzz']) {
+    if (!joined.includes(must)) {
+      throw new Error(`Caption verification FAILED — missing full phrase "${must}"`);
+    }
+  }
+  // No beat should end on a dangling weak word mid-clause.
+  const WEAK_END = /(?:^|\s)(a|an|the|to|of|and|or|for|with|we're|you're|it's|that's|here's|would)$/i;
+  for (const c of captions) {
+    const flat = String(c.text).replace(/\\N/g, ' ').replace(/[,.!?]+$/, '').trim();
+    if (WEAK_END.test(flat) && !/[.!?]$/.test(String(c.text).trim())) {
+      throw new Error(`Caption verification FAILED — dangling mid-phrase beat: "${flat}"`);
+    }
+  }
+  return { ok: true, wordCount: expected.length, beatCount: captions.length };
+}
+
 async function main() {
   for (const still of STILLS) {
     if (!fs.existsSync(still)) throw new Error(`Missing still: ${still}`);
@@ -103,22 +140,30 @@ async function main() {
     imagePaths: STILLS,
     masterFileName: 'florida-buzz-park-reel-sample.mp4',
     spoken: SPOKEN,
-    // No keyword captions — burn the full spoken script for mute viewers.
     voicePath,
     withVoice: true,
   });
 
-  const frameSpecs = [
-    { at: 2, name: 'florida-buzz-park-reel-sample-frame-t2.jpg' },
-    { at: 6, name: 'florida-buzz-park-reel-sample-frame-t6.jpg' },
-    { at: 11, name: 'florida-buzz-park-reel-sample-frame-t11.jpg' },
-    { at: 15, name: 'florida-buzz-park-reel-sample-frame-t15.jpg' },
-  ];
+  const verify = verifyFullScriptCaptions(SPOKEN, rendered.captions);
+  console.log('Caption verification:', verify);
+
+  // One frame at the midpoint of EVERY caption beat — must review before shipping.
   const frames = [];
-  for (const spec of frameSpecs) {
-    const outPath = path.join(OUT_DIR, spec.name);
-    extractFrame(rendered.masterPath, spec.at, outPath);
-    frames.push(outPath);
+  for (let i = 0; i < rendered.captions.length; i += 1) {
+    const c = rendered.captions[i];
+    const mid = (Number(c.start) + Number(c.end)) / 2;
+    const outPath = path.join(OUT_DIR, `florida-buzz-park-reel-sample-beat-${String(i + 1).padStart(2, '0')}.jpg`);
+    extractFrame(rendered.masterPath, mid, outPath);
+    frames.push({ path: outPath, at: mid, text: c.text.replace(/\\N/g, ' / ') });
+  }
+
+  // Also keep the legacy named spot-checks.
+  for (const at of [2, 6, 11, 15]) {
+    extractFrame(
+      rendered.masterPath,
+      at,
+      path.join(OUT_DIR, `florida-buzz-park-reel-sample-frame-t${at}.jpg`)
+    );
   }
 
   const mdPath = path.join(OUT_DIR, 'florida-buzz-park-reel-sample.md');
@@ -126,48 +171,26 @@ async function main() {
 
 ## What this video is
 
-A short vertical Reel about **Lightning Lane at Magic Kingdom** — park photos with a slow zoom and pan, **Geno voiceover** (ElevenLabs \`eleven_v4\`, voice \`${rendered.voice?.voiceId || DEFAULT_ELEVEN_VOICE_GENO}\`), and **full-script captions** (every spoken word on screen for mute viewing). Same path the site will use for daily Facebook park/cruise Reels. No talking AI host, no green screen, no money stickers.
+Lightning Lane Magic Kingdom Reel: slow zoom/pan on park photos, **Geno voiceover**, and **full-script captions** (every spoken word appears on screen for mute viewing — not keyword hooks).
 
-**Motion in plain English:** the camera slowly zooms in and drifts across still photos while Geno narrates and captions show the full script in timed chunks — not keyword-only hooks.
+## Spoken script
 
-**Technical check:** master is \`720x1280\`, \`SAR=1:1\`, \`DAR=9:16\` (landscape article stills are cover-cropped — no letterbox). Publish path uses Meta \`/video_reels\`, not Page \`/videos\`.
+${stripAudioTags(SPOKEN)}
 
-## Script
+## On-screen caption beats (verified)
 
-${SPOKEN}
+${rendered.captions.map((c, i) => `${i + 1}. [${c.start.toFixed(2)}–${c.end.toFixed(2)}s] ${String(c.text).replace(/\\N/g, ' / ')}`).join('\n')}
+
+## Verification
+
+- Word coverage: **PASS** (${verify.wordCount} spoken words present across ${verify.beatCount} beats)
+- Master: \`720x1280\` SAR 1:1 DAR 9:16
+- Audio: Geno ElevenLabs \`eleven_v4\`
 
 ## Files
 
 - Video: \`florida-buzz-park-reel-sample.mp4\`
-- Frames: ${frames.map((f) => `\`${path.basename(f)}\``).join(', ')}
-- Voice: ${rendered.voice?.reused ? 'prebaked Geno mp3' : 'live ElevenLabs Geno TTS'} (${rendered.voice?.model || 'eleven_v4'})
-
-## How daily posting turns on
-
-Code already has the 10:15am Eastern cron. Production still needs these host secrets (DigitalOcean env), then restart/redeploy:
-
-\`\`\`bash
-FB_PARK_REEL_ENABLED=true
-FB_PARK_REEL_PUBLISH=true
-ELEVENLABS_API_KEY=<same Geno key as podcasts>
-# optional: PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1
-\`\`\`
-
-VO is **on by default** when \`ELEVENLABS_API_KEY\` is set. Set \`FB_PARK_REEL_WITH_VOICE=false\` only if you intentionally want silent renders.
-
-Also keep the usual Facebook + Supabase credentials, and make sure rendered files under \`public/reels/daily/\` are reachable at \`https://thefloridabuzz.com/reels/daily/<file>.mp4\`.
-
-Manual checks before going live:
-
-\`\`\`bash
-DRY_RUN=true npm run facebook:park-reel
-FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
-\`\`\`
-
-## Credits
-
-- Seven Dwarfs Mine Train (Magic Kingdom), CC BY 2.0, Wikimedia Commons
-- Big Thunder Mountain Lightning Lane, CC BY-SA 4.0, Wikimedia Commons
+- Beat frames: ${frames.map((f) => `\`${path.basename(f.path)}\``).join(', ')}
 `);
 
   console.log(JSON.stringify({
@@ -176,6 +199,7 @@ FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
     duration: rendered.duration,
     voice: rendered.voice,
     captions: rendered.captions,
+    verify,
     frames,
     mdPath,
   }, null, 2));
@@ -188,4 +212,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { ARTICLE, SPOKEN, main };
+module.exports = { ARTICLE, SPOKEN, main, verifyFullScriptCaptions };

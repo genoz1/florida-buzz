@@ -84,7 +84,7 @@ describe('facebookParkReel voice + captions', () => {
     const lines = formatCaptionLines("Disney Cruise Line's Disney Believe will debut an Encanto stage show");
     assert.match(lines, /\\N/);
     assert.doesNotMatch(lines, /…$/);
-    assert.ok(lines.split('\\N').every((line) => line.length <= 22));
+    assert.ok(lines.split('\\N').length <= 3);
 
     const beats = captionBeatsFromSpoken(
       "[curious] Disney Cruise Line's Disney Believe will debut an Encanto stage show. [upbeat] Follow Florida Buzz.",

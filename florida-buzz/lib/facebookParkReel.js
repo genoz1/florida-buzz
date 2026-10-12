@@ -120,15 +120,16 @@ function spokenScriptFromArticle(article) {
   return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
 }
 
-// Full spoken script on screen (mute-friendly): more chars per beat, never keyword-only.
-const CAPTION_MAX_LINE = 22;
+// Mute-friendly full-script captions: complete phrases, never keyword hooks.
+// 3 short lines fit complete clauses in the FB safe area without mid-word cuts.
+const CAPTION_MAX_LINE = 26;
 const CAPTION_MAX_LINES = 3;
-/** Chunk size must fit on-screen lines so formatCaptionLines never drops words. */
-const CAPTION_CHUNK_CHARS = CAPTION_MAX_LINE * CAPTION_MAX_LINES; // 66
+const CAPTION_CHUNK_CHARS = CAPTION_MAX_LINE * CAPTION_MAX_LINES; // 78
+const CAPTION_MIN_BEAT_SEC = 1.5;
 
 /**
- * Wrap caption copy into short ASS lines (no mid-sentence ellipsis).
- * Prefer more kinetic beats over truncating words Gene actually speaks.
+ * Wrap caption copy into at most maxLines ASS lines.
+ * Caller must pass chunks that fit; never truncates with ellipsis.
  */
 function formatCaptionLines(text, {
   maxLine = CAPTION_MAX_LINE,
@@ -145,20 +146,25 @@ function formatCaptionLines(text, {
   const lines = [];
   let cur = '';
   for (const word of words) {
-    const clipped = word.length > maxLine ? word.slice(0, maxLine) : word;
-    const next = cur ? `${cur} ${clipped}` : clipped;
-    if (next.length <= maxLine) {
+    // Keep whole words; oversize tokens wrap alone rather than being sliced.
+    const token = word;
+    const next = cur ? `${cur} ${token}` : token;
+    if (next.length <= maxLine || !cur) {
       cur = next;
       continue;
     }
-    if (cur) lines.push(cur);
-    cur = clipped;
+    lines.push(cur);
+    cur = token;
   }
   if (cur) lines.push(cur);
 
-  // Upstream chunking keeps this ≤ maxLines; if not, keep every word on extra lines
-  // rather than truncating mid-sentence with "…".
-  return lines.slice(0, Math.max(maxLines, lines.length)).join('\\N') || 'Florida Buzz';
+  if (lines.length <= maxLines) return lines.join('\\N');
+
+  // Too many lines for one beat — pack into maxLines without dropping words
+  // by joining overflow back into the last allowed line (caller should chunk).
+  const head = lines.slice(0, maxLines - 1);
+  const tail = lines.slice(maxLines - 1).join(' ');
+  return [...head, tail].join('\\N');
 }
 
 /** Split a long spoken fragment into beat-sized chunks at word boundaries. */
@@ -183,41 +189,89 @@ function splitCaptionChunk(text, maxChars = CAPTION_CHUNK_CHARS) {
 }
 
 /**
- * Split spoken copy into kinetic caption beats and scale them to audio duration.
- * Caption text matches what Geno says (audio tags stripped).
+ * Split spoken text into complete readable phrases (comma / sentence boundaries).
+ * Avoids mid-clause cuts like ending a beat on "we're" or "wreck".
  */
-function captionBeatsFromSpoken(spoken, durationSec) {
-  const plain = stripAudioTags(spoken);
-  const sentences = plain
-    .split(/(?<=[.!?…])\s+|\s+[—–]\s+|\s+So\.\.\.\s+/i)
+function phraseChunksFromSpoken(spoken) {
+  const plain = stripAudioTags(spoken)
+    .replace(/\s*[—–]\s*/g, ', ')
+    .replace(/\s+So\.\.\.\s*/gi, ' So ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return ['Florida Buzz'];
+
+  // Split into clause-sized phrases; keep trailing punctuation with the phrase.
+  const rawParts = plain
+    .split(/(?<=[,.!?])\s+/)
     .map((p) => p.trim())
     .filter(Boolean);
 
-  // Split each sentence into on-screen chunks; only glue tiny leftovers.
-  const normalized = [];
-  for (const sentence of sentences) {
-    const chunks = splitCaptionChunk(sentence, CAPTION_CHUNK_CHARS);
-    for (const chunk of chunks) {
-      if (normalized.length && chunk.length < 10 && normalized[normalized.length - 1].length < 20) {
-        normalized[normalized.length - 1] = `${normalized[normalized.length - 1]} ${chunk}`.trim();
+  const parts = [];
+  for (const part of rawParts) {
+    if (part.length <= CAPTION_CHUNK_CHARS) {
+      // Merge tiny openers into the previous phrase when safe.
+      if (parts.length && part.length < 16 && !/[.!?]$/.test(parts[parts.length - 1])) {
+        parts[parts.length - 1] = `${parts[parts.length - 1]} ${part}`.trim();
       } else {
-        normalized.push(chunk);
+        parts.push(part);
       }
+      continue;
+    }
+    // Long clause: prefer natural breaks before word-wrapping.
+    const soft = part.split(/(?<=:)\s+|\s+(?=and\s)|(?<=morning,)\s+/i).map((p) => p.trim()).filter(Boolean);
+    if (soft.length > 1 && soft.every((p) => p.length <= CAPTION_CHUNK_CHARS)) {
+      parts.push(...soft);
+    } else {
+      parts.push(...splitCaptionChunk(part, CAPTION_CHUNK_CHARS));
     }
   }
-  const parts = normalized.length ? normalized : [plain || 'Florida Buzz'];
 
-  const weights = parts.map((p) => Math.max(p.length, 8));
+  // Merge dangling fragments that end with weak words (we're / and / to / a …).
+  const WEAK_END = /(?:^|\s)(a|an|the|to|of|and|or|for|with|we're|you're|it's|that's|here's)$/i;
+  const merged = [];
+  for (const part of parts) {
+    if (merged.length && WEAK_END.test(merged[merged.length - 1].replace(/[,.!?]+$/, ''))) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${part}`.trim();
+    } else if (merged.length && part.length < 14) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${part}`.trim();
+    } else {
+      merged.push(part);
+    }
+  }
+
+  // Final pass: anything still over budget gets word-split.
+  const finalParts = [];
+  for (const piece of (merged.length ? merged : [plain])) {
+    if (piece.length <= CAPTION_CHUNK_CHARS) finalParts.push(piece);
+    else finalParts.push(...splitCaptionChunk(piece, CAPTION_CHUNK_CHARS));
+  }
+  return finalParts.length ? finalParts : [plain];
+}
+
+/**
+ * Full mute-friendly captions: every spoken word appears on screen as
+ * complete phrases timed to the VO (not keyword hooks).
+ */
+function captionBeatsFromSpoken(spoken, durationSec) {
+  const parts = phraseChunksFromSpoken(spoken);
+
+  const weights = parts.map((p) => Math.max(p.length, 12));
   const weightSum = weights.reduce((a, b) => a + b, 0);
   const usable = Math.max(durationSec - 0.12, 1);
   let t = 0;
-  return parts.map((text, i) => {
+  const beats = parts.map((text, i) => {
     const share = weights[i] / weightSum;
     const start = t;
-    const end = i === parts.length - 1 ? usable : Math.min(usable, t + share * usable);
-    t = end;
-    return { start, end, text: formatCaptionLines(text) };
+    let end = i === parts.length - 1 ? usable : Math.min(usable, t + share * usable);
+    if (i < parts.length - 1 && end - start < CAPTION_MIN_BEAT_SEC) {
+      end = Math.min(usable - (parts.length - i - 1) * 0.8, start + CAPTION_MIN_BEAT_SEC);
+    }
+    t = Math.max(end, start + 0.35);
+    return { start, end: t, text: formatCaptionLines(text) };
   });
+
+  if (beats.length) beats[beats.length - 1].end = usable;
+  return beats;
 }
 
 /** Legacy silent-path captions (kept for tests / FB_PARK_REEL_WITH_VOICE=false). */
@@ -243,7 +297,8 @@ function scaleCaptionBeats(captions, durationSec) {
 }
 
 function writeAss(captions, duration, outPath) {
-  // Large type + thick outline for phone screens; MarginV keeps copy above FB UI.
+  // BorderStyle 3 = opaque box behind text so full phrases stay readable on busy stills.
+  // Font 46 + 2 lines keeps complete clauses in the FB safe area.
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: 720
@@ -252,8 +307,8 @@ WrapStyle: 2
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,52,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,5,3,2,48,48,280,1
-Style: Brand,DejaVu Sans,34,&H00F4F7FF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,56,1
+Style: Caption,DejaVu Sans,42,&H00FFFFFF,&H00FFFFFF,&H00000000,&HC0000000,-1,0,0,0,100,100,0,0,3,4,0,2,36,36,240,1
+Style: Brand,DejaVu Sans,32,&H00F4F7FF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,56,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,${stamp(duration)},Brand,,0,0,0,,THE FLORIDA BUZZ
@@ -665,6 +720,7 @@ module.exports = {
   resolveStillImage,
   runParkReelJob,
   slowZoomPanStill,
+  phraseChunksFromSpoken,
   splitCaptionChunk,
   spokenScriptFromArticle,
   stripAudioTags,
