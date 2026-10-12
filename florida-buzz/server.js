@@ -368,14 +368,20 @@ if (podcastsCfg.enabled && podcastsCfg.weeklyCron) {
   console.log('Podcast weekly draft checker NOT scheduled — podcasts disabled or PODCASTS_WEEKLY_CRON_ENABLED=false.');
 }
 
-// Twice-daily theme-park / cruise Reel (article stills + slow zoom/pan + big text).
+// Twice-daily park Reels: 10:30am tip/guide + 7:00pm Disney news.
 // Cron on when FB_PARK_REEL_ENABLED=true (+ FB + Supabase). Actual Meta publish
 // also needs FB_PARK_REEL_PUBLISH=true (otherwise the job only renders).
 if (scheduleFlags.facebookParkReel) {
   const {
+    PARK_REEL_MODE_DISNEY_NEWS,
+    PARK_REEL_MODE_TIP,
     shouldRunParkReelCatchUp,
   } = require('./lib/facebookParkReel');
   const { supabase: parkReelSupabase } = require('./lib/supabase');
+
+  function parkReelCommand(mode) {
+    return `FB_PARK_REEL_MODE=${mode} node scripts/facebook-park-reel.js`;
+  }
 
   async function maybeCatchUpParkReel(reason) {
     try {
@@ -387,26 +393,27 @@ if (scheduleFlags.facebookParkReel) {
         );
         return;
       }
+      const mode = decision.mode || PARK_REEL_MODE_TIP;
       console.log(
         `Running Facebook park Reel catch-up (${reason}) — missed ${decision.label || 'slot'}`
-        + ` (posted ${decision.posted}/${decision.expected} today ET)...`
+        + ` mode=${mode} (posted ${decision.posted}/${decision.expected} today ET)...`
       );
-      runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
+      runScheduledCommand('facebook park reel', parkReelCommand(mode));
     } catch (err) {
       console.error(`Facebook park Reel catch-up failed (${reason}):`, err.message || err);
     }
   }
 
-  // 10:30am Eastern — morning park/cruise Reel.
+  // 10:30am Eastern — theme-park tip / guide Reel.
   cron.schedule('30 10 * * *', () => {
-    console.log('Running scheduled Facebook park Reel (10:30am ET)...');
-    runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
+    console.log('Running scheduled Facebook park Reel (10:30am ET tip)...');
+    runScheduledCommand('facebook park reel', parkReelCommand(PARK_REEL_MODE_TIP));
   }, { timezone: 'America/New_York' });
 
-  // 7:00pm Eastern — evening park/cruise Reel.
+  // 7:00pm Eastern — Disney news Reel.
   cron.schedule('0 19 * * *', () => {
-    console.log('Running scheduled Facebook park Reel (7:00pm ET)...');
-    runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
+    console.log('Running scheduled Facebook park Reel (7:00pm ET Disney news)...');
+    runScheduledCommand('facebook park reel', parkReelCommand(PARK_REEL_MODE_DISNEY_NEWS));
   }, { timezone: 'America/New_York' });
 
   // Safety nets if a cron tick or redeploy missed a slot (morning → 2pm, evening → 8pm).
@@ -422,7 +429,7 @@ if (scheduleFlags.facebookParkReel) {
     maybeCatchUpParkReel('startup');
   }, 90_000);
 
-  console.log('Facebook park Reel scheduled: 10:30am + 7:00pm daily (Eastern time) + startup/2pm/8pm catch-up if a slot was missed. Publishing gated by FB_PARK_REEL_PUBLISH=true.');
+  console.log('Facebook park Reel scheduled: 10:30am tip + 7:00pm Disney news (Eastern) + startup/2pm/8pm catch-up if a slot was missed. Publishing gated by FB_PARK_REEL_PUBLISH=true.');
 } else {
   console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true AND FB_PARK_REEL_PUBLISH=true in DigitalOcean (plus FB + Supabase credentials).');
 }
