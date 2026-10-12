@@ -163,6 +163,18 @@ Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_K
 6. When status is `preview_ready`, play/download the private audio and listen.
 7. **Approve audio** → **Publish now** only when satisfied (never auto-publishes).
 
+### Human Geno recording (optional)
+
+Prefer your own voice over TTS for an episode:
+
+1. Record the episode on your phone or mic (M4A / WAV / MP3 is fine).
+2. On the episode admin page, use **Record yourself → AI cleanup**.
+3. Upload the file (optionally keep **Prepend announcer intro bumper** checked).
+4. The server sends audio to ElevenLabs **Voice Isolator** (`/v1/audio-isolation`), which removes background noise / room tone while keeping your real voice — it does **not** clone or replace Geno.
+5. Status moves `generating_audio` → `preview_ready`. Listen, then Approve → Publish as usual.
+
+Requires `ELEVENLABS_API_KEY` (same key as TTS). Does **not** require `PODCASTS_GENERATION_ENABLED` (cleanup is not text-to-speech). For a finished MP3 with no cleanup, use **Upload replacement MP3** instead.
+
 ## ElevenLabs bakeoff scripts
 
 Historical bakeoff notes live in `podcast-tts-elevenlabs-bakeoff.md`. Production no longer defaults to fal Gemini multi-speaker.

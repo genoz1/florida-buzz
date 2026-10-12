@@ -6,6 +6,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const { splitScriptIntoSections, formatScriptForTts } = require('./script');
+const { isolateSpeech } = require('./elevenAudioClean');
 
 /** Deterministic uneven join gaps (ms). Wider breath spacing between sections. */
 const INTER_SECTION_GAP_MS = Object.freeze([140, 220, 160, 280, 180, 240, 150, 300, 190, 170]);
@@ -551,9 +552,80 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
     return saved;
   }
 
+  /**
+   * Upload a human Geno take: ElevenLabs voice isolation (noise cleanup) →
+   * encode → optional announcer intro prepend → store as private preview.
+   * Keeps the real voice; does not clone or replace it.
+   */
+  async function attachCleanedRecording(episode, fileBuffer, originalName = 'recording.m4a', {
+    prependIntro = true,
+    isolateFn = isolateSpeech,
+  } = {}) {
+    if (!cfg.elevenApiKey) {
+      throw new Error('ELEVENLABS_API_KEY is required to clean human recordings');
+    }
+    const raw = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer || []);
+    if (!raw.length) throw new Error('Recording is empty');
+
+    await store.updateEpisode(episode.id, { last_error: null }).catch(() => {});
+    try {
+      await store.setStatus(episode.id, 'generating_audio');
+    } catch {
+      await store.updateEpisode(episode.id, { status: 'generating_audio' });
+    }
+
+    let cleaned;
+    try {
+      const isolated = await isolateFn(raw, {
+        apiKey: cfg.elevenApiKey,
+        filename: originalName || 'recording.m4a',
+      });
+      cleaned = isolated.buffer;
+    } catch (err) {
+      await store.updateEpisode(episode.id, {
+        status: episode.status || 'script_ready',
+        last_error: err.message,
+      });
+      throw err;
+    }
+
+    let master = await encodePodcastMaster(cleaned, ffmpegPath);
+    let introAttached = false;
+    if (prependIntro) {
+      try {
+        const show =
+          (typeof store.getShowById === 'function' && episode.show_id
+            ? await store.getShowById(episode.show_id)
+            : null) ||
+          (typeof store.getShow === 'function' ? await store.getShow(require('./config').DISNEY_SHOW_SLUG) : null);
+        const intro = await loadIntroBuffer({ show, cfg });
+        if (intro?.length) {
+          master = await prependAudioBuffer(intro, master, ffmpegPath);
+          introAttached = true;
+        }
+      } catch (introErr) {
+        console.warn('[podcasts] intro prepend skipped on cleaned recording:', introErr.message);
+      }
+    }
+
+    const saved = await persistMaster(episode, master, {});
+    try {
+      await store.setStatus(episode.id, 'preview_ready');
+    } catch {
+      await store.updateEpisode(episode.id, { status: 'preview_ready' });
+    }
+    await store
+      .updateEpisode(episode.id, {
+        last_error: null,
+      })
+      .catch(() => {});
+    return { ...saved, cleaned: true, introAttached };
+  }
+
   return {
     generatePreview,
     attachUploadedAudio,
+    attachCleanedRecording,
     persistMaster,
     concatMp3Buffers,
     prependAudioBuffer,

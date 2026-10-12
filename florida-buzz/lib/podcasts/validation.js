@@ -105,6 +105,26 @@ function assertAudioUpload(file, maxBytes) {
   return true;
 }
 
+/** Human Geno recordings for AI cleanup — phone m4a/wav/aac/mp3 ok. */
+function assertRecordingUpload(file, maxBytes) {
+  if (!file) throw new Error('Recording file is required');
+  const name = String(file.originalname || '').toLowerCase();
+  const type = String(file.mimetype || '').toLowerCase();
+  const okExt = /\.(mp3|m4a|aac|wav|flac|ogg|mp4|mov|webm)$/i.test(name);
+  const okType =
+    type.startsWith('audio/') ||
+    type.startsWith('video/') ||
+    ['application/octet-stream', ''].includes(type);
+  if (!okExt && !okType) {
+    throw new Error('Upload an audio recording (MP3, M4A, WAV, AAC, etc.)');
+  }
+  if (!okExt && type.startsWith('video/') === false && !type.startsWith('audio/')) {
+    throw new Error('Upload an audio recording (MP3, M4A, WAV, AAC, etc.)');
+  }
+  if (file.size > maxBytes) throw new Error('Recording exceeds size limit');
+  return true;
+}
+
 function assertArtworkUpload(file, maxBytes) {
   if (!file) throw new Error('Artwork file is required');
   const type = String(file.mimetype || '');
@@ -126,5 +146,6 @@ module.exports = {
   validateSourceInput,
   validateEpisodeFields,
   assertAudioUpload,
+  assertRecordingUpload,
   assertArtworkUpload,
 };

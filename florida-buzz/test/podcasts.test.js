@@ -1109,3 +1109,207 @@ test('episode field validation and slugify', () => {
   assert.equal(fields.slug, 'park-tips');
   assert.equal(slugify('Hello World!!'), 'hello-world');
 });
+
+test('assertRecordingUpload accepts phone audio formats', () => {
+  const { assertRecordingUpload } = require('../lib/podcasts/validation');
+  assert.equal(
+    assertRecordingUpload({ originalname: 'geno-take.m4a', mimetype: 'audio/mp4', size: 1000 }, 10_000_000),
+    true
+  );
+  assert.equal(
+    assertRecordingUpload({ originalname: 'voice.wav', mimetype: 'audio/wav', size: 1000 }, 10_000_000),
+    true
+  );
+  assert.throws(
+    () => assertRecordingUpload({ originalname: 'notes.txt', mimetype: 'text/plain', size: 10 }, 10_000_000),
+    /audio recording/i
+  );
+  assert.throws(
+    () => assertRecordingUpload({ originalname: 'huge.m4a', mimetype: 'audio/mp4', size: 99_000_000 }, 1_000_000),
+    /size limit/i
+  );
+});
+
+test('isolateSpeech posts multipart to ElevenLabs audio-isolation', async () => {
+  const { isolateSpeech, ISOLATION_URL } = require('../lib/podcasts/elevenAudioClean');
+  const cleaned = Buffer.from('cleaned-audio-bytes');
+  let sawUrl = null;
+  let sawKey = null;
+  const out = await isolateSpeech(Buffer.from('raw-recording'), {
+    apiKey: 'sk_test_iso',
+    filename: 'geno.m4a',
+    fetcher: async (url, opts) => {
+      sawUrl = url;
+      sawKey = opts.headers['xi-api-key'];
+      assert.equal(opts.method, 'POST');
+      assert.ok(opts.body);
+      return {
+        ok: true,
+        headers: { get: (name) => (name === 'request-id' ? 'iso-req-1' : null) },
+        arrayBuffer: async () => cleaned.buffer.slice(cleaned.byteOffset, cleaned.byteOffset + cleaned.byteLength),
+      };
+    },
+  });
+  assert.equal(sawUrl, ISOLATION_URL);
+  assert.equal(sawKey, 'sk_test_iso');
+  assert.equal(out.requestId, 'iso-req-1');
+  assert.equal(Buffer.compare(out.buffer, cleaned), 0);
+  await assert.rejects(() => isolateSpeech(Buffer.alloc(0), { apiKey: 'sk' }), /empty/i);
+  await assert.rejects(() => isolateSpeech(Buffer.from('x'), {}), /ELEVENLABS_API_KEY/);
+});
+
+test('attachCleanedRecording isolates, encodes, and reaches preview_ready', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, {
+    title: 'Human take',
+    description: 'desc',
+    slug: 'human-take',
+    show_notes_html: '',
+    episode_number: 21,
+  });
+  await store.setStatus(episode.id, 'script_ready');
+
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const ffmpegPath = (() => {
+    try {
+      return require('ffmpeg-static');
+    } catch {
+      return 'ffmpeg';
+    }
+  })();
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-clean-rec-'));
+  const tinyMp3 = path.join(dir, 'tiny.mp3');
+  const mk = spawnSync(
+    ffmpegPath,
+    ['-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.35', '-codec:a', 'libmp3lame', '-b:a', '96k', tinyMp3],
+    { encoding: 'utf8' }
+  );
+  if (mk.status !== 0) {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+    return;
+  }
+  const audioBytes = await fsp.readFile(tinyMp3);
+
+  let isolateCalls = 0;
+  const cfg = config({
+    ELEVENLABS_API_KEY: 'sk_test',
+    PODCASTS_GENERATION_ENABLED: 'false',
+  });
+  const pipeline = createAudioPipeline({
+    cfg,
+    store,
+    fal: createFalTts(cfg),
+    eleven: createElevenTts(cfg),
+    ffmpegPath,
+  });
+  const result = await pipeline.attachCleanedRecording(episode, Buffer.from('noisy-phone-take'), 'geno.m4a', {
+    prependIntro: false,
+    isolateFn: async (buf, opts) => {
+      isolateCalls += 1;
+      assert.equal(opts.filename, 'geno.m4a');
+      assert.equal(opts.apiKey, 'sk_test');
+      assert.ok(buf.length);
+      return { buffer: audioBytes, requestId: 'iso-1' };
+    },
+  });
+  assert.equal(isolateCalls, 1);
+  assert.equal(result.cleaned, true);
+  assert.equal(result.introAttached, false);
+  const after = await store.getEpisodeById(episode.id);
+  assert.equal(after.status, 'preview_ready');
+  assert.ok(after.audio_url);
+  await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+});
+
+test('admin clean-recording route starts background cleanup', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, {
+    title: 'Clean upload',
+    description: 'desc',
+    slug: 'clean-upload',
+    show_notes_html: '',
+    episode_number: 22,
+  });
+  await store.setStatus(episode.id, 'script_ready');
+
+  let cleanedArgs = null;
+  let resolveClean;
+  const cleanedDone = new Promise((resolve) => {
+    resolveClean = resolve;
+  });
+  const cfg = config({
+    PODCASTS_ENABLED: 'true',
+    ADMIN_PASSWORD: 'a-long-test-password',
+    ELEVENLABS_API_KEY: 'sk_test',
+  });
+  const app = express();
+  app.set('view engine', 'ejs');
+  app.set('views', path.join(__dirname, '..', 'views'));
+  app.use(express.urlencoded({ extended: true }));
+  app.use(
+    '/admin/podcasts',
+    createAdminRouter({
+      store,
+      cfg,
+      pipeline: {
+        generatePreview: async () => {},
+        attachUploadedAudio: async () => {},
+        attachCleanedRecording: async (ep, buf, name, opts) => {
+          cleanedArgs = { id: ep.id, name, opts, bytes: buf.length };
+          resolveClean();
+          return { cleaned: true };
+        },
+      },
+      aiText: null,
+      env: { ADMIN_PASSWORD: 'a-long-test-password' },
+    })
+  );
+  const { server, port } = await listen(app);
+  try {
+    const auth = { Authorization: 'Basic ' + Buffer.from('admin:a-long-test-password').toString('base64') };
+    const page = await request(port, 'GET', `/admin/podcasts/episodes/${episode.id}`, { headers: auth });
+    assert.equal(page.status, 200);
+    assert.match(page.body, /clean-recording/);
+    assert.match(page.body, /Record yourself/);
+    const csrf = (page.body.match(/name="csrf" value="([^"]+)"/) || [])[1];
+    assert.ok(csrf);
+
+    const boundary = '----FbCleanBoundary7MA4YWxkTrZu0gW';
+    const body = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="csrf"\r\n\r\n${csrf}\r\n` +
+          `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="prepend_intro"\r\n\r\n0\r\n` +
+          `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="prepend_intro"\r\n\r\n1\r\n` +
+          `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="recording"; filename="geno.m4a"\r\n` +
+          `Content-Type: audio/mp4\r\n\r\n`
+      ),
+      Buffer.from('fake-m4a-bytes'),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    const posted = await request(port, 'POST', `/admin/podcasts/episodes/${episode.id}/clean-recording`, {
+      headers: {
+        ...auth,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': String(body.length),
+      },
+      body,
+    });
+    assert.equal(posted.status, 303);
+    assert.match(posted.headers.location || '', /cleaning-started/);
+    await Promise.race([cleanedDone, new Promise((_, rej) => setTimeout(() => rej(new Error('cleanup not started')), 2000))]);
+    assert.equal(cleanedArgs.id, episode.id);
+    assert.equal(cleanedArgs.name, 'geno.m4a');
+    assert.equal(cleanedArgs.opts.prependIntro, true);
+    assert.equal(cleanedArgs.bytes, Buffer.byteLength('fake-m4a-bytes'));
+  } finally {
+    server.close();
+  }
+});
