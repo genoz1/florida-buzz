@@ -124,11 +124,14 @@ Keep existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SE
    - `Running Facebook park Reel catch-up (startup)` if an overdue slot is short (e.g. afternoon with 0 posts, or after 7pm with only 1), or  
    - `catch-up skipped … morning_already_posted` / `already_posted_today` when that day’s quota is filled.
 4. Confirm in Runtime Logs: `Park Reel candidate:…`, `Public URL (Supabase…`, and a Facebook success / `park-reel:<slug>` in `post_log`.  
-5. Optional Console one-shot (same env):
+5. **Manual test — use the admin URL, not DigitalOcean Console.**  
+   Console sandboxes often die mid-ffmpeg (`WaitPID EOF`) even when production is fine. Open (replace `YOUR_ADMIN_PASSWORD`):
 
-```bash
-FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
+```text
+https://thefloridabuzz.com/admin/facebook-park-reel?key=YOUR_ADMIN_PASSWORD
 ```
+
+Dry run (no Meta post): add `&dryRun=true`. Then watch **Runtime Logs** (not Console) for `Park Reel candidate…` → `Public URL (Supabase…` → run complete. Success also shows in `post_log` as `park-reel:<slug>`.
 
 Until step 2–3, the Reel crons are off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render. With the key present, Reels mux Geno VO and scale captions to the spoken script. Story URL goes in the first comment.
 
