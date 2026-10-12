@@ -108,6 +108,19 @@ router.get('/go/hotels/:dest', (req, res) => {
   return redirectHotelsAffiliate(req, res, dest);
 });
 
+// Short branded Undercover Tourist link for podcast descriptions / show notes.
+// Podcast apps often break long CJ query URLs; this 302s to the tracked affiliate URL.
+router.get('/go/undercover', (req, res) => {
+  const url = undercoverTouristUrl(process.env);
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, url);
+});
+router.get('/go/uct', (req, res) => {
+  const url = undercoverTouristUrl(process.env);
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, url);
+});
+
 router.get('/images/buzz-board-social/:slug.png', async (req, res) => {
   if (!supabase) return render404(req, res);
   const slug = String(req.params.slug || '').toLowerCase();

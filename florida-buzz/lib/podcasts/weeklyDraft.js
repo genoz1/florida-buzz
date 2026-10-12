@@ -195,7 +195,8 @@ ${partnerShowNotesHtml()}
 }
 
 function withPartnerDescription(description, env = process.env) {
-  const base = String(description || '').trim();
+  const { rewritePartnerDescriptionLink } = require('../affiliates/undercoverTourist');
+  const base = rewritePartnerDescriptionLink(String(description || '').trim(), env);
   if (/Undercover Tourist/i.test(base)) return base.slice(0, 4000);
   const blurb = partnerDescriptionBlurb(env);
   const joined = base ? `${base} ${blurb}` : blurb;

@@ -220,7 +220,7 @@ test('show notes include resources section with tracking params', () => {
   assert.match(html, /\/planner/);
   assert.match(html, /\/dining/);
   assert.match(html, /Undercover Tourist/i);
-  assert.match(html, /jdoqocy\.com\/click-101851476-15733832|UNDERCOVER|undercovertourist/i);
+  assert.match(html, /thefloridabuzz\.com\/go\/undercover|UNDERCOVER|undercovertourist/i);
   assert.match(html, /commission|affiliate|partner/i);
 });
 
@@ -232,7 +232,8 @@ test('episode description appends Undercover Tourist partner link', async () => 
     releaseSlot: { key: 'tue', label: 'Tuesday' },
   });
   assert.match(copy.description, /Undercover Tourist/i);
-  assert.match(copy.description, /jdoqocy\.com\/click-101851476-15733832/);
+  assert.match(copy.description, /thefloridabuzz\.com\/go\/undercover/);
+  assert.doesNotMatch(copy.description, /jdoqocy\.com/);
   assert.match(copy.description, /commission|partner/i);
 });
 

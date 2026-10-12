@@ -82,8 +82,18 @@ function undercoverTouristTrackedUrl(
   return `${base}?url=${encodeURIComponent(destination)}`;
 }
 
+/**
+ * Short on-site path used in podcast plain-text descriptions.
+ * Podcast apps often mangle long CJ query URLs; /go/undercover 302s to the tracked link.
+ */
+function undercoverTouristSitePath(siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
+  const base = String(siteUrl || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  return `${base}/go/undercover`;
+}
+
 function partnerShowNotesHtml(env = process.env) {
-  const url = undercoverTouristUrl(env);
+  // HTML show notes can use the short branded link (cleaner) — click still tracks via redirect.
+  const url = undercoverTouristSitePath(env.SITE_URL || 'https://thefloridabuzz.com');
   const safeUrl = escapeHtml(url);
   return [
     '<h2>Partner: Undercover Tourist</h2>',
@@ -93,8 +103,31 @@ function partnerShowNotesHtml(env = process.env) {
 }
 
 function partnerDescriptionBlurb(env = process.env) {
-  const url = undercoverTouristUrl(env);
-  return `Partner: Undercover Tourist for Disney tickets & hotels — ${url}. ${AFFILIATE_DISCLOSURE_SHORT}`;
+  const url = undercoverTouristSitePath(env.SITE_URL || 'https://thefloridabuzz.com');
+  // Keep a space after the URL so podcast apps don't glue on the next period/word.
+  return `Partner: Undercover Tourist for Disney tickets & hotels — ${url} — ${AFFILIATE_DISCLOSURE_SHORT}`;
+}
+
+/** Strip trailing punctuation podcast apps often glue onto URLs. */
+function trimUrlMatch(match) {
+  return String(match || '').replace(/[),.:;]+$/g, '');
+}
+
+/** Rewrite stored description/show-notes that still contain a raw CJ UCT URL. */
+function rewritePartnerDescriptionLink(description, env = process.env) {
+  const text = String(description || '');
+  if (!text) return text;
+  const shortUrl = undercoverTouristSitePath(env.SITE_URL || 'https://thefloridabuzz.com');
+  let out = text.replace(/https?:\/\/(?:www\.)?jdoqocy\.com\/click-[^\s<>"']+/gi, (m) => {
+    const cleaned = trimUrlMatch(m);
+    // Only rewrite UCT evergreen / destination clicks — keep Hotels.com CJ links alone.
+    if (!/15733832|undercovertourist/i.test(cleaned)) return m;
+    return shortUrl;
+  });
+  out = out.replace(/https?:\/\/(?:www\.)?undercovertourist\.com\/disney\/?/gi, shortUrl);
+  const escaped = shortUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  out = out.replace(new RegExp(`(?:${escaped}\\s*){2,}`, 'g'), `${shortUrl} `);
+  return out.slice(0, 4000);
 }
 
 function escapeHtml(value) {
@@ -119,7 +152,9 @@ module.exports = {
   undercoverTouristUrl,
   undercoverTouristDestinationUrl,
   undercoverTouristTrackedUrl,
+  undercoverTouristSitePath,
   partnerShowNotesHtml,
   partnerDescriptionBlurb,
+  rewritePartnerDescriptionLink,
   escapeHtml,
 };

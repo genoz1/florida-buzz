@@ -5,6 +5,8 @@ const {
   AFFILIATE_DISCLOSURE_SHORT,
   undercoverTouristUrl,
   undercoverTouristTrackedUrl,
+  undercoverTouristSitePath,
+  rewritePartnerDescriptionLink,
   escapeHtml,
 } = require('./undercoverTourist');
 const {
@@ -323,6 +325,8 @@ module.exports = {
   newsletterMonetizationHtml,
   undercoverTouristUrl,
   undercoverTouristTrackedUrl,
+  undercoverTouristSitePath,
+  rewritePartnerDescriptionLink,
   PARTNER_NAME,
   AFFILIATE_DISCLOSURE_SHORT,
   escapeHtml,
