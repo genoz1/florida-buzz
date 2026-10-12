@@ -124,7 +124,7 @@ function spokenScriptFromArticle(article) {
  * Wrap caption copy into short ASS lines (no mid-sentence ellipsis).
  * Prefer more kinetic beats over truncating words Gene actually speaks.
  */
-function formatCaptionLines(text, { maxLine = 22, maxLines = 2 } = {}) {
+function formatCaptionLines(text, { maxLine = 16, maxLines = 2 } = {}) {
   const words = String(text || '')
     .replace(/[{}\\]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -153,7 +153,7 @@ function formatCaptionLines(text, { maxLine = 22, maxLines = 2 } = {}) {
 }
 
 /** Split a long spoken fragment into beat-sized chunks at word boundaries. */
-function splitCaptionChunk(text, maxChars = 40) {
+function splitCaptionChunk(text, maxChars = 32) {
   const t = String(text || '').trim();
   if (!t) return [];
   if (t.length <= maxChars) return [t];
@@ -236,11 +236,11 @@ function writeAss(captions, duration, outPath) {
 ScriptType: v4.00+
 PlayResX: 720
 PlayResY: 1280
-WrapStyle: 0
+WrapStyle: 2
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,68,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,5,3,2,48,48,290,1
+Style: Caption,DejaVu Sans,62,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,5,3,2,52,52,300,1
 Style: Brand,DejaVu Sans,34,&H00F4F7FF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,56,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
