@@ -81,7 +81,7 @@ No hashtag dumps on Facebook.
 | Sample (Lightning Lane, for Gene to watch) | `npm run sample:facebook-park-reel` |
 | Schedule | `server.js` at **10:30am + 7:00pm ET** when enabled (+ startup / 2pm / 8pm ET catch-up if a slot was missed) |
 
-**What each Reel looks like:** park article photo(s), camera slowly zooms/pans, **Geno ElevenLabs VO** (`eleven_v4`, voice `bg7PC2IzyIDwYgytMiW1`), and big white captions that match the spoken beats. Florida Buzz brand label. No AI host, no green screen, no wallet stickers.
+**What each Reel looks like:** preferably a **tips/tricks post or evergreen guide** (park/cruise), camera slowly zooms/pans, **Geno ElevenLabs VO** that opens with “tips and tricks,” and big white captions that match the spoken beats. Caption + first comment also say tips and tricks. Falls back to other park/cruise news only when no unused tip/guide is available. No AI host, no green screen, no wallet stickers.
 
 **Does use:** existing article image, ffmpeg slow zoom/pan (cover-crop + `setsar=1` so landscape stills stay true 9:16), Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, upload to **public Supabase** `article-images/park-reels/…` for Meta’s `file_url`, Page **`/video_reels`** publish helper (not legacy `/videos`, which letterboxed vertical files in feed).  
 **Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
