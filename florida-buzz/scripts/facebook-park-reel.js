@@ -17,7 +17,7 @@
  * Daily schedule (server.js): set FB_PARK_REEL_ENABLED=true plus FB + Supabase
  * credentials. Live posting also needs FB_PARK_REEL_PUBLISH=true.
  * MP4 is uploaded to public Supabase (article-images/park-reels/) for Meta.
- * Missed 10:30am ET days catch up on startup and at 2pm ET.
+ * Twice daily: 10:30am + 7:00pm ET. Missed slots catch up on startup and at 2pm/8pm ET.
  */
 
 require('dotenv').config();
