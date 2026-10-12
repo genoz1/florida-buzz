@@ -9,11 +9,15 @@ const { spawnSync } = require('node:child_process');
 const {
   SITE_CTA_SPOKEN,
   captionBeatsFromSpoken,
+  easternDateString,
   ensureSiteCtaSpoken,
   formatCaptionLines,
+  isAtOrAfterParkReelSlotEt,
   parkReelFirstComment,
+  parkReelPostedOnEasternDay,
   parkReelVoiceEnabled,
   renderParkReelFromArticle,
+  shouldRunParkReelCatchUp,
   slowZoomPanStill,
   spokenScriptFromArticle,
   stripAudioTags,
@@ -134,6 +138,66 @@ describe('facebookParkReel voice + captions', () => {
     assert.match(joined, /wreck your morning/);
     assert.match(joined, /automatic yes/);
     assert.match(joined, /florida buzz dot com/);
+  });
+});
+
+describe('facebookParkReel daily catch-up', () => {
+  it('formats Eastern calendar dates as YYYY-MM-DD', () => {
+    // 2026-10-12T01:27Z is still Oct 11 evening in America/New_York (EDT).
+    assert.equal(easternDateString(new Date('2026-10-12T01:27:40.000Z')), '2026-10-11');
+    assert.equal(easternDateString(new Date('2026-10-12T14:30:00.000Z')), '2026-10-12');
+  });
+
+  it('treats 10:30am ET as the daily slot boundary', () => {
+    assert.equal(isAtOrAfterParkReelSlotEt(new Date('2026-10-12T14:29:00.000Z')), false); // 10:29 ET
+    assert.equal(isAtOrAfterParkReelSlotEt(new Date('2026-10-12T14:30:00.000Z')), true); // 10:30 ET
+    assert.equal(isAtOrAfterParkReelSlotEt(new Date('2026-10-12T18:00:00.000Z')), true); // 14:00 ET
+  });
+
+  it('detects whether a park-reel success already landed on the Eastern day', async () => {
+    const client = {
+      from() {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          like() { return this; },
+          order() { return this; },
+          limit() {
+            return Promise.resolve({
+              data: [{
+                created_at: '2026-10-12T01:27:40.173Z', // Oct 11 ET
+                detail: 'park-reel:disney-believe-features-and-venues-for-2027-cruises',
+              }],
+              error: null,
+            });
+          },
+        };
+      },
+    };
+    assert.equal(await parkReelPostedOnEasternDay(client, new Date('2026-10-12T15:00:00.000Z')), false);
+    assert.equal(await parkReelPostedOnEasternDay(client, new Date('2026-10-11T20:00:00.000Z')), true);
+  });
+
+  it('runs catch-up only after the slot when today has no success', async () => {
+    const emptyClient = {
+      from() {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          like() { return this; },
+          order() { return this; },
+          limit() { return Promise.resolve({ data: [], error: null }); },
+        };
+      },
+    };
+    assert.deepEqual(
+      await shouldRunParkReelCatchUp(emptyClient, { now: new Date('2026-10-12T14:00:00.000Z') }),
+      { run: false, reason: 'before_slot' }
+    );
+    assert.deepEqual(
+      await shouldRunParkReelCatchUp(emptyClient, { now: new Date('2026-10-12T15:00:00.000Z') }),
+      { run: true, reason: 'missed_today' }
+    );
   });
 });
 
