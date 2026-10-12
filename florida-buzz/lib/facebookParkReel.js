@@ -14,7 +14,7 @@
  * FB_PARK_REEL_PUBLISH=true and a publicly reachable HTTPS MP4 URL.
  *
  * Env:
- *   FB_PARK_REEL_ENABLED=true          schedule daily 10:30am ET runner (+ catch-up)
+ *   FB_PARK_REEL_ENABLED=true          schedule 10:30am + 7:00pm ET (+ catch-up)
  *   FB_PARK_REEL_PUBLISH=true          actually call Facebook video API
  *   FB_PARK_REEL_WITH_VOICE=false      disable VO (default: on when key set)
  *   ELEVENLABS_API_KEY                 Geno VO via visualNews/elevenTts
@@ -36,9 +36,17 @@ const {
   DEFAULT_ELEVEN_VOICE_GENO,
 } = require('./visualNews/config');
 
-/** Daily cron minute/hour in America/New_York (must match server.js). */
-const PARK_REEL_ET_HOUR = 10;
-const PARK_REEL_ET_MINUTE = 30;
+/**
+ * Daily park Reel slots in America/New_York (must match server.js crons).
+ * Catch-up expects one success per slot that has already passed today.
+ */
+const PARK_REEL_SLOTS_ET = Object.freeze([
+  { id: 'morning', hour: 10, minute: 30, label: '10:30am' },
+  { id: 'evening', hour: 19, minute: 0, label: '7:00pm' },
+]);
+/** @deprecated use PARK_REEL_SLOTS_ET[0] — kept for older tests/imports */
+const PARK_REEL_ET_HOUR = PARK_REEL_SLOTS_ET[0].hour;
+const PARK_REEL_ET_MINUTE = PARK_REEL_SLOTS_ET[0].minute;
 
 const ROOT = path.join(__dirname, '..');
 
@@ -715,10 +723,8 @@ function easternDateString(date = new Date()) {
   }).format(date);
 }
 
-/**
- * True once the daily 10:30am ET park Reel slot has arrived (or passed) today.
- */
-function isAtOrAfterParkReelSlotEt(date = new Date()) {
+/** Eastern wall-clock hour/minute for a Date. */
+function easternHourMinute(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour: 'numeric',
@@ -727,16 +733,43 @@ function isAtOrAfterParkReelSlotEt(date = new Date()) {
   }).formatToParts(date);
   const hour = Number(parts.find((p) => p.type === 'hour')?.value);
   const minute = Number(parts.find((p) => p.type === 'minute')?.value);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
-  return hour > PARK_REEL_ET_HOUR
-    || (hour === PARK_REEL_ET_HOUR && minute >= PARK_REEL_ET_MINUTE);
+  return {
+    hour: Number.isFinite(hour) ? hour : NaN,
+    minute: Number.isFinite(minute) ? minute : NaN,
+  };
+}
+
+function isAtOrAfterEtClock(date, hour, minute) {
+  const et = easternHourMinute(date);
+  if (!Number.isFinite(et.hour) || !Number.isFinite(et.minute)) return false;
+  return et.hour > hour || (et.hour === hour && et.minute >= minute);
 }
 
 /**
- * True when post_log already has a successful park-reel for the Eastern day.
+ * True once the earliest daily park Reel slot (10:30am ET) has arrived.
  */
-async function parkReelPostedOnEasternDay(client, date = new Date()) {
-  if (!client) return false;
+function isAtOrAfterParkReelSlotEt(date = new Date()) {
+  const first = PARK_REEL_SLOTS_ET[0];
+  return isAtOrAfterEtClock(date, first.hour, first.minute);
+}
+
+/**
+ * How many park Reels should already have posted by `date` (Eastern slots).
+ * 0 before 10:30am, 1 from 10:30am until 7:00pm, 2 from 7:00pm on.
+ */
+function expectedParkReelCountEt(date = new Date()) {
+  let n = 0;
+  for (const slot of PARK_REEL_SLOTS_ET) {
+    if (isAtOrAfterEtClock(date, slot.hour, slot.minute)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Count successful park-reel rows in post_log for the Eastern calendar day.
+ */
+async function countParkReelsOnEasternDay(client, date = new Date()) {
+  if (!client) return 0;
   const day = easternDateString(date);
   const { data, error } = await client
     .from('post_log')
@@ -747,21 +780,43 @@ async function parkReelPostedOnEasternDay(client, date = new Date()) {
     .order('created_at', { ascending: false })
     .limit(40);
   if (error) throw new Error(`Could not read park Reel post_log: ${error.message}`);
-  return (data || []).some((row) => easternDateString(new Date(row.created_at)) === day);
+  return (data || []).filter((row) => easternDateString(new Date(row.created_at)) === day).length;
 }
 
 /**
- * Whether catch-up (startup or afternoon safety) should fire the daily job.
- * Requires the slot to have passed and no success yet today (ET).
+ * True when post_log already has a successful park-reel for the Eastern day.
+ */
+async function parkReelPostedOnEasternDay(client, date = new Date()) {
+  return (await countParkReelsOnEasternDay(client, date)) > 0;
+}
+
+/**
+ * Whether catch-up should fire one more park Reel.
+ * After 10:30am ET expects ≥1 success today; after 7:00pm ET expects ≥2.
  */
 async function shouldRunParkReelCatchUp(client, { now = new Date() } = {}) {
-  if (!isAtOrAfterParkReelSlotEt(now)) {
-    return { run: false, reason: 'before_slot' };
+  const expected = expectedParkReelCountEt(now);
+  if (expected <= 0) {
+    return { run: false, reason: 'before_slot', expected: 0, posted: 0 };
   }
-  if (await parkReelPostedOnEasternDay(client, now)) {
-    return { run: false, reason: 'already_posted_today' };
+  const posted = await countParkReelsOnEasternDay(client, now);
+  if (posted >= expected) {
+    return {
+      run: false,
+      reason: expected >= PARK_REEL_SLOTS_ET.length ? 'already_posted_today' : 'morning_already_posted',
+      expected,
+      posted,
+    };
   }
-  return { run: true, reason: 'missed_today' };
+  const missingSlot = PARK_REEL_SLOTS_ET[posted] || PARK_REEL_SLOTS_ET[PARK_REEL_SLOTS_ET.length - 1];
+  return {
+    run: true,
+    reason: `missed_${missingSlot.id}`,
+    expected,
+    posted,
+    slot: missingSlot.id,
+    label: missingSlot.label,
+  };
 }
 
 /**
@@ -849,12 +904,15 @@ module.exports = {
   SITE_CTA_SPOKEN,
   PARK_REEL_ET_HOUR,
   PARK_REEL_ET_MINUTE,
+  PARK_REEL_SLOTS_ET,
   articlePermalink,
   buildReelCaption,
   captionBeatsFromArticle,
   captionBeatsFromSpoken,
+  countParkReelsOnEasternDay,
   easternDateString,
   ensureSiteCtaSpoken,
+  expectedParkReelCountEt,
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
   parkReelFirstComment,

@@ -11,6 +11,7 @@ const {
   captionBeatsFromSpoken,
   easternDateString,
   ensureSiteCtaSpoken,
+  expectedParkReelCountEt,
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
   parkReelFirstComment,
@@ -148,10 +149,13 @@ describe('facebookParkReel daily catch-up', () => {
     assert.equal(easternDateString(new Date('2026-10-12T14:30:00.000Z')), '2026-10-12');
   });
 
-  it('treats 10:30am ET as the daily slot boundary', () => {
+  it('expects 1 Reel after 10:30am ET and 2 after 7:00pm ET', () => {
     assert.equal(isAtOrAfterParkReelSlotEt(new Date('2026-10-12T14:29:00.000Z')), false); // 10:29 ET
     assert.equal(isAtOrAfterParkReelSlotEt(new Date('2026-10-12T14:30:00.000Z')), true); // 10:30 ET
-    assert.equal(isAtOrAfterParkReelSlotEt(new Date('2026-10-12T18:00:00.000Z')), true); // 14:00 ET
+    assert.equal(expectedParkReelCountEt(new Date('2026-10-12T14:29:00.000Z')), 0);
+    assert.equal(expectedParkReelCountEt(new Date('2026-10-12T14:30:00.000Z')), 1);
+    assert.equal(expectedParkReelCountEt(new Date('2026-10-12T22:59:00.000Z')), 1); // 6:59pm ET
+    assert.equal(expectedParkReelCountEt(new Date('2026-10-12T23:00:00.000Z')), 2); // 7:00pm ET
   });
 
   it('detects whether a park-reel success already landed on the Eastern day', async () => {
@@ -178,7 +182,7 @@ describe('facebookParkReel daily catch-up', () => {
     assert.equal(await parkReelPostedOnEasternDay(client, new Date('2026-10-11T20:00:00.000Z')), true);
   });
 
-  it('runs catch-up only after the slot when today has no success', async () => {
+  it('catch-up fills morning then evening without blocking the second slot', async () => {
     const emptyClient = {
       from() {
         return {
@@ -192,12 +196,47 @@ describe('facebookParkReel daily catch-up', () => {
     };
     assert.deepEqual(
       await shouldRunParkReelCatchUp(emptyClient, { now: new Date('2026-10-12T14:00:00.000Z') }),
-      { run: false, reason: 'before_slot' }
+      { run: false, reason: 'before_slot', expected: 0, posted: 0 }
     );
-    assert.deepEqual(
-      await shouldRunParkReelCatchUp(emptyClient, { now: new Date('2026-10-12T15:00:00.000Z') }),
-      { run: true, reason: 'missed_today' }
-    );
+    const morningMiss = await shouldRunParkReelCatchUp(emptyClient, {
+      now: new Date('2026-10-12T15:00:00.000Z'),
+    });
+    assert.equal(morningMiss.run, true);
+    assert.equal(morningMiss.reason, 'missed_morning');
+    assert.equal(morningMiss.expected, 1);
+
+    const onePosted = {
+      from() {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          like() { return this; },
+          order() { return this; },
+          limit() {
+            return Promise.resolve({
+              data: [{
+                created_at: '2026-10-12T14:35:00.000Z', // 10:35am ET
+                detail: 'park-reel:morning-tip',
+              }],
+              error: null,
+            });
+          },
+        };
+      },
+    };
+    const afterMorning = await shouldRunParkReelCatchUp(onePosted, {
+      now: new Date('2026-10-12T18:00:00.000Z'), // 2pm ET
+    });
+    assert.equal(afterMorning.run, false);
+    assert.equal(afterMorning.reason, 'morning_already_posted');
+
+    const eveningMiss = await shouldRunParkReelCatchUp(onePosted, {
+      now: new Date('2026-10-12T23:05:00.000Z'), // 7:05pm ET
+    });
+    assert.equal(eveningMiss.run, true);
+    assert.equal(eveningMiss.reason, 'missed_evening');
+    assert.equal(eveningMiss.expected, 2);
+    assert.equal(eveningMiss.posted, 1);
   });
 });
 
