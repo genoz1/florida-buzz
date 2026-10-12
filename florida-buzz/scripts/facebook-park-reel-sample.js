@@ -46,7 +46,7 @@ const CAPTIONS = [
   { start: 6.4, end: 9.6, text: 'Seven Dwarfs\\NMine Train' },
   { start: 9.6, end: 12.4, text: 'Standby:\\N50 minutes' },
   { start: 12.4, end: 15.2, text: 'So… is it\\Nworth it?' },
-  { start: 15.2, end: 19.0, text: 'Pay only if it\\Nsaves your morning' },
+  { start: 15.2, end: 19.0, text: 'Pay only if it\\Nsaves your AM' },
   { start: 19.0, end: 23.0, text: 'Record price\\N≠ auto yes' },
 ];
 

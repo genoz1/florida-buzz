@@ -91,8 +91,10 @@ describe('facebookParkReel voice + captions', () => {
       10
     );
     const joined = beats.map((b) => b.text.replace(/\\N/g, ' ')).join(' ');
-    assert.match(joined, /Disney Cruise Line/i);
+    assert.match(joined, /Disney Cruise/i);
+    assert.match(joined, /Believe/i);
     assert.match(joined, /Encanto/i);
+    assert.match(joined, /stage show/i);
     assert.doesNotMatch(joined, /Believe will \.\.\./);
     assert.doesNotMatch(joined, /…/);
   });

@@ -120,11 +120,19 @@ function spokenScriptFromArticle(article) {
   return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
 }
 
+const CAPTION_MAX_LINE = 16;
+const CAPTION_MAX_LINES = 2;
+/** Chunk size must fit on-screen lines so formatCaptionLines never drops words. */
+const CAPTION_CHUNK_CHARS = CAPTION_MAX_LINE * CAPTION_MAX_LINES; // 32
+
 /**
  * Wrap caption copy into short ASS lines (no mid-sentence ellipsis).
  * Prefer more kinetic beats over truncating words Gene actually speaks.
  */
-function formatCaptionLines(text, { maxLine = 16, maxLines = 2 } = {}) {
+function formatCaptionLines(text, {
+  maxLine = CAPTION_MAX_LINE,
+  maxLines = CAPTION_MAX_LINES,
+} = {}) {
   const words = String(text || '')
     .replace(/[{}\\]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -136,24 +144,24 @@ function formatCaptionLines(text, { maxLine = 16, maxLines = 2 } = {}) {
   const lines = [];
   let cur = '';
   for (const word of words) {
-    const next = cur ? `${cur} ${word}` : word;
+    const clipped = word.length > maxLine ? word.slice(0, maxLine) : word;
+    const next = cur ? `${cur} ${clipped}` : clipped;
     if (next.length <= maxLine) {
       cur = next;
       continue;
     }
     if (cur) lines.push(cur);
-    cur = word.length > maxLine ? `${word.slice(0, maxLine - 1)}…` : word;
-    if (lines.length >= maxLines) {
-      cur = '';
-      break;
-    }
+    cur = clipped;
   }
-  if (cur && lines.length < maxLines) lines.push(cur);
-  return lines.join('\\N') || 'Florida Buzz';
+  if (cur) lines.push(cur);
+
+  // Upstream chunking keeps this ≤ maxLines; if not, keep every word on extra lines
+  // rather than truncating mid-sentence with "…".
+  return lines.slice(0, Math.max(maxLines, lines.length)).join('\\N') || 'Florida Buzz';
 }
 
 /** Split a long spoken fragment into beat-sized chunks at word boundaries. */
-function splitCaptionChunk(text, maxChars = 32) {
+function splitCaptionChunk(text, maxChars = CAPTION_CHUNK_CHARS) {
   const t = String(text || '').trim();
   if (!t) return [];
   if (t.length <= maxChars) return [t];
@@ -179,21 +187,24 @@ function splitCaptionChunk(text, maxChars = 32) {
  */
 function captionBeatsFromSpoken(spoken, durationSec) {
   const plain = stripAudioTags(spoken);
-  let parts = plain
+  const sentences = plain
     .split(/(?<=[.!?…])\s+|\s+[—–]\s+|\s+So\.\.\.\s+/i)
     .map((p) => p.trim())
     .filter(Boolean);
 
-  // Keep Reels readable: merge tiny fragments, split long ones at words (no "…").
+  // Split each sentence into on-screen chunks; only glue tiny leftovers.
   const normalized = [];
-  for (const part of parts) {
-    if (normalized.length && (part.length < 12 || normalized[normalized.length - 1].length < 18)) {
-      normalized[normalized.length - 1] = `${normalized[normalized.length - 1]} ${part}`.trim();
-    } else {
-      normalized.push(...splitCaptionChunk(part, 40));
+  for (const sentence of sentences) {
+    const chunks = splitCaptionChunk(sentence, CAPTION_CHUNK_CHARS);
+    for (const chunk of chunks) {
+      if (normalized.length && chunk.length < 10 && normalized[normalized.length - 1].length < 20) {
+        normalized[normalized.length - 1] = `${normalized[normalized.length - 1]} ${chunk}`.trim();
+      } else {
+        normalized.push(chunk);
+      }
     }
   }
-  parts = normalized.length ? normalized : [plain || 'Florida Buzz'];
+  const parts = normalized.length ? normalized : [plain || 'Florida Buzz'];
 
   const weights = parts.map((p) => Math.max(p.length, 8));
   const weightSum = weights.reduce((a, b) => a + b, 0);
