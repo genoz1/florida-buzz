@@ -372,12 +372,43 @@ if (podcastsCfg.enabled && podcastsCfg.weeklyCron) {
 // Cron on when FB_PARK_REEL_ENABLED=true (+ FB + Supabase). Actual Meta publish
 // also needs FB_PARK_REEL_PUBLISH=true (otherwise the job only renders).
 if (scheduleFlags.facebookParkReel) {
+  const {
+    shouldRunParkReelCatchUp,
+  } = require('./lib/facebookParkReel');
+  const { supabase: parkReelSupabase } = require('./lib/supabase');
+
+  async function maybeCatchUpParkReel(reason) {
+    try {
+      const decision = await shouldRunParkReelCatchUp(parkReelSupabase);
+      if (!decision.run) {
+        console.log(`Facebook park Reel catch-up skipped (${reason}): ${decision.reason}`);
+        return;
+      }
+      console.log(`Running Facebook park Reel catch-up (${reason}) — missed today's 10:30am ET slot...`);
+      runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
+    } catch (err) {
+      console.error(`Facebook park Reel catch-up failed (${reason}):`, err.message || err);
+    }
+  }
+
   // 10:30am Eastern — daily park/cruise Reel create + post (publish still needs FB_PARK_REEL_PUBLISH).
   cron.schedule('30 10 * * *', () => {
     console.log('Running scheduled Facebook park Reel...');
     runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
   }, { timezone: 'America/New_York' });
-  console.log('Facebook park Reel scheduled: 10:30am daily (Eastern time). Publishing gated by FB_PARK_REEL_PUBLISH=true.');
+
+  // Afternoon safety net if the morning tick or a mid-morning redeploy missed the day.
+  cron.schedule('0 14 * * *', () => {
+    maybeCatchUpParkReel('14:00 ET safety');
+  }, { timezone: 'America/New_York' });
+
+  // After deploy/restart: if today's 10:30 ET already passed and post_log has no
+  // park-reel success for the Eastern day, create+post once (covers today's miss).
+  setTimeout(() => {
+    maybeCatchUpParkReel('startup');
+  }, 90_000);
+
+  console.log('Facebook park Reel scheduled: 10:30am daily (Eastern time) + startup/2pm catch-up if missed. Publishing gated by FB_PARK_REEL_PUBLISH=true.');
 } else {
   console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true AND FB_PARK_REEL_PUBLISH=true in DigitalOcean (plus FB + Supabase credentials).');
 }

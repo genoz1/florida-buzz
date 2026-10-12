@@ -79,55 +79,37 @@ No hashtag dumps on Facebook.
 | Picker + slow zoom/pan render + optional publish | `lib/facebookParkReel.js` |
 | CLI | `npm run facebook:park-reel` / `npm run facebook:park-reel:dry` |
 | Sample (Lightning Lane, for Gene to watch) | `npm run sample:facebook-park-reel` |
-| Schedule | `server.js` at **10:30am ET** when enabled |
+| Schedule | `server.js` at **10:30am ET** when enabled (+ startup / 2pm ET catch-up if that day was missed) |
 
 **What each Reel looks like:** park article photo(s), camera slowly zooms/pans, **Geno ElevenLabs VO** (`eleven_v4`, voice `bg7PC2IzyIDwYgytMiW1`), and big white captions that match the spoken beats. Florida Buzz brand label. No AI host, no green screen, no wallet stickers.
 
-**Does use:** existing article image, ffmpeg slow zoom/pan (cover-crop + `setsar=1` so landscape stills stay true 9:16), Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, Page **`/video_reels`** publish helper (not legacy `/videos`, which letterboxed vertical files in feed).  
+**Does use:** existing article image, ffmpeg slow zoom/pan (cover-crop + `setsar=1` so landscape stills stay true 9:16), Geno TTS via `lib/visualNews/elevenTts.js`, ASS captions aligned to VO, upload to **public Supabase** `article-images/park-reels/…` for Meta’s `file_url`, Page **`/video_reels`** publish helper (not legacy `/videos`, which letterboxed vertical files in feed).  
 **Does not use:** AI presenters, green-screen, fal Seedance, guide-reels worker, wallet stickers.
 
 **Render invariants:** master is always **720×1280**, `SAR=1:1`, `DAR=9:16`. Landscape article photos are cover-cropped (no black bars). Captions are large, short-line, high-contrast — never truncated mid-sentence with `…`.
+
+### Why today’s 10:30 Reel can miss
+
+1. **`FB_PARK_REEL_ENABLED` / `FB_PARK_REEL_PUBLISH` not set on DigitalOcean** — without `ENABLED`, the cron never registers (startup log will say `NOT scheduled`).  
+2. **Deploy landed after 10:30 ET** — the 10:30 cron only fires on the running process; a merge at 10:54 ET cannot retroactively fire 10:30. Catch-up (below) fixes that on the next restart once flags are on.  
+3. **Local `/reels/daily/` alone** — DO disk is ephemeral; Meta needs a durable HTTPS MP4. The job now prefers a Supabase public URL.
 
 ### Code vs production secrets
 
 | Already in code | Needs Gene in DigitalOcean / host env |
 |-----------------|----------------------------------------|
-| Cron slot `15 10 * * *` America/New_York | `FB_PARK_REEL_ENABLED=true` |
-| Render → `public/reels/daily/*.mp4` | `FB_PARK_REEL_PUBLISH=true` (after one good manual post) |
-| Topic picker for park/cruise articles | Existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
-| Public URL shape `SITE_URL/reels/daily/<file>.mp4` | Confirm `SITE_URL=https://thefloridabuzz.com` and that `/reels/daily/` is served |
-| Geno VO when `ELEVENLABS_API_KEY` is set (default on) | Same `ELEVENLABS_API_KEY` as podcasts; optional `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1` |
+| Cron slot `30 10 * * *` America/New_York | `FB_PARK_REEL_ENABLED=true` |
+| Startup + 2pm ET catch-up if no success today | `FB_PARK_REEL_PUBLISH=true` |
+| Render → `public/reels/daily/*.mp4` + upload `article-images/park-reels/` | Existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
+| Topic picker for park/cruise articles | Same `ELEVENLABS_API_KEY` as podcasts |
+| Geno VO when `ELEVENLABS_API_KEY` is set (default on) | optional `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1` |
 
 Code **cannot** flip DigitalOcean secrets by itself. Until those two Reel flags are set in the host, the daily Reel cron stays off (or only renders if enabled without publish). VO needs `ELEVENLABS_API_KEY` in production (set `FB_PARK_REEL_WITH_VOICE=false` only for intentional silent renders).
 
 ### Turn on in production (Gene) — exact steps
 
-1. Deploy this branch.  
-2. Confirm article automate + guides still write to the site (no env change required for the park/cruise Facebook filter — it is on by default).  
-3. **Facebook feed drain** already turns on automatically when `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, and `SUPABASE_SERVICE_KEY` are set. Optional cadence tweaks:
-
-```bash
-# Defaults are already good for “all park posts, ~90 min apart.”
-# FB_MIN_HOURS_BETWEEN_POSTS=1.5
-# Leave FB_MAX_POSTS_PER_DAY unset (or 0) so park/cruise volume is not hard-capped.
-# FB_MAX_POSTS_PER_RUN=1
-```
-
-4. **Manual Reel dry run** (render only):
-
-```bash
-DRY_RUN=true npm run facebook:park-reel
-```
-
-5. Confirm the MP4 is under `public/reels/daily/` and reachable at  
-   `https://thefloridabuzz.com/reels/daily/<file>.mp4` after deploy/sync.  
-6. **Publish one Reel by hand**:
-
-```bash
-FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
-```
-
-7. **Turn on the daily schedule + live posting** — add these to production secrets, then restart/redeploy:
+1. Deploy latest `main` (includes 10:30 ET cron + catch-up + Supabase MP4 host).  
+2. In DigitalOcean → App → **Settings → App-Level Environment Variables**, add/confirm:
 
 ```bash
 FB_PARK_REEL_ENABLED=true
@@ -135,9 +117,20 @@ FB_PARK_REEL_PUBLISH=true
 ELEVENLABS_API_KEY=<same Geno key as podcasts>
 ```
 
-Until step 7, the daily Reel cron is off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render. With the key present, daily Reels mux Geno VO and scale captions to the spoken script.
+Keep existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SITE_URL=https://thefloridabuzz.com`.
 
-Meta still receives a **Page video** via `/{page-id}/videos` (same helper as before). That is good enough for discovery testing; dedicated Facebook Reels Graph placement can be layered later. Put the article URL in the first comment (already wired).
+3. **Save and redeploy** (or Force Rebuild). Within ~90 seconds of boot you should see either:
+   - `Facebook park Reel scheduled: 10:30am daily...` and then  
+   - `Running Facebook park Reel catch-up (startup)` **if today’s 10:30 already passed and no park-reel success exists for the Eastern day**, or  
+   - `catch-up skipped … already_posted_today` if one already landed.
+4. Confirm in Runtime Logs: `Park Reel candidate:…`, `Public URL (Supabase…`, and a Facebook success / `park-reel:<slug>` in `post_log`.  
+5. Optional Console one-shot (same env):
+
+```bash
+FB_PARK_REEL_PUBLISH=true npm run facebook:park-reel
+```
+
+Until step 2–3, the daily Reel cron is off. Until `FB_PARK_REEL_PUBLISH=true`, a scheduled job would only render. With the key present, daily Reels mux Geno VO and scale captions to the spoken script. Story URL goes in the first comment.
 
 ## Explicitly out of scope (still rejected)
 

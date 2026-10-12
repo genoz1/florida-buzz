@@ -14,12 +14,12 @@
  * FB_PARK_REEL_PUBLISH=true and a publicly reachable HTTPS MP4 URL.
  *
  * Env:
- *   FB_PARK_REEL_ENABLED=true          schedule daily 10:30am ET runner
+ *   FB_PARK_REEL_ENABLED=true          schedule daily 10:30am ET runner (+ catch-up)
  *   FB_PARK_REEL_PUBLISH=true          actually call Facebook video API
  *   FB_PARK_REEL_WITH_VOICE=false      disable VO (default: on when key set)
  *   ELEVENLABS_API_KEY                 Geno VO via visualNews/elevenTts
  *   PODCASTS_ELEVEN_VOICE_GENO         optional override (default Geno clone)
- *   SITE_URL                           used to build public /reels/daily URL
+ *   SITE_URL                           fallback public /reels/daily URL (prefer Supabase)
  *   FB_PARK_REEL_OUT_DIR               default public/reels/daily
  */
 
@@ -30,10 +30,15 @@ const { isFacebookTopicAllowed } = require('./facebookDistribution');
 const { postToFacebookPage } = require('./facebook');
 const { toFacebookFeedCaption } = require('./socialCopy');
 const { synthesizeElevenV4 } = require('./visualNews/elevenTts');
+const { supabase } = require('./supabase');
 const {
   config: visualNewsConfig,
   DEFAULT_ELEVEN_VOICE_GENO,
 } = require('./visualNews/config');
+
+/** Daily cron minute/hour in America/New_York (must match server.js). */
+const PARK_REEL_ET_HOUR = 10;
+const PARK_REEL_ET_MINUTE = 30;
 
 const ROOT = path.join(__dirname, '..');
 
@@ -698,6 +703,94 @@ async function publishParkReel({
   };
 }
 
+/**
+ * Calendar date in America/New_York as YYYY-MM-DD (en-CA).
+ */
+function easternDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/**
+ * True once the daily 10:30am ET park Reel slot has arrived (or passed) today.
+ */
+function isAtOrAfterParkReelSlotEt(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value);
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
+  return hour > PARK_REEL_ET_HOUR
+    || (hour === PARK_REEL_ET_HOUR && minute >= PARK_REEL_ET_MINUTE);
+}
+
+/**
+ * True when post_log already has a successful park-reel for the Eastern day.
+ */
+async function parkReelPostedOnEasternDay(client, date = new Date()) {
+  if (!client) return false;
+  const day = easternDateString(date);
+  const { data, error } = await client
+    .from('post_log')
+    .select('created_at, detail')
+    .eq('platform', 'facebook')
+    .eq('status', 'success')
+    .like('detail', 'park-reel:%')
+    .order('created_at', { ascending: false })
+    .limit(40);
+  if (error) throw new Error(`Could not read park Reel post_log: ${error.message}`);
+  return (data || []).some((row) => easternDateString(new Date(row.created_at)) === day);
+}
+
+/**
+ * Whether catch-up (startup or afternoon safety) should fire the daily job.
+ * Requires the slot to have passed and no success yet today (ET).
+ */
+async function shouldRunParkReelCatchUp(client, { now = new Date() } = {}) {
+  if (!isAtOrAfterParkReelSlotEt(now)) {
+    return { run: false, reason: 'before_slot' };
+  }
+  if (await parkReelPostedOnEasternDay(client, now)) {
+    return { run: false, reason: 'already_posted_today' };
+  }
+  return { run: true, reason: 'missed_today' };
+}
+
+/**
+ * Upload the rendered MP4 to public Supabase Storage so Meta's file_url fetch
+ * works on DigitalOcean (ephemeral local public/ is not reliable).
+ * Falls back to null when storage is unavailable — caller keeps SITE_URL path.
+ */
+async function uploadParkReelPublic(localPath, {
+  client = supabase,
+  fileName = null,
+  bucket = 'article-images',
+} = {}) {
+  if (!client || !localPath || !fs.existsSync(localPath)) return null;
+  const base = fileName || path.basename(localPath);
+  const objectPath = `park-reels/${base}`;
+  const body = fs.readFileSync(localPath);
+  const { error } = await client.storage.from(bucket).upload(objectPath, body, {
+    contentType: 'video/mp4',
+    upsert: true,
+    cacheControl: '2592000',
+  });
+  if (error) {
+    console.error(`[warn] park Reel Supabase upload failed: ${error.message}`);
+    return null;
+  }
+  const { data } = client.storage.from(bucket).getPublicUrl(objectPath);
+  return data?.publicUrl || null;
+}
+
 async function runParkReelJob({
   client,
   dryRun = process.env.DRY_RUN === 'true',
@@ -712,14 +805,26 @@ async function runParkReelJob({
   console.log(`Park Reel candidate: ${picked.title} (/article/${picked.slug})`);
   const rendered = await renderParkReelFromArticle(picked);
   console.log(`Rendered: ${rendered.masterPath}`);
-  console.log(`Public URL (must be reachable for Meta): ${rendered.publicUrl}`);
   if (rendered.voice) {
     console.log(`Voice: Geno ${rendered.voice.voiceId} (${rendered.voice.model})`);
   }
 
+  const hostedUrl = await uploadParkReelPublic(rendered.masterPath, {
+    client,
+    fileName: path.basename(rendered.masterPath),
+  });
+  const videoUrl = hostedUrl || rendered.publicUrl;
+  if (hostedUrl) {
+    console.log(`Public URL (Supabase, for Meta): ${hostedUrl}`);
+  } else {
+    console.log(`Public URL (local SITE_URL fallback — must be reachable for Meta): ${rendered.publicUrl}`);
+  }
+  rendered.hostedUrl = hostedUrl || null;
+  rendered.videoUrl = videoUrl;
+
   const published = await publishParkReel({
     article: picked,
-    videoUrl: rendered.publicUrl,
+    videoUrl,
     caption: rendered.caption,
     articleUrl: rendered.articleUrl,
     dryRun,
@@ -742,13 +847,18 @@ function parkReelScheduleEnabled(env = process.env) {
 
 module.exports = {
   SITE_CTA_SPOKEN,
+  PARK_REEL_ET_HOUR,
+  PARK_REEL_ET_MINUTE,
   articlePermalink,
   buildReelCaption,
   captionBeatsFromArticle,
   captionBeatsFromSpoken,
+  easternDateString,
   ensureSiteCtaSpoken,
   formatCaptionLines,
+  isAtOrAfterParkReelSlotEt,
   parkReelFirstComment,
+  parkReelPostedOnEasternDay,
   parkReelScheduleEnabled,
   parkReelVoiceEnabled,
   pickParkCruiseArticle,
@@ -756,10 +866,12 @@ module.exports = {
   renderParkReelFromArticle,
   resolveStillImage,
   runParkReelJob,
+  shouldRunParkReelCatchUp,
   slowZoomPanStill,
   phraseChunksFromSpoken,
   splitCaptionChunk,
   spokenScriptFromArticle,
   stripAudioTags,
   synthesizeParkReelVoice,
+  uploadParkReelPublic,
 };
