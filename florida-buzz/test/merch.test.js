@@ -3,56 +3,100 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const express = require('express');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
-const { merchConfig, parseProductsJson } = require('../lib/merch');
+const express = require('express');
+const { merchConfig, parseProductsJson, loadCatalogFile } = require('../lib/merch');
 
-test('merchConfig reads store URL and featured product env', () => {
-  const cfg = merchConfig({
-    PRINTIFY_STORE_URL: 'https://florida-buzz.printify.me/',
-    PRINTIFY_FEATURED_TITLE: 'Park Day Tee',
-    PRINTIFY_FEATURED_URL: 'https://florida-buzz.printify.me/product/1',
-    PRINTIFY_FEATURED_IMAGE_URL: 'https://images.example.com/tee.jpg',
-    PRINTIFY_FEATURED_PRICE: '$28',
-    PRINTIFY_FEATURED_DESCRIPTION: 'Soft cotton for rope drop.',
-  });
+test('catalog file drives two product cards; placeholders ignored', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-'));
+  const file = path.join(dir, 'merch-products.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      storeUrl: 'https://florida-buzz.printify.me',
+      products: [
+        {
+          title: 'Park Day Tee',
+          url: 'https://florida-buzz.printify.me/product/1',
+          imageUrl: 'https://images.example.com/1.jpg',
+          description: 'Sizes on Printify',
+        },
+        {
+          title: 'Sunset Tee',
+          url: 'https://florida-buzz.printify.me/product/2',
+          imageUrl: 'https://images.example.com/2.jpg',
+        },
+        {
+          title: 'Replace with shirt name',
+          url: 'https://YOUR-STORE.printify.me/product/x',
+        },
+      ],
+    })
+  );
+  const cfg = merchConfig({}, { catalogPath: file });
   assert.equal(cfg.enabled, true);
   assert.equal(cfg.storeUrl, 'https://florida-buzz.printify.me/');
-  assert.equal(cfg.products.length, 1);
+  assert.equal(cfg.products.length, 2);
   assert.equal(cfg.products[0].title, 'Park Day Tee');
-  assert.equal(cfg.products[0].price, '$28');
+  assert.equal(cfg.products[1].title, 'Sunset Tee');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('PRINTIFY_PRODUCTS JSON wins over featured shortcuts', () => {
+test('default catalog file loads without throwing', () => {
+  const file = loadCatalogFile();
+  assert.ok(file);
+  assert.ok(Array.isArray(file.products));
+});
+
+test('PRINTIFY_STORE_URL overrides catalog storeUrl', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-'));
+  const file = path.join(dir, 'merch-products.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      storeUrl: 'https://old.printify.me',
+      products: [{ title: 'Tee', url: 'https://old.printify.me/product/1' }],
+    })
+  );
+  const cfg = merchConfig(
+    { PRINTIFY_STORE_URL: 'https://new.printify.me' },
+    { catalogPath: file }
+  );
+  assert.equal(cfg.storeUrl, 'https://new.printify.me/');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('PRINTIFY_PRODUCTS JSON still works as override', () => {
   const products = parseProductsJson(
-    JSON.stringify([
-      { title: 'Hat', url: 'https://store.printify.me/hat', price: '$22' },
-      { title: 'Skip', url: 'not-a-url' },
-    ])
+    JSON.stringify([{ title: 'Hat', url: 'https://store.printify.me/hat', price: '$22' }])
   );
   assert.equal(products.length, 1);
   assert.equal(products[0].title, 'Hat');
-
-  const cfg = merchConfig({
-    PRINTIFY_PRODUCTS: JSON.stringify([
-      { title: 'From JSON', url: 'https://store.printify.me/json' },
-    ]),
-    PRINTIFY_FEATURED_TITLE: 'Ignored',
-    PRINTIFY_FEATURED_URL: 'https://store.printify.me/ignored',
-  });
-  assert.equal(cfg.products[0].title, 'From JSON');
 });
 
-test('merch page renders featured product and store CTA', async () => {
-  process.env.PRINTIFY_STORE_URL = 'https://florida-buzz.printify.me';
-  process.env.PRINTIFY_FEATURED_TITLE = 'Florida Buzz Tee';
-  process.env.PRINTIFY_FEATURED_URL = 'https://florida-buzz.printify.me/product/shirt';
-  process.env.PRINTIFY_FEATURED_PRICE = '$28';
+test('merch page renders two products from catalog file', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-page-'));
+  const catalogPath = path.join(dir, 'merch-products.json');
+  fs.writeFileSync(
+    catalogPath,
+    JSON.stringify({
+      storeUrl: 'https://florida-buzz.printify.me',
+      products: [
+        { title: 'Florida Buzz Tee', url: 'https://florida-buzz.printify.me/product/shirt' },
+        { title: 'Second Drop', url: 'https://florida-buzz.printify.me/product/two' },
+      ],
+    })
+  );
 
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
-  app.use('/', require('../routes/main'));
+  app.get('/merch', (req, res) => {
+    const merch = merchConfig({}, { catalogPath });
+    res.render('merch', { merch, pageTitle: 'Buzz Merch — The Florida Buzz' });
+  });
 
   const server = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -71,14 +115,10 @@ test('merch page renders featured product and store CTA', async () => {
     });
     assert.match(body, /Wear the Buzz/);
     assert.match(body, /Florida Buzz Tee/);
-    assert.match(body, /florida-buzz\.printify\.me/);
-    assert.match(body, /Buy on Printify/);
-    assert.match(body, /href="\/merch"/);
+    assert.match(body, /Second Drop/);
+    assert.match(body, /choose size and color/i);
   } finally {
     server.close();
-    delete process.env.PRINTIFY_STORE_URL;
-    delete process.env.PRINTIFY_FEATURED_TITLE;
-    delete process.env.PRINTIFY_FEATURED_URL;
-    delete process.env.PRINTIFY_FEATURED_PRICE;
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });

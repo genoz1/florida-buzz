@@ -1,0 +1,20 @@
+{
+  "storeUrl": "",
+  "storeName": "Florida Buzz Merch",
+  "products": [
+    {
+      "id": "shirt-1",
+      "title": "Replace with shirt name",
+      "url": "https://YOUR-STORE.printify.me/product/YOUR-PRODUCT-1",
+      "imageUrl": "",
+      "description": "Sizes and colors are chosen at checkout on Printify."
+    },
+    {
+      "id": "shirt-2",
+      "title": "Replace with second product name",
+      "url": "https://YOUR-STORE.printify.me/product/YOUR-PRODUCT-2",
+      "imageUrl": "",
+      "description": "Sizes and colors are chosen at checkout on Printify."
+    }
+  ]
+}
