@@ -79,7 +79,7 @@ No hashtag dumps on Facebook.
 | Picker + slow zoom/pan render + optional publish | `lib/facebookParkReel.js` |
 | CLI | `npm run facebook:park-reel` / `npm run facebook:park-reel:dry` |
 | Sample (Lightning Lane, for Gene to watch) | `npm run sample:facebook-park-reel` |
-| Schedule | `server.js` at **10:15am ET** when enabled |
+| Schedule | `server.js` at **10:30am ET** when enabled |
 
 **What each Reel looks like:** park article photo(s), camera slowly zooms/pans, **Geno ElevenLabs VO** (`eleven_v4`, voice `bg7PC2IzyIDwYgytMiW1`), and big white captions that match the spoken beats. Florida Buzz brand label. No AI host, no green screen, no wallet stickers.
 
