@@ -84,7 +84,7 @@ describe('facebookParkReel voice + captions', () => {
     const lines = formatCaptionLines("Disney Cruise Line's Disney Believe will debut an Encanto stage show");
     assert.match(lines, /\\N/);
     assert.doesNotMatch(lines, /…$/);
-    assert.ok(lines.split('\\N').every((line) => line.length <= 16));
+    assert.ok(lines.split('\\N').every((line) => line.length <= 22));
 
     const beats = captionBeatsFromSpoken(
       "[curious] Disney Cruise Line's Disney Believe will debut an Encanto stage show. [upbeat] Follow Florida Buzz.",
@@ -97,6 +97,28 @@ describe('facebookParkReel voice + captions', () => {
     assert.match(joined, /stage show/i);
     assert.doesNotMatch(joined, /Believe will \.\.\./);
     assert.doesNotMatch(joined, /…/);
+  });
+
+  it('burns the entire spoken script into captions (mute-friendly, not keyword hooks)', () => {
+    const spoken = `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. Follow Florida Buzz.`;
+    const plain = stripAudioTags(spoken);
+    const beats = captionBeatsFromSpoken(spoken, 23);
+    const normalize = (s) => String(s)
+      .replace(/\\N/g, ' ')
+      .replace(/[—–…$-]/g, ' ')
+      .replace(/[^\w\s']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    const joined = normalize(beats.map((b) => b.text).join(' '));
+    const expectedWords = normalize(plain).split(' ').filter(Boolean);
+    const missing = expectedWords.filter((w) => !joined.includes(w));
+    assert.deepEqual(missing, [], `missing spoken words in captions: ${missing.join(', ')}`);
+    // Full phrases — not keyword-only hooks like "Up to $229".
+    assert.match(joined, /two hundred twenty nine/);
+    assert.match(joined, /wreck your morning/);
+    assert.match(joined, /automatic yes/);
+    assert.match(joined, /follow florida buzz/);
   });
 });
 

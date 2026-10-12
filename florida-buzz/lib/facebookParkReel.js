@@ -120,10 +120,11 @@ function spokenScriptFromArticle(article) {
   return `[curious] ${title}. ${tip} [upbeat] Follow Florida Buzz.`;
 }
 
-const CAPTION_MAX_LINE = 16;
-const CAPTION_MAX_LINES = 2;
+// Full spoken script on screen (mute-friendly): more chars per beat, never keyword-only.
+const CAPTION_MAX_LINE = 22;
+const CAPTION_MAX_LINES = 3;
 /** Chunk size must fit on-screen lines so formatCaptionLines never drops words. */
-const CAPTION_CHUNK_CHARS = CAPTION_MAX_LINE * CAPTION_MAX_LINES; // 32
+const CAPTION_CHUNK_CHARS = CAPTION_MAX_LINE * CAPTION_MAX_LINES; // 66
 
 /**
  * Wrap caption copy into short ASS lines (no mid-sentence ellipsis).
@@ -251,7 +252,7 @@ WrapStyle: 2
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,62,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,5,3,2,52,52,300,1
+Style: Caption,DejaVu Sans,52,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,5,3,2,48,48,280,1
 Style: Brand,DejaVu Sans,34,&H00F4F7FF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,3,1,8,36,36,56,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

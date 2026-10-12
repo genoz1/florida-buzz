@@ -39,17 +39,6 @@ const ARTICLE = {
   spoken: SPOKEN,
 };
 
-/** Caption beats match the spoken script (scaled to real audio duration). */
-const CAPTIONS = [
-  { start: 0.0, end: 3.2, text: 'Lightning Lane\\Nhit new highs' },
-  { start: 3.2, end: 6.4, text: 'Up to $229' },
-  { start: 6.4, end: 9.6, text: 'Seven Dwarfs\\NMine Train' },
-  { start: 9.6, end: 12.4, text: 'Standby:\\N50 minutes' },
-  { start: 12.4, end: 15.2, text: 'So… is it\\Nworth it?' },
-  { start: 15.2, end: 19.0, text: 'Pay only if it\\Nsaves your AM' },
-  { start: 19.0, end: 23.0, text: 'Record price\\N≠ auto yes' },
-];
-
 const STILLS = [
   path.join(REFS, 'seven-dwarfs-mine-train.jpg'),
   path.join(REFS, 'big-thunder-lightning-lane.jpg'),
@@ -114,7 +103,7 @@ async function main() {
     imagePaths: STILLS,
     masterFileName: 'florida-buzz-park-reel-sample.mp4',
     spoken: SPOKEN,
-    captions: CAPTIONS,
+    // No keyword captions — burn the full spoken script for mute viewers.
     voicePath,
     withVoice: true,
   });
@@ -137,9 +126,9 @@ async function main() {
 
 ## What this video is
 
-A short vertical Reel about **Lightning Lane at Magic Kingdom** — park photos with a slow zoom and pan, **Geno voiceover** (ElevenLabs \`eleven_v4\`, voice \`${rendered.voice?.voiceId || DEFAULT_ELEVEN_VOICE_GENO}\`), and big on-screen captions that match what he says. Same cheap path the site will use for daily Facebook park/cruise Reels. No talking AI host, no green screen, no money stickers.
+A short vertical Reel about **Lightning Lane at Magic Kingdom** — park photos with a slow zoom and pan, **Geno voiceover** (ElevenLabs \`eleven_v4\`, voice \`${rendered.voice?.voiceId || DEFAULT_ELEVEN_VOICE_GENO}\`), and **full-script captions** (every spoken word on screen for mute viewing). Same path the site will use for daily Facebook park/cruise Reels. No talking AI host, no green screen, no money stickers.
 
-**Motion in plain English:** the camera slowly zooms in and drifts across still photos while Geno narrates and large captions change with the spoken beats.
+**Motion in plain English:** the camera slowly zooms in and drifts across still photos while Geno narrates and captions show the full script in timed chunks — not keyword-only hooks.
 
 **Technical check:** master is \`720x1280\`, \`SAR=1:1\`, \`DAR=9:16\` (landscape article stills are cover-cropped — no letterbox). Publish path uses Meta \`/video_reels\`, not Page \`/videos\`.
 
@@ -199,4 +188,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { ARTICLE, SPOKEN, CAPTIONS, main };
+module.exports = { ARTICLE, SPOKEN, main };
