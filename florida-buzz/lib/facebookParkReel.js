@@ -180,20 +180,94 @@ function scoreParkReelCandidate(article = {}) {
   return score;
 }
 
+/**
+ * Which park/brand to name at the top of the Reel (spoken + captions).
+ * More specific brands win (Disney Cruise before Disney, etc.).
+ */
+const PARK_BRAND_RULES = [
+  {
+    id: 'disney-cruise',
+    label: 'Disney Cruise',
+    test: (hay) => /disney\s*cruise|\bdcl\b/.test(hay),
+  },
+  {
+    id: 'disney',
+    label: 'Disney',
+    test: (hay) => /\bdisney\b|magic kingdom|\bepcot\b|hollywood studios|hollywood hollywood|animal kingdom|lightning lane|disney springs|\bwdw\b|genie\+/.test(hay),
+  },
+  {
+    id: 'universal',
+    label: 'Universal',
+    test: (hay) => /\buniversal\b|islands of adventure|epic universe|citywalk/.test(hay),
+  },
+  {
+    id: 'seaworld',
+    label: 'SeaWorld',
+    test: (hay) => /\bseaworld\b|sesame street land/.test(hay),
+  },
+  {
+    id: 'busch-gardens',
+    label: 'Busch Gardens',
+    test: (hay) => /busch gardens/.test(hay),
+  },
+  {
+    id: 'legoland',
+    label: 'LEGOLAND',
+    test: (hay) => /\blegoland\b/.test(hay),
+  },
+  {
+    id: 'royal-caribbean',
+    label: 'Royal Caribbean',
+    test: (hay) => /royal caribbean/.test(hay),
+  },
+  {
+    id: 'carnival',
+    label: 'Carnival',
+    test: (hay) => /\bcarnival\b/.test(hay),
+  },
+  {
+    id: 'norwegian',
+    label: 'Norwegian',
+    test: (hay) => /\bnorwegian\b|\bncl\b/.test(hay),
+  },
+  {
+    id: 'cruise',
+    label: 'cruise',
+    test: (hay, article) => String(article?.category || '').toLowerCase() === 'cruises'
+      || /\bcruise\b|port canaveral/.test(hay),
+  },
+];
+
+function parkBrandFromArticle(article = {}) {
+  const hay = [
+    article.slug,
+    article.title,
+    article.dek,
+    article.fb_caption,
+    article.category,
+  ].filter(Boolean).join(' ').toLowerCase();
+  for (const rule of PARK_BRAND_RULES) {
+    if (rule.test(hay, article)) {
+      return { id: rule.id, label: rule.label };
+    }
+  }
+  return { id: 'theme-park', label: 'theme park' };
+}
+
+/** Cold open: "Here's another Disney tip from The Florida Buzz." */
+function parkReelSpokenOpener(article = {}) {
+  const { label } = parkBrandFromArticle(article);
+  return `Here's another ${label} tip from The Florida Buzz.`;
+}
+
 function spokenScriptFromArticle(article) {
   if (article?.spoken) return ensureSiteCtaSpoken(article.spoken);
   const title = String(article?.title || 'Florida theme parks').trim();
   const dek = String(article?.dek || '').trim();
   const tip = dek || 'Worth knowing before your next park day.';
-  // Tips & tricks framing — big draw on Reels; guides get the fuller line.
-  if (isTipsOrGuideContent(article)) {
-    return ensureSiteCtaSpoken(
-      `[curious] Florida Buzz tips and tricks. ${title}. ${tip}`
-    );
-  }
-  return ensureSiteCtaSpoken(
-    `[curious] Tips and tricks from Florida Buzz. ${title}. ${tip}`
-  );
+  const opener = parkReelSpokenOpener(article);
+  // Park named first, then the tip — mute-friendly captions follow this script.
+  return ensureSiteCtaSpoken(`[curious] ${opener} ${title}. ${tip}`);
 }
 
 // Mute-friendly full-script captions: complete phrases, never keyword hooks.
@@ -583,8 +657,9 @@ function buildReelCaption(article) {
   const base = toFacebookFeedCaption(
     article.fb_caption || `${article.title}. ${article.dek || ''}`.trim()
   );
-  // Discovery packaging — lead with tips & tricks; story URL in first comment.
-  return `${base}\n\nTips and tricks from Florida Buzz — save this for your next trip.\n\nMore at thefloridabuzz.com`;
+  const { label } = parkBrandFromArticle(article);
+  // Discovery packaging — name the park; story URL in first comment.
+  return `${base}\n\nHere's another ${label} tip from The Florida Buzz — save this for your next trip.\n\nMore at thefloridabuzz.com`;
 }
 
 function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
@@ -1009,9 +1084,11 @@ module.exports = {
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
   isTipsOrGuideContent,
+  parkBrandFromArticle,
   parkReelFirstComment,
   parkReelPostedOnEasternDay,
   parkReelScheduleEnabled,
+  parkReelSpokenOpener,
   parkReelVoiceEnabled,
   pickParkCruiseArticle,
   publishParkReel,

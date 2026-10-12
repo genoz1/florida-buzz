@@ -16,8 +16,10 @@ const {
   formatCaptionLines,
   isAtOrAfterParkReelSlotEt,
   isTipsOrGuideContent,
+  parkBrandFromArticle,
   parkReelFirstComment,
   parkReelPostedOnEasternDay,
+  parkReelSpokenOpener,
   parkReelVoiceEnabled,
   rankParkReelCandidates,
   renderParkReelFromArticle,
@@ -68,23 +70,26 @@ describe('facebookParkReel voice + captions', () => {
     assert.equal(parkReelVoiceEnabled({}), false);
   });
 
-  it('builds a spoken Geno script with tips-and-tricks framing + site CTA', () => {
+  it('opens spoken script with the park name tip line + site CTA', () => {
     const spoken = spokenScriptFromArticle({
       title: 'Lightning Lane hit record highs — worth it?',
       dek: 'Pay only if that wait would wreck your Magic Kingdom morning',
+      category: 'theme-parks',
     });
+    const plain = stripAudioTags(spoken);
+    assert.match(plain, /^Here's another Disney tip from The Florida Buzz\./i);
     assert.match(spoken, /Lightning Lane hit record highs/i);
-    assert.match(stripAudioTags(spoken), /Tips and tricks from Florida Buzz/i);
-    assert.match(stripAudioTags(spoken), /Florida Buzz dot com/i);
+    assert.match(plain, /Florida Buzz dot com/i);
     assert.match(spoken, /\[[^\]]+\]/);
     assert.equal(ensureSiteCtaSpoken(spoken), spoken);
 
-    const guideSpoken = spokenScriptFromArticle({
-      title: 'Disney World Trip Itinerary Framework',
-      dek: 'A calm plan you can actually follow',
-      is_evergreen: true,
-    });
-    assert.match(stripAudioTags(guideSpoken), /Florida Buzz tips and tricks/i);
+    assert.equal(parkBrandFromArticle({ title: 'Epic Universe tip' }).label, 'Universal');
+    assert.equal(parkBrandFromArticle({ title: 'Sesame Street Land at SeaWorld' }).label, 'SeaWorld');
+    assert.equal(parkBrandFromArticle({ title: 'Disney Cruise transfers', category: 'cruises' }).label, 'Disney Cruise');
+    assert.match(
+      parkReelSpokenOpener({ title: 'Universal Orlando VIP Experience' }),
+      /Here's another Universal tip from The Florida Buzz\./i
+    );
   });
 
   it('always appends the Florida Buzz dot com CTA and tips-first first comment', () => {
@@ -102,7 +107,10 @@ describe('facebookParkReel voice + captions', () => {
       is_evergreen: true,
     });
     assert.match(guideComment, /Full tips and tricks/i);
-    assert.match(buildReelCaption({ title: 'Boat tips', dek: 'Keep docks moving' }), /Tips and tricks from Florida Buzz/i);
+    assert.match(
+      buildReelCaption({ title: 'Disney boat tips', dek: 'Keep docks moving', category: 'theme-parks' }),
+      /Here's another Disney tip from The Florida Buzz/i
+    );
   });
 
   it('ranks evergreen guides and tip posts ahead of plain park news', () => {
