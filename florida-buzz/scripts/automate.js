@@ -12,6 +12,15 @@ const { createPost: createInstagramPost } = require('../lib/instagram');
 const { createPost: createThreadsPost } = require('../lib/threads');
 const { postToFacebookPage } = require('../lib/facebook');
 const {
+  decideFacebookDistribution,
+  getFacebookCadenceConfig,
+} = require('../lib/facebookDistribution');
+const {
+  applyFacebookFeedDecision,
+  loadPendingFacebookFeedPosts,
+  markFacebookFeedResolved,
+} = require('../lib/facebookFeedQueue');
+const {
   normalizePinCopy,
   toFacebookFeedCaption,
   toInstagramCaption,
@@ -39,7 +48,10 @@ const parser = new Parser({
 });
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
-const FB_POST_DELAY_MINUTES = parseInt(process.env.FB_POST_DELAY_MINUTES, 10) || 10;
+// Facebook cadence defaults live in lib/facebookDistribution.js (60 min within-run
+// delay, 3h min spacing, max 1/run, no daily hard cap). Park/cruise items that
+// miss a slot stay queued (fb_posted=false) for a later run. Website unchanged.
+const FB_POST_DELAY_MINUTES = getFacebookCadenceConfig().postDelayMinutes;
 
 // Same mechanism generate-guide.js already uses: the AI writes a placeholder link,
 // and this swaps it for a real Amazon search URL with the affiliate tag attached.
@@ -605,15 +617,88 @@ async function isDuplicateOfRecent(title, category) {
 async function run() {
   console.log(`=== The Florida Buzz automation run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
-  if (!DRY_RUN) console.log(`Posts will be spaced ${FB_POST_DELAY_MINUTES} minute(s) apart across all platforms within this run.\n`);
+  const fbCadence = getFacebookCadenceConfig();
+  if (!DRY_RUN) {
+    const dayCap = fbCadence.maxPostsPerDay > 0
+      ? `${fbCadence.maxPostsPerDay}/day`
+      : 'no daily cap (queue + spacing)';
+    console.log(
+      `Facebook: every park/cruise article & guide posts; max ${fbCadence.maxPostsPerRun}/run, `
+      + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart `
+      + `(within-run FB delay ${fbCadence.postDelayMinutes}m). Extras stay queued — not dropped. Website + other social unchanged.\n`
+    );
+  }
 
-  let postCount = 0;
+  let facebookPostsThisRun = 0;
   const retryQueue = createArticleRetryQueue(supabase, { dryRun: DRY_RUN });
   const imageRepairQueue = createImageRepairQueue(supabase);
   const handledGuids = new Set();
 
   async function completeItem(guid) {
     if (await markSeen(guid)) await retryQueue.clear(guid);
+  }
+
+  async function attemptFacebookForContent({
+    category,
+    title,
+    dek,
+    fb_caption,
+    slug,
+    imageUrl,
+    linkCommentKind = 'article',
+  }) {
+    const fbDecision = await decideFacebookDistribution(
+      {
+        category,
+        title,
+        dek,
+        caption: fb_caption,
+        slug,
+      },
+      { client: supabase, postsThisRun: facebookPostsThisRun }
+    );
+    const gate = await applyFacebookFeedDecision(supabase, slug, fbDecision, { dryRun: DRY_RUN });
+    if (gate.action !== 'post') return gate.action;
+
+    if (facebookPostsThisRun > 0 && FB_POST_DELAY_MINUTES > 0) {
+      console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before the next Facebook post...`);
+      await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
+    }
+    const fbOk = await postToFacebookPage({
+      message: toFacebookFeedCaption(fb_caption),
+      link: `${process.env.SITE_URL}/article/${slug}`,
+      imageUrl,
+      dryRun: DRY_RUN,
+      linkPlacement: 'first_comment',
+      linkCommentKind,
+    });
+    if (fbOk !== false) {
+      facebookPostsThisRun += 1;
+      await markFacebookFeedResolved(supabase, slug, { dryRun: DRY_RUN });
+      return 'posted';
+    }
+    // Leave fb_posted=false so a later run retries after a failed API call.
+    return 'failed';
+  }
+
+  // Oldest deferred park/cruise Facebook posts first (spacing, not dropping).
+  if (!DRY_RUN && supabase) {
+    const queuedFb = await loadPendingFacebookFeedPosts(supabase, { limit: 5, dryRun: DRY_RUN });
+    if (queuedFb.length) {
+      console.log(`Facebook feed queue: ${queuedFb.length} park/cruise item(s) waiting for spacing.\n`);
+      for (const row of queuedFb) {
+        const action = await attemptFacebookForContent({
+          category: row.category,
+          title: row.title,
+          dek: row.dek,
+          fb_caption: row.fb_caption,
+          slug: row.slug,
+          imageUrl: row.image_url,
+          linkCommentKind: row.is_evergreen ? 'guide' : 'article',
+        });
+        if (action === 'posted' || action === 'deferred' || action === 'failed') break;
+      }
+    }
   }
 
   async function processItem(source, item, { queued = false } = {}) {
@@ -852,28 +937,35 @@ async function run() {
     }
     await notifyIndexNow(`${process.env.SITE_URL}/article/${slug}`);
 
-    if (postCount > 0) {
-      console.log(`  Waiting ${FB_POST_DELAY_MINUTES} minute(s) before posting this article to all platforms...`);
-      await sleep(FB_POST_DELAY_MINUTES * 60 * 1000);
-    }
-    await postToFacebook({ title: article.title, fb_caption: article.fb_caption, slug, imageUrl: finalImage });
+    // Facebook only for theme-park / cruise stories. Cadence spaces posts;
+    // blocked items stay queued (fb_posted=false) for a later run — never dropped.
+    // Website save above always happens; Pinterest / Instagram / Threads stay open.
+    await attemptFacebookForContent({
+      category: realCategory,
+      title: article.title,
+      dek: article.dek,
+      fb_caption: article.fb_caption,
+      slug,
+      imageUrl: finalImage,
+      linkCommentKind: 'article',
+    });
+
     await postToPinterest({
       pin_title: article.pin_title,
       pin_description: article.pin_description,
       slug,
       imageUrl: finalImage,
-      category: article.category,
+      category: realCategory,
       title: article.title,
     });
     await postToInstagram({
-      caption: toInstagramCaption(article.fb_caption, article.category),
+      caption: toInstagramCaption(article.fb_caption, realCategory),
       imageUrl: finalImage,
     });
     await postToThreads({
       text: toThreadsPost(article.fb_caption, `${process.env.SITE_URL}/article/${slug}`),
       imageUrl: finalImage,
     });
-    postCount += 1;
     await completeItem(guid);
   }
 
@@ -927,4 +1019,5 @@ module.exports = {
   toInstagramCaption,
   toThreadsPost,
   normalizePinCopy,
+  decideFacebookDistribution,
 };

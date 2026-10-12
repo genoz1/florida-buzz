@@ -8,6 +8,7 @@ const { createPin } = require('../lib/pinterest');
 const { createPost: createInstagramPost } = require('../lib/instagram');
 const { createPost: createThreadsPost } = require('../lib/threads');
 const { postToFacebookPage } = require('../lib/facebook');
+const { isNonArticleFacebookAllowed } = require('../lib/facebookDistribution');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
@@ -153,7 +154,13 @@ async function run() {
 
   const results = {};
 
-  results.facebook = await postToFacebookPage({ message: caption.message, link: pageUrl, imageUrl, dryRun: DRY_RUN });
+  const feedGate = isNonArticleFacebookAllowed();
+  if (feedGate.ok) {
+    results.facebook = await postToFacebookPage({ message: caption.message, link: pageUrl, imageUrl, dryRun: DRY_RUN });
+  } else {
+    console.log(`  [skip] Facebook feature promo: ${feedGate.reason} — ${feedGate.detail}`);
+    results.facebook = false;
+  }
 
   if (DRY_RUN) {
     console.log(`[dry-run] Would post to Instagram: "${instagramCaption}"`);

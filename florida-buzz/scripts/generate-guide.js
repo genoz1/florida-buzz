@@ -6,6 +6,12 @@ const { validateGuide, validateTopic } = require('../lib/contentValidation');
 const { generateArticleImage } = require('../lib/imageGen');
 const { createPin } = require('../lib/pinterest');
 const { postToFacebookPage } = require('../lib/facebook');
+const { decideFacebookDistribution, getFacebookCadenceConfig } = require('../lib/facebookDistribution');
+const {
+  applyFacebookFeedDecision,
+  loadPendingFacebookFeedPosts,
+  markFacebookFeedResolved,
+} = require('../lib/facebookFeedQueue');
 const { normalizePinCopy, toFacebookFeedCaption } = require('../lib/socialCopy');
 const { notifyIndexNow } = require('../lib/indexnow');
 
@@ -458,9 +464,68 @@ async function postToPinterest({ pin_title, pin_description, slug, imageUrl, cat
   }
 }
 
+async function attemptGuideFacebookPost({
+  category,
+  title,
+  dek,
+  fb_caption,
+  slug,
+  imageUrl,
+  postsThisRun,
+}) {
+  const fbDecision = await decideFacebookDistribution(
+    {
+      category,
+      title,
+      dek,
+      caption: fb_caption,
+      slug,
+    },
+    { client: supabase, postsThisRun }
+  );
+  const gate = await applyFacebookFeedDecision(supabase, slug, fbDecision, { dryRun: DRY_RUN });
+  if (gate.action !== 'post') return { action: gate.action, postsThisRun };
+
+  const fbOk = await postToFacebook({ fb_caption, slug, imageUrl });
+  if (fbOk !== false) {
+    await markFacebookFeedResolved(supabase, slug, { dryRun: DRY_RUN });
+    return { action: 'posted', postsThisRun: postsThisRun + 1 };
+  }
+  return { action: 'failed', postsThisRun };
+}
+
 async function run() {
   console.log(`=== Daily evergreen guide generation — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
+
+  const fbCadence = getFacebookCadenceConfig();
+  let facebookPostsThisRun = 0;
+  if (!DRY_RUN && supabase) {
+    const dayCap = fbCadence.maxPostsPerDay > 0
+      ? `${fbCadence.maxPostsPerDay}/day`
+      : 'no daily cap (queue + spacing)';
+    console.log(
+      `Facebook: every park/cruise guide posts; max ${fbCadence.maxPostsPerRun}/run, `
+      + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart. Extras stay queued.\n`
+    );
+    const queuedFb = await loadPendingFacebookFeedPosts(supabase, { limit: 5, dryRun: DRY_RUN });
+    if (queuedFb.length) {
+      console.log(`Facebook feed queue: ${queuedFb.length} park/cruise item(s) waiting for spacing.`);
+      for (const row of queuedFb) {
+        const result = await attemptGuideFacebookPost({
+          category: row.category,
+          title: row.title,
+          dek: row.dek,
+          fb_caption: row.fb_caption,
+          slug: row.slug,
+          imageUrl: row.image_url,
+          postsThisRun: facebookPostsThisRun,
+        });
+        facebookPostsThisRun = result.postsThisRun;
+        if (result.action === 'posted' || result.action === 'deferred' || result.action === 'failed') break;
+      }
+    }
+  }
 
   const category = FORCE_CATEGORY || pickWeightedCategory();
   console.log(FORCE_CATEGORY ? `Category forced for today: ${category}` : `Category for today: ${category}`);
@@ -550,7 +615,17 @@ async function run() {
   console.log(`Saved guide: /article/${slug}`);
   await notifyIndexNow(`${SITE_URL}/article/${slug}`);
 
-  await postToFacebook({ fb_caption: guide.fb_caption, slug, imageUrl });
+  // Same Facebook gate as automate.js: park/cruise only, spaced — never permanently dropped.
+  await attemptGuideFacebookPost({
+    category,
+    title: guide.title,
+    dek: guide.dek,
+    fb_caption: guide.fb_caption,
+    slug,
+    imageUrl,
+    postsThisRun: facebookPostsThisRun,
+  });
+
   await postToPinterest({
     pin_title: guide.pin_title,
     pin_description: guide.pin_description,
@@ -570,4 +645,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, pickTopic, researchAndWriteGuide, pickByline, GUIDE_BYLINE };
+module.exports = { run, pickTopic, researchAndWriteGuide, pickByline, GUIDE_BYLINE, decideFacebookDistribution };

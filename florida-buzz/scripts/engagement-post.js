@@ -4,6 +4,7 @@ const { generateStructuredText } = require('../lib/aiText');
 const { engagementPost: engagementPostSchema } = require('../lib/aiSchemas');
 const { validateEngagementPost } = require('../lib/contentValidation');
 const { postToFacebookPage } = require('../lib/facebook');
+const { isNonArticleFacebookAllowed } = require('../lib/facebookDistribution');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 
@@ -73,6 +74,13 @@ ${recentTopics.length ? recentTopics.map((t) => `- ${t}`).join('\n') : '(none ye
 async function run() {
   console.log(`=== Engagement post — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be posted or saved.\n');
+
+  const feedGate = isNonArticleFacebookAllowed();
+  if (!feedGate.ok) {
+    console.log(`  [skip] Facebook engagement: ${feedGate.reason} — ${feedGate.detail}`);
+    console.log('\n=== Run complete ===');
+    return;
+  }
 
   const recentTopics = await getRecentTopics();
   console.log(`Avoiding ${recentTopics.length} recently used topic(s).`);

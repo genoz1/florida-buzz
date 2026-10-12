@@ -24,6 +24,22 @@ function stripStorySuffix(text) {
     .trim();
 }
 
+const PARK_HINT_RE = /\b(disney|universal|magic kingdom|epcot|epic universe|cruise|lightning lane|theme park)\b/i;
+
+/**
+ * Pick a short comment CTA. Prefer a park/cruise-flavored question when the
+ * hook already names the destination — still one question, no hashtag dumps.
+ */
+function facebookCommentCta(core) {
+  if (/\bcruise\b/i.test(core)) {
+    return 'Would this change your next sailing — yes or no?';
+  }
+  if (PARK_HINT_RE.test(core)) {
+    return 'Would this change your park day — yes or no?';
+  }
+  return 'What would you do — tell us below 👇';
+}
+
 /**
  * Facebook photo captions should open with a curiosity-gap hook and invite a
  * comment. The article URL belongs in a first comment (linkPlacement), not here.
@@ -32,7 +48,7 @@ function toFacebookFeedCaption(fbCaption) {
   const core = stripStorySuffix(fbCaption);
   if (!core) return core;
   if (COMMENT_CTA_RE.test(core)) return core;
-  return `${core}\n\nWhat would you do — tell us below 👇`;
+  return `${core}\n\n${facebookCommentCta(core)}`;
 }
 
 function instagramHashtagsForCategory(category) {
@@ -95,6 +111,7 @@ function normalizePinCopy({ pin_title, pin_description, category = null, title =
 module.exports = {
   COMMENT_CTA_RE,
   INSTAGRAM_HASHTAGS_BY_CATEGORY,
+  facebookCommentCta,
   instagramHashtagsForCategory,
   normalizePinCopy,
   stripStorySuffix,

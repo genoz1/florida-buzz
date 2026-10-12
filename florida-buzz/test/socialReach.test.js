@@ -38,7 +38,7 @@ test('article Facebook captions keep curiosity-gap hooks and comment CTAs withou
   assert.match(withLegacySuffix, /Lightning Lane/);
   assert.doesNotMatch(withLegacySuffix, /Full story/i);
   assert.doesNotMatch(withLegacySuffix, /https?:\/\//);
-  assert.match(withLegacySuffix, /tell us below|what would you do/i);
+  assert.match(withLegacySuffix, /park day|tell us below|what would you do|yes or no/i);
 
   const alreadyHasCta = toFacebookFeedCaption(
     'Universal quietly adjusted park hours for a busy weekend — would you change your plan?'
