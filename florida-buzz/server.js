@@ -372,13 +372,14 @@ if (podcastsCfg.enabled && podcastsCfg.weeklyCron) {
 // Cron on when FB_PARK_REEL_ENABLED=true (+ FB + Supabase). Actual Meta publish
 // also needs FB_PARK_REEL_PUBLISH=true (otherwise the job only renders).
 if (scheduleFlags.facebookParkReel) {
-  cron.schedule('15 10 * * *', () => {
+  // 10:30am Eastern — daily park/cruise Reel create + post (publish still needs FB_PARK_REEL_PUBLISH).
+  cron.schedule('30 10 * * *', () => {
     console.log('Running scheduled Facebook park Reel...');
     runScheduledCommand('facebook park reel', 'node scripts/facebook-park-reel.js');
   }, { timezone: 'America/New_York' });
-  console.log('Facebook park Reel scheduled: 10:15am daily (Eastern time). Publishing gated by FB_PARK_REEL_PUBLISH.');
+  console.log('Facebook park Reel scheduled: 10:30am daily (Eastern time). Publishing gated by FB_PARK_REEL_PUBLISH=true.');
 } else {
-  console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true (plus FB + Supabase credentials) to enable.');
+  console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true AND FB_PARK_REEL_PUBLISH=true in DigitalOcean (plus FB + Supabase credentials).');
 }
 
 // Drain queued park/cruise Facebook posts about every 90 minutes (Eastern).

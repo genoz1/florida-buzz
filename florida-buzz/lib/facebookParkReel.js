@@ -14,7 +14,7 @@
  * FB_PARK_REEL_PUBLISH=true and a publicly reachable HTTPS MP4 URL.
  *
  * Env:
- *   FB_PARK_REEL_ENABLED=true          schedule daily 10:15am ET runner
+ *   FB_PARK_REEL_ENABLED=true          schedule daily 10:30am ET runner
  *   FB_PARK_REEL_PUBLISH=true          actually call Facebook video API
  *   FB_PARK_REEL_WITH_VOICE=false      disable VO (default: on when key set)
  *   ELEVENLABS_API_KEY                 Geno VO via visualNews/elevenTts
