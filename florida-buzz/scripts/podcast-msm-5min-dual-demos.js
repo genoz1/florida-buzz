@@ -2,9 +2,8 @@
 'use strict';
 
 /**
- * Build two ~5 minute MSM-style dual demos:
- *   Geno 2 + Amy
- *   Geno 2 + Eliza
+ * Build ~5 minute MSM-style dual demos.
+ * Default: Instant Geno + Amy (settled cohost).
  *
  * Required:
  *   ELEVENLABS_API_KEY
@@ -12,38 +11,38 @@
  *
  * Usage:
  *   PODCASTS_GENERATION_ENABLED=true node scripts/podcast-msm-5min-dual-demos.js
+ *   MSM_DEMO_ONLY=amy PODCASTS_GENERATION_ENABLED=true node scripts/podcast-msm-5min-dual-demos.js
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { config } = require('../lib/podcasts/config');
+const { config, DEFAULT_ELEVEN_VOICE_GENO } = require('../lib/podcasts/config');
 const { createElevenTts } = require('../lib/podcasts/elevenTts');
 const { mixDualLines } = require('../lib/podcasts/dualMix');
-const { VOICE_COLD_START_WARMUP, probeMp3DurationSec, trimLeadingAudio } =
-  require('../lib/podcasts/audioPipeline');
 const lines = require('./data/msm-demo-5min-lines');
 
-const GENO2 = '5tg8WQNhwRAIGFxz4EFe';
+const INSTANT_GENO = DEFAULT_ELEVEN_VOICE_GENO; // bg7PC2IzyIDwYgytMiW1
 const AMY = 'OZxMHsGaBmV5pjMIDIn0';
 const ELIZA = 'ut2XM2wJyIZLTtW6lFzZ';
 
 const ALL_DEMOS = [
-  { slug: 'geno2-amy', label: 'Geno 2 + Amy', genaVoice: AMY },
-  { slug: 'geno2-eliza', label: 'Geno 2 + Eliza', genaVoice: ELIZA },
+  { slug: 'instant-geno-amy', label: 'Instant Geno + Amy', genaVoice: AMY },
+  { slug: 'instant-geno-eliza', label: 'Instant Geno + Eliza', genaVoice: ELIZA },
 ];
 
-/** Soften premade cohost “lips on mic”; Geno 2 keeps closer PVC settings. */
+/** Soften premade cohost “lips on mic”. */
 const GENA_VOICE_SETTINGS = Object.freeze({
   stability: 0.42,
   similarity_boost: 0.62,
   style: 0,
   use_speaker_boost: false,
 });
+/** Instant Geno — calm conversational (not Geno 2 PVC hot settings). */
 const GENO_VOICE_SETTINGS = Object.freeze({
-  stability: 0.52,
-  similarity_boost: 0.95,
-  style: 0.25,
-  use_speaker_boost: true,
+  stability: 0.35,
+  similarity_boost: 0.65,
+  style: 0,
+  use_speaker_boost: false,
 });
 
 function outDir() {
@@ -63,41 +62,18 @@ async function synthLine(eleven, line, voiceId, prev, next) {
   });
 }
 
-async function renderDemo({ cfg, eleven, ffmpegPath, demo, dir }) {
+async function renderDemo({ eleven, ffmpegPath, demo, dir }) {
   console.log(`\n=== ${demo.label} (${lines.length} lines) ===`);
   const rendered = [];
-  let genoWarmupSec = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const voiceId = line.speaker === 'Gena' ? demo.genaVoice : GENO2;
+    const voiceId = line.speaker === 'Gena' ? demo.genaVoice : INSTANT_GENO;
     process.stdout.write(`  [${i + 1}/${lines.length}] ${line.speaker}… `);
     const prev = lines[i - 1];
     const next = lines[i + 1];
-
-    let result;
-    if (line.speaker === 'Geno' && i === 0) {
-      // Cold-start skip for Geno 2 first line only
-      const warmup = await eleven.synthesizeText(VOICE_COLD_START_WARMUP, {
-        voiceId: GENO2,
-        nextText: line.text,
-        voiceSettings: GENO_VOICE_SETTINGS,
-      });
-      genoWarmupSec = await probeMp3DurationSec(warmup.buffer, ffmpegPath);
-      const combined = await eleven.synthesizeText(`${VOICE_COLD_START_WARMUP}\n\n${line.text}`, {
-        voiceId: GENO2,
-        previousText: VOICE_COLD_START_WARMUP,
-        nextText: next?.text,
-        voiceSettings: GENO_VOICE_SETTINGS,
-      });
-      const trimmed = await trimLeadingAudio(combined.buffer, genoWarmupSec, ffmpegPath);
-      result = { ...combined, buffer: trimmed };
-      console.log(`ok (warmup ${genoWarmupSec.toFixed(1)}s trimmed)`);
-    } else {
-      result = await synthLine(eleven, line, voiceId, prev, next);
-      console.log(`ok (${result.buffer.length} bytes)`);
-    }
-
+    const result = await synthLine(eleven, line, voiceId, prev, next);
+    console.log(`ok (${result.buffer.length} bytes)`);
     rendered.push({ ...line, buffer: result.buffer, voiceId });
   }
 
@@ -108,17 +84,15 @@ async function renderDemo({ cfg, eleven, ffmpegPath, demo, dir }) {
     outPath: finalPath,
     matchMicDistance: true,
   });
-  const finalBuf = mixed.buffer;
 
   const scriptPath = path.join(dir, `msm-5min-${demo.slug}.txt`);
   fs.writeFileSync(
     scriptPath,
     [
       `Florida Buzz MSM-style dual demo — ${demo.label}`,
-      `Geno voice: ${GENO2}`,
+      `Geno voice: ${INSTANT_GENO} (Instant)`,
       `Gena voice: ${demo.genaVoice}`,
       `Approx duration: ${(mixed.totalMs / 1000 / 60).toFixed(2)} min (pre-FX mix timeline)`,
-      `Warmup trimmed from first Geno line: ${genoWarmupSec ? genoWarmupSec.toFixed(2) + 's' : 'n/a'}`,
       '',
       ...lines.map((l, idx) => `${idx + 1}. ${l.speaker}: ${l.text}`),
     ].join('\n')
@@ -137,17 +111,17 @@ async function main() {
   if (!cfg.elevenApiKey) throw new Error('ELEVENLABS_API_KEY required');
   if (!cfg.generation) throw new Error('Set PODCASTS_GENERATION_ENABLED=true');
 
-  const eleven = createElevenTts({ ...cfg, elevenVoiceGeno: GENO2 });
+  const eleven = createElevenTts({ ...cfg, elevenVoiceGeno: INSTANT_GENO });
   const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
   const dir = outDir();
-  const only = String(process.env.MSM_DEMO_ONLY || '')
+  const only = String(process.env.MSM_DEMO_ONLY || 'amy')
     .trim()
     .toLowerCase();
-  const demos = ALL_DEMOS.filter((d) => !only || d.slug.includes(only) || d.label.toLowerCase().includes(only));
+  const demos = ALL_DEMOS.filter((d) => !only || only === 'all' || d.slug.includes(only) || d.label.toLowerCase().includes(only));
   if (!demos.length) throw new Error(`No demos matched MSM_DEMO_ONLY=${only}`);
   const outputs = [];
   for (const demo of demos) {
-    outputs.push(await renderDemo({ cfg, eleven, ffmpegPath, demo, dir }));
+    outputs.push(await renderDemo({ eleven, ffmpegPath, demo, dir }));
   }
   fs.writeFileSync(path.join(dir, 'msm-5min-demos.json'), JSON.stringify(outputs, null, 2));
   console.log('\nAll demos done.');
