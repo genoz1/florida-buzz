@@ -107,7 +107,7 @@ test('release slots default to Tuesday then Friday', () => {
   assert.equal(slots[1].key, 'fri');
 });
 
-test('selectReleaseSlotForRun picks today on Tue/Fri force, else next upcoming', () => {
+test('selectReleaseSlotForRun picks today on Tue/Fri force, else extra (not Tue/Fri)', () => {
   const settings = defaultSettings();
 
   const tue = selectReleaseSlotForRun({
@@ -126,14 +126,24 @@ test('selectReleaseSlotForRun picks today on Tue/Fri force, else next upcoming',
   assert.equal(fri.slot.key, 'fri');
   assert.equal(fri.reason, 'force_today');
 
-  // Saturday → next Tuesday
+  // Saturday force → Extra (does not consume Tuesday)
   const sat = selectReleaseSlotForRun({
     settings,
     now: new Date('2026-10-10T22:00:00.000Z'),
     force: true,
   });
-  assert.equal(sat.slot.key, 'tue');
-  assert.equal(sat.reason, 'force_next');
+  assert.equal(sat.slot.key, 'extra');
+  assert.equal(sat.reason, 'force_extra');
+  assert.equal(sat.slot.label, 'Extra');
+
+  // Monday force → Extra (does not consume Tuesday)
+  const mon = selectReleaseSlotForRun({
+    settings,
+    now: new Date('2026-10-12T18:00:00.000Z'), // Mon afternoon ET
+    force: true,
+  });
+  assert.equal(mon.slot.key, 'extra');
+  assert.equal(mon.reason, 'force_extra');
 
   // Cron path: Tuesday generate window
   const cronTue = selectReleaseSlotForRun({
@@ -266,7 +276,7 @@ test('force weekly draft creates exactly one episode for the selected slot', asy
   const store = createMemoryStore();
   await store.upsertScheduleSettings('florida-buzz-disney', { weekly_draft_enabled: true });
 
-  // Saturday force → next Tuesday slot, one episode only
+  // Saturday force → Extra slot (does not consume Tuesday/Friday)
   const result = await createWeeklyDraft({
     store,
     supabase: mockSupabase(),
@@ -289,13 +299,13 @@ test('force weekly draft creates exactly one episode for the selected slot', asy
   assert.equal(result.episodes.length, 1);
   assert.equal(result.episodesCreated, 1);
   assert.equal(result.episodesPerWeek, 1);
-  assert.equal(result.releaseSlot.key, 'tue');
-  assert.equal(result.slotReason, 'force_next');
+  assert.equal(result.releaseSlot.key, 'extra');
+  assert.equal(result.slotReason, 'force_extra');
   assert.notEqual(result.episode.status, 'published');
   assert.notEqual(result.episode.status, 'scheduled');
   assert.equal(result.audioGenerated, false);
-  assert.equal(result.episode.intended_publish_weekday, 2);
-  assert.match(result.episode.slug, /-tue$/);
+  assert.equal(result.episode.intended_publish_weekday, 6); // Saturday ET
+  assert.match(result.episode.slug, /-extra$/);
   assert.doesNotMatch(result.episode.title, /Part\s*\d/i);
   assert.doesNotMatch(result.episode.slug, /-p\d/);
 
@@ -417,7 +427,7 @@ test('full AI script weekly draft auto-starts private preview and never publishe
   const weeklyPath = require.resolve('../lib/podcasts/weeklyDraft');
   const realScript = require('../lib/podcasts/script');
   const longScript = [
-    'Geno: [conversational] Ok, welcome to Florida Buzz: Disney. I\'m Geno. I\'ve been going to Walt Disney World since I was eighteen months old — over fifty years ago. Let\'s go.',
+    'Geno: [conversational] Welcome to the Florida Buzz Disney podcast. I\'m your host Geno, and thank you for joining us. Let\'s go.',
     `Geno: ${'Quick hit on park planning and dining tips for guests. '.repeat(30)}`,
   ].join('\n\n');
   assert.ok(longScript.length > 200);

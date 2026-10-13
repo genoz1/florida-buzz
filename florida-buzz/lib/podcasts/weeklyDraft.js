@@ -6,7 +6,6 @@ const {
   matchesGenerateSlot,
   matchingGenerateSlot,
   partsInTimezone,
-  nextUpcomingWeekday,
   WEEKDAY_NAMES,
 } = require('./timeEt');
 const { collectWeeklySources } = require('./sourceCollector');
@@ -76,7 +75,8 @@ function releaseSlotsFromSettings(settings = {}) {
 /**
  * Pick exactly one release slot for this run.
  * - Cron: matching generate window (Tue or Fri)
- * - Force: today's slot if Tue/Fri, else next upcoming
+ * - Force on Tue/Fri: that day's scheduled slot
+ * - Force on any other day: Extra/manual slot (does NOT consume Tue/Fri)
  * - Explicit / reject: use provided or prior episode slot
  */
 function selectReleaseSlotForRun({
@@ -92,6 +92,17 @@ function selectReleaseSlotForRun({
   const byKey = (key) => {
     if (!key) return null;
     const normalized = String(key).replace(/^gen-/, '');
+    if (normalized === 'extra' || key === 'extra') {
+      const parts = partsInTimezone(now, tz);
+      return {
+        key: 'extra',
+        index: -1,
+        weekday: parts.weekday,
+        hour: Number(settings.intended_publish_hour ?? DEFAULT_RELEASE_SLOTS[0].hour),
+        minute: Number(settings.intended_publish_minute ?? DEFAULT_RELEASE_SLOTS[0].minute),
+        label: 'Extra',
+      };
+    }
     return (
       slots.find((s) => s.key === key || s.key === normalized) ||
       slots.find((s) => String(key).startsWith(s.key)) ||
@@ -125,13 +136,19 @@ function selectReleaseSlotForRun({
     const parts = partsInTimezone(now, tz);
     const today = slots.find((s) => s.weekday === parts.weekday);
     if (today) return { slot: today, targetDate: now, reason: 'force_today' };
-    const upcoming = nextUpcomingWeekday(
-      now,
-      slots.map((s) => s.weekday),
-      tz
-    );
-    const slot = slots.find((s) => s.weekday === upcoming.weekday) || slots[0];
-    return { slot, targetDate: upcoming.targetDate, reason: 'force_next' };
+    // Off-schedule force: bonus episode — leave Tue/Fri for their cron windows.
+    return {
+      slot: {
+        key: 'extra',
+        index: -1,
+        weekday: parts.weekday,
+        hour: Number(settings.intended_publish_hour ?? DEFAULT_RELEASE_SLOTS[0].hour),
+        minute: Number(settings.intended_publish_minute ?? DEFAULT_RELEASE_SLOTS[0].minute),
+        label: 'Extra',
+      },
+      targetDate: now,
+      reason: 'force_extra',
+    };
   }
 
   return null;
@@ -344,7 +361,7 @@ function buildFallbackScript({ weekKey, sources, copy }) {
   const evergreen = sources.find((s) => s.source_kind === 'evergreen_topic' && s.included !== false);
   const turns = [];
   turns.push(
-    `Geno: [conversational] Ok, welcome to Florida Buzz: Disney. I'm Geno. I've been going to Walt Disney World since I was eighteen months old — over fifty years ago — and I'm here with park news and real planning from The Florida Buzz. [warmly] Here's what we're locking in today. Let's go.`
+    `Geno: [conversational] Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. [warmly] Here's what we're locking in today. Let's go.`
   );
   turns.push(`Geno: This week’s draft focus is ${copy.title}. Quick hits first, then one deeper dive.`);
   turns.push('Geno: Exact facts still come from The Florida Buzz — articles, guides, and the Buzz Board.');

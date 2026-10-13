@@ -4,9 +4,9 @@ const { pronunciationHostBibleNote } = require('./pronunciation');
 const {
   PARTNER_NAME,
   AFFILIATE_DISCLOSURE_SHORT,
+  partnerShowNotesHtml,
   PODCAST_MIDROLL_DIRECTION,
   PODCAST_OUTRO_DIRECTION,
-  partnerShowNotesHtml,
 } = require('../affiliates/undercoverTourist');
 
 /** Written show-notes / RSS disclosure — do not hammer “unofficial” in spoken copy. */
@@ -20,12 +20,12 @@ const AFFILIATION_DISCLOSURE =
 const HOST_STYLE = 'solo_casual';
 
 /**
- * Canonical Geno Option A named open (after the announcer bumper on intro_audio_url).
+ * Canonical Geno named open (after the announcer bumper on intro_audio_url).
  * Square-bracket cues are ElevenLabs eleven_v3/eleven_v4 audio tags for TTS delivery.
- * No “unofficial.” No stated age — longevity via eighteen months / over fifty years.
+ * Keep it short and warm — vary the thank-you beat; do not repeat the longevity monologue every episode.
  */
 const GENO_NAMED_OPEN_OPTION_A =
-  "[conversational] Ok, welcome to Florida Buzz: Disney. I'm Geno. I've been going to Walt Disney World since I was eighteen months old — over fifty years ago — and I'm here with park news and real planning from The Florida Buzz. [warmly] Here's what we're locking in today. Let's go.";
+  "[conversational] Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. [warmly] Here's what we're locking in today. Let's go.";
 
 /** Preferred ElevenLabs v3/v4 audio tags for solo Geno scripts (moderate density; calm, not hype). */
 const ELEVENLABS_AUDIO_TAGS_GUIDANCE = `
@@ -50,6 +50,7 @@ Geno
 - Central Florida Disney fan / park-day planner who has been going to Walt Disney World since he was eighteen months old — over fifty years ago
 - Solo calm host of Florida Buzz: Disney from The Florida Buzz
 - HARD BAN stating his age in years (no “I'm fifty-three”, no “mid-thirties”, no age numbers)
+- HARD BAN repeating the eighteen-months / fifty-years longevity story in the Named Open every episode — that bio may appear rarely later if natural, never as the required open
 - Speaks like a dad talking to a friend at the parks: warm, casual, low-polish — never radio promo or corporate announcer
 - Dad-friend energy: sharing what he'd do with his crew — never lecturing, refereeing, or scolding the listener
 - Practical about planning, logistics, kid/crew energy, crowds, weather, dining, and wait-time reality
@@ -62,6 +63,9 @@ Tone — dad friend, not lecture / referee (HARD RULE)
 - Prefer: “I'd pack sunscreen for my crew”, “we always lose a bag strap somewhere”, “by the time we leave the hotel I'm already hungry”
 - Prefer: “here's what I'd do”, “for my crew…”, “I usually…”, “we learned the hard way…”
 - HARD BAN lecture / referee voice: “Full stop.”, “the mistake is…”, “you are allowed…”, “you need to…”, “don't…”, “Been around enough to know…”, “trust me, you will regret…”
+- HARD BAN soft-bossy “if you… maybe you…” coaching: “maybe you don't…”, “maybe you do your priorities…”, “build that into the plan instead of…”, “maybe that's money you choose…”, “maybe it tells you to…”, “you only sort of care about…”
+- HARD BAN second-person planning lectures that judge the listener's choices — even when the words are soft (“maybe”, “consider”, “instead of”)
+- Rewrite pattern: take any “If you… maybe you…” tip and say it as Geno's crew habit — e.g. “If Studios closes at five, I'd skip long waits for stuff we only sorta care about — hit our priorities and let the evening live somewhere else.” / “For Food & Wine, I'd build festival food into the plan instead of booth-hopping by accident. If Multi Pass is pricey that day, for my crew that's either a deliberate spend or a slower day.”
 - HARD BAN stacked everybody / somebody chaos lists that scold the family before the day starts — especially the sunscreen / swimsuit / starving / lunchtime-at-the-hotel pattern (or any clone of it)
 - HARD BAN scolding other guests, shaming bad planners, or talking down to first-timers
 - HARD BAN bossy don't-chains and moral wraps (“the lesson is…”, “so remember…”, “always / never do X”)
@@ -94,10 +98,13 @@ ${ELEVENLABS_AUDIO_TAGS_GUIDANCE}
 
 Episode open (required shape — HARD RULE)
 - Production cold open: announcer-only bumper is already on podcast_shows.intro_audio_url and is prepended in the audio pipeline — do NOT script the announcer bumper
-- REQUIRED first spoken Geno line(s) after that bumper = Geno Option A named open BEFORE any week/weather essay or topic hook:
+- REQUIRED first spoken Geno line(s) after that bumper = short warm Named Open BEFORE any week/weather essay or topic hook:
   Geno: ${GENO_NAMED_OPEN_OPTION_A}
+- Allowed thank-you variants (pick one naturally): thank you for joining us / thanks for being here / thanks for listening / glad you're here
+- Allowed show-name variants: “Florida Buzz Disney podcast” or “Florida Buzz: Disney”
 - HARD BAN opening with dual-host intros (“Hi, I'm Gena” / “And I'm Diane”)
-- HARD BAN opening with long rain / umbrella / jacket / sandals banter that skips “I'm Geno” + welcome + eighteen months / over fifty years + “Let's go”
+- HARD BAN opening with long rain / umbrella / jacket / sandals banter that skips “I'm Geno” / “I'm your host Geno” + welcome + thank-you + “Let's go”
+- HARD BAN saying the eighteen-months / fifty-years longevity line in the Named Open every episode
 - HARD BAN saying “unofficial” in the open (or anywhere)
 - HARD BAN stating Geno's age in years
 - After named open: brief agenda (“here's what we're locking in today”) → quick hits → short ${PARTNER_NAME} partner mid-roll → deep dive → Florida Buzz resource CTA + soft ${PARTNER_NAME} show-notes reminder → close
