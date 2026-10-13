@@ -416,20 +416,27 @@ if (scheduleFlags.facebookParkReel) {
     runScheduledCommand('facebook park reel', parkReelCommand(PARK_REEL_MODE_DISNEY_NEWS));
   }, { timezone: 'America/New_York' });
 
-  // Safety nets if a cron tick or redeploy missed a slot (morning → 2pm, evening → 8pm).
-  cron.schedule('0 14 * * *', () => {
-    maybeCatchUpParkReel('14:00 ET morning safety');
-  }, { timezone: 'America/New_York' });
-  cron.schedule('0 20 * * *', () => {
-    maybeCatchUpParkReel('20:00 ET evening safety');
-  }, { timezone: 'America/New_York' });
+  // Safety nets if a cron tick missed a slot (morning → 2pm, evening → 8pm).
+  // Only when publish is on — render+ffmpeg on 512MB without publish still OOMs.
+  if (process.env.FB_PARK_REEL_PUBLISH === 'true') {
+    cron.schedule('0 14 * * *', () => {
+      maybeCatchUpParkReel('14:00 ET morning safety');
+    }, { timezone: 'America/New_York' });
+    cron.schedule('0 20 * * *', () => {
+      maybeCatchUpParkReel('20:00 ET evening safety');
+    }, { timezone: 'America/New_York' });
+  }
 
-  // After deploy/restart: fill any overdue slot for the Eastern day (0→1 after 10:30, 1→2 after 7pm).
-  setTimeout(() => {
-    maybeCatchUpParkReel('startup');
-  }, 90_000);
-
-  console.log('Facebook park Reel scheduled: 10:30am tip + 7:00pm Disney news (Eastern) + startup/2pm/8pm catch-up if a slot was missed. Publishing gated by FB_PARK_REEL_PUBLISH=true.');
+  // Do NOT run park-reel catch-up on process startup. On apps-s-1vcpu-0.5gb,
+  // ffmpeg+TTS catch-up OOMs the web container (~exit 128) and causes a crash loop.
+  // Timed 2pm/8pm catch-ups below remain for missed slots without killing boot.
+  const publishReels = process.env.FB_PARK_REEL_PUBLISH === 'true';
+  console.log(
+    'Facebook park Reel scheduled: 10:30am tip + 7:00pm Disney news (Eastern)'
+    + (publishReels
+      ? ' + 2pm/8pm catch-up if a slot was missed (publish ON).'
+      : ' (catch-up/publish OFF — set FB_PARK_REEL_PUBLISH=true when ready; avoid on 512MB).')
+  );
 } else {
   console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true AND FB_PARK_REEL_PUBLISH=true in DigitalOcean (plus FB + Supabase credentials).');
 }
