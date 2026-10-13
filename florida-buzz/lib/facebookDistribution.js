@@ -273,6 +273,77 @@ async function loadRecentFacebookSuccesses(client, { limit = 50 } = {}) {
 }
 
 /**
+ * Max age (days) for non-evergreen news on the Facebook drain queue.
+ * Older rows are permanently skipped (fb_posted=true) so July stories
+ * cannot dump onto the Page in October.
+ */
+function facebookMaxNewsAgeDays(env = process.env) {
+  return positiveInt(env.FB_MAX_NEWS_AGE_DAYS, 21);
+}
+
+const SEASONAL_WINDOWS = Object.freeze([
+  {
+    name: 'independence_day',
+    // Mid-June through mid-July only
+    months: [6, 7],
+    // In July allow through day 15; in June from day 15
+    re: /\b(independence day|fourth of july|4th of july|july\s*4(?:th)?|july fourth)\b/i,
+  },
+  {
+    name: 'june_festival',
+    months: [6],
+    re: /\bjune (?:festival|festivals|events?)\b/i,
+  },
+]);
+
+/**
+ * Reject dated/seasonal captions that are out of season, and reject stale
+ * non-evergreen news older than FB_MAX_NEWS_AGE_DAYS (default 21).
+ *
+ * @returns {{ ok: boolean, reason: string, detail?: string }}
+ */
+function isFacebookContentFresh(content = {}, env = process.env, now = new Date()) {
+  const hay = haystackFromContent(content);
+  const month = now.getUTCMonth() + 1; // 1-12
+  const day = now.getUTCDate();
+
+  for (const window of SEASONAL_WINDOWS) {
+    if (!window.re.test(hay)) continue;
+    let inSeason = window.months.includes(month);
+    if (window.name === 'independence_day') {
+      inSeason =
+        (month === 6 && day >= 15) || (month === 7 && day <= 15);
+    }
+    if (!inSeason) {
+      return {
+        ok: false,
+        reason: 'seasonal_mismatch',
+        detail: `Seasonal “${window.name}” content blocked in ${month}/${day}`,
+      };
+    }
+  }
+
+  const publishedAt = content.publishedAt || content.published_at;
+  const isEvergreen = content.isEvergreen === true || content.is_evergreen === true;
+  if (!isEvergreen && publishedAt) {
+    const published = new Date(publishedAt);
+    if (Number.isFinite(published.getTime())) {
+      const ageDays = (now.getTime() - published.getTime()) / (24 * 60 * 60 * 1000);
+      const maxAge = facebookMaxNewsAgeDays(env);
+      if (maxAge > 0 && ageDays > maxAge) {
+        return {
+          ok: false,
+          reason: 'stale_news',
+          detail: `News is ${ageDays.toFixed(0)}d old (max ${maxAge}d for Facebook)`,
+        };
+      }
+    }
+  }
+
+  return { ok: true, reason: 'fresh' };
+}
+
+/**
  * Full decide path for article/guide Facebook posts.
  *
  * @returns {Promise<{ ok: boolean, reason: string, detail?: string, topic?: object, cadence?: object }>}
@@ -287,6 +358,11 @@ async function decideFacebookDistribution(content, {
   const topic = isFacebookTopicAllowed(content, env);
   if (!topic.ok) {
     return { ok: false, reason: topic.reason, detail: topic.detail, topic };
+  }
+
+  const fresh = isFacebookContentFresh(content, env, now instanceof Date ? now : new Date());
+  if (!fresh.ok) {
+    return { ok: false, reason: fresh.reason, detail: fresh.detail, topic, fresh };
   }
 
   const history = recentSuccesses != null
@@ -312,7 +388,9 @@ module.exports = {
   allowedCategories,
   decideFacebookDistribution,
   evaluateFacebookCadence,
+  facebookMaxNewsAgeDays,
   getFacebookCadenceConfig,
+  isFacebookContentFresh,
   isFacebookTopicAllowed,
   isNonArticleFacebookAllowed,
   isParkCruiseTopic,

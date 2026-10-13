@@ -74,6 +74,8 @@ async function run() {
         dek: row.dek,
         caption: row.fb_caption,
         slug: row.slug,
+        published_at: row.published_at,
+        is_evergreen: row.is_evergreen,
       },
       { client: supabase, postsThisRun: posted }
     );

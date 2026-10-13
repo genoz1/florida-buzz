@@ -87,7 +87,13 @@ async function applyFacebookFeedDecision(client, slug, decision, {
   const reason = decision?.reason || 'unknown';
   const detail = decision?.detail ? ` — ${decision.detail}` : '';
 
-  if (reason === 'topic_filtered') {
+  // Permanent skips — clear from the drain queue so July content cannot
+  // resurface months later.
+  if (
+    reason === 'topic_filtered' ||
+    reason === 'seasonal_mismatch' ||
+    reason === 'stale_news'
+  ) {
     await markFacebookFeedResolved(client, slug, { dryRun, logger });
     logger.log(`  [skip] Facebook: ${reason}${detail}`);
     return { action: 'skipped', reason };
