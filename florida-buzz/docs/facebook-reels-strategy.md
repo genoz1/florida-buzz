@@ -5,18 +5,18 @@ Operational note for Gene. **Website publishing is unchanged** — Facebook dist
 ## Plain English (the important part)
 
 **Yes — every article and guide posts to Facebook.**  
-They are **spaced about every 30 minutes** so the Page does not dump several posts in under an hour.
+They are **spaced about every 15 minutes** — the same gap production used before the park/cruise filter (`FB_POST_DELAY_MINUTES=15`; code default used to be 10).
 
-“1 per run” only means **one Facebook post per drain tick** — not “only one a day.” There are drain ticks about every **30 minutes** from 7am–11pm Eastern, plus automate/guide runs that also drain the queue.
+Automate/guide runs can post a batch with that 15-minute wait between successes. Drain ticks about every **15 minutes** from 7am–11pm Eastern keep the queue moving between those runs.
 
-**If ~16 articles publish on the site today, Facebook will post them about every 30 minutes across the waking day.** Nothing is dropped — extras wait in a queue (`articles.fb_posted = false`) until the next eligible tick.
+**If ~45 articles publish on the site today, Facebook can clear them in about 11 hours of spaced posting.** Nothing is dropped — extras wait in a queue (`articles.fb_posted = false`) until the next eligible tick.
 
 ## What shipped
 
 1. **Full feed** — every article and guide can post to Facebook (optional park/cruise filter is off by default)  
-2. **Cadence** — ~30 min between Facebook successes; max 1 per run; **no default daily hard cap**  
+2. **Cadence** — ~15 min between Facebook successes; no default per-run or daily hard cap  
 3. **Queue, don’t drop** — cadence blocks leave the item queued for the next eligible run  
-4. **Frequent drain** — dedicated `facebook-feed-drain` cron ~every 30 minutes Eastern so same-day volume clears  
+4. **Frequent drain** — dedicated `facebook-feed-drain` cron ~every 15 minutes Eastern so same-day volume clears  
 5. **Promo / engagement / city** — allowed on Facebook again by default  
 6. **Feed packaging** — stronger comment CTAs; link stays in first comment  
 7. **Park Reel path** — still park/cruise-only; article/park still photos with a slow zoom/pan + captions  
@@ -49,16 +49,16 @@ When that flag is on, allowed when either:
 
 | Knob | Default | Env override |
 |------|---------|--------------|
-| Min hours between FB successes | **0.5** (~30 min) | `FB_MIN_HOURS_BETWEEN_POSTS` (use `1` if you want slower) |
+| Min hours between FB successes | **0.25** (~15 min) | `FB_MIN_HOURS_BETWEEN_POSTS` (use `0.1667` for ~10 min) |
 | Max FB posts per rolling 24h | **0 (off)** | `FB_MAX_POSTS_PER_DAY` — set only if you want a ceiling; blocked items still queue |
-| Max FB posts per automate/guide/drain run | **1** | `FB_MAX_POSTS_PER_RUN` |
-| Within-run wait after an FB post | **60** minutes | `FB_POST_DELAY_MINUTES` (only matters if max-per-run > 1) |
+| Max FB posts per automate/guide run | **0 (off)** | `FB_MAX_POSTS_PER_RUN` — drain still posts 1/tick |
+| Within-run wait after an FB post | **15** minutes | `FB_POST_DELAY_MINUTES` |
 
 History comes from `post_log` (`platform=facebook`, `status=success`). If Supabase is down, cadence falls back to in-run counters only.
 
-**Queue behavior:** article/guide rows stay `fb_posted=false` until a successful Facebook post. Dedicated drain ticks (~every 30 min, avoiding automate clock times) plus automate (6am / 11am / 3pm / 7pm ET) and guide runs (7:45am / 12:45pm / 5:45pm / 10:45pm ET) each post the oldest queued item when spacing allows.
+**Queue behavior:** article/guide rows stay `fb_posted=false` until a successful Facebook post. Dedicated drain ticks (~every 15 min, avoiding automate clock times) plus automate (6am / 11am / 3pm / 7pm ET) and guide runs (7:45am / 12:45pm / 5:45pm / 10:45pm ET) post when spacing allows.
 
-**Why ~30 minutes:** that is about the widest gap that still clears a normal full-day article + guide volume without dumping several posts at once. Wider gaps (1–1.5h) build a multi-day backlog when the site publishes ~40 pieces/day.
+**Why ~15 minutes:** that matches the pre-filter production delay. At 15 min, 45 posts need ~11 hours — so a full day clears. At 30 min, only ~32 posts fit in a 16-hour waking day, so a 45-post day would backlog.
 
 **Non-article Facebook jobs** (promo, engagement, city roundup FB, feature promo FB) are allowed by default. Skip them with:
 
@@ -161,4 +161,4 @@ Writes `florida-buzz-park-reel-sample.mp4` (and frames) under `/opt/cursor/artif
 
 ## Recommendation summary
 
-Ship with codebase reality: **every article & guide posts to Facebook**, **~30 minutes apart via queue + drain cron**, **park Reels stay park/cruise-only**, prove reach, then keep or kill based on plays / follows — not post count.
+Ship with codebase reality: **every article & guide posts to Facebook**, **~15 minutes apart via queue + drain cron**, **park Reels stay park/cruise-only**, prove reach, then keep or kill based on plays / follows — not post count.

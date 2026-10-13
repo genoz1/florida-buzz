@@ -73,17 +73,22 @@ test('FB_ALLOWED_CATEGORIES overrides the default allowlist when filter is on', 
   assert.equal(isFacebookTopicAllowed({ category: 'cruises', title: 'Sail tip' }, env).ok, true);
 });
 
-test('cadence defaults space posts ~30 minutes without a tight daily drop-cap', () => {
+test('cadence defaults space posts ~15 minutes without a tight daily/run drop-cap', () => {
   const config = getFacebookCadenceConfig({});
-  assert.equal(config.minHoursBetweenPosts, 0.5);
+  assert.equal(config.minHoursBetweenPosts, 0.25);
   assert.equal(config.maxPostsPerDay, 0);
-  assert.equal(config.maxPostsPerRun, 1);
-  assert.equal(config.postDelayMinutes, 60);
-  assert.ok(config.minHoursBetweenPosts >= 0.5 && config.minHoursBetweenPosts <= 1);
+  assert.equal(config.maxPostsPerRun, 0);
+  assert.equal(config.postDelayMinutes, 15);
+  assert.ok(config.minHoursBetweenPosts >= 0.15 && config.minHoursBetweenPosts <= 0.3);
 });
 
-test('cadence blocks a second Facebook post in the same run', () => {
-  const blocked = evaluateFacebookCadence({ postsThisRun: 1, recentSuccesses: [] }, {});
+test('cadence blocks a second Facebook post in the same run only when a run cap is set', () => {
+  const unlimited = evaluateFacebookCadence({ postsThisRun: 3, recentSuccesses: [] }, {});
+  assert.equal(unlimited.ok, true);
+  const blocked = evaluateFacebookCadence(
+    { postsThisRun: 1, recentSuccesses: [] },
+    { FB_MAX_POSTS_PER_RUN: '1' }
+  );
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'max_per_run');
   assert.equal(isFacebookCadenceDeferral(blocked.reason), true);
@@ -91,7 +96,7 @@ test('cadence blocks a second Facebook post in the same run', () => {
 
 test('cadence blocks when last Facebook success was too recent', () => {
   const now = new Date('2026-10-11T18:00:00.000Z');
-  const recent = [{ created_at: '2026-10-11T17:45:00.000Z' }]; // 15 min ago (< 0.5h)
+  const recent = [{ created_at: '2026-10-11T17:50:00.000Z' }]; // 10 min ago (< 0.25h)
   const blocked = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'min_spacing');
@@ -100,7 +105,7 @@ test('cadence blocks when last Facebook success was too recent', () => {
 
 test('cadence allows a post after the minimum gap', () => {
   const now = new Date('2026-10-11T20:00:00.000Z');
-  const recent = [{ created_at: '2026-10-11T19:25:00.000Z' }]; // 35 min ago (> default 0.5h)
+  const recent = [{ created_at: '2026-10-11T19:44:00.000Z' }]; // 16 min ago (> default 0.25h)
   const ok = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
   assert.equal(ok.ok, true);
   assert.equal(ok.reason, 'cadence_ok');
@@ -122,23 +127,23 @@ test('default daily max is off so many posts are not hard-dropped', () => {
   assert.equal(ok.ok, true);
 });
 
-test('0.5h gap + frequent runs can clear many posts across a waking day', () => {
+test('15 min gap can clear a 45-post day inside waking hours', () => {
   const start = new Date('2026-10-11T12:00:00.000Z');
-  const gapMs = 0.5 * 60 * 60 * 1000;
+  const gapMs = 0.25 * 60 * 60 * 1000;
   const successes = [];
-  for (let i = 0; i < 16; i += 1) {
+  for (let i = 0; i < 45; i += 1) {
     const now = new Date(start.getTime() + i * gapMs);
     const decision = evaluateFacebookCadence(
-      { postsThisRun: 0, recentSuccesses: successes, now },
-      { FB_MIN_HOURS_BETWEEN_POSTS: '0.5' }
+      { postsThisRun: i, recentSuccesses: successes, now },
+      {}
     );
     assert.equal(decision.ok, true, `post ${i + 1} should be allowed at ${now.toISOString()}`);
     successes.unshift({ created_at: now.toISOString() });
   }
-  assert.equal(successes.length, 16);
+  assert.equal(successes.length, 45);
   const last = new Date(successes[0].created_at);
   const hoursSpan = (last.getTime() - start.getTime()) / (60 * 60 * 1000);
-  assert.equal(hoursSpan, 7.5, 'sixteen posts at 0.5h = 7.5h from first to last');
+  assert.equal(hoursSpan, 11, 'forty-five posts at 15 min = 11h from first to last');
 });
 
 test('optional FB_MAX_POSTS_PER_DAY still defers rather than implying a permanent skip', () => {
@@ -259,7 +264,7 @@ test('automate, guide, and drain scripts queue Facebook posts instead of permane
   assert.match(server, /facebook-feed-drain\.js/);
   assert.match(distribution, /FB_TOPIC_FILTER_ENABLED === 'true'/);
   assert.match(docs, /every article and guide/i);
-  assert.match(docs, /about every 30 minutes|~30 min/i);
+  assert.match(docs, /about every 15 minutes|~15 min/i);
   assert.doesNotMatch(automate, /Posts will be spaced \$\{FB_POST_DELAY_MINUTES\} minute\(s\) apart across all platforms/);
 });
 

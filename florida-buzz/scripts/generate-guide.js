@@ -504,9 +504,13 @@ async function run() {
     const dayCap = fbCadence.maxPostsPerDay > 0
       ? `${fbCadence.maxPostsPerDay}/day`
       : 'no daily cap (queue + spacing)';
+    const runCap = fbCadence.maxPostsPerRun > 0
+      ? `${fbCadence.maxPostsPerRun}/run`
+      : 'no per-run cap';
     console.log(
-      `Facebook: every article & guide posts; max ${fbCadence.maxPostsPerRun}/run, `
-      + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart. Extras stay queued.\n`
+      `Facebook: every article & guide posts; ${runCap}, `
+      + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart `
+      + `(within-run FB delay ${fbCadence.postDelayMinutes}m). Extras stay queued.\n`
     );
     const queuedFb = await loadPendingFacebookFeedPosts(supabase, { limit: 5, dryRun: DRY_RUN });
     if (queuedFb.length) {

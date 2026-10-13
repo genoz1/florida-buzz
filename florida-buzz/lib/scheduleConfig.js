@@ -56,9 +56,8 @@ function getScheduleFlags(env = process.env) {
 }
 
 /**
- * ~30-minute Facebook feed drain slots (America/New_York), waking day.
- * Matches the default ≥30 min cadence so posts are spaced as far apart as
- * practical while still clearing a normal full article+guide day.
+ * ~15-minute Facebook feed drain slots (America/New_York), waking day.
+ * Matches the default ≥15 min cadence (pre-filter FB_POST_DELAY_MINUTES).
  * Intentionally avoids article automate times (6am / 11am / 3pm / 7pm) so two
  * processes do not race the same queued slug. Automate + guides still drain
  * when they run; these ticks fill the gaps.
@@ -66,6 +65,8 @@ function getScheduleFlags(env = process.env) {
 const FACEBOOK_FEED_DRAIN_CRONS = [
   // :00 — skip automate hours 6 / 11 / 15 / 19
   { cron: '0 7-10,12-14,16-18,20-23 * * *', label: ':00 (7–10,12–14,16–18,20–23)' },
+  // :15 / :45 — keep the queue moving between half-hours
+  { cron: '15,45 7-22 * * *', label: ':15/:45 (7–22)' },
   // :30 — full waking half-hours
   { cron: '30 7-22 * * *', label: ':30 (7–22)' },
 ];
