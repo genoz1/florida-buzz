@@ -77,18 +77,19 @@ async function probeDurationSec(ffmpegPath, filePath) {
 
 /**
  * Per-speaker mic-distance balance, then identical loudnorm target.
- * Geno 2 PVC reads distant; premade cohosts (Amy) read lips-on-mic — equal LUFS alone is not enough.
+ * Geno gets warm body + tinny 3k cut; premade cohosts (Amy) step back from lips-on-mic.
  */
 function speakerBalanceFilter(speaker, { loudnessLufs = -16, truePeakDb = -1.5 } = {}) {
   const sp = String(speaker || '').toLowerCase();
   const loudnorm = `loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=6`;
   if (sp === 'geno') {
-    // Instant Geno — light forward presence (not Geno 2 salvage)
+    // Warm / close without metallic 3k presence boost
     return [
-      'highpass=f=70',
-      'equalizer=f=250:t=q:w=0.9:g=1',
-      'equalizer=f=3000:t=q:w=0.9:g=1.5',
-      'acompressor=threshold=-22dB:ratio=2.5:attack=10:release=140:makeup=2.5',
+      'highpass=f=60',
+      'equalizer=f=220:t=q:w=0.9:g=1.8',
+      'equalizer=f=3000:t=q:w=0.85:g=-3',
+      'equalizer=f=5500:t=q:w=0.7:g=-2',
+      'acompressor=threshold=-22dB:ratio=2.4:attack=12:release=150:makeup=2.2',
       `loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=6`,
     ].join(',');
   }

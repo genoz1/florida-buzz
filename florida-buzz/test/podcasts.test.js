@@ -684,7 +684,7 @@ test('trimLeadingAudio drops Geno 2 cold-start warmup', async () => {
   }
 });
 
-test('applyVoicePresence levels TTS for closer Geno 2 delivery', async () => {
+test('applyVoicePresence warms Geno delivery without tinny presence', async () => {
   const { applyVoicePresence } = require('../lib/podcasts/audioPipeline');
   const { spawnSync } = require('node:child_process');
   const fsp = require('node:fs/promises');

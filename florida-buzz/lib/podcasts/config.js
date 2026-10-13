@@ -5,10 +5,10 @@ const DEFAULT_FAL_TTS_ENDPOINT = 'fal-ai/gemini-tts';
 const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
 const DEFAULT_FAL_SOLO_VOICE = 'Aoede';
 
-// ElevenLabs Geno — Instant Voice Clone (production). Geno 2 PVC was too roomy/distant.
+// ElevenLabs Geno — Instant Voice Clone (production default). Geno 3 is the close-mic PVC.
 const DEFAULT_ELEVEN_MODEL = 'eleven_v4';
 const DEFAULT_ELEVEN_VOICE_GENO = 'bg7PC2IzyIDwYgytMiW1'; // Instant Voice Clone
-const DEFAULT_ELEVEN_VOICE_GENO_PVC = '5tg8WQNhwRAIGFxz4EFe'; // Geno 2 professional (do not use until re-cloned close-mic)
+const DEFAULT_ELEVEN_VOICE_GENO_PVC = 'n715fGrdv64E0c9urL7h'; // Geno 3 close-mic PVC (Geno 2 5tg8… was roomy — retired)
 const DEFAULT_ELEVEN_VOICE_GENA = 'OZxMHsGaBmV5pjMIDIn0'; // Amy — Natural and Sweet
 const DEFAULT_ELEVEN_OUTPUT_FORMAT = 'mp3_44100_128';
 

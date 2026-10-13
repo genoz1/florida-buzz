@@ -253,7 +253,8 @@ async function trimLeadingAudio(buffer, seconds, ffmpegPath) {
 }
 
 /**
- * Light leveling for Instant Geno (not the heavy Geno 2 salvage FX).
+ * Warm leveling for Instant Geno / Geno 3 — body in the low-mids, cut tinny 3k.
+ * Avoid presence boosts that read thin or metallic on PVC patches.
  */
 async function applyVoicePresence(buffer, ffmpegPath) {
   if (!buffer?.length) throw new Error('Episode audio is empty');
@@ -268,10 +269,14 @@ async function applyVoicePresence(buffer, ffmpegPath) {
       inPath,
       '-af',
       [
-        'highpass=f=70',
-        'equalizer=f=250:t=q:w=0.9:g=1',
-        'equalizer=f=4500:t=q:w=0.8:g=-1.5',
-        'acompressor=threshold=-22dB:ratio=2.5:attack=12:release=140:makeup=2',
+        'highpass=f=60',
+        // Chest / warmth
+        'equalizer=f=220:t=q:w=0.9:g=2',
+        // Tinny upper-mid presence (Geno 3 runs hot here)
+        'equalizer=f=3000:t=q:w=0.85:g=-3.5',
+        // Soften harsh air without muffling consonants
+        'equalizer=f=5500:t=q:w=0.7:g=-2.5',
+        'acompressor=threshold=-22dB:ratio=2.4:attack=12:release=150:makeup=2',
         'loudnorm=I=-16:TP=-1.5:LRA=7',
       ].join(','),
       '-codec:a',

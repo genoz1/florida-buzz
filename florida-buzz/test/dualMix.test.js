@@ -42,7 +42,7 @@ async function toneMp3(seconds, freq) {
   return buf;
 }
 
-test('resolveHostMode dual aliases and Geno 2 default voice', () => {
+test('resolveHostMode dual aliases and Instant Geno default voice', () => {
   assert.equal(resolveHostMode({}), 'solo');
   assert.equal(resolveHostMode({ PODCASTS_HOST_MODE: 'dual' }), 'dual');
   assert.equal(resolveHostMode({ PODCASTS_HOST_MODE: 'msm' }), 'dual');
@@ -59,11 +59,12 @@ test('MSM delivery bible and sample lines encode overlaps', () => {
   assert.ok(MSM_STYLE_DUAL_SAMPLE_LINES.some((l) => l.speaker === 'Gena'));
 });
 
-test('speakerBalanceFilter pulls Geno forward and Gena back from the mic', () => {
+test('speakerBalanceFilter warms Geno (cuts tinny 3k) and steps Gena back', () => {
   const geno = speakerBalanceFilter('Geno');
   const gena = speakerBalanceFilter('Gena');
-  assert.match(geno, /equalizer=f=3000/);
-  assert.match(geno, /makeup=2\.5/);
+  assert.match(geno, /equalizer=f=220/);
+  assert.match(geno, /equalizer=f=3000:t=q:w=0\.85:g=-3/);
+  assert.match(geno, /makeup=2\.2/);
   assert.match(geno, /loudnorm=I=-16/);
   assert.match(gena, /equalizer=f=3200.*g=-3\.5|g=-3\.5/);
   assert.match(gena, /volume=-1dB/);
