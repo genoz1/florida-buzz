@@ -56,16 +56,17 @@ function createElevenTts(cfg, fetcher = fetch) {
     };
   }
 
-  async function synthesizeRaw(text, { speed, previousText, nextText } = {}) {
+  async function synthesizeRaw(text, { speed, previousText, nextText, voiceId } = {}) {
     if (!cfg.generation) throw new Error('Podcast audio generation is disabled');
     if (!cfg.elevenApiKey) throw new Error('ELEVENLABS_API_KEY is required for podcast TTS');
-    if (!cfg.elevenVoiceGeno) throw new Error('PODCASTS_ELEVEN_VOICE_GENO is required');
+    const resolvedVoice = String(voiceId || cfg.elevenVoiceGeno || '').trim();
+    if (!resolvedVoice) throw new Error('PODCASTS_ELEVEN_VOICE_GENO is required');
     // Preserve [audio tags] verbatim — only trim outer whitespace.
     const trimmed = String(text || '').trim();
     if (!trimmed) throw new Error('ElevenLabs TTS text is empty');
 
     const resolvedSpeed = speed != null ? speed : pickSectionSpeed(trimmed);
-    const url = `${TTS_URL}/${cfg.elevenVoiceGeno}?output_format=${encodeURIComponent(cfg.elevenOutputFormat || 'mp3_44100_128')}`;
+    const url = `${TTS_URL}/${resolvedVoice}?output_format=${encodeURIComponent(cfg.elevenOutputFormat || 'mp3_44100_128')}`;
     const headers = {
       'xi-api-key': cfg.elevenApiKey,
       'Content-Type': 'application/json',
@@ -117,7 +118,7 @@ function createElevenTts(cfg, fetcher = fetch) {
       buffer,
       requestId: response.headers.get('request-id') || null,
       model: cfg.elevenModel,
-      voiceId: cfg.elevenVoiceGeno,
+      voiceId: resolvedVoice,
       speed: resolvedSpeed,
       styleNote: pronunciationStyleInstructions(),
     };
@@ -134,6 +135,7 @@ function createElevenTts(cfg, fetcher = fetch) {
         speed: opts.speed != null ? opts.speed : pickSectionSpeed(text),
         previousText: opts.previousText,
         nextText: opts.nextText,
+        voiceId: opts.voiceId,
       });
     },
     async synthesizeText(text, opts = {}) {
