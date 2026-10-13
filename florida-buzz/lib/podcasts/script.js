@@ -118,6 +118,7 @@ ${HOST_BIBLE}
 Outline rules:
 - Always spell Geno. Solo host only — never outline Gena/Diane dual-host segments.
 - Shape a calm casual solo briefing, not a news rundown, dual-host chat, or hype reel — must feel unscripted / reactive, not written.
+- Tone: dad friend sharing what he'd do with his crew — never lecturer, referee, or scolding dad.
 - Segment 1 MUST be Named Open and MUST list Geno Option A beats explicitly before any topic hook:
   1) Welcome to Florida Buzz: Disney
   2) I'm Geno
@@ -128,6 +129,8 @@ Outline rules:
 - After Named Open: Quick Hits (several short sourced topics) → short ${PARTNER_NAME} partner mid-roll → one Deep Dive → CTA / close with Florida Buzz resources + soft ${PARTNER_NAME} show-notes reminder.
 - HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + eighteen months / fifty years + Let's go.
 - HARD BAN outlining spoken “unofficial” or stating Geno's age in years.
+- HARD BAN lecture / referee beats: no “Full stop.”, “the mistake is…”, “you are allowed…”, “you need to…”, bossy don't-chains, “Been around enough…”, or scolding other guests.
+- HARD BAN stacked everybody / somebody hotel-chaos lists (sunscreen / swimsuit / starving / lunchtime-before-you-leave clones). Prefer we / I'd / for my crew observational beats instead.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
 - Plan exactly 1–2 brief "recent park experience" anecdote beats tied to the deep dive (or one quick hit).
@@ -174,7 +177,8 @@ ${ELEVENLABS_AUDIO_TAGS_GUIDANCE}
 Conversation requirements:
 - Target roughly 20–25 minutes of natural solo talk (~3,000–3,800 spoken words; substantive, not rushed; not padded filler).
 - Write a FULL episode script in one pass when possible — do not stop after a short open or a few topics.
-- Sound like a Central Florida park-day dad talking casually — not a presenter summarizing articles, not reading a written essay, not an announcer.
+- Sound like a Central Florida park-day dad talking casually to a friend — not a presenter summarizing articles, not reading a written essay, not an announcer, not a referee.
+- Dad-friend voice: default to we / I'd / for my crew / what I do on our days. Tips sound like preferences and lived habits, never orders.
 - Casual wording: “ok / look / so / yeah / here's the thing…” when natural. Start thoughts the way people talk.
 - Breath groups: FEWER, LONGER Geno: lines (one breath / one thought). Do not split every sentence onto its own line. Use … and — inside lines for micro-pauses.
 - Moderate calm audio tags so eleven_v4 has delivery cues: tag roughly every other Geno: line (more when emotion shifts). Prefer [conversational], [warmly], [chuckles], [nostalgic], [thoughtful], [sighs], [curious]. Avoid [excited] / [upbeat]. A long run of untagged lines sounds flat — that is a script failure.
@@ -191,6 +195,9 @@ Conversation requirements:
 - HARD BAN stating Geno's age in years (no “I'm fifty-three”, no “mid-thirties”).
 - HARD BAN writing a full episode with no square-bracket audio tags after the open.
 - HARD BAN long untagged stretches — after the open, keep calm tags coming on about every other line so TTS does not flatten.
+- HARD BAN lecture / referee phrasing: “Full stop.”, “the mistake is…”, “you are allowed…”, “you need to…”, “Been around enough…”, bossy don't-chains, “the lesson is…”, “so remember…”, scolding other guests or first-timers.
+- HARD BAN stacked everybody / somebody chaos lists — especially hotel-morning stacks like everybody needs sunscreen / somebody can't find a swimsuit / somebody else is starving / somehow it's lunchtime before you leave. If hotel chaos comes up, keep it one observational we/I'd beat, not a scolding parade.
+- Prefer rewrites like: “I'd pack sunscreen for my crew”, “we always misplace something on the way out”, “by the time we leave the hotel I'm already hungry.”
 - Cover approved source topics accurately, but weave them into calm host talk, opinions, and reactions.
 - Clearly distinguish factual information from personal opinion when discussing prices, policies, hours, attraction status, or wait times — those facts must come only from approved/current sources.
 - When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer Geno's take, and invite listeners to visit the Buzz Board.
@@ -254,7 +261,8 @@ async function generateConversation({ aiText, show, episode, outline, sources })
         `You continue an unfinished Florida Buzz: Disney solo podcast script.
 Keep the exact "Geno:" line format.
 Keep moderate calm ElevenLabs audio tags (roughly every other Geno line; e.g. Geno: [chuckles] …, Geno: [conversational] …). Prefer [warmly], [conversational], [chuckles], [laughs], [sighs], [nostalgic], [thoughtful]. Avoid [excited] / [upbeat]. Do not stack tags. Do not continue with long untagged stretches.
-Write fewer, longer breath-group lines with … and — for micro-pauses. Casual dad-talk wording — no announcer polish, never say “unofficial,” never state Geno's age in years.
+Write fewer, longer breath-group lines with … and — for micro-pauses. Casual dad-friend wording — we / I'd / for my crew — no announcer polish, no lecture or referee voice, never say “unofficial,” never state Geno's age in years.
+HARD BAN “Full stop.”, “the mistake is…”, “you are allowed…”, bossy don't-chains, “Been around enough…”, scolding guests, and stacked everybody/somebody hotel-chaos lists (sunscreen/swimsuit/starving/lunchtime clones).
 Do not restart the episode or repeat the named open.
 Continue naturally from the last lines until the full episode reaches about 20–25 minutes (~3000–3800 spoken words).
 Preserve solo casual host style (quick hits + deep dive + CTA) and Florida Buzz source accuracy rules.

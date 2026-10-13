@@ -387,6 +387,15 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /Undercover Tourist/i);
   assert.match(HOST_BIBLE, /partner mid-roll/i);
   assert.match(HOST_BIBLE, /show notes/i);
+  assert.match(HOST_BIBLE, /Dad-friend|dad friend/i);
+  assert.match(HOST_BIBLE, /lecture|referee/i);
+  assert.match(HOST_BIBLE, /Full stop/i);
+  assert.match(HOST_BIBLE, /the mistake is/i);
+  assert.match(HOST_BIBLE, /you are allowed/i);
+  assert.match(HOST_BIBLE, /everybody \/ somebody|everybody \/ somebody chaos|stacked everybody/i);
+  assert.match(HOST_BIBLE, /sunscreen/i);
+  assert.match(HOST_BIBLE, /for my crew/i);
+  assert.match(HOST_BIBLE, /we \/ I'd|I'd \/ for my crew/i);
   const show = { title: 'Florida Buzz: Disney' };
   const episode = { title: 'Week in the parks', description: 'News and tips' };
   const sources = [
@@ -410,6 +419,9 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(outline.system, /Partner mid-roll/i);
   assert.match(outline.system, /Undercover Tourist/i);
   assert.match(outline.system, /Partner outro/i);
+  assert.match(outline.system, /dad friend|Dad-friend/i);
+  assert.match(outline.system, /HARD BAN lecture|HARD BAN stacked everybody/i);
+  assert.match(outline.system, /sunscreen/i);
   assert.doesNotMatch(outline.system, /Lead: Diane/);
   assert.match(outline.user, /solo Geno|Geno Option A/i);
   assert.match(outline.user, /Undercover Tourist/i);
@@ -441,6 +453,11 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /Undercover Tourist/i);
   assert.match(conversation.system, /REQUIRED mid-episode partner mention/i);
   assert.match(conversation.system, /Soft outro/i);
+  assert.match(conversation.system, /Dad-friend|dad-friend|for my crew/i);
+  assert.match(conversation.system, /HARD BAN lecture|HARD BAN stacked everybody/i);
+  assert.match(conversation.system, /Full stop/i);
+  assert.match(conversation.system, /sunscreen/i);
+  assert.match(conversation.system, /swimsuit/i);
   assert.match(conversation.user, /Undercover Tourist/i);
   assert.match(conversation.user, /Partner mid-roll direction/i);
   assert.match(conversation.user, /quick hits \+ short Undercover Tourist mid-roll/i);
@@ -474,6 +491,8 @@ test('outline and conversation prompts require solo Geno structure', () => {
   assert.match(conversation.system, /\[conversational\]/);
   assert.match(conversation.system, /breath groups|Breath groups/i);
   assert.match(conversation.system, /HARD BAN saying “unofficial”/i);
+  assert.match(conversation.system, /HARD BAN lecture|HARD BAN stacked everybody/i);
+  assert.match(conversation.system, /for my crew/i);
 });
 
 test('conversation token budget supports a ~20–25 minute script', () => {
