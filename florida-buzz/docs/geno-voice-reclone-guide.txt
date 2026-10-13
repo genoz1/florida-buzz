@@ -1,18 +1,30 @@
-Geno Professional Voice Clone — status
-======================================
+Geno voice clones — clear vs boxy
+=================================
 
-Geno 3 (n715fGrdv64E0c9urL7h) is the close-mic PVC.
-Geno 2 (5tg8WQNhwRAIGFxz4EFe) was roomy/distant — do not use.
+You cannot train a PVC on “TTS beginning good / TTS ending bad.”
+ElevenLabs only learns from the source recordings you upload.
 
-Production default remains Instant Geno (bg7PC2IzyIDwYgytMiW1) until you
-flip PODCASTS_ELEVEN_VOICE_GENO / PODCASTS_ELEVEN_VOICE_ID to Geno 3.
+Geno3 (n715fGrdv64E0c9urL7h) was trained on 4 takes (~30 min). Those takes
+already carry small-room / boxy low-mids, so generations drift thick and
+muffled — especially later in a line.
 
-Presence FX is warm on purpose: low-mid body, cut tinny ~3 kHz, soft air cut.
-Speaker boost stays off by default so PVC does not go thin/metallic.
+WHAT TO DO FOR GENO4
+1. Use the curated clear pack (clearest slices + best overall take):
+   agent-samples/geno4-clear-train/geno4_clear_train_pack.zip
+2. ElevenLabs → Professional Voice Clone → name it Geno4.
+3. Upload ONLY that pack. Do not re-add the old full Geno3 takes.
+4. After it finishes, send the new voice_id.
 
-RECORDING RULES (if you re-clone again)
-1. Phone or USB mic 6–10 inches from your mouth (same distance the whole time).
-2. Quiet room — closet with clothes is fine. No echo / kitchen / open room.
-3. Speak at normal conversation volume — not “podcast host” projection.
-4. Stay on-axis; don’t turn away mid-sentence.
-5. 10–30 minutes total of clean speech (more is better for PVC).
+TTS DEFAULTS AFTER GENO4
+- stability 0.4–0.5
+- similarity 0.65–0.75 (too high locks onto room)
+- speaker boost OFF
+- style 0
+
+UNTIL THEN
+Production stays Instant Geno (bg7PC2IzyIDwYgytMiW1).
+
+IF YOU RECORD NEW AUDIO
+- Mic 6–10 inches, quiet soft room (not a closet / bathroom / car).
+- Normal conversation volume, on-axis.
+- Prefer 15–30 min of the clear tone you like at the start of lines.
