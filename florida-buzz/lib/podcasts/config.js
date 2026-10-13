@@ -5,9 +5,11 @@ const DEFAULT_FAL_TTS_ENDPOINT = 'fal-ai/gemini-tts';
 const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
 const DEFAULT_FAL_SOLO_VOICE = 'Aoede';
 
-// ElevenLabs solo Geno (production default).
+// ElevenLabs Geno — Professional Voice Clone "Geno 2" (less Instant-Voice polish).
 const DEFAULT_ELEVEN_MODEL = 'eleven_v4';
-const DEFAULT_ELEVEN_VOICE_GENO = 'bg7PC2IzyIDwYgytMiW1';
+const DEFAULT_ELEVEN_VOICE_GENO = '5tg8WQNhwRAIGFxz4EFe'; // Geno 2 (professional)
+const DEFAULT_ELEVEN_VOICE_GENO_LEGACY_INSTANT = 'bg7PC2IzyIDwYgytMiW1'; // Instant Voice Clone
+const DEFAULT_ELEVEN_VOICE_GENA = 'hGQkZQUA5RiOXIw7P9iO'; // Kiora — Gena Bakeoff (professional)
 const DEFAULT_ELEVEN_OUTPUT_FORMAT = 'mp3_44100_128';
 
 // Legacy fal multi-speaker presets (only used if PODCASTS_TTS_PROVIDER=fal with dual mode).
@@ -41,9 +43,16 @@ function resolveTtsProvider(env = {}) {
   return 'elevenlabs';
 }
 
+function resolveHostMode(env = {}) {
+  const raw = String(env.PODCASTS_HOST_MODE || 'solo').trim().toLowerCase();
+  if (raw === 'dual' || raw === 'dual_msm' || raw === 'msm') return 'dual';
+  return 'solo';
+}
+
 function config(env = process.env) {
   const temperature = Number(env.PODCASTS_TTS_TEMPERATURE ?? 0.9);
   const ttsProvider = resolveTtsProvider(env);
+  const hostMode = resolveHostMode(env);
   // ElevenLabs solo chunks stay under reliable request sizes; fal can take larger packs.
   const defaultSectionChars = ttsProvider === 'elevenlabs' ? 4000 : 5600;
   const maxChars = Number(env.PODCASTS_TTS_SECTION_CHARS || defaultSectionChars);
@@ -54,6 +63,10 @@ function config(env = process.env) {
   const elevenVoiceGeno = normalizeVoice(
     env.PODCASTS_ELEVEN_VOICE_GENO || env.PODCASTS_ELEVEN_VOICE_ID || env.ELEVENLABS_VOICE_GENO,
     DEFAULT_ELEVEN_VOICE_GENO
+  );
+  const elevenVoiceGena = normalizeVoice(
+    env.PODCASTS_ELEVEN_VOICE_GENA || env.ELEVENLABS_VOICE_GENA,
+    DEFAULT_ELEVEN_VOICE_GENA
   );
   return Object.freeze({
     // Public directory/show/episode/RSS are on unless explicitly disabled.
@@ -70,10 +83,11 @@ function config(env = process.env) {
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     ownerEmail: env.PODCASTS_OWNER_EMAIL || 'floridabuzzonline@gmail.com',
     ttsProvider,
-    hostMode: 'solo',
+    hostMode,
     elevenApiKey: env.ELEVENLABS_API_KEY || null,
     elevenModel: env.PODCASTS_ELEVEN_MODEL || env.ELEVENLABS_MODEL_ID || DEFAULT_ELEVEN_MODEL,
     elevenVoiceGeno,
+    elevenVoiceGena,
     elevenOutputFormat: env.PODCASTS_ELEVEN_OUTPUT_FORMAT || DEFAULT_ELEVEN_OUTPUT_FORMAT,
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,
@@ -102,6 +116,7 @@ function config(env = process.env) {
 module.exports = {
   config,
   resolveTtsProvider,
+  resolveHostMode,
   EPISODE_STATUSES,
   DISNEY_SHOW_SLUG,
   DEFAULT_FAL_TTS_ENDPOINT,
@@ -111,5 +126,7 @@ module.exports = {
   DEFAULT_DIANE_VOICE,
   DEFAULT_ELEVEN_MODEL,
   DEFAULT_ELEVEN_VOICE_GENO,
+  DEFAULT_ELEVEN_VOICE_GENO_LEGACY_INSTANT,
+  DEFAULT_ELEVEN_VOICE_GENA,
   DEFAULT_ELEVEN_OUTPUT_FORMAT,
 };
