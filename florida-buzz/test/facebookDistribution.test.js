@@ -9,6 +9,7 @@ const {
   decideFacebookDistribution,
   evaluateFacebookCadence,
   getFacebookCadenceConfig,
+  isFacebookContentFresh,
   isFacebookTopicAllowed,
   isNonArticleFacebookAllowed,
   isParkCruiseTopic,
@@ -213,6 +214,24 @@ test('applyFacebookFeedDecision skips topics permanently and defers cadence', as
   assert.equal(skip.action, 'skipped');
   assert.deepEqual(updates[0], { fb_posted: true });
 
+  const seasonal = await applyFacebookFeedDecision(
+    client,
+    'july-eagle',
+    { ok: false, reason: 'seasonal_mismatch', detail: 'out of season' },
+    { logger: { log() {}, error() {} } }
+  );
+  assert.equal(seasonal.action, 'skipped');
+  assert.deepEqual(updates[1], { fb_posted: true });
+
+  const stale = await applyFacebookFeedDecision(
+    client,
+    'old-kaya-brunch',
+    { ok: false, reason: 'stale_news', detail: 'too old' },
+    { logger: { log() {}, error() {} } }
+  );
+  assert.equal(stale.action, 'skipped');
+  assert.deepEqual(updates[2], { fb_posted: true });
+
   const defer = await applyFacebookFeedDecision(
     client,
     'magic-kingdom-tip',
@@ -220,7 +239,7 @@ test('applyFacebookFeedDecision skips topics permanently and defers cadence', as
     { logger: { log() {}, error() {} } }
   );
   assert.equal(defer.action, 'deferred');
-  assert.equal(updates.length, 1, 'cadence deferral must not mark fb_posted');
+  assert.equal(updates.length, 3, 'cadence deferral must not mark fb_posted');
 
   const post = await applyFacebookFeedDecision(
     client,
@@ -275,4 +294,64 @@ test('fb_posted backfill migration prevents re-queuing the back catalog', () => 
   );
   assert.match(migration, /update public\.articles/i);
   assert.match(migration, /fb_posted\s*=\s*true/i);
+});
+
+test('seasonal Independence Day captions are blocked outside mid-June/mid-July', () => {
+  const julyContent = {
+    title: "Walt Disney World's Bald Eagles Get a 4th of July Salute",
+    caption: 'Walt Disney World gave an official Independence Day salute to the bald eagle',
+    published_at: '2026-07-05T16:31:41Z',
+    is_evergreen: false,
+  };
+  const october = new Date('2026-10-13T20:00:00Z');
+  const july = new Date('2026-07-04T12:00:00Z');
+  assert.equal(isFacebookContentFresh(julyContent, {}, october).ok, false);
+  assert.equal(isFacebookContentFresh(julyContent, {}, october).reason, 'seasonal_mismatch');
+  assert.equal(isFacebookContentFresh(julyContent, {}, july).ok, true);
+});
+
+test('stale non-evergreen news older than 21 days is blocked on Facebook', () => {
+  const now = new Date('2026-10-13T20:00:00Z');
+  const stale = {
+    title: 'Some old park tip',
+    caption: 'An old story',
+    published_at: '2026-07-05T16:00:00Z',
+    is_evergreen: false,
+  };
+  const fresh = {
+    title: 'Nomad Lounge reservations',
+    caption: 'Reservations start in November',
+    published_at: '2026-10-12T15:00:00Z',
+    is_evergreen: false,
+  };
+  const evergreenOld = {
+    title: 'Beach guide',
+    caption: 'Evergreen beach tips',
+    published_at: '2026-07-05T16:00:00Z',
+    is_evergreen: true,
+  };
+  assert.equal(isFacebookContentFresh(stale, {}, now).ok, false);
+  assert.equal(isFacebookContentFresh(stale, {}, now).reason, 'stale_news');
+  assert.equal(isFacebookContentFresh(fresh, {}, now).ok, true);
+  assert.equal(isFacebookContentFresh(evergreenOld, {}, now).ok, true);
+});
+
+test('decideFacebookDistribution permanently skips stale seasonal news', async () => {
+  const decision = await decideFacebookDistribution(
+    {
+      category: 'theme-parks',
+      title: 'Bald Eagles Independence Day',
+      caption: 'Independence Day salute to the bald eagle',
+      slug: 'bald-eagles-at-walt-disney-world-independence-day-2026',
+      published_at: '2026-07-05T16:31:41Z',
+      is_evergreen: false,
+    },
+    {
+      now: new Date('2026-10-13T20:00:00Z'),
+      recentSuccesses: [],
+      env: {},
+    }
+  );
+  assert.equal(decision.ok, false);
+  assert.equal(decision.reason, 'seasonal_mismatch');
 });

@@ -480,6 +480,8 @@ async function attemptGuideFacebookPost({
       dek,
       caption: fb_caption,
       slug,
+      published_at: new Date().toISOString(),
+      is_evergreen: true,
     },
     { client: supabase, postsThisRun }
   );
