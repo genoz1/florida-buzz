@@ -6,9 +6,10 @@ Isolated podcast publishing for The Florida Buzz. Public pages are on by default
 
 Default audio generation is **solo Geno** via ElevenLabs `eleven_v4` text-to-speech (not fal Gemini multi-speaker).
 
-- Host: Geno Instant Voice Clone `bg7PC2IzyIDwYgytMiW1`
-- Script shape: Named Open (Geno Option A) → Quick Hits → one Deep Dive → CTA
-- Named open (after announcer bumper on `intro_audio_url`): welcome / I'm Geno / eighteen months old · over fifty years / let's go (never say “unofficial”; never state age in years)
+- Host: Geno 11 Instant Voice Clone `EK1vMGRoEG4LXcQRzXam`
+- Script shape: Named Open (Geno Option A) → 4–6 Disney World news stories (varied length) → short partner mid-roll once → close
+- Show identity: Walt Disney World **news + commentary** roundup (not a vacation-planning seminar; not fake dual-host chat)
+- Named open (after announcer bumper on `intro_audio_url`): welcome / I'm your host Geno / thank you / what's happening at Disney World / let's go (never say “unofficial”; never state age in years; longevity bio is rare, not required)
 - TTS: calm Geno settings (low stability, style 0, no speaker boost) + per-section variable speed + wider breath gaps between sections
 - Announcer-only bumper v7 stays on `podcast_shows.intro_audio_url` and is prepended by the existing audio pipeline
 
@@ -21,7 +22,7 @@ PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=true
 ELEVENLABS_API_KEY=<set securely in DO; never commit>
 PODCASTS_TTS_PROVIDER=elevenlabs
-PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1
+PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam
 ```
 
 `PODCASTS_ELEVEN_VOICE_ID` is accepted as an alias for `PODCASTS_ELEVEN_VOICE_GENO`.
@@ -66,9 +67,9 @@ Other optional overrides:
 PODCASTS_AUDIO_BUCKET=podcast-audio
 PODCASTS_ARTWORK_BUCKET=podcast-artwork
 PODCASTS_MAX_UPLOAD_MB=80
-PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=16000
-PODCASTS_SCRIPT_MIN_WORDS=3000
-PODCASTS_SCRIPT_TARGET_MAX_WORDS=3800
+PODCASTS_SCRIPT_MAX_OUTPUT_TOKENS=12000
+PODCASTS_SCRIPT_MIN_WORDS=1800
+PODCASTS_SCRIPT_TARGET_MAX_WORDS=2400
 PODCASTS_SCRIPT_TIMEOUT_MS=420000
 PODCASTS_SCRIPT_CONTINUE_ATTEMPTS=2
 PODCASTS_FAL_TTS_ENDPOINT=fal-ai/gemini-tts
@@ -78,7 +79,7 @@ PODCASTS_FAL_POLL_INTERVAL_MS=2000
 PODCASTS_FAL_SECTION_RETRIES=2
 ```
 
-Each weekly draft run creates **exactly one** standalone ~20–25 minute episode for the current slot (Tuesday run → Tuesday episode, Friday run → Friday episode). Never two episodes in one run, and never Part 1/Part 2 of one show. With generation + auto-preview on, private audio builds itself so you can listen before publishing.
+Each weekly draft run creates **exactly one** standalone ~12–15 minute episode for the current slot (Tuesday run → Tuesday episode, Friday run → Friday episode). Never two episodes in one run, and never Part 1/Part 2 of one show. With generation + auto-preview on, private audio builds itself so you can listen before publishing.
 
 Reuses existing `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `OPENAI_API_KEY`. New path also needs `ELEVENLABS_API_KEY`.
 
@@ -109,7 +110,7 @@ PODCASTS_GENERATION_ENABLED=true          # enables paid TTS + auto private prev
 PODCASTS_AUTO_PREVIEW_ENABLED=true        # default; set false for click-only TTS
 ELEVENLABS_API_KEY=sk_***                 # required for ElevenLabs path
 PODCASTS_TTS_PROVIDER=elevenlabs          # or omit for auto-when-key-present
-PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1
+PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam
 ```
 
 Keep schedule **auto_publish** off in admin while you listen to previews. Rotate any ElevenLabs key that was pasted into chat.
@@ -137,15 +138,15 @@ Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`.
 
 ## Host (full episodes)
 
-**Geno** is the solo casual host. Scripts use `Geno:` lines only. Delivery is calm conversational (not announcer/hype).
+**Geno** is the solo news-table host. Scripts use `Geno:` lines only. Delivery is calm conversational commentary about Disney World news (not announcer/hype, not vacation-planning lectures).
 
 ### Required show open (every full episode)
 
 After the announcer bumper, first spoken lines must be Geno Option A:
 
-> Ok, welcome to Florida Buzz: Disney. I'm Geno. I've been going to Walt Disney World since I was eighteen months old — over fifty years ago — and I'm here with park news and real planning from The Florida Buzz. Here's what we're locking in today. Let's go.
+> Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. Here's what's happening at Disney World. Let's go.
 
-Then: quick hits → one deep dive → Florida Buzz CTA / close.
+Then: 4–6 news story segments (with `=== SEGMENT: story-N ===` markers for per-story TTS) → short partner mid-roll once → Florida Buzz CTA / close.
 
 ### Drive listeners to TheFloridaBuzz.com
 
@@ -153,13 +154,13 @@ Naturally reference verified Florida Buzz resources. Say “The Florida Buzz dot
 
 ## Admin dashboard steps (after deploy)
 
-Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_KEY`, `PODCASTS_TTS_PROVIDER=elevenlabs` or omit for auto, `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1`). Apply the solo-Geno hosts migration (or run `node scripts/podcast-upload-cover.js` so RSS hosts = Geno).
+Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_KEY`, `PODCASTS_TTS_PROVIDER=elevenlabs` or omit for auto, `PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam`). Apply the solo-Geno hosts migration (or run `node scripts/podcast-upload-cover.js` so RSS hosts = Geno).
 
 1. Open `https://thefloridabuzz.com/admin/podcasts` (Basic auth).
 2. Turn **weekly drafts** on (and leave auto-publish off). With `PODCASTS_GENERATION_ENABLED=true`, Tue/Fri cron (or **Run weekly draft now**) creates one standalone script and **starts private ElevenLabs preview in the background**.
 3. Open that episode. If status is `generating_audio`, wait — do not need to click Generate private preview unless auto-preview was disabled or TTS failed.
-4. If the script box is empty/scaffold: click **Save / generate script** and wait for a full solo Geno script (~3,000+ words), then click **Generate private preview** (scaffold scripts never auto-TTS).
-5. Confirm Geno Option A open + quick hits + deep dive + CTA (`Geno:` lines only).
+4. If the script box is empty/scaffold: click **Save / generate script** and wait for a full solo Geno script (~1,800–2,400 words / ~12–15 min), then click **Generate private preview** (scaffold scripts never auto-TTS).
+5. Confirm Geno Option A open + 4–6 news stories + mid-roll + CTA (`Geno:` lines only; news-table voice, not planner tips).
 6. When status is `preview_ready`, play/download the private audio and listen.
 7. **Approve audio** → **Publish now** only when satisfied (never auto-publishes).
 

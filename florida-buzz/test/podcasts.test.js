@@ -371,8 +371,9 @@ test('generateConversation rejects scripts that skip the named show open', async
   );
 });
 
-test('full-episode prompts keep solo Geno host bible and structure', () => {
-  assert.equal(HOST_STYLE, 'solo_casual');
+test('full-episode prompts keep solo Geno news-roundup host bible and structure', () => {
+  assert.equal(HOST_STYLE, 'news_table');
+  assert.match(HOST_BIBLE, /NEWS \+ COMMENTARY|news roundup|across from/i);
   assert.match(HOST_BIBLE, /Geno/);
   assert.match(HOST_BIBLE, /eighteen months/i);
   assert.match(HOST_BIBLE, /fifty years/i);
@@ -383,8 +384,9 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /Let's go/i);
   assert.match(HOST_BIBLE, /maybe you don't|soft-bossy|if you… maybe you/i);
   assert.match(HOST_BIBLE, /HARD BAN repeating the eighteen-months|HARD BAN saying the eighteen-months/i);
-  assert.match(HOST_BIBLE, /Quick Hits|quick hits/i);
-  assert.match(HOST_BIBLE, /Deep Dive|deep dive/i);
+  assert.match(HOST_BIBLE, /Four to six NEWS STORIES|4–6|story-\*/i);
+  assert.match(HOST_BIBLE, /NO Deep Dive|not a vacation-planning/i);
+  assert.match(HOST_BIBLE, /SEGMENT:/i);
   assert.match(HOST_BIBLE, /HARD BAN/i);
   assert.match(HOST_BIBLE, /Gena|Diane/);
   assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open|do NOT cold-open/i);
@@ -397,17 +399,17 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /Undercover Tourist/i);
   assert.match(HOST_BIBLE, /partner mid-roll/i);
   assert.match(HOST_BIBLE, /show notes/i);
-  assert.match(HOST_BIBLE, /Dad-friend|dad friend/i);
+  assert.match(HOST_BIBLE, /across from|talking about the news|Nomad Lounge/i);
   assert.match(HOST_BIBLE, /lecture|referee/i);
   assert.match(HOST_BIBLE, /Full stop/i);
   assert.match(HOST_BIBLE, /the mistake is/i);
   assert.match(HOST_BIBLE, /you are allowed/i);
   assert.match(HOST_BIBLE, /everybody \/ somebody|everybody \/ somebody chaos|stacked everybody/i);
   assert.match(HOST_BIBLE, /sunscreen/i);
-  assert.match(HOST_BIBLE, /for my crew/i);
-  assert.match(HOST_BIBLE, /we \/ I'd|I'd \/ for my crew/i);
+  assert.match(HOST_BIBLE, /vacation-planning|vacation planning/i);
+  assert.match(HOST_BIBLE, /mixed feelings/i);
   const show = { title: 'Florida Buzz: Disney' };
-  const episode = { title: 'Week in the parks', description: 'News and tips' };
+  const episode = { title: 'Week in the parks', description: 'Disney World news roundup' };
   const sources = [
     {
       included: true,
@@ -420,8 +422,8 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(outline.system, /Never invent breaking-news/);
   assert.match(outline.system, /Geno/);
   assert.match(outline.system, /Named Open/i);
-  assert.match(outline.system, /Quick Hits/i);
-  assert.match(outline.system, /Deep Dive/i);
+  assert.match(outline.system, /4–6 story|Story 1/i);
+  assert.match(outline.system, /NEWS \+ COMMENTARY|news roundup|across the table/i);
   assert.match(outline.system, /I'm Geno|I\'m Geno|your host Geno/i);
   assert.match(outline.system, /Florida Buzz Disney podcast|welcome to Florida Buzz: Disney/i);
   assert.match(outline.system, /maybe you don't|soft-bossy|if you… maybe you/i);
@@ -430,8 +432,7 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(outline.system, /Partner mid-roll/i);
   assert.match(outline.system, /Undercover Tourist/i);
   assert.match(outline.system, /Partner outro/i);
-  assert.match(outline.system, /dad friend|Dad-friend/i);
-  assert.match(outline.system, /HARD BAN lecture|HARD BAN stacked everybody/i);
+  assert.match(outline.system, /HARD BAN vacation-planning|HARD BAN lecture/i);
   assert.match(outline.system, /sunscreen/i);
   assert.doesNotMatch(outline.system, /Lead: Diane/);
   assert.match(outline.user, /solo Geno|Geno Option A/i);
@@ -439,15 +440,14 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   const conversation = buildConversationPrompt({
     show,
     episode,
-    outline: '1. Named Open\n2. Quick Hits\n3. Deep Dive\nAnecdote: mobile order mixup',
+    outline: '1. Named Open\n2. Story 1\n3. Story 2\n4. Mid-roll\n5. Close',
     sources,
   });
-  assert.match(conversation.system, /not a presenter summarizing articles|not presenters summarizing articles/i);
-  assert.match(outline.system, /timeless composite/i);
+  assert.match(conversation.system, /not a news anchor|NOT a news anchor|across from someone/i);
   assert.doesNotMatch(conversation.user, /AI-generated hosts/i);
   assert.match(conversation.user, /not affiliated with/i);
   assert.match(conversation.system, /The Florida Buzz dot com/i);
-  assert.match(conversation.system, /2–4 natural Florida Buzz references/);
+  assert.match(conversation.system, /1–2 natural Florida Buzz references/);
   assert.match(conversation.system, /never read long URLs/i);
   assert.match(conversation.system, /STANDALONE EPISODE RULE/i);
   assert.match(conversation.system, /Part 1/);
@@ -459,22 +459,22 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /ElevenLabs audio tags/i);
   assert.match(conversation.system, /\[warmly\]/);
   assert.match(conversation.system, /\[chuckles\]/);
-  assert.match(conversation.system, /Moderate calm audio tags|moderate calm|every other Geno/i);
+  assert.match(conversation.system, /Light calm audio tags|light calm|every other Geno/i);
   assert.match(conversation.system, /audio tags so eleven_v4|Breath groups|every other/i);
   assert.match(conversation.system, /Partner mid-roll/i);
   assert.match(conversation.system, /Undercover Tourist/i);
   assert.match(conversation.system, /REQUIRED mid-episode partner mention/i);
   assert.match(conversation.system, /Soft outro/i);
-  assert.match(conversation.system, /Dad-friend|dad-friend|for my crew/i);
-  assert.match(conversation.system, /HARD BAN lecture|HARD BAN stacked everybody/i);
+  assert.match(conversation.system, /Nomad Lounge|mixed feelings|across from someone/i);
+  assert.match(conversation.system, /HARD BAN lecture|HARD BAN vacation-planning/i);
+  assert.match(conversation.system, /SEGMENT:/);
   assert.match(conversation.system, /Full stop/i);
   assert.match(conversation.system, /sunscreen/i);
   assert.match(conversation.system, /swimsuit/i);
   assert.match(conversation.user, /Undercover Tourist/i);
   assert.match(conversation.user, /Partner mid-roll direction/i);
-  assert.match(conversation.user, /quick hits \+ short Undercover Tourist mid-roll/i);
+  assert.match(conversation.user, /4–6 story|story segments/i);
   assert.match(outline.system, /ONE standalone episode/i);
-  assert.match(outline.system, /Resource:/);
   assert.match(conversation.user, /\/wait-times/);
   assert.match(conversation.user, /\/planner/);
   assert.match(conversation.user, /\/dining/);
@@ -486,38 +486,56 @@ test('outline and conversation prompts require solo Geno structure', () => {
   const sources = [];
   const outline = buildOutlinePrompt({ show, episode, sources });
   assert.match(outline.system, /Named Open/i);
-  assert.match(outline.system, /Quick Hits/i);
-  assert.match(outline.system, /Deep Dive/i);
+  assert.match(outline.system, /4–6 story|Story 1|story segments/i);
+  assert.match(outline.system, /NEWS \+ COMMENTARY|news roundup/i);
   assert.doesNotMatch(outline.system, /Lead: Gena/);
   assert.doesNotMatch(outline.system, /Lead: Diane/);
   const conversation = buildConversationPrompt({
     show,
     episode,
-    outline: '1. Named Open\n2. Quick Hits\n3. Deep Dive',
+    outline: '1. Named Open\n2. Story 1\n3. Close',
     sources,
   });
   assert.match(conversation.system, /SOLO STRUCTURE/i);
   assert.match(conversation.system, /Geno:/);
   assert.doesNotMatch(conversation.system, /Support host mostly short comments/);
-  assert.match(HOST_BIBLE, /solo casual|solo_casual|calm casual/i);
+  assert.match(HOST_BIBLE, /news_table|news roundup|NEWS \+ COMMENTARY/i);
   assert.match(conversation.system, /\[conversational\]/);
   assert.match(conversation.system, /breath groups|Breath groups/i);
   assert.match(conversation.system, /HARD BAN saying “unofficial”/i);
-  assert.match(conversation.system, /HARD BAN lecture|HARD BAN stacked everybody/i);
-  assert.match(conversation.system, /for my crew/i);
+  assert.match(conversation.system, /HARD BAN lecture|HARD BAN vacation-planning/i);
+  assert.match(conversation.system, /across from someone|Nomad Lounge/i);
 });
 
-test('conversation token budget supports a ~20–25 minute script', () => {
-  assert.ok(CONVERSATION_MAX_OUTPUT_TOKENS >= 12000);
-  assert.ok(CONVERSATION_MIN_WORDS >= 2500);
-  assert.ok(CONVERSATION_MIN_WORDS <= 3500);
+
+test('splitScriptIntoSections prefers === SEGMENT markers for per-story TTS', () => {
+  const script = [
+    '=== SEGMENT: open ===',
+    'Geno: [conversational] Welcome to the Florida Buzz Disney podcast. I\'m your host Geno, and thank you for joining us. Let\'s go.',
+    '=== SEGMENT: story-1 ===',
+    'Geno: [thoughtful] So Disney made a change at Nomad Lounge.',
+    '=== SEGMENT: close ===',
+    'Geno: [warmly] That\'s it for today — find the stories at The Florida Buzz dot com.',
+  ].join('\n');
+  const sections = splitScriptIntoSections(script, 4000);
+  assert.equal(sections.length, 3);
+  assert.match(sections[0], /Welcome to the Florida Buzz/);
+  assert.match(sections[1], /Nomad Lounge/);
+  assert.doesNotMatch(sections[0], /SEGMENT/);
+  assert.equal(formatScriptForTts(sections[1]), '[thoughtful] So Disney made a change at Nomad Lounge.');
+});
+
+test('conversation token budget supports a ~12–15 minute script', () => {
+  assert.ok(CONVERSATION_MAX_OUTPUT_TOKENS >= 8000);
+  assert.ok(CONVERSATION_MIN_WORDS >= 1600);
+  assert.ok(CONVERSATION_MIN_WORDS <= 2200);
   const conversation = buildConversationPrompt({
     show: { title: 'Florida Buzz: Disney' },
     episode: { title: 'Test', description: 'Desc' },
     outline: '1. Open',
     sources: [],
   });
-  assert.match(conversation.system, /3,000–3,800 spoken words/i);
+  assert.match(conversation.system, /1,800–2,400 spoken words/i);
   assert.match(conversation.user, /Length requirement/i);
 });
 
@@ -552,7 +570,7 @@ test('short AI scripts are rejected and continuations can append', async () => {
         outline: '1. Open',
         sources: [],
       }),
-    /too short for a ~20–25 minute episode/i
+    /too short for a ~12–15 minute episode/i
   );
   assert.ok(calls >= 2);
 });
@@ -841,13 +859,12 @@ test('fal fallback builds solo Geno single-speaker input', () => {
   assert.equal(input.voice, 'Aoede');
   assert.doesNotMatch(input.prompt, /^Geno:/m);
   assert.match(input.prompt, /Hello from the parks/);
-  assert.match(input.style_instructions, /Solo casual|solo casual/i);
+  assert.match(input.style_instructions, /news-table|across from someone|Solo Geno news/i);
   assert.match(input.style_instructions, /Geno/);
-  assert.match(input.style_instructions, /quick hits/i);
-  assert.match(input.style_instructions, /deep dive/i);
+  assert.match(input.style_instructions, /4–6 news stories|news stories/i);
   assert.match(input.style_instructions, /Florida Buzz Disney podcast|thank you for joining/i);
   assert.match(input.style_instructions, /never say unofficial/i);
-  assert.match(input.style_instructions, /maybe-you|for my crew/i);
+  assert.match(input.style_instructions, /maybe-you|vacation-planning/i);
 });
 
 test('elevenlabs TTS refuses when generation disabled', async () => {
