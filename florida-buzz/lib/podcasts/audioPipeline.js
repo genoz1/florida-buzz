@@ -154,6 +154,49 @@ async function concatMp3Buffers(buffers, ffmpegPath, { varySectionGaps = true } 
 }
 
 /**
+ * Pull quiet / “distant” PVC patches forward without adding radio polish.
+ * highpass → light presence shelf → gentle compression → tight loudnorm.
+ */
+async function applyVoicePresence(buffer, ffmpegPath) {
+  if (!buffer?.length) throw new Error('Episode audio is empty');
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-presence-'));
+  try {
+    const inPath = path.join(dir, 'in.mp3');
+    const outPath = path.join(dir, 'out.mp3');
+    await fsp.writeFile(inPath, buffer);
+    await runFfmpeg(ffmpegPath, [
+      '-y',
+      '-i',
+      inPath,
+      '-af',
+      [
+        'highpass=f=70',
+        'equalizer=f=3200:t=q:w=0.9:g=2.5',
+        'equalizer=f=200:t=q:w=1.0:g=-2',
+        'acompressor=threshold=-22dB:ratio=3:attack=8:release=120:makeup=3.5',
+        'loudnorm=I=-16:TP=-1.5:LRA=6',
+      ].join(','),
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      '96k',
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
+      outPath,
+    ]);
+    const out = await fsp.readFile(outPath);
+    return out.length > 500 ? out : buffer;
+  } catch (err) {
+    console.warn('[podcasts] voice presence FX skipped:', err.message);
+    return buffer;
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Re-encode masters for storage. Long ~30–45 minute episodes at 192kbps exceed
  * Supabase Free global upload limit (50MB). Voice podcasts are fine at 96k mono.
  */
@@ -482,6 +525,7 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
 
       let master = await concatMp3Buffers(buffers, ffmpegPath);
       let introAttached = false;
+      let presenceApplied = false;
       jobResult = {
         ...jobResult,
         heartbeat_at: new Date().toISOString(),
@@ -489,6 +533,17 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
         section: sections.length,
       };
       await store.updateJob(job.id, { result: jobResult, section_index: sections.length - 1 });
+      // Presence FX on TTS body only (before bumper) — pulls PVC “distant” dips forward.
+      if (provider === 'elevenlabs' && cfg.voicePresenceFx !== false) {
+        jobResult = {
+          ...jobResult,
+          heartbeat_at: new Date().toISOString(),
+          phase: 'presence',
+        };
+        await store.updateJob(job.id, { result: jobResult });
+        master = await applyVoicePresence(master, ffmpegPath);
+        presenceApplied = true;
+      }
       try {
         const show =
           (typeof store.getShowById === 'function' && episode.show_id
@@ -499,12 +554,14 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
         if (intro?.length) {
           master = await prependAudioBuffer(intro, master, ffmpegPath);
           introAttached = true;
-        } else {
+        } else if (!presenceApplied) {
           master = await encodePodcastMaster(master, ffmpegPath);
         }
       } catch (introErr) {
         console.warn('[podcasts] intro prepend skipped:', introErr.message);
-        master = await encodePodcastMaster(master, ffmpegPath);
+        if (!presenceApplied) {
+          master = await encodePodcastMaster(master, ffmpegPath);
+        }
       }
       jobResult = {
         ...jobResult,
@@ -512,6 +569,7 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
         phase: 'upload',
         master_bytes: master.length,
         intro_attached: introAttached,
+        presence_fx: presenceApplied,
       };
       await store.updateJob(job.id, { result: jobResult });
       const saved = await persistMaster(episode, master);
@@ -642,5 +700,6 @@ module.exports = {
   INTER_SECTION_GAP_MS,
   prependAudioBuffer,
   encodePodcastMaster,
+  applyVoicePresence,
   loadIntroBuffer,
 };
