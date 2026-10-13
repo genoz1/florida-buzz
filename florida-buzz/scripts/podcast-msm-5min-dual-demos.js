@@ -19,7 +19,7 @@ const path = require('node:path');
 const { config } = require('../lib/podcasts/config');
 const { createElevenTts } = require('../lib/podcasts/elevenTts');
 const { mixDualLines } = require('../lib/podcasts/dualMix');
-const { applyVoicePresence, VOICE_COLD_START_WARMUP, probeMp3DurationSec, trimLeadingAudio } =
+const { VOICE_COLD_START_WARMUP, probeMp3DurationSec, trimLeadingAudio } =
   require('../lib/podcasts/audioPipeline');
 const lines = require('./data/msm-demo-5min-lines');
 
@@ -27,10 +27,24 @@ const GENO2 = '5tg8WQNhwRAIGFxz4EFe';
 const AMY = 'OZxMHsGaBmV5pjMIDIn0';
 const ELIZA = 'ut2XM2wJyIZLTtW6lFzZ';
 
-const DEMOS = [
+const ALL_DEMOS = [
   { slug: 'geno2-amy', label: 'Geno 2 + Amy', genaVoice: AMY },
   { slug: 'geno2-eliza', label: 'Geno 2 + Eliza', genaVoice: ELIZA },
 ];
+
+/** Soften premade cohost “lips on mic”; Geno 2 keeps closer PVC settings. */
+const GENA_VOICE_SETTINGS = Object.freeze({
+  stability: 0.42,
+  similarity_boost: 0.62,
+  style: 0,
+  use_speaker_boost: false,
+});
+const GENO_VOICE_SETTINGS = Object.freeze({
+  stability: 0.4,
+  similarity_boost: 0.78,
+  style: 0,
+  use_speaker_boost: true,
+});
 
 function outDir() {
   const dir = process.env.MSM_DEMO_OUT_DIR || '/opt/cursor/artifacts/gena-voice-bakeoff';
@@ -39,11 +53,13 @@ function outDir() {
 }
 
 async function synthLine(eleven, line, voiceId, prev, next) {
+  const isGena = line.speaker === 'Gena';
   return eleven.synthesizeText(line.text, {
     voiceId,
     previousText: prev?.text,
     nextText: next?.text,
     speed: line.text.length < 42 ? 1.04 : /\[thoughtful\]/i.test(line.text) ? 0.93 : 0.98,
+    voiceSettings: isGena ? GENA_VOICE_SETTINGS : GENO_VOICE_SETTINGS,
   });
 }
 
@@ -65,12 +81,14 @@ async function renderDemo({ cfg, eleven, ffmpegPath, demo, dir }) {
       const warmup = await eleven.synthesizeText(VOICE_COLD_START_WARMUP, {
         voiceId: GENO2,
         nextText: line.text,
+        voiceSettings: GENO_VOICE_SETTINGS,
       });
       genoWarmupSec = await probeMp3DurationSec(warmup.buffer, ffmpegPath);
       const combined = await eleven.synthesizeText(`${VOICE_COLD_START_WARMUP}\n\n${line.text}`, {
         voiceId: GENO2,
         previousText: VOICE_COLD_START_WARMUP,
         nextText: next?.text,
+        voiceSettings: GENO_VOICE_SETTINGS,
       });
       const trimmed = await trimLeadingAudio(combined.buffer, genoWarmupSec, ffmpegPath);
       result = { ...combined, buffer: trimmed };
@@ -83,20 +101,14 @@ async function renderDemo({ cfg, eleven, ffmpegPath, demo, dir }) {
     rendered.push({ ...line, buffer: result.buffer, voiceId });
   }
 
-  const rawPath = path.join(dir, `msm-5min-${demo.slug}-raw.mp3`);
+  const finalPath = path.join(dir, `msm-5min-${demo.slug}-balanced.mp3`);
   const mixed = await mixDualLines({
     ffmpegPath,
     lines: rendered,
-    outPath: rawPath,
+    outPath: finalPath,
+    matchMicDistance: true,
   });
-
-  // Presence FX on full mix (warmer Geno 2 recipe)
-  let finalBuf = mixed.buffer;
-  if (cfg.voicePresenceFx !== false) {
-    finalBuf = await applyVoicePresence(finalBuf, ffmpegPath);
-  }
-  const finalPath = path.join(dir, `msm-5min-${demo.slug}.mp3`);
-  fs.writeFileSync(finalPath, finalBuf);
+  const finalBuf = mixed.buffer;
 
   const scriptPath = path.join(dir, `msm-5min-${demo.slug}.txt`);
   fs.writeFileSync(
@@ -128,8 +140,13 @@ async function main() {
   const eleven = createElevenTts({ ...cfg, elevenVoiceGeno: GENO2 });
   const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
   const dir = outDir();
+  const only = String(process.env.MSM_DEMO_ONLY || '')
+    .trim()
+    .toLowerCase();
+  const demos = ALL_DEMOS.filter((d) => !only || d.slug.includes(only) || d.label.toLowerCase().includes(only));
+  if (!demos.length) throw new Error(`No demos matched MSM_DEMO_ONLY=${only}`);
   const outputs = [];
-  for (const demo of DEMOS) {
+  for (const demo of demos) {
     outputs.push(await renderDemo({ cfg, eleven, ffmpegPath, demo, dir }));
   }
   fs.writeFileSync(path.join(dir, 'msm-5min-demos.json'), JSON.stringify(outputs, null, 2));

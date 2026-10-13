@@ -38,15 +38,18 @@ function pickSectionSpeed(text) {
 }
 
 function createElevenTts(cfg, fetcher = fetch) {
-  function buildBody(text, { speed } = {}) {
+  function buildBody(text, { speed, voiceSettings } = {}) {
     // `text` must retain ElevenLabs audio tags; no bracket-stripping here.
     const clampedSpeed = Math.max(0.7, Math.min(1.2, Number(speed) || 0.95));
     // Geno 2 Professional Voice Clone: higher similarity + speaker boost keeps the
     // voice closer/more present. Style stays low to avoid Instant-Voice announcer polish.
-    const stability = Number(cfg.elevenStability ?? 0.4);
-    const similarity = Number(cfg.elevenSimilarityBoost ?? 0.78);
-    const style = Number(cfg.elevenStyle ?? 0);
-    const speakerBoost = cfg.elevenSpeakerBoost !== false;
+    const stability = Number(voiceSettings?.stability ?? cfg.elevenStability ?? 0.4);
+    const similarity = Number(voiceSettings?.similarity_boost ?? cfg.elevenSimilarityBoost ?? 0.78);
+    const style = Number(voiceSettings?.style ?? cfg.elevenStyle ?? 0);
+    const speakerBoost =
+      voiceSettings?.use_speaker_boost != null
+        ? !!voiceSettings.use_speaker_boost
+        : cfg.elevenSpeakerBoost !== false;
     return {
       text,
       model_id: cfg.elevenModel,
@@ -61,7 +64,7 @@ function createElevenTts(cfg, fetcher = fetch) {
     };
   }
 
-  async function synthesizeRaw(text, { speed, previousText, nextText, voiceId } = {}) {
+  async function synthesizeRaw(text, { speed, previousText, nextText, voiceId, voiceSettings } = {}) {
     if (!cfg.generation) throw new Error('Podcast audio generation is disabled');
     if (!cfg.elevenApiKey) throw new Error('ELEVENLABS_API_KEY is required for podcast TTS');
     const resolvedVoice = String(voiceId || cfg.elevenVoiceGeno || '').trim();
@@ -78,7 +81,7 @@ function createElevenTts(cfg, fetcher = fetch) {
       Accept: 'audio/mpeg',
     };
 
-    let body = buildBody(trimmed, { speed: resolvedSpeed });
+    let body = buildBody(trimmed, { speed: resolvedSpeed, voiceSettings });
     if (previousText) body.previous_text = String(previousText).slice(-100);
     if (nextText) body.next_text = String(nextText).slice(0, 100);
 
@@ -141,6 +144,7 @@ function createElevenTts(cfg, fetcher = fetch) {
         previousText: opts.previousText,
         nextText: opts.nextText,
         voiceId: opts.voiceId,
+        voiceSettings: opts.voiceSettings,
       });
     },
     async synthesizeText(text, opts = {}) {

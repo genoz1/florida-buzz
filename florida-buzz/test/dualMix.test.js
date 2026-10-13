@@ -6,7 +6,7 @@ const fsp = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { mixDualLines, probeDurationSec } = require('../lib/podcasts/dualMix');
+const { mixDualLines, probeDurationSec, speakerBalanceFilter } = require('../lib/podcasts/dualMix');
 const { MSM_STYLE_DUAL_SAMPLE_LINES, MSM_DELIVERY_BIBLE } = require('../lib/podcasts/deliveryMsm');
 const { config, resolveHostMode, DEFAULT_ELEVEN_VOICE_GENO } = require('../lib/podcasts/config');
 
@@ -57,6 +57,16 @@ test('MSM delivery bible and sample lines encode overlaps', () => {
   assert.match(MSM_DELIVERY_BIBLE, /Main Street Magic/i);
   assert.ok(MSM_STYLE_DUAL_SAMPLE_LINES.some((l) => (l.overlapPrevMs || 0) > 0));
   assert.ok(MSM_STYLE_DUAL_SAMPLE_LINES.some((l) => l.speaker === 'Gena'));
+});
+
+test('speakerBalanceFilter pulls Geno forward and Gena back from the mic', () => {
+  const geno = speakerBalanceFilter('Geno');
+  const gena = speakerBalanceFilter('Gena');
+  assert.match(geno, /equalizer=f=3000/);
+  assert.match(geno, /loudnorm=I=-16/);
+  assert.match(gena, /equalizer=f=3200.*g=-3\.5|g=-3\.5/);
+  assert.match(gena, /volume=-1dB/);
+  assert.match(gena, /loudnorm=I=-16/);
 });
 
 test('mixDualLines overlaps and matches loudness', async () => {
