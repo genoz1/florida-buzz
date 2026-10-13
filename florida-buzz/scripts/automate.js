@@ -657,6 +657,8 @@ async function run() {
         dek,
         caption: fb_caption,
         slug,
+        published_at: new Date().toISOString(),
+        is_evergreen: false,
       },
       { client: supabase, postsThisRun: facebookPostsThisRun }
     );

@@ -31,14 +31,15 @@ test('Facebook first-comment messages differ for articles, guides, and Buzz Boar
   );
 });
 
-test('article Facebook captions keep curiosity-gap hooks and comment CTAs without URLs', () => {
+test('article Facebook captions strip Full story suffix and do not invent park-day CTAs', () => {
   const withLegacySuffix = toFacebookFeedCaption(
     'Disney just changed something about Lightning Lane pricing this week. ⚡ Full story ↓'
   );
   assert.match(withLegacySuffix, /Lightning Lane/);
   assert.doesNotMatch(withLegacySuffix, /Full story/i);
   assert.doesNotMatch(withLegacySuffix, /https?:\/\//);
-  assert.match(withLegacySuffix, /park day|tell us below|what would you do|yes or no/i);
+  // Never append generic CTAs that mismatch the story (Independence Day → park day).
+  assert.doesNotMatch(withLegacySuffix, /park day|tell us below|yes or no/i);
 
   const alreadyHasCta = toFacebookFeedCaption(
     'Universal quietly adjusted park hours for a busy weekend — would you change your plan?'
@@ -47,6 +48,12 @@ test('article Facebook captions keep curiosity-gap hooks and comment CTAs withou
     alreadyHasCta,
     'Universal quietly adjusted park hours for a busy weekend — would you change your plan?'
   );
+
+  const seasonal = toFacebookFeedCaption(
+    'Walt Disney World gave an official Independence Day salute to the bald eagle 🦅 Full story ↓'
+  );
+  assert.match(seasonal, /Independence Day/);
+  assert.doesNotMatch(seasonal, /park day|tell us below/i);
 });
 
 test('Instagram captions are comment-first with a short focused hashtag set', () => {
@@ -116,7 +123,7 @@ test('article automation posts Facebook with first_comment link placement', () =
   assert.match(automate, /linkPlacement:\s*'first_comment'/);
   assert.match(automate, /linkCommentKind:\s*'article'/);
   assert.match(automate, /toFacebookFeedCaption\(fb_caption\)/);
-  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*article\.category\)/);
+  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*realCategory\)/);
   assert.match(automate, /normalizePinCopy/);
 });
 
