@@ -154,6 +154,105 @@ async function concatMp3Buffers(buffers, ffmpegPath, { varySectionGaps = true } 
 }
 
 /**
+ * Spoken throwaway used only to get Geno 2 past the distant cold-start.
+ * Trimmed from the first TTS section before the real episode audio.
+ * (~5s with current Geno 2 / eleven_v4 settings.)
+ */
+const VOICE_COLD_START_WARMUP =
+  '[conversational] Okay… yeah. One two three. Alright.';
+
+async function probeMp3DurationSec(buffer, ffmpegPath) {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-probe-'));
+  try {
+    const inPath = path.join(dir, 'in.mp3');
+    await fsp.writeFile(inPath, buffer);
+    // Prefer system ffprobe; ffmpeg-static bundles often ship only the ffmpeg binary.
+    const candidates = ['ffprobe', String(ffmpegPath || 'ffmpeg').replace(/ffmpeg$/, 'ffprobe')];
+    for (const bin of candidates) {
+      try {
+        const dur = await new Promise((resolve, reject) => {
+          const child = spawn(
+            bin,
+            ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', inPath],
+            { stdio: ['ignore', 'pipe', 'pipe'] }
+          );
+          let out = '';
+          let err = '';
+          child.stdout.on('data', (c) => {
+            out += c.toString();
+          });
+          child.stderr.on('data', (c) => {
+            err += c.toString();
+          });
+          child.on('error', reject);
+          child.on('close', (code) => {
+            const n = Number(String(out).trim());
+            if (code === 0 && Number.isFinite(n) && n > 0) resolve(n);
+            else reject(new Error(`ffprobe duration failed: ${err || out}`));
+          });
+        });
+        return dur;
+      } catch {
+        /* try next / ffmpeg fallback */
+      }
+    }
+    // Fallback: parse Duration from ffmpeg -i stderr (works with ffmpeg-static).
+    const dur = await new Promise((resolve, reject) => {
+      const child = spawn(ffmpegPath || 'ffmpeg', ['-i', inPath], { stdio: ['ignore', 'ignore', 'pipe'] });
+      let err = '';
+      child.stderr.on('data', (c) => {
+        err += c.toString();
+      });
+      child.on('error', reject);
+      child.on('close', () => {
+        const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(err);
+        if (!m) return reject(new Error('ffmpeg duration parse failed'));
+        resolve(Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]));
+      });
+    });
+    return dur;
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/** Drop the leading N seconds (used to discard Geno 2 cold-start warmup). */
+async function trimLeadingAudio(buffer, seconds, ffmpegPath) {
+  const sec = Number(seconds);
+  if (!buffer?.length) throw new Error('Audio buffer is empty');
+  if (!Number.isFinite(sec) || sec <= 0.05) return buffer;
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-trim-lead-'));
+  try {
+    const inPath = path.join(dir, 'in.mp3');
+    const outPath = path.join(dir, 'out.mp3');
+    await fsp.writeFile(inPath, buffer);
+    await runFfmpeg(ffmpegPath, [
+      '-y',
+      '-ss',
+      sec.toFixed(3),
+      '-i',
+      inPath,
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      '96k',
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
+      outPath,
+    ]);
+    const out = await fsp.readFile(outPath);
+    return out.length > 500 ? out : buffer;
+  } catch (err) {
+    console.warn('[podcasts] leading trim skipped:', err.message);
+    return buffer;
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Pull quiet / “distant” PVC patches forward without tinny radio polish.
  * Warm low-mids, tame harsh highs, gentle compression, loudnorm.
  */
@@ -356,6 +455,8 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
       const prevPlain = i > 0 ? formatScriptForTts(sections[i - 1], { keepSpeakerPrefix: false }) : null;
       const nextPlain =
         i < sections.length - 1 ? formatScriptForTts(sections[i + 1], { keepSpeakerPrefix: false }) : null;
+      const useWarmup =
+        i === 0 && cfg.voiceWarmupEnabled !== false && typeof eleven.synthesizeText === 'function';
       for (let attempt = 1; attempt <= sectionRetries && !buffer; attempt += 1) {
         jobResult = {
           ...jobResult,
@@ -363,24 +464,50 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
           phase: 'synthesize',
           section: i + 1,
           section_attempt: attempt,
+          voice_warmup: useWarmup,
         };
         await store.updateJob(job.id, { section_index: i, status: 'running', result: jobResult });
         try {
-          const synthesized = await eleven.synthesize(sections[i], {
-            previousText: prevPlain,
-            nextText: nextPlain,
-          });
-          buffer = synthesized.buffer;
-          jobResult = {
-            ...jobResult,
-            [`section_${i}_request`]: synthesized.requestId,
-            [`section_${i}_attempt_${attempt}`]: synthesized.requestId,
-            [`section_${i}_speed`]: synthesized.speed,
-            heartbeat_at: new Date().toISOString(),
-            phase: 'download',
-            section: i + 1,
-          };
-          await store.updateJob(job.id, { fal_request_id: synthesized.requestId, result: jobResult });
+          if (useWarmup) {
+            // Speak a throwaway line first so Geno 2 is past the distant cold-start,
+            // then keep only the real section audio.
+            const warmup = await eleven.synthesizeText(VOICE_COLD_START_WARMUP, {
+              nextText: formatScriptForTts(sections[i], { keepSpeakerPrefix: false }),
+            });
+            const warmupSec = await probeMp3DurationSec(warmup.buffer, ffmpegPath);
+            const sectionPlain = formatScriptForTts(sections[i], { keepSpeakerPrefix: false });
+            const combined = await eleven.synthesizeText(`${VOICE_COLD_START_WARMUP}\n\n${sectionPlain}`, {
+              previousText: VOICE_COLD_START_WARMUP,
+              nextText: nextPlain,
+            });
+            buffer = await trimLeadingAudio(combined.buffer, warmupSec, ffmpegPath);
+            jobResult = {
+              ...jobResult,
+              [`section_${i}_request`]: combined.requestId,
+              [`section_${i}_attempt_${attempt}`]: combined.requestId,
+              [`section_${i}_speed`]: combined.speed,
+              voice_warmup_sec: warmupSec,
+              heartbeat_at: new Date().toISOString(),
+              phase: 'download',
+              section: i + 1,
+            };
+          } else {
+            const synthesized = await eleven.synthesize(sections[i], {
+              previousText: prevPlain,
+              nextText: nextPlain,
+            });
+            buffer = synthesized.buffer;
+            jobResult = {
+              ...jobResult,
+              [`section_${i}_request`]: synthesized.requestId,
+              [`section_${i}_attempt_${attempt}`]: synthesized.requestId,
+              [`section_${i}_speed`]: synthesized.speed,
+              heartbeat_at: new Date().toISOString(),
+              phase: 'download',
+              section: i + 1,
+            };
+          }
+          await store.updateJob(job.id, { fal_request_id: jobResult[`section_${i}_request`], result: jobResult });
         } catch (err) {
           lastSectionError = err;
           console.warn(`[podcasts] elevenlabs section ${i + 1} attempt ${attempt}:`, err.message);
@@ -703,5 +830,8 @@ module.exports = {
   prependAudioBuffer,
   encodePodcastMaster,
   applyVoicePresence,
+  trimLeadingAudio,
+  probeMp3DurationSec,
+  VOICE_COLD_START_WARMUP,
   loadIntroBuffer,
 };
