@@ -62,7 +62,8 @@ test('MSM delivery bible and sample lines encode overlaps', () => {
 test('speakerBalanceFilter pulls Geno forward and Gena back from the mic', () => {
   const geno = speakerBalanceFilter('Geno');
   const gena = speakerBalanceFilter('Gena');
-  assert.match(geno, /equalizer=f=3000/);
+  assert.match(geno, /equalizer=f=2800.*g=4\.5|g=4\.5/);
+  assert.match(geno, /makeup=7/);
   assert.match(geno, /loudnorm=I=-16/);
   assert.match(gena, /equalizer=f=3200.*g=-3\.5|g=-3\.5/);
   assert.match(gena, /volume=-1dB/);

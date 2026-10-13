@@ -89,10 +89,10 @@ function config(env = process.env) {
     elevenVoiceGeno,
     elevenVoiceGena,
     elevenOutputFormat: env.PODCASTS_ELEVEN_OUTPUT_FORMAT || DEFAULT_ELEVEN_OUTPUT_FORMAT,
-    // Geno 2 PVC: closer/more present without Instant-Voice polish
-    elevenStability: Number(env.PODCASTS_ELEVEN_STABILITY ?? 0.4),
-    elevenSimilarityBoost: Number(env.PODCASTS_ELEVEN_SIMILARITY ?? 0.78),
-    elevenStyle: Number(env.PODCASTS_ELEVEN_STYLE ?? 0),
+    // Geno 2 PVC: max closeness (roomy clone) — high similarity + speaker boost + light style
+    elevenStability: Number(env.PODCASTS_ELEVEN_STABILITY ?? 0.52),
+    elevenSimilarityBoost: Number(env.PODCASTS_ELEVEN_SIMILARITY ?? 0.95),
+    elevenStyle: Number(env.PODCASTS_ELEVEN_STYLE ?? 0.25),
     elevenSpeakerBoost: String(env.PODCASTS_ELEVEN_SPEAKER_BOOST ?? 'true').toLowerCase() !== 'false',
     // ffmpeg presence pass after TTS (pulls quiet/distant patches forward)
     voicePresenceFx: String(env.PODCASTS_VOICE_PRESENCE_FX ?? 'true').toLowerCase() !== 'false',

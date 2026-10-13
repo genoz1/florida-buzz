@@ -83,13 +83,15 @@ function speakerBalanceFilter(speaker, { loudnessLufs = -16, truePeakDb = -1.5 }
   const sp = String(speaker || '').toLowerCase();
   const loudnorm = `loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=6`;
   if (sp === 'geno') {
-    // Pull Geno forward: warmth + light presence + compression
+    // Geno 2 PVC reads across-the-room — match solo close-mic recipe
     return [
-      'highpass=f=60',
-      'equalizer=f=250:t=q:w=0.9:g=1.2',
-      'equalizer=f=3000:t=q:w=0.9:g=1.8',
-      'acompressor=threshold=-22dB:ratio=3:attack=8:release=120:makeup=3.5',
-      loudnorm,
+      'highpass=f=80',
+      'equalizer=f=120:t=q:w=1.0:g=-2.5',
+      'equalizer=f=900:t=q:w=0.8:g=1.8',
+      'equalizer=f=2800:t=q:w=0.8:g=4.5',
+      'equalizer=f=5000:t=q:w=0.7:g=2',
+      'acompressor=threshold=-28dB:ratio=4.5:attack=3:release=80:makeup=7',
+      `loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=4`,
     ].join(',');
   }
   // Gena / Amy / Eliza — step back from the mic (cut proximity + air)

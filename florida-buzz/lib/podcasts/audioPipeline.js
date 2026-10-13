@@ -253,8 +253,8 @@ async function trimLeadingAudio(buffer, seconds, ffmpegPath) {
 }
 
 /**
- * Pull quiet / “distant” PVC patches forward without tinny radio polish.
- * Warm low-mids, tame harsh highs, gentle compression, loudnorm.
+ * Force Geno 2 PVC to sit close to the mic (solo + dual).
+ * Heavy presence + compression — PVC was trained roomy; FX must pull it forward hard.
  */
 async function applyVoicePresence(buffer, ffmpegPath) {
   if (!buffer?.length) throw new Error('Episode audio is empty');
@@ -269,13 +269,17 @@ async function applyVoicePresence(buffer, ffmpegPath) {
       inPath,
       '-af',
       [
-        'highpass=f=60',
-        // Warmth (not thin/tinny 3k presence boost)
-        'equalizer=f=250:t=q:w=0.9:g=1.5',
-        // Soften harsh upper mids / air that reads as tinny
-        'equalizer=f=4500:t=q:w=0.8:g=-2',
-        'acompressor=threshold=-22dB:ratio=2.8:attack=10:release=140:makeup=3',
-        'loudnorm=I=-16:TP=-1.5:LRA=7',
+        'highpass=f=80',
+        // Cut distant room boom
+        'equalizer=f=120:t=q:w=1.0:g=-2.5',
+        // Body / chest for close talk
+        'equalizer=f=900:t=q:w=0.8:g=1.8',
+        // Strong close-mic presence (intentional — Geno 2 reads across-the-room without this)
+        'equalizer=f=2800:t=q:w=0.8:g=4.5',
+        'equalizer=f=5000:t=q:w=0.7:g=2',
+        // Squash dynamics so quiet distant patches jump forward
+        'acompressor=threshold=-28dB:ratio=4.5:attack=3:release=80:makeup=7',
+        'loudnorm=I=-15:TP=-1.2:LRA=4',
       ].join(','),
       '-codec:a',
       'libmp3lame',

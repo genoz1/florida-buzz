@@ -43,9 +43,9 @@ function createElevenTts(cfg, fetcher = fetch) {
     const clampedSpeed = Math.max(0.7, Math.min(1.2, Number(speed) || 0.95));
     // Geno 2 Professional Voice Clone: higher similarity + speaker boost keeps the
     // voice closer/more present. Style stays low to avoid Instant-Voice announcer polish.
-    const stability = Number(voiceSettings?.stability ?? cfg.elevenStability ?? 0.4);
-    const similarity = Number(voiceSettings?.similarity_boost ?? cfg.elevenSimilarityBoost ?? 0.78);
-    const style = Number(voiceSettings?.style ?? cfg.elevenStyle ?? 0);
+    const stability = Number(voiceSettings?.stability ?? cfg.elevenStability ?? 0.52);
+    const similarity = Number(voiceSettings?.similarity_boost ?? cfg.elevenSimilarityBoost ?? 0.95);
+    const style = Number(voiceSettings?.style ?? cfg.elevenStyle ?? 0.25);
     const speakerBoost =
       voiceSettings?.use_speaker_boost != null
         ? !!voiceSettings.use_speaker_boost
@@ -55,9 +55,9 @@ function createElevenTts(cfg, fetcher = fetch) {
       model_id: cfg.elevenModel,
       language_code: 'en',
       voice_settings: {
-        stability: Number.isFinite(stability) ? Math.max(0, Math.min(1, stability)) : 0.4,
-        similarity_boost: Number.isFinite(similarity) ? Math.max(0, Math.min(1, similarity)) : 0.78,
-        style: Number.isFinite(style) ? Math.max(0, Math.min(1, style)) : 0,
+        stability: Number.isFinite(stability) ? Math.max(0, Math.min(1, stability)) : 0.52,
+        similarity_boost: Number.isFinite(similarity) ? Math.max(0, Math.min(1, similarity)) : 0.95,
+        style: Number.isFinite(style) ? Math.max(0, Math.min(1, style)) : 0.25,
         use_speaker_boost: speakerBoost,
         speed: clampedSpeed,
       },

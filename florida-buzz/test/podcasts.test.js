@@ -638,11 +638,11 @@ test('formatScriptForTts and ElevenLabs client preserve emotion audio tags', asy
   assert.match(capturedBody.text, /\[nostalgic\]/);
   assert.doesNotMatch(capturedBody.text, /^Geno:/m);
   assert.equal(capturedBody.model_id, cfg.elevenModel);
-  assert.equal(capturedBody.voice_settings.style, 0);
+  assert.ok(capturedBody.voice_settings.style >= 0.2);
   assert.equal(capturedBody.voice_settings.use_speaker_boost, true);
-  assert.ok(capturedBody.voice_settings.stability >= 0.35);
-  assert.ok(capturedBody.voice_settings.stability <= 0.5);
-  assert.ok(capturedBody.voice_settings.similarity_boost >= 0.7);
+  assert.ok(capturedBody.voice_settings.stability >= 0.45);
+  assert.ok(capturedBody.voice_settings.stability <= 0.6);
+  assert.ok(capturedBody.voice_settings.similarity_boost >= 0.9);
   assert.ok(capturedBody.voice_settings.speed >= 0.7);
   assert.ok(capturedBody.voice_settings.speed <= 1.2);
 });
