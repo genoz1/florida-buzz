@@ -154,8 +154,8 @@ async function concatMp3Buffers(buffers, ffmpegPath, { varySectionGaps = true } 
 }
 
 /**
- * Pull quiet / “distant” PVC patches forward without adding radio polish.
- * highpass → light presence shelf → gentle compression → tight loudnorm.
+ * Pull quiet / “distant” PVC patches forward without tinny radio polish.
+ * Warm low-mids, tame harsh highs, gentle compression, loudnorm.
  */
 async function applyVoicePresence(buffer, ffmpegPath) {
   if (!buffer?.length) throw new Error('Episode audio is empty');
@@ -170,11 +170,13 @@ async function applyVoicePresence(buffer, ffmpegPath) {
       inPath,
       '-af',
       [
-        'highpass=f=70',
-        'equalizer=f=3200:t=q:w=0.9:g=2.5',
-        'equalizer=f=200:t=q:w=1.0:g=-2',
-        'acompressor=threshold=-22dB:ratio=3:attack=8:release=120:makeup=3.5',
-        'loudnorm=I=-16:TP=-1.5:LRA=6',
+        'highpass=f=60',
+        // Warmth (not thin/tinny 3k presence boost)
+        'equalizer=f=250:t=q:w=0.9:g=1.5',
+        // Soften harsh upper mids / air that reads as tinny
+        'equalizer=f=4500:t=q:w=0.8:g=-2',
+        'acompressor=threshold=-22dB:ratio=2.8:attack=10:release=140:makeup=3',
+        'loudnorm=I=-16:TP=-1.5:LRA=7',
       ].join(','),
       '-codec:a',
       'libmp3lame',
