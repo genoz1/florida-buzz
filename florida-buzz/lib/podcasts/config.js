@@ -96,6 +96,8 @@ function config(env = process.env) {
     elevenSpeakerBoost: String(env.PODCASTS_ELEVEN_SPEAKER_BOOST ?? 'true').toLowerCase() !== 'false',
     // ffmpeg presence pass after TTS (pulls quiet/distant patches forward)
     voicePresenceFx: String(env.PODCASTS_VOICE_PRESENCE_FX ?? 'true').toLowerCase() !== 'false',
+    // Geno 2 cold-start: speak a ~5s throwaway warmup on section 1, then trim it
+    voiceWarmupEnabled: String(env.PODCASTS_VOICE_WARMUP ?? 'true').toLowerCase() !== 'false',
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,
     falModel: env.PODCASTS_FAL_TTS_MODEL || DEFAULT_FAL_TTS_MODEL,

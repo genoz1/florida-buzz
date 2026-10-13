@@ -647,6 +647,42 @@ test('formatScriptForTts and ElevenLabs client preserve emotion audio tags', asy
   assert.ok(capturedBody.voice_settings.speed <= 1.2);
 });
 
+test('trimLeadingAudio drops Geno 2 cold-start warmup', async () => {
+  const { trimLeadingAudio, VOICE_COLD_START_WARMUP } = require('../lib/podcasts/audioPipeline');
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  assert.match(VOICE_COLD_START_WARMUP, /Okay|Alright|one two three/i);
+  const ffmpegPath = 'ffmpeg';
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-trim-lead-'));
+  try {
+    const src = path.join(dir, 'in.mp3');
+    const mk = spawnSync(
+      ffmpegPath,
+      [
+        '-y',
+        '-f',
+        'lavfi',
+        '-i',
+        'sine=frequency=440:sample_rate=44100:duration=3',
+        '-codec:a',
+        'libmp3lame',
+        '-b:a',
+        '128k',
+        src,
+      ],
+      { encoding: 'utf8' }
+    );
+    if (mk.status !== 0) return;
+    const trimmed = await trimLeadingAudio(await fsp.readFile(src), 1.0, ffmpegPath);
+    assert.ok(trimmed.length > 200);
+    assert.ok(trimmed.length < (await fsp.stat(src)).size);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 test('applyVoicePresence levels TTS for closer Geno 2 delivery', async () => {
   const { applyVoicePresence } = require('../lib/podcasts/audioPipeline');
   const { spawnSync } = require('node:child_process');
@@ -954,6 +990,8 @@ test('generatePreview uses ElevenLabs solo path with section chunking and intro 
     ELEVENLABS_API_KEY: 'sk_test',
     PODCASTS_TTS_PROVIDER: 'elevenlabs',
     PODCASTS_TTS_SECTION_CHARS: '700',
+    // Tiny fixture mp3 is only 0.4s — warmup trim would wipe the stub audio.
+    PODCASTS_VOICE_WARMUP: 'false',
   });
   const eleven = {
     async synthesize() {
