@@ -3,10 +3,10 @@
 /**
  * Durable Facebook feed deferral using articles.fb_posted.
  *
- * Park/cruise articles and guides that pass the topic filter but fail cadence
- * stay fb_posted=false and are posted on a later automate/guide run once the
- * minimum spacing has elapsed. Non-park topics mark fb_posted=true so they
- * never sit in this queue.
+ * Articles and guides that fail cadence stay fb_posted=false and are posted on
+ * a later automate/guide/drain run once the minimum spacing has elapsed.
+ * When an optional topic filter is on, non-matching topics mark fb_posted=true
+ * so they never sit in this queue.
  */
 
 const { isFacebookTopicAllowed } = require('./facebookDistribution');
@@ -25,8 +25,8 @@ async function markFacebookFeedResolved(client, slug, { dryRun = false, logger =
 }
 
 /**
- * Oldest unpublished Facebook-feed candidates (fb_posted=false), filtered to
- * theme-park / cruise topics. Cadence is checked by the caller.
+ * Oldest unpublished Facebook-feed candidates (fb_posted=false).
+ * Cadence is checked by the caller. Topic filtering is optional (off by default).
  */
 async function loadPendingFacebookFeedPosts(client, {
   limit = 20,
@@ -56,7 +56,7 @@ async function loadPendingFacebookFeedPosts(client, {
       slug: row.slug,
     }, env);
     if (!topic.ok) {
-      // Stale non-park row left false — resolve so it stops clogging the queue.
+      // Optional topic filter rejected this row — resolve so it stops clogging the queue.
       await markFacebookFeedResolved(client, row.slug, { logger });
       continue;
     }

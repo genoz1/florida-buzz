@@ -44,7 +44,7 @@ function getScheduleFlags(env = process.env) {
     // Live Meta posting still needs FB_PARK_REEL_PUBLISH=true (public MP4 URL).
     facebookParkReel: env.FB_PARK_REEL_ENABLED === 'true'
       && hasRequiredConfig(env, ['FB_PAGE_ID', 'FB_PAGE_ACCESS_TOKEN', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY']),
-    // Drain queued park/cruise Facebook posts on a tight grid (no AI needed).
+    // Drain queued Facebook article/guide posts on a tight grid (no AI needed).
     // On whenever FB + Supabase are configured so same-day volume can clear.
     facebookFeedDrain: hasRequiredConfig(env, [
       'FB_PAGE_ID',
@@ -56,16 +56,18 @@ function getScheduleFlags(env = process.env) {
 }
 
 /**
- * ~90-minute Facebook feed drain slots (America/New_York), waking day.
+ * ~30-minute Facebook feed drain slots (America/New_York), waking day.
+ * Matches the default ≥30 min cadence so posts are spaced as far apart as
+ * practical while still clearing a normal full article+guide day.
  * Intentionally avoids article automate times (6am / 11am / 3pm / 7pm) so two
  * processes do not race the same queued slug. Automate + guides still drain
  * when they run; these ticks fill the gaps.
  */
 const FACEBOOK_FEED_DRAIN_CRONS = [
-  // :00 — 8am, 10am, 1pm, 4pm, 6pm, 9pm, 11pm (skip automate hours)
-  { cron: '0 8,10,13,16,18,21,23 * * *', label: ':00 (8/10/13/16/18/21/23)' },
-  // :30 — 7:30am, 9:30am, 12:30pm, 2:30pm, 5:30pm, 8:30pm, 10:30pm
-  { cron: '30 7,9,12,14,17,20,22 * * *', label: ':30 (7/9/12/14/17/20/22)' },
+  // :00 — skip automate hours 6 / 11 / 15 / 19
+  { cron: '0 7-10,12-14,16-18,20-23 * * *', label: ':00 (7–10,12–14,16–18,20–23)' },
+  // :30 — full waking half-hours
+  { cron: '30 7-22 * * *', label: ':30 (7–22)' },
 ];
 
 const FACEBOOK_BUZZ_SLOT_SCHEDULE = [

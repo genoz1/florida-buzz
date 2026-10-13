@@ -49,7 +49,7 @@ const parser = new Parser({
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
 // Facebook cadence defaults live in lib/facebookDistribution.js (60 min within-run
-// delay, 3h min spacing, max 1/run, no daily hard cap). Park/cruise items that
+// delay, 0.5h min spacing, max 1/run, no daily hard cap). Articles/guides that
 // miss a slot stay queued (fb_posted=false) for a later run. Website unchanged.
 const FB_POST_DELAY_MINUTES = getFacebookCadenceConfig().postDelayMinutes;
 
@@ -623,7 +623,7 @@ async function run() {
       ? `${fbCadence.maxPostsPerDay}/day`
       : 'no daily cap (queue + spacing)';
     console.log(
-      `Facebook: every park/cruise article & guide posts; max ${fbCadence.maxPostsPerRun}/run, `
+      `Facebook: every article & guide posts; max ${fbCadence.maxPostsPerRun}/run, `
       + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart `
       + `(within-run FB delay ${fbCadence.postDelayMinutes}m). Extras stay queued — not dropped. Website + other social unchanged.\n`
     );
@@ -681,11 +681,11 @@ async function run() {
     return 'failed';
   }
 
-  // Oldest deferred park/cruise Facebook posts first (spacing, not dropping).
+  // Oldest deferred Facebook posts first (spacing, not dropping).
   if (!DRY_RUN && supabase) {
     const queuedFb = await loadPendingFacebookFeedPosts(supabase, { limit: 5, dryRun: DRY_RUN });
     if (queuedFb.length) {
-      console.log(`Facebook feed queue: ${queuedFb.length} park/cruise item(s) waiting for spacing.\n`);
+      console.log(`Facebook feed queue: ${queuedFb.length} item(s) waiting for spacing.\n`);
       for (const row of queuedFb) {
         const action = await attemptFacebookForContent({
           category: row.category,

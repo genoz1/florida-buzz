@@ -11,6 +11,7 @@ const {
   getFacebookCadenceConfig,
   isFacebookTopicAllowed,
   isNonArticleFacebookAllowed,
+  isParkCruiseTopic,
   PARK_CRUISE_KEYWORDS,
 } = require('../lib/facebookDistribution');
 const {
@@ -18,58 +19,67 @@ const {
   isFacebookCadenceDeferral,
 } = require('../lib/facebookFeedQueue');
 
-test('topic filter allows theme-parks and cruises by category', () => {
+test('feed topic filter is off by default so every article/guide can post', () => {
+  assert.equal(isFacebookTopicAllowed({ category: 'beaches', title: 'Best shells in Sarasota' }).ok, true);
+  assert.equal(isFacebookTopicAllowed({ category: 'wildlife', title: 'Manatee season' }).ok, true);
   assert.equal(isFacebookTopicAllowed({ category: 'theme-parks', title: 'Hours update' }).ok, true);
-  assert.equal(isFacebookTopicAllowed({ category: 'cruises', title: 'Port tip' }).ok, true);
+  assert.equal(isFacebookTopicAllowed({ category: 'beaches', title: 'Shells' }).reason, 'filter_disabled');
 });
 
-test('topic filter rejects beaches/space/food unless keywords match', () => {
+test('optional park/cruise topic filter can be enabled', () => {
+  const env = { FB_TOPIC_FILTER_ENABLED: 'true' };
+  assert.equal(isFacebookTopicAllowed({ category: 'theme-parks', title: 'Hours update' }, env).ok, true);
+  assert.equal(isFacebookTopicAllowed({ category: 'cruises', title: 'Port tip' }, env).ok, true);
   assert.equal(
-    isFacebookTopicAllowed({ category: 'beaches', title: 'Best shells in Sarasota' }).ok,
+    isFacebookTopicAllowed({ category: 'beaches', title: 'Best shells in Sarasota' }, env).ok,
     false
   );
   assert.equal(
-    isFacebookTopicAllowed({ category: 'space', title: 'Rocket launch viewing tips' }).ok,
+    isFacebookTopicAllowed({ category: 'space', title: 'Rocket launch viewing tips' }, env).ok,
     false
   );
   assert.equal(
     isFacebookTopicAllowed({
       category: 'food',
       title: 'Magic Kingdom snack ranking for rope drop',
-    }).ok,
+    }, env).ok,
     true
   );
   assert.equal(
     isFacebookTopicAllowed({
       category: 'events',
       title: 'Port Canaveral cruise weekend events',
-    }).ok,
+    }, env).ok,
     true
   );
 });
 
-test('topic filter can be disabled with FB_TOPIC_FILTER_ENABLED=false', () => {
-  const decision = isFacebookTopicAllowed(
-    { category: 'wildlife', title: 'Manatee season' },
-    { FB_TOPIC_FILTER_ENABLED: 'false' }
+test('isParkCruiseTopic always applies the park/cruise allowlist for Reels', () => {
+  assert.equal(isParkCruiseTopic({ category: 'theme-parks', title: 'Park tip' }).ok, true);
+  assert.equal(isParkCruiseTopic({ category: 'beaches', title: 'Shelling guide' }).ok, false);
+  // Even when feed filter is explicitly off, Reels helper stays park/cruise-only.
+  assert.equal(
+    isParkCruiseTopic(
+      { category: 'wildlife', title: 'Manatees' },
+      { FB_TOPIC_FILTER_ENABLED: 'false' }
+    ).ok,
+    false
   );
-  assert.equal(decision.ok, true);
-  assert.equal(decision.reason, 'filter_disabled');
 });
 
-test('FB_ALLOWED_CATEGORIES overrides the default allowlist', () => {
-  const env = { FB_ALLOWED_CATEGORIES: 'cruises' };
+test('FB_ALLOWED_CATEGORIES overrides the default allowlist when filter is on', () => {
+  const env = { FB_TOPIC_FILTER_ENABLED: 'true', FB_ALLOWED_CATEGORIES: 'cruises' };
   assert.equal(isFacebookTopicAllowed({ category: 'theme-parks', title: 'Park tip' }, env).ok, false);
   assert.equal(isFacebookTopicAllowed({ category: 'cruises', title: 'Sail tip' }, env).ok, true);
 });
 
-test('cadence defaults space posts ~90 minutes without a tight daily drop-cap', () => {
+test('cadence defaults space posts ~30 minutes without a tight daily drop-cap', () => {
   const config = getFacebookCadenceConfig({});
-  assert.equal(config.minHoursBetweenPosts, 1.5);
+  assert.equal(config.minHoursBetweenPosts, 0.5);
   assert.equal(config.maxPostsPerDay, 0);
   assert.equal(config.maxPostsPerRun, 1);
   assert.equal(config.postDelayMinutes, 60);
-  assert.ok(config.minHoursBetweenPosts >= 1.5 && config.minHoursBetweenPosts <= 2);
+  assert.ok(config.minHoursBetweenPosts >= 0.5 && config.minHoursBetweenPosts <= 1);
 });
 
 test('cadence blocks a second Facebook post in the same run', () => {
@@ -81,7 +91,7 @@ test('cadence blocks a second Facebook post in the same run', () => {
 
 test('cadence blocks when last Facebook success was too recent', () => {
   const now = new Date('2026-10-11T18:00:00.000Z');
-  const recent = [{ created_at: '2026-10-11T17:00:00.000Z' }]; // 1h ago (< 1.5h)
+  const recent = [{ created_at: '2026-10-11T17:45:00.000Z' }]; // 15 min ago (< 0.5h)
   const blocked = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
   assert.equal(blocked.ok, false);
   assert.equal(blocked.reason, 'min_spacing');
@@ -90,13 +100,13 @@ test('cadence blocks when last Facebook success was too recent', () => {
 
 test('cadence allows a post after the minimum gap', () => {
   const now = new Date('2026-10-11T20:00:00.000Z');
-  const recent = [{ created_at: '2026-10-11T18:00:00.000Z' }]; // 2h ago (> default 1.5h)
+  const recent = [{ created_at: '2026-10-11T19:25:00.000Z' }]; // 35 min ago (> default 0.5h)
   const ok = evaluateFacebookCadence({ postsThisRun: 0, recentSuccesses: recent, now }, {});
   assert.equal(ok.ok, true);
   assert.equal(ok.reason, 'cadence_ok');
 });
 
-test('default daily max is off so many park posts are not hard-dropped', () => {
+test('default daily max is off so many posts are not hard-dropped', () => {
   const now = new Date('2026-10-11T20:00:00.000Z');
   const recent = [
     { created_at: '2026-10-11T08:00:00.000Z' },
@@ -112,24 +122,23 @@ test('default daily max is off so many park posts are not hard-dropped', () => {
   assert.equal(ok.ok, true);
 });
 
-test('1.5h gap + frequent runs can clear eight park posts in one waking day', () => {
-  // Simulate drain ticks every 90 minutes starting 12:00 — eight successes fit before midnight.
-  const start = new Date('2026-10-11T16:00:00.000Z'); // noon ET roughly for the story
-  const gapMs = 1.5 * 60 * 60 * 1000;
+test('0.5h gap + frequent runs can clear many posts across a waking day', () => {
+  const start = new Date('2026-10-11T12:00:00.000Z');
+  const gapMs = 0.5 * 60 * 60 * 1000;
   const successes = [];
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < 16; i += 1) {
     const now = new Date(start.getTime() + i * gapMs);
     const decision = evaluateFacebookCadence(
       { postsThisRun: 0, recentSuccesses: successes, now },
-      { FB_MIN_HOURS_BETWEEN_POSTS: '1.5' }
+      { FB_MIN_HOURS_BETWEEN_POSTS: '0.5' }
     );
     assert.equal(decision.ok, true, `post ${i + 1} should be allowed at ${now.toISOString()}`);
     successes.unshift({ created_at: now.toISOString() });
   }
-  assert.equal(successes.length, 8);
+  assert.equal(successes.length, 16);
   const last = new Date(successes[0].created_at);
   const hoursSpan = (last.getTime() - start.getTime()) / (60 * 60 * 1000);
-  assert.equal(hoursSpan, 10.5, 'eight posts at 1.5h = 10.5h from first to last');
+  assert.equal(hoursSpan, 7.5, 'sixteen posts at 0.5h = 7.5h from first to last');
 });
 
 test('optional FB_MAX_POSTS_PER_DAY still defers rather than implying a permanent skip', () => {
@@ -148,10 +157,10 @@ test('optional FB_MAX_POSTS_PER_DAY still defers rather than implying a permanen
   assert.match(blocked.detail, /queued/i);
 });
 
-test('decideFacebookDistribution combines topic + cadence', async () => {
+test('decideFacebookDistribution allows all topics by default and still enforces cadence', async () => {
   const now = new Date('2026-10-11T20:00:00.000Z');
   const allowed = await decideFacebookDistribution(
-    { category: 'theme-parks', title: 'Lightning Lane change' },
+    { category: 'beaches', title: 'Shelling guide' },
     {
       postsThisRun: 0,
       now,
@@ -162,7 +171,12 @@ test('decideFacebookDistribution combines topic + cadence', async () => {
 
   const filtered = await decideFacebookDistribution(
     { category: 'beaches', title: 'Shelling guide' },
-    { postsThisRun: 0, now, recentSuccesses: [] }
+    {
+      postsThisRun: 0,
+      now,
+      recentSuccesses: [],
+      env: { FB_TOPIC_FILTER_ENABLED: 'true' },
+    }
   );
   assert.equal(filtered.ok, false);
   assert.equal(filtered.reason, 'topic_filtered');
@@ -212,9 +226,9 @@ test('applyFacebookFeedDecision skips topics permanently and defers cadence', as
   assert.equal(post.action, 'post');
 });
 
-test('non-article Facebook jobs are skipped by default', () => {
-  assert.equal(isNonArticleFacebookAllowed({}).ok, false);
-  assert.equal(isNonArticleFacebookAllowed({ FB_SKIP_NON_PARK_FEED: 'false' }).ok, true);
+test('non-article Facebook jobs are allowed by default', () => {
+  assert.equal(isNonArticleFacebookAllowed({}).ok, true);
+  assert.equal(isNonArticleFacebookAllowed({ FB_SKIP_NON_PARK_FEED: 'true' }).ok, false);
 });
 
 test('keyword list documents Disney/Universal/cruise coverage', () => {
@@ -229,6 +243,7 @@ test('automate, guide, and drain scripts queue Facebook posts instead of permane
   const drain = fs.readFileSync(path.join(__dirname, '../scripts/facebook-feed-drain.js'), 'utf8');
   const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
   const docs = fs.readFileSync(path.join(__dirname, '../docs/facebook-reels-strategy.md'), 'utf8');
+  const distribution = fs.readFileSync(path.join(__dirname, '../lib/facebookDistribution.js'), 'utf8');
   assert.match(automate, /decideFacebookDistribution/);
   assert.match(automate, /facebookPostsThisRun/);
   assert.match(automate, /loadPendingFacebookFeedPosts/);
@@ -242,9 +257,9 @@ test('automate, guide, and drain scripts queue Facebook posts instead of permane
   assert.match(drain, /markFacebookFeedResolved/);
   assert.match(server, /FACEBOOK_FEED_DRAIN_CRONS/);
   assert.match(server, /facebook-feed-drain\.js/);
-  assert.match(docs, /every theme-park and cruise article and guide still posts/i);
-  assert.match(docs, /about every 1\.5 hours/i);
-  assert.match(docs, /If 8 park posts publish on the site today/i);
+  assert.match(distribution, /FB_TOPIC_FILTER_ENABLED === 'true'/);
+  assert.match(docs, /every article and guide/i);
+  assert.match(docs, /about every 30 minutes|~30 min/i);
   assert.doesNotMatch(automate, /Posts will be spaced \$\{FB_POST_DELAY_MINUTES\} minute\(s\) apart across all platforms/);
 });
 

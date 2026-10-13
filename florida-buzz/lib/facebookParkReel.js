@@ -28,7 +28,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { isFacebookTopicAllowed } = require('./facebookDistribution');
+const { isParkCruiseTopic } = require('./facebookDistribution');
 const { postToFacebookPage } = require('./facebook');
 const { toFacebookFeedCaption } = require('./socialCopy');
 const { synthesizeElevenV4 } = require('./visualNews/elevenTts');
@@ -633,7 +633,8 @@ async function synthesizeParkReelVoice({
 
 function allowedParkReelCandidate(row) {
   if (!row?.image_url) return false;
-  return isFacebookTopicAllowed({
+  // Reels stay park/cruise-only even when the feed posts every article/guide.
+  return isParkCruiseTopic({
     category: row.category,
     title: row.title,
     dek: row.dek,
