@@ -1,0 +1,25 @@
+Geno Professional Voice Clone — close-mic redo guide
+=====================================================
+
+Geno 2 (PVC) sounds distant because the training audio was too far from the mic /
+too roomy. EQ cannot fix that. Re-clone with close, dry samples.
+
+RECORDING RULES (non-negotiable)
+1. Phone or USB mic 6–10 inches from your mouth (same distance the whole time).
+2. Quiet room — closet with clothes is fine. No echo / kitchen / open room.
+3. Speak at normal conversation volume — not “podcast host” projection.
+4. Stay on-axis; don’t turn away mid-sentence.
+5. 10–30 minutes total of clean speech (more is better for PVC).
+
+WHAT TO RECORD
+- Free-talk about a park day (Boardwalk vs Beach Club, hotel mornings, etc.).
+- Or read the MSM Ep 912 first-10 read-along in a natural voice.
+- Include laughs, “yeah / okay / so…”, unfinished thoughts — real you.
+
+AFTER YOU RECORD
+1. In ElevenLabs: create a NEW Professional Voice Clone (e.g. “Geno 3”).
+2. Upload only the close-mic takes (don’t mix in old roomy samples).
+3. Send me the new voice_id — I’ll point production at it.
+
+UNTIL THEN
+Production uses Instant Geno (bg7PC2IzyIDwYgytMiW1).

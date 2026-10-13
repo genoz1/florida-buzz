@@ -46,7 +46,7 @@ test('resolveHostMode dual aliases and Geno 2 default voice', () => {
   assert.equal(resolveHostMode({}), 'solo');
   assert.equal(resolveHostMode({ PODCASTS_HOST_MODE: 'dual' }), 'dual');
   assert.equal(resolveHostMode({ PODCASTS_HOST_MODE: 'msm' }), 'dual');
-  assert.equal(DEFAULT_ELEVEN_VOICE_GENO, '5tg8WQNhwRAIGFxz4EFe');
+  assert.equal(DEFAULT_ELEVEN_VOICE_GENO, 'bg7PC2IzyIDwYgytMiW1');
   const cfg = config({ PODCASTS_HOST_MODE: 'dual' });
   assert.equal(cfg.hostMode, 'dual');
   assert.ok(cfg.elevenVoiceGena);
@@ -62,8 +62,8 @@ test('MSM delivery bible and sample lines encode overlaps', () => {
 test('speakerBalanceFilter pulls Geno forward and Gena back from the mic', () => {
   const geno = speakerBalanceFilter('Geno');
   const gena = speakerBalanceFilter('Gena');
-  assert.match(geno, /equalizer=f=2800.*g=4\.5|g=4\.5/);
-  assert.match(geno, /makeup=7/);
+  assert.match(geno, /equalizer=f=3000/);
+  assert.match(geno, /makeup=2\.5/);
   assert.match(geno, /loudnorm=I=-16/);
   assert.match(gena, /equalizer=f=3200.*g=-3\.5|g=-3\.5/);
   assert.match(gena, /volume=-1dB/);
