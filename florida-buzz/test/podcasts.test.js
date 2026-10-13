@@ -639,10 +639,46 @@ test('formatScriptForTts and ElevenLabs client preserve emotion audio tags', asy
   assert.doesNotMatch(capturedBody.text, /^Geno:/m);
   assert.equal(capturedBody.model_id, cfg.elevenModel);
   assert.equal(capturedBody.voice_settings.style, 0);
-  assert.equal(capturedBody.voice_settings.use_speaker_boost, false);
-  assert.ok(capturedBody.voice_settings.stability <= 0.35);
+  assert.equal(capturedBody.voice_settings.use_speaker_boost, true);
+  assert.ok(capturedBody.voice_settings.stability >= 0.35);
+  assert.ok(capturedBody.voice_settings.stability <= 0.5);
+  assert.ok(capturedBody.voice_settings.similarity_boost >= 0.7);
   assert.ok(capturedBody.voice_settings.speed >= 0.7);
   assert.ok(capturedBody.voice_settings.speed <= 1.2);
+});
+
+test('applyVoicePresence levels TTS for closer Geno 2 delivery', async () => {
+  const { applyVoicePresence } = require('../lib/podcasts/audioPipeline');
+  const { spawnSync } = require('node:child_process');
+  const fsp = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  const ffmpegPath = 'ffmpeg';
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-presence-test-'));
+  try {
+    const src = path.join(dir, 'in.mp3');
+    const mk = spawnSync(
+      ffmpegPath,
+      [
+        '-y',
+        '-f',
+        'lavfi',
+        '-i',
+        'sine=frequency=440:sample_rate=44100:duration=1.2',
+        '-codec:a',
+        'libmp3lame',
+        '-b:a',
+        '128k',
+        src,
+      ],
+      { encoding: 'utf8' }
+    );
+    if (mk.status !== 0) return;
+    const out = await applyVoicePresence(await fsp.readFile(src), ffmpegPath);
+    assert.ok(out.length > 500);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('script sections prefer larger multi-turn packs and absorb tiny tails', () => {

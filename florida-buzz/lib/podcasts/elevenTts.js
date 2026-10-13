@@ -41,16 +41,21 @@ function createElevenTts(cfg, fetcher = fetch) {
   function buildBody(text, { speed } = {}) {
     // `text` must retain ElevenLabs audio tags; no bracket-stripping here.
     const clampedSpeed = Math.max(0.7, Math.min(1.2, Number(speed) || 0.95));
+    // Geno 2 Professional Voice Clone: higher similarity + speaker boost keeps the
+    // voice closer/more present. Style stays low to avoid Instant-Voice announcer polish.
+    const stability = Number(cfg.elevenStability ?? 0.4);
+    const similarity = Number(cfg.elevenSimilarityBoost ?? 0.78);
+    const style = Number(cfg.elevenStyle ?? 0);
+    const speakerBoost = cfg.elevenSpeakerBoost !== false;
     return {
       text,
       model_id: cfg.elevenModel,
       language_code: 'en',
       voice_settings: {
-        // Calm / conversational — style 0 + no speaker boost = less radio polish
-        stability: 0.3,
-        similarity_boost: 0.55,
-        style: 0,
-        use_speaker_boost: false,
+        stability: Number.isFinite(stability) ? Math.max(0, Math.min(1, stability)) : 0.4,
+        similarity_boost: Number.isFinite(similarity) ? Math.max(0, Math.min(1, similarity)) : 0.78,
+        style: Number.isFinite(style) ? Math.max(0, Math.min(1, style)) : 0,
+        use_speaker_boost: speakerBoost,
         speed: clampedSpeed,
       },
     };
