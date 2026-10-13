@@ -312,8 +312,11 @@ test('assertScriptOpenShape requires Geno Option A named open', () => {
   assert.doesNotThrow(() => assertScriptOpenShape(good));
   assert.match(GENO_NAMED_OPEN_OPTION_A, /\[conversational\]/i);
   assert.match(GENO_NAMED_OPEN_OPTION_A, /\[warmly\]/i);
-  assert.match(GENO_NAMED_OPEN_OPTION_A, /eighteen months/i);
-  assert.match(GENO_NAMED_OPEN_OPTION_A, /fifty years/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /Florida Buzz Disney podcast/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /your host Geno/i);
+  assert.match(GENO_NAMED_OPEN_OPTION_A, /thank you for joining us/i);
+  assert.doesNotMatch(GENO_NAMED_OPEN_OPTION_A, /eighteen months/i);
+  assert.doesNotMatch(GENO_NAMED_OPEN_OPTION_A, /fifty years/i);
   assert.doesNotMatch(GENO_NAMED_OPEN_OPTION_A, /unofficial/i);
 
   const weatherColdOpen = [
@@ -330,14 +333,19 @@ test('assertScriptOpenShape requires Geno Option A named open', () => {
   assert.throws(() => assertScriptOpenShape(dualHost), /dual-host|Geno:/i);
 
   const missingLetsGo = [
-    "Geno: Welcome to Florida Buzz: Disney. I'm Geno. I've been going since I was eighteen months old — over fifty years ago.",
+    "Geno: Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us.",
   ].join('\n');
   assert.throws(() => assertScriptOpenShape(missingLetsGo), /Let's go/i);
 
   const saysUnofficial = [
-    "Geno: Welcome to Florida Buzz: Disney. I'm Geno — your unofficial fan host. I've been going since I was eighteen months old — over fifty years ago. Let's go.",
+    "Geno: Welcome to the Florida Buzz Disney podcast. I'm your host Geno — your unofficial fan host. Thank you for joining us. Let's go.",
   ].join('\n');
   assert.throws(() => assertScriptOpenShape(saysUnofficial), /unofficial/i);
+
+  const longevityOpen = [
+    "Geno: Welcome to the Florida Buzz Disney podcast. I'm Geno. I've been going since I was eighteen months old — over fifty years ago. Thank you for joining us. Let's go.",
+  ].join('\n');
+  assert.throws(() => assertScriptOpenShape(longevityOpen), /eighteen months|fifty years|longevity/i);
 });
 
 test('generateConversation rejects scripts that skip the named show open', async () => {
@@ -369,10 +377,12 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(HOST_BIBLE, /eighteen months/i);
   assert.match(HOST_BIBLE, /fifty years/i);
   assert.match(HOST_BIBLE, /solo/i);
-  assert.match(HOST_BIBLE, /I'm Geno/i);
-  assert.match(HOST_BIBLE, /welcome to Florida Buzz: Disney/i);
+  assert.match(HOST_BIBLE, /I'm Geno|I'm your host Geno/i);
+  assert.match(HOST_BIBLE, /welcome to the Florida Buzz Disney podcast|welcome to Florida Buzz: Disney/i);
   assert.match(HOST_BIBLE, /FORBID saying “unofficial”|never say “unofficial”|HARD BAN saying “unofficial”/i);
   assert.match(HOST_BIBLE, /Let's go/i);
+  assert.match(HOST_BIBLE, /maybe you don't|soft-bossy|if you… maybe you/i);
+  assert.match(HOST_BIBLE, /HARD BAN repeating the eighteen-months|HARD BAN saying the eighteen-months/i);
   assert.match(HOST_BIBLE, /Quick Hits|quick hits/i);
   assert.match(HOST_BIBLE, /Deep Dive|deep dive/i);
   assert.match(HOST_BIBLE, /HARD BAN/i);
@@ -412,8 +422,9 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(outline.system, /Named Open/i);
   assert.match(outline.system, /Quick Hits/i);
   assert.match(outline.system, /Deep Dive/i);
-  assert.match(outline.system, /I'm Geno|I\'m Geno/i);
-  assert.match(outline.system, /welcome to Florida Buzz: Disney/i);
+  assert.match(outline.system, /I'm Geno|I\'m Geno|your host Geno/i);
+  assert.match(outline.system, /Florida Buzz Disney podcast|welcome to Florida Buzz: Disney/i);
+  assert.match(outline.system, /maybe you don't|soft-bossy|if you… maybe you/i);
   assert.match(outline.system, /solo/i);
   assert.match(outline.system, /ElevenLabs audio tags|audio tags/i);
   assert.match(outline.system, /Partner mid-roll/i);
@@ -441,9 +452,10 @@ test('full-episode prompts keep solo Geno host bible and structure', () => {
   assert.match(conversation.system, /STANDALONE EPISODE RULE/i);
   assert.match(conversation.system, /Part 1/);
   assert.match(conversation.system, /SOLO STRUCTURE/i);
-  assert.match(conversation.system, /I'm Geno|I\'m Geno/i);
-  assert.match(conversation.system, /welcome to Florida Buzz: Disney/i);
+  assert.match(conversation.system, /I'm Geno|I\'m Geno|your host Geno/i);
+  assert.match(conversation.system, /Florida Buzz Disney podcast|welcome to Florida Buzz: Disney/i);
   assert.match(conversation.system, /HARD BAN dual-host/i);
+  assert.match(conversation.system, /maybe you don't|soft-bossy/i);
   assert.match(conversation.system, /ElevenLabs audio tags/i);
   assert.match(conversation.system, /\[warmly\]/);
   assert.match(conversation.system, /\[chuckles\]/);
@@ -760,8 +772,9 @@ test('fal fallback builds solo Geno single-speaker input', () => {
   assert.match(input.style_instructions, /Geno/);
   assert.match(input.style_instructions, /quick hits/i);
   assert.match(input.style_instructions, /deep dive/i);
-  assert.match(input.style_instructions, /eighteen months|fifty years/i);
+  assert.match(input.style_instructions, /Florida Buzz Disney podcast|thank you for joining/i);
   assert.match(input.style_instructions, /never say unofficial/i);
+  assert.match(input.style_instructions, /maybe-you|for my crew/i);
 });
 
 test('elevenlabs TTS refuses when generation disabled', async () => {

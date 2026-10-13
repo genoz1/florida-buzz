@@ -38,7 +38,8 @@ function countScriptWords(scriptText) {
 }
 
 /**
- * Hard-require Geno Option A named open before topic hooks / weather essays.
+ * Hard-require short Geno named open before topic hooks / weather essays.
+ * Longevity monologue is banned from the required open (bio may appear rarely later).
  */
 function assertScriptOpenShape(scriptText) {
   const lines = String(scriptText || '')
@@ -60,15 +61,24 @@ function assertScriptOpenShape(scriptText) {
   if (/^Geno:\s*Okay,?\s*how was your week/i.test(first)) {
     throw new Error('Script open bans the weather-only cold open ("Okay, how was your week…")');
   }
-  if (!/I['’]?m Geno/i.test(headText)) {
-    throw new Error('Script open must include I\'m Geno in the first spoken lines');
+  if (!/I['’]?m(?:\s+your\s+host)?\s+Geno/i.test(headText)) {
+    throw new Error('Script open must include I\'m Geno / I\'m your host Geno in the first spoken lines');
   }
-  if (!/welcome to Florida Buzz(?::?\s*Disney)?/i.test(headText)) {
-    throw new Error('Script open must welcome listeners to Florida Buzz: Disney');
+  if (!/welcome to (?:the\s+)?Florida Buzz(?:\s+Disney(?:\s+podcast)?|:?\s*Disney)/i.test(headText)) {
+    throw new Error('Script open must welcome listeners to the Florida Buzz Disney podcast');
   }
-  if (!/(eighteen|18)\s+months?/i.test(earlyText) || !/(fifty|50)\s+years?/i.test(earlyText)) {
+  const hasThanks =
+    /glad you(?:'re| are) here/i.test(headText) ||
+    (/(thank you for|thanks for)/i.test(headText) &&
+      /(joining us|being here|listening)/i.test(headText));
+  if (!hasThanks) {
     throw new Error(
-      'Script open must mention going since eighteen months old / over fifty years ago (no age in years)'
+      'Script open must thank listeners (joining us / being here / listening) or say glad you\'re here'
+    );
+  }
+  if (/(eighteen|18)\s+months?/i.test(earlyText) && /(fifty|50)\s+years?/i.test(earlyText)) {
+    throw new Error(
+      'Script open must not repeat the eighteen months / fifty years longevity monologue every episode'
     );
   }
   if (/unofficial/i.test(earlyText)) {
@@ -119,17 +129,18 @@ Outline rules:
 - Always spell Geno. Solo host only — never outline Gena/Diane dual-host segments.
 - Shape a calm casual solo briefing, not a news rundown, dual-host chat, or hype reel — must feel unscripted / reactive, not written.
 - Tone: dad friend sharing what he'd do with his crew — never lecturer, referee, or scolding dad.
-- Segment 1 MUST be Named Open and MUST list Geno Option A beats explicitly before any topic hook:
-  1) Welcome to Florida Buzz: Disney
-  2) I'm Geno
-  3) Been going since eighteen months old — over fifty years ago
-  4) Park news / real planning from The Florida Buzz
-  5) Here's what we're locking in today / Let's go
+- Segment 1 MUST be Named Open and MUST list short warm Geno Option A beats explicitly before any topic hook:
+  1) Welcome to the Florida Buzz Disney podcast (or Florida Buzz: Disney)
+  2) I'm your host Geno / I'm Geno
+  3) Thank you for joining us / being here / listening (vary)
+  4) Here's what we're locking in today / Let's go
+- HARD BAN putting the eighteen-months / fifty-years longevity monologue in Segment 1
 - Plan moderate ElevenLabs audio tags across the episode (Named Open keeps [conversational]/[warmly]; Quick Hits / Deep Dive / CTA should keep tagging roughly every other Geno line with [chuckles], [nostalgic], [thoughtful], [conversational], [warmly], [sighs] where natural). Prefer calm tags — avoid [excited]/[upbeat]. Untagged stretches of many lines in a row are a failure mode.
 - After Named Open: Quick Hits (several short sourced topics) → short ${PARTNER_NAME} partner mid-roll → one Deep Dive → CTA / close with Florida Buzz resources + soft ${PARTNER_NAME} show-notes reminder.
-- HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + eighteen months / fifty years + Let's go.
+- HARD BAN Segment 1 dual-host intros or weather-only cold opens that skip I'm Geno + welcome + thank-you + Let's go.
 - HARD BAN outlining spoken “unofficial” or stating Geno's age in years.
 - HARD BAN lecture / referee beats: no “Full stop.”, “the mistake is…”, “you are allowed…”, “you need to…”, bossy don't-chains, “Been around enough…”, or scolding other guests.
+- HARD BAN soft-bossy “if you… maybe you…” coaching outlines (maybe you don't / maybe you do your priorities / money you choose / it tells you to). Outline tips as I'd / we / for my crew habits instead.
 - HARD BAN stacked everybody / somebody hotel-chaos lists (sunscreen / swimsuit / starving / lunchtime-before-you-leave clones). Prefer we / I'd / for my crew observational beats instead.
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions and personal anecdotes.
@@ -153,7 +164,7 @@ ${sourceBlock || '(none yet — use timeless composite experiences only; invent 
 Verified Florida Buzz tools hosts may recommend (only these site tools; plus included source articles/guides/Buzz Board links above):
 ${verifiedToolsBlock()}
 
-Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be Geno Option A (welcome / I'm Geno / eighteen months / over fifty years / let's go — never “unofficial”). Then Quick Hits, a short ${PARTNER_NAME} partner mid-roll, one Deep Dive, Florida Buzz resource beats, a soft ${PARTNER_NAME} show-notes reminder, and a full standalone close — never “see you in Part 2.”`,
+Write a segment outline for an approximately 20–25 minute solo Geno episode (~3,000–3,800 spoken words when scripted). Segment 1 Named Open MUST be short Geno Option A (welcome to the Florida Buzz Disney podcast / I'm your host Geno / thank you for joining us / let's go — never “unofficial”, never the eighteen-months longevity monologue). Then Quick Hits, a short ${PARTNER_NAME} partner mid-roll, one Deep Dive, Florida Buzz resource beats, a soft ${PARTNER_NAME} show-notes reminder, and a full standalone close — never “see you in Part 2.”`,
   };
 }
 
@@ -167,7 +178,7 @@ function buildConversationPrompt({ show, episode, outline, sources }) {
 Format every spoken line as:
 Geno: ...
 or with an ElevenLabs audio tag at the start of the spoken beat:
-Geno: [conversational] Ok, welcome to Florida Buzz: Disney. I'm Geno...
+Geno: [conversational] Welcome to the Florida Buzz Disney podcast. I'm your host Geno...
 Geno: [chuckles] Okay, this next one's a classic park-day trap...
 
 ${HOST_BIBLE}
@@ -183,19 +194,23 @@ Conversation requirements:
 - Breath groups: FEWER, LONGER Geno: lines (one breath / one thought). Do not split every sentence onto its own line. Use … and — inside lines for micro-pauses.
 - Moderate calm audio tags so eleven_v4 has delivery cues: tag roughly every other Geno: line (more when emotion shifts). Prefer [conversational], [warmly], [chuckles], [nostalgic], [thoughtful], [sighs], [curious]. Avoid [excited] / [upbeat]. A long run of untagged lines sounds flat — that is a script failure.
 - SOLO STRUCTURE (critical):
-  1) Named Open — Geno Option A (exact intent; wording may match closely; keep audio tags):
+  1) Named Open — Geno Option A (exact intent; wording may vary the thank-you beat; keep audio tags):
      Geno: ${GENO_NAMED_OPEN_OPTION_A}
+     Allowed thank-you variants: thank you for joining us / thanks for being here / thanks for listening / glad you're here
   2) Quick Hits — several short sourced topics with punchy takes (tag a few lines where energy shifts)
   3) Partner mid-roll — SHORT (~15–25 seconds): ${PODCAST_MIDROLL_DIRECTION}
   4) One Deep Dive — longer planning opinion + one brief park anecdote (use [nostalgic]/[sighs]/[chuckles] where natural)
   5) CTA / close — The Florida Buzz dot com resources + soft ${PARTNER_NAME} show-notes reminder + warm goodbye ([warmly] near the close is good)
 - HARD BAN dual-host dialogue (no Gena:/Diane: lines, no cohost reactions).
-- HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + eighteen months / fifty years + Let's go.
+- HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + thank-you + Let's go.
+- HARD BAN the eighteen-months / fifty-years longevity monologue in the Named Open (or as a required every-episode beat).
 - HARD BAN saying “unofficial” anywhere in the spoken script.
 - HARD BAN stating Geno's age in years (no “I'm fifty-three”, no “mid-thirties”).
 - HARD BAN writing a full episode with no square-bracket audio tags after the open.
 - HARD BAN long untagged stretches — after the open, keep calm tags coming on about every other line so TTS does not flatten.
 - HARD BAN lecture / referee phrasing: “Full stop.”, “the mistake is…”, “you are allowed…”, “you need to…”, “Been around enough…”, bossy don't-chains, “the lesson is…”, “so remember…”, scolding other guests or first-timers.
+- HARD BAN soft-bossy second-person coaching even when hedged: “maybe you don't…”, “maybe you do your priorities…”, “build that into the plan instead of…”, “maybe that's money you choose…”, “maybe it tells you to…”, “you only sort of care about…”.
+- Prefer rewrites like: “If Studios closes at five, I'd skip long waits for stuff we only sorta care about”, “For Food & Wine, I'd build festival food into the plan”, “If Multi Pass is pricey that day, for my crew that's either a deliberate spend or a slower day.”
 - HARD BAN stacked everybody / somebody chaos lists — especially hotel-morning stacks like everybody needs sunscreen / somebody can't find a swimsuit / somebody else is starving / somehow it's lunchtime before you leave. If hotel chaos comes up, keep it one observational we/I'd beat, not a scolding parade.
 - Prefer rewrites like: “I'd pack sunscreen for my crew”, “we always misplace something on the way out”, “by the time we leave the hotel I'm already hungry.”
 - Cover approved source topics accurately, but weave them into calm host talk, opinions, and reactions.
@@ -203,7 +218,7 @@ Conversation requirements:
 - When Buzz Board questions are included: paraphrase as needed, never invent community answers/usernames/votes, offer Geno's take, and invite listeners to visit the Buzz Board.
 - Include one or two brief recent-park-experience stories connected directly to the episode topics.
 - Uneven pacing is good: mix short punchy hits with longer deep-dive stretches; allow mid-thought pivots and unfinished sentences.
-- Show identity is in Option A (eighteen months / over fifty years + Florida Buzz) — do not add an “unofficial” disclaimer speech.
+- Show identity is in the short Option A welcome (Florida Buzz Disney podcast + I'm your host Geno) — do not add an “unofficial” disclaimer speech.
 - Do not claim a live studio audience, callers, or TV panel format.
 
 Florida Buzz listener guidance (helpful, not ad-read):
@@ -236,7 +251,7 @@ ${sourceBlock || '(none — timeless composites only; no dated claims)'}
 Verified Florida Buzz tools (promote only these site tools, plus the approved sources above):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: Geno Option A — welcome / I'm Geno / eighteen months / over fifty years / let's go — before quick hits. Never say “unofficial.” Structure: quick hits + short ${PARTNER_NAME} mid-roll + one deep dive + CTA with soft ${PARTNER_NAME} show-notes reminder. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~20–25 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: short Geno Option A — welcome to the Florida Buzz Disney podcast / I'm your host Geno / thank you for joining us (or being here / listening) / let's go — before quick hits. Never say “unofficial.” Never open with the eighteen-months longevity monologue. Keep tips as I'd / we / for my crew — never soft-bossy “maybe you…” lectures. Structure: quick hits + short ${PARTNER_NAME} mid-roll + one deep dive + CTA with soft ${PARTNER_NAME} show-notes reminder. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
