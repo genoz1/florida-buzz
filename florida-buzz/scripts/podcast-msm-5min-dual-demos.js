@@ -40,9 +40,9 @@ const GENA_VOICE_SETTINGS = Object.freeze({
   use_speaker_boost: false,
 });
 const GENO_VOICE_SETTINGS = Object.freeze({
-  stability: 0.4,
-  similarity_boost: 0.78,
-  style: 0,
+  stability: 0.52,
+  similarity_boost: 0.95,
+  style: 0.25,
   use_speaker_boost: true,
 });
 
