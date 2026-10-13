@@ -5,11 +5,11 @@ const DEFAULT_FAL_TTS_ENDPOINT = 'fal-ai/gemini-tts';
 const DEFAULT_FAL_TTS_MODEL = 'gemini-2.5-pro-tts';
 const DEFAULT_FAL_SOLO_VOICE = 'Aoede';
 
-// ElevenLabs Geno — Professional Voice Clone "Geno 2" (less Instant-Voice polish).
+// ElevenLabs Geno — Instant Voice Clone (production). Geno 2 PVC was too roomy/distant.
 const DEFAULT_ELEVEN_MODEL = 'eleven_v4';
-const DEFAULT_ELEVEN_VOICE_GENO = '5tg8WQNhwRAIGFxz4EFe'; // Geno 2 (professional)
-const DEFAULT_ELEVEN_VOICE_GENO_LEGACY_INSTANT = 'bg7PC2IzyIDwYgytMiW1'; // Instant Voice Clone
-const DEFAULT_ELEVEN_VOICE_GENA = 'hGQkZQUA5RiOXIw7P9iO'; // Kiora — Gena Bakeoff (professional)
+const DEFAULT_ELEVEN_VOICE_GENO = 'bg7PC2IzyIDwYgytMiW1'; // Instant Voice Clone
+const DEFAULT_ELEVEN_VOICE_GENO_PVC = '5tg8WQNhwRAIGFxz4EFe'; // Geno 2 professional (do not use until re-cloned close-mic)
+const DEFAULT_ELEVEN_VOICE_GENA = 'OZxMHsGaBmV5pjMIDIn0'; // Amy — Natural and Sweet
 const DEFAULT_ELEVEN_OUTPUT_FORMAT = 'mp3_44100_128';
 
 // Legacy fal multi-speaker presets (only used if PODCASTS_TTS_PROVIDER=fal with dual mode).
@@ -89,15 +89,15 @@ function config(env = process.env) {
     elevenVoiceGeno,
     elevenVoiceGena,
     elevenOutputFormat: env.PODCASTS_ELEVEN_OUTPUT_FORMAT || DEFAULT_ELEVEN_OUTPUT_FORMAT,
-    // Geno 2 PVC: max closeness (roomy clone) — high similarity + speaker boost + light style
-    elevenStability: Number(env.PODCASTS_ELEVEN_STABILITY ?? 0.52),
-    elevenSimilarityBoost: Number(env.PODCASTS_ELEVEN_SIMILARITY ?? 0.95),
-    elevenStyle: Number(env.PODCASTS_ELEVEN_STYLE ?? 0.25),
-    elevenSpeakerBoost: String(env.PODCASTS_ELEVEN_SPEAKER_BOOST ?? 'true').toLowerCase() !== 'false',
-    // ffmpeg presence pass after TTS (pulls quiet/distant patches forward)
+    // Instant Geno: calm conversational — avoid PVC “max closeness” settings that overcook Instant
+    elevenStability: Number(env.PODCASTS_ELEVEN_STABILITY ?? 0.35),
+    elevenSimilarityBoost: Number(env.PODCASTS_ELEVEN_SIMILARITY ?? 0.65),
+    elevenStyle: Number(env.PODCASTS_ELEVEN_STYLE ?? 0),
+    elevenSpeakerBoost: String(env.PODCASTS_ELEVEN_SPEAKER_BOOST ?? 'false').toLowerCase() === 'true',
+    // Light presence only (heavy FX was for failed Geno 2 salvage)
     voicePresenceFx: String(env.PODCASTS_VOICE_PRESENCE_FX ?? 'true').toLowerCase() !== 'false',
-    // Geno 2 cold-start: speak a ~5s throwaway warmup on section 1, then trim it
-    voiceWarmupEnabled: String(env.PODCASTS_VOICE_WARMUP ?? 'true').toLowerCase() !== 'false',
+    // Warmup trim was for Geno 2 cold-start; off for Instant by default
+    voiceWarmupEnabled: String(env.PODCASTS_VOICE_WARMUP ?? 'false').toLowerCase() === 'true',
     falKey: env.FAL_KEY || null,
     falEndpoint: env.PODCASTS_FAL_TTS_ENDPOINT || DEFAULT_FAL_TTS_ENDPOINT,
     falModel: env.PODCASTS_FAL_TTS_MODEL || DEFAULT_FAL_TTS_MODEL,
@@ -135,7 +135,7 @@ module.exports = {
   DEFAULT_DIANE_VOICE,
   DEFAULT_ELEVEN_MODEL,
   DEFAULT_ELEVEN_VOICE_GENO,
-  DEFAULT_ELEVEN_VOICE_GENO_LEGACY_INSTANT,
+  DEFAULT_ELEVEN_VOICE_GENO_PVC,
   DEFAULT_ELEVEN_VOICE_GENA,
   DEFAULT_ELEVEN_OUTPUT_FORMAT,
 };
