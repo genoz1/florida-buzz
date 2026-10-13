@@ -63,7 +63,7 @@ function probeVideo(file) {
 
 describe('facebookParkReel voice + captions', () => {
   it('defaults Geno voice id to the podcast clone', () => {
-    assert.equal(DEFAULT_ELEVEN_VOICE_GENO, 'bg7PC2IzyIDwYgytMiW1');
+    assert.equal(DEFAULT_ELEVEN_VOICE_GENO, 'EK1vMGRoEG4LXcQRzXam');
   });
 
   it('enables VO when ElevenLabs key is present unless explicitly disabled', () => {

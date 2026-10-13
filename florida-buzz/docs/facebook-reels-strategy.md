@@ -110,7 +110,7 @@ Same render path either way: still photo, slow zoom/pan, Geno VO, mute-friendly 
 | Startup + 2pm / 8pm ET catch-up (correct mode per missed slot) | `FB_PARK_REEL_PUBLISH=true` |
 | Render → `public/reels/daily/*.mp4` + upload `article-images/park-reels/` | Existing `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
 | Topic picker for park/cruise articles | Same `ELEVENLABS_API_KEY` as podcasts |
-| Geno VO when `ELEVENLABS_API_KEY` is set (default on) | optional `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1` |
+| Geno VO when `ELEVENLABS_API_KEY` is set (default on) | optional `PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam` |
 
 Code **cannot** flip DigitalOcean secrets by itself. Until those two Reel flags are set in the host, the daily Reel cron stays off (or only renders if enabled without publish). VO needs `ELEVENLABS_API_KEY` in production (set `FB_PARK_REEL_WITH_VOICE=false` only for intentional silent renders).
 

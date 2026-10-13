@@ -1,30 +1,20 @@
-Geno voice clones — clear vs boxy
-=================================
+Geno voice clones — production
+==============================
 
-You cannot train a PVC on “TTS beginning good / TTS ending bad.”
-ElevenLabs only learns from the source recordings you upload.
+Production Geno voice: Geno 11 Instant Clone
+  voice_id: EK1vMGRoEG4LXcQRzXam
 
-Geno3 (n715fGrdv64E0c9urL7h) was trained on 4 takes (~30 min). Those takes
-already carry small-room / boxy low-mids, so generations drift thick and
-muffled — especially later in a line.
+Retired / do not use for production:
+  - Instant Geno (old): bg7PC2IzyIDwYgytMiW1
+  - Geno 2 PVC (roomy): 5tg8WQNhwRAIGFxz4EFe
+  - Geno 3 PVC (boxy):  n715fGrdv64E0c9urL7h
 
-WHAT TO DO FOR GENO4
-1. Use the curated clear pack (clearest slices + best overall take):
-   agent-samples/geno4-clear-train/geno4_clear_train_pack.zip
-2. ElevenLabs → Professional Voice Clone → name it Geno4.
-3. Upload ONLY that pack. Do not re-add the old full Geno3 takes.
-4. After it finishes, send the new voice_id.
-
-TTS DEFAULTS AFTER GENO4
-- stability 0.4–0.5
-- similarity 0.65–0.75 (too high locks onto room)
-- speaker boost OFF
+TTS DEFAULTS
+- stability 0.35–0.5
+- similarity 0.58–0.75 (too high locks onto room)
+- speaker boost OFF in app config (voice UI default may still show on)
 - style 0
 
-UNTIL THEN
-Production stays Instant Geno (bg7PC2IzyIDwYgytMiW1).
-
-IF YOU RECORD NEW AUDIO
-- Mic 6–10 inches, quiet soft room (not a closet / bathroom / car).
-- Normal conversation volume, on-axis.
-- Prefer 15–30 min of the clear tone you like at the start of lines.
+DO env (hammerhead):
+  PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam
+  PODCASTS_ELEVEN_VOICE_ID=EK1vMGRoEG4LXcQRzXam

@@ -42,11 +42,11 @@ async function toneMp3(seconds, freq) {
   return buf;
 }
 
-test('resolveHostMode dual aliases and Instant Geno default voice', () => {
+test('resolveHostMode dual aliases and Geno 11 default voice', () => {
   assert.equal(resolveHostMode({}), 'solo');
   assert.equal(resolveHostMode({ PODCASTS_HOST_MODE: 'dual' }), 'dual');
   assert.equal(resolveHostMode({ PODCASTS_HOST_MODE: 'msm' }), 'dual');
-  assert.equal(DEFAULT_ELEVEN_VOICE_GENO, 'bg7PC2IzyIDwYgytMiW1');
+  assert.equal(DEFAULT_ELEVEN_VOICE_GENO, 'EK1vMGRoEG4LXcQRzXam');
   const cfg = config({ PODCASTS_HOST_MODE: 'dual' });
   assert.equal(cfg.hostMode, 'dual');
   assert.ok(cfg.elevenVoiceGena);

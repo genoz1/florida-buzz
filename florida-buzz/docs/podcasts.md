@@ -6,7 +6,7 @@ Isolated podcast publishing for The Florida Buzz. Public pages are on by default
 
 Default audio generation is **solo Geno** via ElevenLabs `eleven_v4` text-to-speech (not fal Gemini multi-speaker).
 
-- Host: Geno Instant Voice Clone `bg7PC2IzyIDwYgytMiW1`
+- Host: Geno 11 Instant Voice Clone `EK1vMGRoEG4LXcQRzXam`
 - Script shape: Named Open (Geno Option A) → Quick Hits → one Deep Dive → CTA
 - Named open (after announcer bumper on `intro_audio_url`): welcome / I'm Geno / eighteen months old · over fifty years / let's go (never say “unofficial”; never state age in years)
 - TTS: calm Geno settings (low stability, style 0, no speaker boost) + per-section variable speed + wider breath gaps between sections
@@ -21,7 +21,7 @@ PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=true
 ELEVENLABS_API_KEY=<set securely in DO; never commit>
 PODCASTS_TTS_PROVIDER=elevenlabs
-PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1
+PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam
 ```
 
 `PODCASTS_ELEVEN_VOICE_ID` is accepted as an alias for `PODCASTS_ELEVEN_VOICE_GENO`.
@@ -109,7 +109,7 @@ PODCASTS_GENERATION_ENABLED=true          # enables paid TTS + auto private prev
 PODCASTS_AUTO_PREVIEW_ENABLED=true        # default; set false for click-only TTS
 ELEVENLABS_API_KEY=sk_***                 # required for ElevenLabs path
 PODCASTS_TTS_PROVIDER=elevenlabs          # or omit for auto-when-key-present
-PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1
+PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam
 ```
 
 Keep schedule **auto_publish** off in admin while you listen to previews. Rotate any ElevenLabs key that was pasted into chat.
@@ -153,7 +153,7 @@ Naturally reference verified Florida Buzz resources. Say “The Florida Buzz dot
 
 ## Admin dashboard steps (after deploy)
 
-Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_KEY`, `PODCASTS_TTS_PROVIDER=elevenlabs` or omit for auto, `PODCASTS_ELEVEN_VOICE_GENO=bg7PC2IzyIDwYgytMiW1`). Apply the solo-Geno hosts migration (or run `node scripts/podcast-upload-cover.js` so RSS hosts = Geno).
+Confirm DO env vars first (`PODCASTS_GENERATION_ENABLED=true`, `ELEVENLABS_API_KEY`, `PODCASTS_TTS_PROVIDER=elevenlabs` or omit for auto, `PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam`). Apply the solo-Geno hosts migration (or run `node scripts/podcast-upload-cover.js` so RSS hosts = Geno).
 
 1. Open `https://thefloridabuzz.com/admin/podcasts` (Basic auth).
 2. Turn **weekly drafts** on (and leave auto-publish off). With `PODCASTS_GENERATION_ENABLED=true`, Tue/Fri cron (or **Run weekly draft now**) creates one standalone script and **starts private ElevenLabs preview in the background**.

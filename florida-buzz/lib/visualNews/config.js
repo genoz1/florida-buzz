@@ -7,7 +7,7 @@
 
 const DEFAULT_ELEVEN_MODEL = 'eleven_v4';
 /** Geno — same ElevenLabs voice as Florida Buzz podcast host (`lib/podcasts/config.js`). */
-const DEFAULT_ELEVEN_VOICE_GENO = 'bg7PC2IzyIDwYgytMiW1';
+const DEFAULT_ELEVEN_VOICE_GENO = 'EK1vMGRoEG4LXcQRzXam'; // geno 11 Instant (same as podcasts)
 const DEFAULT_VOICE = DEFAULT_ELEVEN_VOICE_GENO;
 const DEFAULT_OUTPUT_FORMAT = 'mp3_44100_128';
 const DEFAULT_WIDTH = 720;

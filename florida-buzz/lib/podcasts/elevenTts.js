@@ -2,7 +2,7 @@
 
 // Isolated ElevenLabs v4 solo TTS client for podcasts.
 // Never call when PODCASTS_GENERATION_ENABLED is not true.
-// Default production path: Geno Instant Voice Clone via text-to-speech.
+// Default production path: Geno Geno 11 Instant Voice Clone via text-to-speech.
 //
 // Audio tags: pass script text through with square-bracket cues intact
 // ([conversational], [warmly], [chuckles], …). eleven_v3 / eleven_v4 read these as

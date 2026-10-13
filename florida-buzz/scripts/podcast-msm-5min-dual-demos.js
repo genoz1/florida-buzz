@@ -3,7 +3,7 @@
 
 /**
  * Build ~5 minute MSM-style dual demos.
- * Default: Instant Geno + Amy, natural (anti-polish) recipe.
+ * Default: Geno 11 + Amy, natural (anti-polish) recipe.
  *
  * Required:
  *   ELEVENLABS_API_KEY
@@ -21,13 +21,13 @@ const { createElevenTts } = require('../lib/podcasts/elevenTts');
 const { mixDualLines } = require('../lib/podcasts/dualMix');
 const rawLines = require('./data/msm-demo-5min-lines');
 
-const INSTANT_GENO = DEFAULT_ELEVEN_VOICE_GENO; // bg7PC2IzyIDwYgytMiW1
+const INSTANT_GENO = DEFAULT_ELEVEN_VOICE_GENO; // Geno 11
 const AMY = 'OZxMHsGaBmV5pjMIDIn0';
 const ELIZA = 'ut2XM2wJyIZLTtW6lFzZ';
 
 const ALL_DEMOS = [
-  { slug: 'instant-geno-amy', label: 'Instant Geno + Amy', genaVoice: AMY },
-  { slug: 'instant-geno-eliza', label: 'Instant Geno + Eliza', genaVoice: ELIZA },
+  { slug: 'geno11-amy', label: 'Geno 11 + Amy', genaVoice: AMY },
+  { slug: 'geno11-eliza', label: 'Geno 11 + Eliza', genaVoice: ELIZA },
 ];
 
 /** Strip polish tags that make every line sound staged. Keep laughs only. */
@@ -122,7 +122,7 @@ async function renderDemo({ eleven, ffmpegPath, demo, dir }) {
   }
 
   const finalPath = path.join(dir, `msm-5min-${demo.slug}-balanced.mp3`);
-  // Instant Geno + Amy: skip heavy mic-salvage EQ (it reads fake/processed).
+  // Geno 11 + Amy: skip heavy mic-salvage EQ (it reads fake/processed).
   // Loudnorm-only keeps them in the same ballpark without plastic tone.
   const mixed = await mixDualLines({
     ffmpegPath,
