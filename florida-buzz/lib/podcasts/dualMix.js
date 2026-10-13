@@ -1,8 +1,9 @@
 'use strict';
 
 /**
- * Dual-host audio mixer: synthesize each line on its own voice, loudnorm to the
- * same target, then lay tracks with optional overlap (negative delay vs previous).
+ * Dual-host audio mixer: synthesize each line on its own voice, balance mic
+ * distance per speaker, loudnorm to the same target, then lay tracks with
+ * optional overlap (negative delay vs previous).
  *
  * Text-to-Dialogue alone cannot create true talk-over; this path can.
  */
@@ -31,31 +32,103 @@ function runFfmpeg(ffmpegPath, args) {
 }
 
 async function probeDurationSec(ffmpegPath, filePath) {
-  // ffprobe via ffmpeg -i stderr is messy; use ffprobe if present else ffmpeg.
-  const ffprobe = ffmpegPath.replace(/ffmpeg$/, 'ffprobe');
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      ffprobe,
-      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', filePath],
-      { stdio: ['ignore', 'pipe', 'pipe'] }
-    );
-    let out = '';
-    let err = '';
-    child.stdout.on('data', (c) => {
-      out += c.toString();
+  const ffprobeBin = 'ffprobe';
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(
+        ffprobeBin,
+        ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', filePath],
+        { stdio: ['ignore', 'pipe', 'pipe'] }
+      );
+      let out = '';
+      let err = '';
+      child.stdout.on('data', (c) => {
+        out += c.toString();
+      });
+      child.stderr.on('data', (c) => {
+        err += c.toString();
+      });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        const n = Number(String(out).trim());
+        if (code === 0 && Number.isFinite(n) && n > 0) resolve(n);
+        else reject(new Error(`ffprobe duration failed: ${err || out}`));
+      });
     });
-    child.stderr.on('data', (c) => {
-      err += c.toString();
+  } catch {
+    // ffmpeg-static path may not include ffprobe — parse ffmpeg -i
+    return new Promise((resolve, reject) => {
+      const child = spawn(ffmpegPath || 'ffmpeg', ['-i', filePath], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+      let err = '';
+      child.stderr.on('data', (c) => {
+        err += c.toString();
+      });
+      child.on('error', reject);
+      child.on('close', () => {
+        const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(err);
+        if (!m) return reject(new Error('ffmpeg duration parse failed'));
+        resolve(Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]));
+      });
     });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      const n = Number(String(out).trim());
-      if (code === 0 && Number.isFinite(n) && n > 0) resolve(n);
-      else reject(new Error(`ffprobe duration failed: ${err || out}`));
-    });
-  });
+  }
 }
 
+/**
+ * Per-speaker mic-distance balance, then identical loudnorm target.
+ * Geno 2 PVC reads distant; premade cohosts (Amy) read lips-on-mic — equal LUFS alone is not enough.
+ */
+function speakerBalanceFilter(speaker, { loudnessLufs = -16, truePeakDb = -1.5 } = {}) {
+  const sp = String(speaker || '').toLowerCase();
+  const loudnorm = `loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=6`;
+  if (sp === 'geno') {
+    // Pull Geno forward: warmth + light presence + compression
+    return [
+      'highpass=f=60',
+      'equalizer=f=250:t=q:w=0.9:g=1.2',
+      'equalizer=f=3000:t=q:w=0.9:g=1.8',
+      'acompressor=threshold=-22dB:ratio=3:attack=8:release=120:makeup=3.5',
+      loudnorm,
+    ].join(',');
+  }
+  // Gena / Amy / Eliza — step back from the mic (cut proximity + air)
+  return [
+    'highpass=f=85',
+    'equalizer=f=160:t=q:w=1.0:g=-3',
+    'equalizer=f=3200:t=q:w=0.85:g=-3.5',
+    'equalizer=f=6500:t=q:w=0.7:g=-2.5',
+    'acompressor=threshold=-20dB:ratio=2.2:attack=15:release=160:makeup=1.2',
+    'volume=-1dB',
+    loudnorm,
+  ].join(',');
+}
+
+async function balanceAndLoudnormFile(
+  ffmpegPath,
+  inPath,
+  outPath,
+  { speaker, loudnessLufs = -16, truePeakDb = -1.5 } = {}
+) {
+  await runFfmpeg(ffmpegPath, [
+    '-y',
+    '-i',
+    inPath,
+    '-af',
+    speakerBalanceFilter(speaker, { loudnessLufs, truePeakDb }),
+    '-ar',
+    '44100',
+    '-ac',
+    '1',
+    '-codec:a',
+    'libmp3lame',
+    '-b:a',
+    '128k',
+    outPath,
+  ]);
+}
+
+/** @deprecated use balanceAndLoudnormFile — kept for callers/tests */
 async function loudnormFile(ffmpegPath, inPath, outPath, { i = -16, tp = -1.5, lra = 11 } = {}) {
   await runFfmpeg(ffmpegPath, [
     '-y',
@@ -87,6 +160,7 @@ async function mixDualLines({
   outPath,
   loudnessLufs = MSM_DELIVERY_TARGETS.loudnessLufs,
   truePeakDb = MSM_DELIVERY_TARGETS.truePeakDb,
+  matchMicDistance = true,
 } = {}) {
   if (!Array.isArray(lines) || !lines.length) throw new Error('mixDualLines requires lines');
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-dual-mix-'));
@@ -98,10 +172,19 @@ async function mixDualLines({
       const rawPath = path.join(dir, `raw-${i}.mp3`);
       const normPath = path.join(dir, `norm-${i}.mp3`);
       await fsp.writeFile(rawPath, lines[i].buffer);
-      await loudnormFile(ffmpegPath, rawPath, normPath, {
-        i: loudnessLufs,
-        tp: truePeakDb,
-      });
+      if (matchMicDistance) {
+        await balanceAndLoudnormFile(ffmpegPath, rawPath, normPath, {
+          speaker: lines[i].speaker,
+          loudnessLufs,
+          truePeakDb,
+        });
+      } else {
+        await loudnormFile(ffmpegPath, rawPath, normPath, {
+          i: loudnessLufs,
+          tp: truePeakDb,
+          lra: 6,
+        });
+      }
       normPaths.push(normPath);
       durations.push(await probeDurationSec(ffmpegPath, normPath));
     }
@@ -114,7 +197,7 @@ async function mixDualLines({
       const startMs = i === 0 ? 0 : Math.max(0, cursorMs - overlap);
       const durMs = Math.round(durations[i] * 1000);
       const gapAfter = Math.max(0, Number(lines[i].gapAfterMs) || 0);
-      placements.push({ startMs, durMs, path: normPaths[i] });
+      placements.push({ startMs, durMs, path: normPaths[i], speaker: lines[i].speaker });
       cursorMs = startMs + durMs + gapAfter;
     }
     const totalMs = Math.max(...placements.map((p) => p.startMs + p.durMs)) + 200;
@@ -128,14 +211,14 @@ async function mixDualLines({
     const filterParts = [];
     for (let i = 0; i < placements.length; i++) {
       const delay = placements[i].startMs;
-      // adelay needs ms per channel; apad to full length
       filterParts.push(
         `[${i}:a]adelay=${delay}|${delay},apad=whole_dur=${totalSec},aformat=sample_rates=44100:channel_layouts=mono[a${i}]`
       );
     }
     const mixInputs = placements.map((_, i) => `[a${i}]`).join('');
+    // Final bus loudnorm only — per-line already matched; keep LRA a bit open
     filterParts.push(
-      `${mixInputs}amix=inputs=${placements.length}:duration=longest:normalize=0,loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=11[out]`
+      `${mixInputs}amix=inputs=${placements.length}:duration=longest:normalize=0,loudnorm=I=${loudnessLufs}:TP=${truePeakDb}:LRA=8[out]`
     );
     args.push(
       '-filter_complex',
@@ -161,15 +244,13 @@ async function mixDualLines({
       placements,
       totalMs,
       lineCount: lines.length,
+      matchMicDistance: !!matchMicDistance,
     };
   } finally {
     if (!outPath) {
       await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
-    } else {
-      // keep dir only if outPath inside it; else clean temp
-      if (!String(outPath).startsWith(dir)) {
-        await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
-      }
+    } else if (!String(outPath).startsWith(dir)) {
+      await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }
 }
@@ -177,6 +258,8 @@ async function mixDualLines({
 module.exports = {
   mixDualLines,
   loudnormFile,
+  balanceAndLoudnormFile,
+  speakerBalanceFilter,
   probeDurationSec,
   runFfmpeg,
 };
