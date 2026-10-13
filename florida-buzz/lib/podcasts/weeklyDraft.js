@@ -288,7 +288,7 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
     ? articleTitles[0].slice(0, 48)
     : `${slot.label} planning talk & park opinions`;
   const fallbackTitle = `Florida Buzz: Disney — ${focusHint}`;
-  const fallbackDescription = `Standalone ${slot.label} episode: Geno covers Florida Buzz Disney news with quick hits, one deep dive, and planning tips from The Florida Buzz. Visit https://thefloridabuzz.com. Unofficial fan podcast.`;
+  const fallbackDescription = `Standalone ${slot.label} episode: Geno covers Walt Disney World news and commentary in a short conversational roundup from The Florida Buzz. Visit https://thefloridabuzz.com.`;
 
   if (!aiText) {
     return {

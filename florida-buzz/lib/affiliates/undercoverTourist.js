@@ -35,11 +35,11 @@ const AFFILIATE_DISCLOSURE_SHORT =
 
 /** Spoken mid-roll direction (~15–25 sec) for solo Geno scripts — not read as a hard ad. */
 const PODCAST_MIDROLL_DIRECTION =
-  "If you're planning a Disney trip, check our partner Undercover Tourist for tickets and hotel deals — the link is in the show notes. Booking there helps support the show. Keep it human and brief; disclose it's a partner/affiliate; no hard-sell spam. Do not read the URL aloud.";
+  "Quick human aside: our partner Undercover Tourist has Disney tickets and hotels — link in the show notes. Booking there helps support the show. Disclose it's a partner/affiliate; keep it brief; no vacation-planning pitch; no hard-sell spam. Do not read the URL aloud.";
 
 /** Soft outro reminder direction. */
 const PODCAST_OUTRO_DIRECTION =
-  'Brief reminder: the Undercover Tourist partner link for tickets and hotels is in the show notes — then warm goodbye with Florida Buzz resources. No hard sell.';
+  'Brief reminder: the Undercover Tourist partner link for tickets and hotels is in the show notes — then warm goodbye. Mention The Florida Buzz dot com lightly if natural. No hard sell, no planner lecture.';
 
 function undercoverTouristBase(env = process.env) {
   return String(env.UNDERCOVER_TOURIST_LINK || CJ_EVERGREEN_BASE).replace(/\/$/, '');

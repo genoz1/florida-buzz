@@ -22,7 +22,7 @@ function seedShow() {
     title: 'Florida Buzz: Disney',
     publisher: 'The Florida Buzz',
     description:
-      'Geno hosts Florida Buzz: Disney — a fan podcast with park news, attractions, food, resorts, events, and Disney World vacation planning. Calm conversational coverage of Magic Kingdom, EPCOT, Disney’s Animal Kingdom, Hollywood Studios, wait times, dining, and practical trip tips. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.',
+      'Geno hosts The Florida Buzz Disney Podcast — Walt Disney World news, updates, and commentary. A conversational roundup of park developments, restaurant changes, announcements, and operations — not a vacation planning seminar. Find the stories at https://thefloridabuzz.com.',
     hosts: [{ name: 'Geno', role: 'host' }],
     disclosure: DEFAULT_DISCLOSURE,
     language: 'en-us',

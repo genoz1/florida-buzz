@@ -49,7 +49,7 @@ function createFalTts(cfg, fetcher = fetch) {
       output_format: cfg.outputFormat,
       voice: cfg.falSoloVoice || cfg.genaVoice || 'Aoede',
       style_instructions: [
-        'Solo casual Central Florida park-day host (Geno) — calm dad-talk, warm, conversational. Never state age in years, never say unofficial, never lecture or soft-boss the listener with maybe-you coaching. Never cartoon, never robotic AI assistant, never dual-host banter, never radio announcer polish. Named welcome first (Welcome to the Florida Buzz Disney podcast / I\'m your host Geno / thank you for joining us / Let\'s go), then quick hits, one deep dive, CTA. Tips sound like I\'d / we / for my crew habits. Longer breath groups, uneven pacing, micro-pauses. Less announcer, more real conversation.',
+        'Solo Geno news-table host — sitting across from someone talking about Disney World news. Warm, conversational, uneven pacing. Never state age in years, never say unofficial, never vacation-planning lectures, never soft-boss maybe-you coaching. Never cartoon, never robotic AI assistant, never dual-host banter, never news-anchor polish. Named welcome first (Welcome to the Florida Buzz Disney podcast / I\'m your host Geno / thank you for joining us / what\'s happening at Disney World / Let\'s go), then 4–6 news stories with opinions, short partner mid-roll, CTA. Mixed feelings and skepticism OK. Longer breath groups, micro-pauses. Less announcer, more real conversation.',
         pronunciationStyleInstructions(),
       ].join(' '),
     };
