@@ -36,8 +36,11 @@ async function run() {
   if (DRY_RUN) console.log('DRY RUN: nothing will be posted.\n');
 
   const cadence = getFacebookCadenceConfig();
+  // Drain stays lightweight: one post per tick even when automate may post many.
+  const perDrain = cadence.maxPostsPerRun > 0 ? cadence.maxPostsPerRun : 1;
+  const runCapLabel = cadence.maxPostsPerRun > 0 ? `${cadence.maxPostsPerRun}/run` : '1/drain tick';
   console.log(
-    `Cadence: max ${cadence.maxPostsPerRun}/run, ≥${cadence.minHoursBetweenPosts}h apart, `
+    `Cadence: max ${runCapLabel}, ≥${cadence.minHoursBetweenPosts}h apart, `
     + (cadence.maxPostsPerDay > 0 ? `${cadence.maxPostsPerDay}/day cap` : 'no daily hard cap')
     + '. Queue keeps items until posted (spacing deferrals only).\n'
   );
@@ -48,7 +51,7 @@ async function run() {
   }
 
   const queued = await loadPendingFacebookFeedPosts(supabase, {
-    limit: Math.max(cadence.maxPostsPerRun, 1),
+    limit: perDrain,
     dryRun: DRY_RUN,
   });
   if (!queued.length) {
@@ -62,7 +65,7 @@ async function run() {
   let skipped = 0;
 
   for (const row of queued) {
-    if (posted >= cadence.maxPostsPerRun) break;
+    if (posted >= perDrain) break;
 
     const decision = await decideFacebookDistribution(
       {

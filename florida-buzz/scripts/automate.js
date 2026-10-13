@@ -48,8 +48,8 @@ const parser = new Parser({
 });
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const MAX_ITEMS_PER_SOURCE = parseInt(process.env.MAX_ITEMS_PER_SOURCE, 10) || 3;
-// Facebook cadence defaults live in lib/facebookDistribution.js (60 min within-run
-// delay, 0.5h min spacing, max 1/run, no daily hard cap). Articles/guides that
+// Facebook cadence defaults live in lib/facebookDistribution.js (15 min within-run
+// delay + 15 min min spacing, no per-run/daily hard cap). Articles/guides that
 // miss a slot stay queued (fb_posted=false) for a later run. Website unchanged.
 const FB_POST_DELAY_MINUTES = getFacebookCadenceConfig().postDelayMinutes;
 
@@ -622,8 +622,11 @@ async function run() {
     const dayCap = fbCadence.maxPostsPerDay > 0
       ? `${fbCadence.maxPostsPerDay}/day`
       : 'no daily cap (queue + spacing)';
+    const runCap = fbCadence.maxPostsPerRun > 0
+      ? `${fbCadence.maxPostsPerRun}/run`
+      : 'no per-run cap';
     console.log(
-      `Facebook: every article & guide posts; max ${fbCadence.maxPostsPerRun}/run, `
+      `Facebook: every article & guide posts; ${runCap}, `
       + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart `
       + `(within-run FB delay ${fbCadence.postDelayMinutes}m). Extras stay queued — not dropped. Website + other social unchanged.\n`
     );

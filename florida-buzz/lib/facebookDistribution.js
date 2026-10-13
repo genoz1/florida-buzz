@@ -13,20 +13,19 @@
  * Env overrides (all optional):
  *   FB_TOPIC_FILTER_ENABLED=true      enable park/cruise-only allowlist
  *   FB_ALLOWED_CATEGORIES=theme-parks,cruises
- *   FB_MIN_HOURS_BETWEEN_POSTS=0.5    default 0.5 (~30 min; max gap that still
- *                                     clears a normal full-day article volume)
+ *   FB_MIN_HOURS_BETWEEN_POSTS=0.25   default 0.25 (~15 min; matches pre-filter
+ *                                     FB_POST_DELAY_MINUTES production spacing)
  *   FB_MAX_POSTS_PER_DAY=0            default 0 = no daily hard cap (queue/spacing only)
- *   FB_MAX_POSTS_PER_RUN=1            default 1 (extras stay queued for later runs)
- *   FB_POST_DELAY_MINUTES=60          within-run wait after an FB post (default 60)
+ *   FB_MAX_POSTS_PER_RUN=0            default 0 = no per-run cap (space within the run)
+ *   FB_POST_DELAY_MINUTES=15          within-run wait after an FB post (default 15)
  *   FB_SKIP_NON_PARK_FEED=true        skip promo/engagement/city FB posts
  *
- * Cadence never permanently drops article/guide rows. When spacing (or
- * max-per-run) blocks a post, articles.fb_posted stays false and a later
- * automate/guide/drain run posts it.
+ * Cadence never permanently drops article/guide rows. When spacing blocks a
+ * post, articles.fb_posted stays false and a later automate/guide/drain run
+ * posts it.
  *
- * Throughput math (defaults): ≥30 min gap × drain ~every 30 min through the
- * waking day ≈ up to ~30+ FB posts/day, so a normal full article+guide day
- * can clear without dumping several posts in one burst.
+ * Throughput math (defaults): ≥15 min gap. A 45-post day clears in ~11h of
+ * spaced posting (same idea as the old within-run 10–15 minute delay).
  */
 
 const DEFAULT_ALLOWED_CATEGORIES = ['theme-parks', 'cruises'];
@@ -107,15 +106,17 @@ function skipNonParkFeedPosts(env = process.env) {
 
 function getFacebookCadenceConfig(env = process.env) {
   return {
-    // ~30 minutes: widest practical gap that still clears a normal full-day
-    // article + guide volume when drain ticks run about every half hour.
-    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 0.5),
+    // ~15 minutes — same spacing the site used before the park/cruise filter
+    // (code default was 10; production FB_POST_DELAY_MINUTES was 15).
+    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 0.25),
     // 0 = unlimited (default). A positive value is a soft ceiling for the day;
     // blocked items remain queued (fb_posted=false) for later runs.
     maxPostsPerDay: positiveInt(env.FB_MAX_POSTS_PER_DAY, 0),
-    maxPostsPerRun: positiveInt(env.FB_MAX_POSTS_PER_RUN, 1),
-    // Only used when more than one Facebook post is allowed in a single run.
-    postDelayMinutes: positiveInt(env.FB_POST_DELAY_MINUTES, 60),
+    // 0 = unlimited per run (default). Automate/guide can clear a batch with
+    // postDelayMinutes between successes, matching the old within-run spacing.
+    maxPostsPerRun: positiveInt(env.FB_MAX_POSTS_PER_RUN, 0),
+    // Within-run wait after each Facebook success when posting more than one.
+    postDelayMinutes: positiveInt(env.FB_POST_DELAY_MINUTES, 15),
   };
 }
 
@@ -199,7 +200,8 @@ function evaluateFacebookCadence(state = {}, env = process.env) {
   const postsThisRun = Number(state.postsThisRun) || 0;
   const recent = Array.isArray(state.recentSuccesses) ? state.recentSuccesses : [];
 
-  if (postsThisRun >= config.maxPostsPerRun) {
+  // maxPostsPerRun === 0 means no per-run cap (within-run delay + min spacing only).
+  if (config.maxPostsPerRun > 0 && postsThisRun >= config.maxPostsPerRun) {
     return {
       ok: false,
       reason: 'max_per_run',

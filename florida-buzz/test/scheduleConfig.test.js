@@ -128,16 +128,19 @@ test('Facebook feed drain is on whenever FB + Supabase credentials exist', () =>
   }).facebookFeedDrain, true);
 });
 
-test('Facebook feed drain crons cover ~30 minute daytime slots without automate hours', () => {
-  assert.equal(FACEBOOK_FEED_DRAIN_CRONS.length, 2);
+test('Facebook feed drain crons cover ~15 minute daytime slots without automate hours', () => {
+  assert.equal(FACEBOOK_FEED_DRAIN_CRONS.length, 3);
   assert.deepEqual(
     FACEBOOK_FEED_DRAIN_CRONS.map((entry) => entry.cron).sort(),
-    ['0 7-10,12-14,16-18,20-23 * * *', '30 7-22 * * *'].sort()
+    ['0 7-10,12-14,16-18,20-23 * * *', '15,45 7-22 * * *', '30 7-22 * * *'].sort()
   );
   const joined = FACEBOOK_FEED_DRAIN_CRONS.map((entry) => entry.cron).join(' ');
-  // Must not collide with article automate at 6 / 11 / 15 / 19.
-  assert.doesNotMatch(joined, /\b6\b/);
-  assert.doesNotMatch(joined, /\b11\b/);
-  assert.doesNotMatch(joined, /\b15\b/);
-  assert.doesNotMatch(joined, /\b19\b/);
+  // Must not collide with article automate at 6 / 11 / 15 / 19 on the hour.
+  // Note: minute lists may contain "15" (as :15), so only check hour tokens carefully.
+  assert.doesNotMatch(joined, /(^|[\s,-])6([\s,-]|$)/);
+  assert.doesNotMatch(joined, /(^|[\s,-])11([\s,-]|$)/);
+  assert.doesNotMatch(joined, /(^|[\s,-])19([\s,-]|$)/);
+  // Automate 3pm (:00) — hour 15 must not appear in the :00 cron hour list.
+  const topOfHour = FACEBOOK_FEED_DRAIN_CRONS.find((entry) => entry.cron.startsWith('0 ')).cron;
+  assert.doesNotMatch(topOfHour, /(^|[\s,-])15([\s,-]|$)/);
 });
