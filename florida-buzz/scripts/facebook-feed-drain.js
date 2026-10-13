@@ -2,12 +2,12 @@
 'use strict';
 
 /**
- * Lightweight Facebook park/cruise feed drain.
+ * Lightweight Facebook feed drain.
  *
- * Does not write new articles. Posts at most one queued park/cruise item
+ * Does not write new articles. Posts at most one queued article/guide
  * (articles.fb_posted=false) when the cadence gap has elapsed. Scheduled
- * frequently enough that a normal day's park/cruise volume can all reach
- * Facebook the same day without dumping five posts in under an hour.
+ * frequently enough that a normal day's volume can all reach Facebook the
+ * same day without dumping several posts in under an hour.
  *
  * Usage:
  *   DRY_RUN=true node scripts/facebook-feed-drain.js
@@ -39,7 +39,7 @@ async function run() {
   console.log(
     `Cadence: max ${cadence.maxPostsPerRun}/run, ≥${cadence.minHoursBetweenPosts}h apart, `
     + (cadence.maxPostsPerDay > 0 ? `${cadence.maxPostsPerDay}/day cap` : 'no daily hard cap')
-    + '. Queue never drops park/cruise items.\n'
+    + '. Queue keeps items until posted (spacing deferrals only).\n'
   );
 
   if (!supabase) {
@@ -56,7 +56,7 @@ async function run() {
     return { posted: 0, deferred: 0, skipped: 0 };
   }
 
-  console.log(`Queue: ${queued.length} park/cruise item(s) waiting.`);
+  console.log(`Queue: ${queued.length} item(s) waiting.`);
   let posted = 0;
   let deferred = 0;
   let skipped = 0;

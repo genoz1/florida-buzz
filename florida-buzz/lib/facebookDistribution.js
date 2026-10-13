@@ -3,28 +3,30 @@
 /**
  * Facebook feed distribution policy for Florida Buzz.
  *
- * Website / other social channels are unchanged. This module only decides
- * whether a piece of content may be posted to the Facebook Page:
+ * Website / other social channels are unchanged. This module decides whether
+ * a piece of content may be posted to the Facebook Page:
  *
- * 1. Topic allowlist — theme parks + cruises (category and/or keywords)
+ * 1. Topic filter — OFF by default (every article & guide can post). Optional
+ *    park/cruise allowlist remains available via FB_TOPIC_FILTER_ENABLED=true.
  * 2. Cadence — hours between posts, max posts per run, max posts per day
  *
  * Env overrides (all optional):
- *   FB_TOPIC_FILTER_ENABLED=false     disable topic filter (not recommended)
+ *   FB_TOPIC_FILTER_ENABLED=true      enable park/cruise-only allowlist
  *   FB_ALLOWED_CATEGORIES=theme-parks,cruises
- *   FB_MIN_HOURS_BETWEEN_POSTS=1.5    default 1.5 (~90 min; full day volume can clear)
+ *   FB_MIN_HOURS_BETWEEN_POSTS=0.5    default 0.5 (~30 min; max gap that still
+ *                                     clears a normal full-day article volume)
  *   FB_MAX_POSTS_PER_DAY=0            default 0 = no daily hard cap (queue/spacing only)
  *   FB_MAX_POSTS_PER_RUN=1            default 1 (extras stay queued for later runs)
  *   FB_POST_DELAY_MINUTES=60          within-run wait after an FB post (default 60)
- *   FB_SKIP_NON_PARK_FEED=false       allow promo/engagement/city FB again
+ *   FB_SKIP_NON_PARK_FEED=true        skip promo/engagement/city FB posts
  *
- * Cadence never permanently drops park/cruise articles or guides. When spacing
- * (or max-per-run) blocks a post, articles.fb_posted stays false and a later
- * automate/guide/drain run posts it. Only non-park topics are skipped for Facebook.
+ * Cadence never permanently drops article/guide rows. When spacing (or
+ * max-per-run) blocks a post, articles.fb_posted stays false and a later
+ * automate/guide/drain run posts it.
  *
- * Throughput math (defaults): gap 1.5h × drain ~every 90 min ≈ up to ~10–12 FB
- * park/cruise posts in a waking day. “1 per run” does NOT mean “only 1/day” —
- * it means one per drain/automate/guide tick; more ticks = more posts same day.
+ * Throughput math (defaults): ≥30 min gap × drain ~every 30 min through the
+ * waking day ≈ up to ~30+ FB posts/day, so a normal full article+guide day
+ * can clear without dumping several posts in one burst.
  */
 
 const DEFAULT_ALLOWED_CATEGORIES = ['theme-parks', 'cruises'];
@@ -93,24 +95,23 @@ function positiveInt(raw, fallback) {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+/** Feed topic filter is opt-in — default posts every article/guide. */
 function topicFilterEnabled(env = process.env) {
-  return env.FB_TOPIC_FILTER_ENABLED !== 'false';
+  return env.FB_TOPIC_FILTER_ENABLED === 'true';
 }
 
+/** Non-article feed jobs (promo/engagement/city) post unless explicitly skipped. */
 function skipNonParkFeedPosts(env = process.env) {
-  // Default ON: promo / engagement / city roundups do not hit Facebook while
-  // the Page focuses on park + cruise discovery.
-  return env.FB_SKIP_NON_PARK_FEED !== 'false';
+  return env.FB_SKIP_NON_PARK_FEED === 'true';
 }
 
 function getFacebookCadenceConfig(env = process.env) {
   return {
-    // ~90 minutes: far better than a 48-minute burst, still fast enough that
-    // 8+ park/cruise posts can all leave the queue the same day when the
-    // facebook-feed-drain cron runs about every 90 minutes.
-    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 1.5),
+    // ~30 minutes: widest practical gap that still clears a normal full-day
+    // article + guide volume when drain ticks run about every half hour.
+    minHoursBetweenPosts: positiveNumber(env.FB_MIN_HOURS_BETWEEN_POSTS, 0.5),
     // 0 = unlimited (default). A positive value is a soft ceiling for the day;
-    // blocked park/cruise items remain queued (fb_posted=false) for later runs.
+    // blocked items remain queued (fb_posted=false) for later runs.
     maxPostsPerDay: positiveInt(env.FB_MAX_POSTS_PER_DAY, 0),
     maxPostsPerRun: positiveInt(env.FB_MAX_POSTS_PER_RUN, 1),
     // Only used when more than one Facebook post is allowed in a single run.
@@ -166,6 +167,14 @@ function isFacebookTopicAllowed(content = {}, env = process.env) {
 }
 
 /**
+ * Always apply the park/cruise allowlist (used by Reels topic picking).
+ * Independent of the feed-level FB_TOPIC_FILTER_ENABLED flag.
+ */
+function isParkCruiseTopic(content = {}, env = process.env) {
+  return isFacebookTopicAllowed(content, { ...env, FB_TOPIC_FILTER_ENABLED: 'true' });
+}
+
+/**
  * Whether promo / engagement / city-roundup style jobs should post to Facebook.
  */
 function isNonArticleFacebookAllowed(env = process.env) {
@@ -175,7 +184,7 @@ function isNonArticleFacebookAllowed(env = process.env) {
   return {
     ok: false,
     reason: 'non_park_feed_skipped',
-    detail: 'FB_SKIP_NON_PARK_FEED is on — only park/cruise article & guide posts (plus Reels) go to Facebook',
+    detail: 'FB_SKIP_NON_PARK_FEED is on — promo/engagement/city Facebook posts are skipped',
   };
 }
 
@@ -210,7 +219,7 @@ function evaluateFacebookCadence(state = {}, env = process.env) {
     return {
       ok: false,
       reason: 'max_per_day',
-      detail: `Already ${postsToday} Facebook success(es) in the last 24h (max ${config.maxPostsPerDay}); park/cruise items stay queued`,
+      detail: `Already ${postsToday} Facebook success(es) in the last 24h (max ${config.maxPostsPerDay}); items stay queued`,
       config,
     };
   }
@@ -304,6 +313,7 @@ module.exports = {
   getFacebookCadenceConfig,
   isFacebookTopicAllowed,
   isNonArticleFacebookAllowed,
+  isParkCruiseTopic,
   loadRecentFacebookSuccesses,
   matchParkCruiseKeyword,
   skipNonParkFeedPosts,

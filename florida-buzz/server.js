@@ -441,10 +441,10 @@ if (scheduleFlags.facebookParkReel) {
   console.log('Facebook park Reel NOT scheduled — set FB_PARK_REEL_ENABLED=true AND FB_PARK_REEL_PUBLISH=true in DigitalOcean (plus FB + Supabase credentials).');
 }
 
-// Drain queued park/cruise Facebook posts about every 90 minutes (Eastern).
+// Drain queued Facebook article/guide posts about every 30 minutes (Eastern).
 // Article automate (4×/day) and guides (4×/day) also drain when they run;
-// this grid is what makes “all of today’s park posts, spaced” actually finish
-// the same day when volume is 6–10+. Spacing still enforced by FB_MIN_HOURS_BETWEEN_POSTS.
+// this grid is what makes “all of today’s posts, spaced” actually finish
+// the same day. Spacing still enforced by FB_MIN_HOURS_BETWEEN_POSTS (default 0.5h).
 if (scheduleFlags.facebookFeedDrain) {
   for (const entry of FACEBOOK_FEED_DRAIN_CRONS) {
     cron.schedule(entry.cron, () => {
@@ -453,9 +453,8 @@ if (scheduleFlags.facebookFeedDrain) {
     }, { timezone: 'America/New_York' });
   }
   console.log(
-    'Facebook feed drain scheduled ~every 90 minutes Eastern '
-    + '(7:30, 8:00, 9:30, 10:00, 12:30, 13:00, 14:30, 16:00, 17:30, 18:00, 20:30, 21:00, 22:30, 23:00) '
-    + '— avoids automate hours; posts at most 1 park/cruise item per tick when spacing allows.'
+    'Facebook feed drain scheduled ~every 30 minutes Eastern (7am–11pm, skipping automate :00 hours) '
+    + '— posts at most 1 article/guide per tick when ≥30 min spacing allows.'
   );
 } else {
   console.log('Facebook feed drain NOT scheduled — set FB_PAGE_ID, FB_PAGE_ACCESS_TOKEN, SUPABASE_URL, and SUPABASE_SERVICE_KEY.');

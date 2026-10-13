@@ -505,12 +505,12 @@ async function run() {
       ? `${fbCadence.maxPostsPerDay}/day`
       : 'no daily cap (queue + spacing)';
     console.log(
-      `Facebook: every park/cruise guide posts; max ${fbCadence.maxPostsPerRun}/run, `
+      `Facebook: every article & guide posts; max ${fbCadence.maxPostsPerRun}/run, `
       + `${dayCap}, ≥${fbCadence.minHoursBetweenPosts}h apart. Extras stay queued.\n`
     );
     const queuedFb = await loadPendingFacebookFeedPosts(supabase, { limit: 5, dryRun: DRY_RUN });
     if (queuedFb.length) {
-      console.log(`Facebook feed queue: ${queuedFb.length} park/cruise item(s) waiting for spacing.`);
+      console.log(`Facebook feed queue: ${queuedFb.length} item(s) waiting for spacing.`);
       for (const row of queuedFb) {
         const result = await attemptGuideFacebookPost({
           category: row.category,

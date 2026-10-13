@@ -128,11 +128,11 @@ test('Facebook feed drain is on whenever FB + Supabase credentials exist', () =>
   }).facebookFeedDrain, true);
 });
 
-test('Facebook feed drain crons cover ~90 minute daytime slots without automate hours', () => {
+test('Facebook feed drain crons cover ~30 minute daytime slots without automate hours', () => {
   assert.equal(FACEBOOK_FEED_DRAIN_CRONS.length, 2);
   assert.deepEqual(
     FACEBOOK_FEED_DRAIN_CRONS.map((entry) => entry.cron).sort(),
-    ['0 8,10,13,16,18,21,23 * * *', '30 7,9,12,14,17,20,22 * * *'].sort()
+    ['0 7-10,12-14,16-18,20-23 * * *', '30 7-22 * * *'].sort()
   );
   const joined = FACEBOOK_FEED_DRAIN_CRONS.map((entry) => entry.cron).join(' ');
   // Must not collide with article automate at 6 / 11 / 15 / 19.

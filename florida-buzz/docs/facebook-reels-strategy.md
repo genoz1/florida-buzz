@@ -1,65 +1,69 @@
-# Facebook strategy: park/cruise feed + inexpensive Reels
+# Facebook strategy: full feed + inexpensive park Reels
 
-Operational note for Gene. **Website publishing is unchanged** — only Facebook distribution is filtered and spaced.
+Operational note for Gene. **Website publishing is unchanged** — Facebook distribution is spaced so the Page does not dump a burst of posts.
 
 ## Plain English (the important part)
 
-**Yes — every theme-park and cruise article and guide still posts to Facebook.**  
-They are just **spaced about 90 minutes apart** so the Page does not dump five posts in under an hour.
+**Yes — every article and guide posts to Facebook.**  
+They are **spaced about every 30 minutes** so the Page does not dump several posts in under an hour.
 
-“1 per run” only means **one Facebook post per drain tick** — not “only one a day.” There are about **12 drain ticks** from 6am–10:30pm Eastern, plus automate/guide runs that also drain the queue.
+“1 per run” only means **one Facebook post per drain tick** — not “only one a day.” There are drain ticks about every **30 minutes** from 7am–11pm Eastern, plus automate/guide runs that also drain the queue.
 
-**If 8 park posts publish on the site today, Facebook will post all 8, about every 1.5 hours, finishing by ~afternoon/evening the same day** (e.g. first at 6:00am → last around 4:30pm; if all eight land at noon, last around 10:30pm). Nothing is dropped — extras wait in a queue (`articles.fb_posted = false`) until the next eligible tick.
+**If ~16 articles publish on the site today, Facebook will post them about every 30 minutes across the waking day.** Nothing is dropped — extras wait in a queue (`articles.fb_posted = false`) until the next eligible tick.
 
 ## What shipped
 
-1. **Topic filter** — Facebook article/guide posts only for theme parks + cruises  
-2. **Cadence** — ~90 min between Facebook successes; max 1 per run; **no default daily hard cap**  
+1. **Full feed** — every article and guide can post to Facebook (optional park/cruise filter is off by default)  
+2. **Cadence** — ~30 min between Facebook successes; max 1 per run; **no default daily hard cap**  
 3. **Queue, don’t drop** — cadence blocks leave the item queued for the next eligible run  
-4. **Frequent drain** — dedicated `facebook-feed-drain` cron ~every 90 minutes Eastern so same-day volume clears  
-5. **Non-park feed jobs skipped** — promo / engagement / city roundup / feature-promo Facebook posts off by default  
+4. **Frequent drain** — dedicated `facebook-feed-drain` cron ~every 30 minutes Eastern so same-day volume clears  
+5. **Promo / engagement / city** — allowed on Facebook again by default  
 6. **Feed packaging** — stronger comment CTAs; link stays in first comment  
-7. **Park Reel path** — article/park still photos with a slow zoom/pan + big on-screen text; not fal/guide-reels  
+7. **Park Reel path** — still park/cruise-only; article/park still photos with a slow zoom/pan + captions  
 
-## Topic filter
+## Topic filter (optional)
 
 Module: `lib/facebookDistribution.js`  
 Queue helper: `lib/facebookFeedQueue.js`  
 Drain script: `scripts/facebook-feed-drain.js`  
 Wired into: `scripts/automate.js`, `scripts/generate-guide.js`, `server.js` drain cron
 
-**Allowed when either:**
+**Default: filter off** (`FB_TOPIC_FILTER_ENABLED` unset/false) — beaches, wildlife, food, events, space, etc. all post to Facebook with the same spacing queue.
+
+To re-enable park/cruise-only feed posts:
+
+```bash
+FB_TOPIC_FILTER_ENABLED=true
+```
+
+When that flag is on, allowed when either:
 
 | Signal | Examples |
 |--------|----------|
 | Category | `theme-parks`, `cruises` (override with `FB_ALLOWED_CATEGORIES`) |
 | Keywords in title/dek/caption/slug | disney, magic kingdom, epcot, hollywood studios, animal kingdom, universal, epic universe, seaworld, legoland, busch gardens, lightning lane, cruise, port canaveral, royal caribbean, … |
 
-Beaches, space, wildlife, generic food/events, etc. still publish on the **website** (and other social) but **skip Facebook** (and mark the Facebook step resolved so they do not sit in the queue).
-
-**Guides use the same gate as articles** — a theme-parks or cruises guide is queued/spaced the same way.
-
-Disable filter (not recommended): `FB_TOPIC_FILTER_ENABLED=false`.
+**Park Reels always stay park/cruise-only** via `isParkCruiseTopic()`, even when the feed filter is off.
 
 ## Cadence defaults
 
 | Knob | Default | Env override |
 |------|---------|--------------|
-| Min hours between FB successes | **1.5** (~90 min) | `FB_MIN_HOURS_BETWEEN_POSTS` (use `2` if you want slower) |
+| Min hours between FB successes | **0.5** (~30 min) | `FB_MIN_HOURS_BETWEEN_POSTS` (use `1` if you want slower) |
 | Max FB posts per rolling 24h | **0 (off)** | `FB_MAX_POSTS_PER_DAY` — set only if you want a ceiling; blocked items still queue |
 | Max FB posts per automate/guide/drain run | **1** | `FB_MAX_POSTS_PER_RUN` |
 | Within-run wait after an FB post | **60** minutes | `FB_POST_DELAY_MINUTES` (only matters if max-per-run > 1) |
 
 History comes from `post_log` (`platform=facebook`, `status=success`). If Supabase is down, cadence falls back to in-run counters only.
 
-**Queue behavior:** park/cruise rows stay `fb_posted=false` until a successful Facebook post (or an intentional non-park skip). Dedicated drain ticks (~every 90 min, avoiding automate clock times) plus automate (6am / 11am / 3pm / 7pm ET) and guide runs (7:45am / 12:45pm / 5:45pm / 10:45pm ET) each post the oldest queued item when spacing allows.
+**Queue behavior:** article/guide rows stay `fb_posted=false` until a successful Facebook post. Dedicated drain ticks (~every 30 min, avoiding automate clock times) plus automate (6am / 11am / 3pm / 7pm ET) and guide runs (7:45am / 12:45pm / 5:45pm / 10:45pm ET) each post the oldest queued item when spacing allows.
 
-**Why the old “3 hours + 4 automate runs” scared Gene:** with a 3h gap and only a few runs, only ~4–5 posts cleared per day and extras waited overnight — that felt like a hard cap. Defaults are now **1.5h gap + ~12 drain slots/day** so a normal park/cruise day finishes on Facebook the same day.
+**Why ~30 minutes:** that is about the widest gap that still clears a normal full-day article + guide volume without dumping several posts at once. Wider gaps (1–1.5h) build a multi-day backlog when the site publishes ~40 pieces/day.
 
-**Non-park Facebook jobs** (promo, engagement, city roundup FB, feature promo FB) are skipped while `FB_SKIP_NON_PARK_FEED` is not `false`. Re-enable with:
+**Non-article Facebook jobs** (promo, engagement, city roundup FB, feature promo FB) are allowed by default. Skip them with:
 
 ```bash
-FB_SKIP_NON_PARK_FEED=false
+FB_SKIP_NON_PARK_FEED=true
 ```
 
 ## Feed packaging
@@ -157,4 +161,4 @@ Writes `florida-buzz-park-reel-sample.mp4` (and frames) under `/opt/cursor/artif
 
 ## Recommendation summary
 
-Ship the ChatGPT plan with codebase reality: **park/cruise-only Facebook**, **every park/cruise article & guide still posts the same day**, **~90 minutes apart via queue + drain cron**, **cheap stills→video Reel daily once Gene sets the two env flags**, prove reach, then keep or kill based on plays / follows — not post count.
+Ship with codebase reality: **every article & guide posts to Facebook**, **~30 minutes apart via queue + drain cron**, **park Reels stay park/cruise-only**, prove reach, then keep or kill based on plays / follows — not post count.
