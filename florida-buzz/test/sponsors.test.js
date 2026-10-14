@@ -103,7 +103,7 @@ test('sponsors page links to become-a-sponsor flow', async () => {
     assert.match(body, /Rook Careers/);
     assert.match(body, /Become a sponsor/);
     assert.match(body, /href="\/sponsors\/become"/);
-    assert.match(body, /href="\/sponsors\/packet"/);
+    assert.match(body, /Florida_Buzz_Sponsor_Packet\.pdf/);
     assert.doesNotMatch(body, /Email about sponsorship/);
   } finally {
     server.close();

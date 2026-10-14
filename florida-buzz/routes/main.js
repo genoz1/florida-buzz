@@ -653,12 +653,17 @@ router.get('/sponsors/become', (req, res) => {
 });
 
 router.get('/sponsors/packet', (req, res) => {
-  const { becomeSponsorPageData } = require('../lib/sponsors');
-  const page = becomeSponsorPageData(process.env);
-  res.render('sponsor-packet', {
-    packet: page.packet,
-    tiers: page.tiers,
-  });
+  const { SPONSOR_PACKET } = require('../lib/sponsors');
+  // Prefer the official PDF packet; keep ?format=html for the lightweight web view.
+  if (String(req.query.format || '').toLowerCase() === 'html') {
+    const { becomeSponsorPageData } = require('../lib/sponsors');
+    const page = becomeSponsorPageData(process.env);
+    return res.render('sponsor-packet', {
+      packet: page.packet,
+      tiers: page.tiers,
+    });
+  }
+  return res.redirect(302, SPONSOR_PACKET.pdfPath);
 });
 
 router.get('/sponsors/become/success', (req, res) => {
@@ -905,7 +910,7 @@ router.get('/sitemap.xml', async (req, res) => {
     { loc: `${siteUrl}/merch`, priority: '0.7' },
     { loc: `${siteUrl}/sponsors`, priority: '0.6' },
     { loc: `${siteUrl}/sponsors/become`, priority: '0.6' },
-    { loc: `${siteUrl}/sponsors/packet`, priority: '0.5' },
+    { loc: `${siteUrl}/docs/Florida_Buzz_Sponsor_Packet.pdf`, priority: '0.5' },
     { loc: `${siteUrl}/gene-zentko`, priority: '0.5' },
     { loc: `${siteUrl}/privacy`, priority: '0.3' },
     { loc: `${siteUrl}/terms`, priority: '0.3' },

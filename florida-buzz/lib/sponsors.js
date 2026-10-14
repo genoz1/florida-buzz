@@ -108,6 +108,8 @@ const SPONSOR_PACKET = {
     'Independent editorial — sponsorship never buys coverage',
   ],
   contactEmail: 'floridabuzzonline@gmail.com',
+  /** Public PDF path (committed under public/docs/). */
+  pdfPath: '/docs/Florida_Buzz_Sponsor_Packet.pdf',
 };
 
 function formatUsdFromCents(cents) {
