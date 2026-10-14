@@ -50,7 +50,7 @@ test('default catalog file loads without throwing', () => {
   assert.ok(Array.isArray(file.products));
 });
 
-test('PRINTIFY_STORE_URL overrides catalog storeUrl', () => {
+test('SHOPIFY_STORE_URL / MERCH_STORE_URL override catalog storeUrl', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-'));
   const file = path.join(dir, 'merch-products.json');
   fs.writeFileSync(
@@ -60,17 +60,32 @@ test('PRINTIFY_STORE_URL overrides catalog storeUrl', () => {
       products: [{ title: 'Tee', url: 'https://old.printify.me/product/1' }],
     })
   );
-  const cfg = merchConfig(
+  const shopify = merchConfig(
+    { SHOPIFY_STORE_URL: 'https://florida-buzz.myshopify.com' },
+    { catalogPath: file }
+  );
+  assert.equal(shopify.storeUrl, 'https://florida-buzz.myshopify.com/');
+  assert.equal(shopify.provider, 'shopify');
+  assert.equal(shopify.checkoutLabel, 'Buy on Shopify');
+
+  const merchEnv = merchConfig(
+    { MERCH_STORE_URL: 'https://shop.thefloridabuzz.com' },
+    { catalogPath: file }
+  );
+  assert.equal(merchEnv.storeUrl, 'https://shop.thefloridabuzz.com/');
+
+  const legacy = merchConfig(
     { PRINTIFY_STORE_URL: 'https://new.printify.me' },
     { catalogPath: file }
   );
-  assert.equal(cfg.storeUrl, 'https://new.printify.me/');
+  assert.equal(legacy.storeUrl, 'https://new.printify.me/');
+  assert.equal(legacy.provider, 'printify');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('PRINTIFY_PRODUCTS JSON still works as override', () => {
+test('MERCH_PRODUCTS / PRINTIFY_PRODUCTS JSON still works as override', () => {
   const products = parseProductsJson(
-    JSON.stringify([{ title: 'Hat', url: 'https://store.printify.me/hat', price: '$22' }])
+    JSON.stringify([{ title: 'Hat', url: 'https://store.myshopify.com/products/hat', price: '$22' }])
   );
   assert.equal(products.length, 1);
   assert.equal(products[0].title, 'Hat');
@@ -82,10 +97,14 @@ test('merch page renders two products from catalog file', async () => {
   fs.writeFileSync(
     catalogPath,
     JSON.stringify({
-      storeUrl: 'https://florida-buzz.printify.me',
+      provider: 'shopify',
+      storeUrl: 'https://florida-buzz.myshopify.com',
       products: [
-        { title: 'Florida Buzz Tee', url: 'https://florida-buzz.printify.me/product/shirt' },
-        { title: 'Second Drop', url: 'https://florida-buzz.printify.me/product/two' },
+        {
+          title: 'I Caught My Buzz in Florida Tee',
+          url: 'https://florida-buzz.myshopify.com/products/caught-my-buzz',
+        },
+        { title: 'Second Drop', url: 'https://florida-buzz.myshopify.com/products/two' },
       ],
     })
   );
@@ -114,8 +133,9 @@ test('merch page renders two products from catalog file', async () => {
         .on('error', reject);
     });
     assert.match(body, /Wear the Buzz/);
-    assert.match(body, /Florida Buzz Tee/);
+    assert.match(body, /I Caught My Buzz in Florida Tee/);
     assert.match(body, /Second Drop/);
+    assert.match(body, /Buy on Shopify/);
     assert.match(body, /choose size and color/i);
   } finally {
     server.close();

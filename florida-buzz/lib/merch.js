@@ -1,19 +1,19 @@
 'use strict';
 
 /**
- * Florida Buzz Merch — Printify Pop-Up Store bridge.
+ * Florida Buzz Merch — external storefront bridge (Shopify preferred).
  *
- * Colors, sizes, prices, and checkout live on Printify. This site only
- * shows a couple of product cards and deep-links into the Pop-Up Store.
+ * Colors, sizes, prices, and checkout live on the store (Shopify / Printify).
+ * This site only shows product cards and deep-links into the store.
  *
  * Primary config: content/merch-products.json
- *   { "storeUrl": "https://your-store.printify.me", "products": [
- *       { "title", "url", "imageUrl?", "description?" }
- *   ] }
+ *   { "storeUrl": "https://your-store.myshopify.com", "provider": "shopify",
+ *     "products": [ { "title", "url", "imageUrl?", "description?" } ] }
  *
  * Optional env overrides:
- *   PRINTIFY_STORE_URL — overrides JSON storeUrl
- *   PRINTIFY_PRODUCTS  — JSON array override (rare; prefer the file)
+ *   MERCH_STORE_URL / SHOPIFY_STORE_URL / PRINTIFY_STORE_URL — overrides JSON storeUrl
+ *   MERCH_STORE_NAME / SHOPIFY_STORE_NAME / PRINTIFY_STORE_NAME
+ *   MERCH_PRODUCTS / PRINTIFY_PRODUCTS — JSON array override (rare; prefer the file)
  */
 
 const fs = require('node:fs');
@@ -35,7 +35,16 @@ function trimUrl(value) {
 
 function isPlaceholderUrl(url) {
   if (!url) return true;
-  return /YOUR-STORE|YOUR-PRODUCT|example\.com/i.test(url);
+  return /YOUR-STORE|YOUR-PRODUCT|example\.com|myshopify\.com\/products\/YOUR/i.test(url);
+}
+
+function detectProvider(storeUrl, explicit) {
+  const raw = String(explicit || '').trim().toLowerCase();
+  if (raw === 'shopify' || raw === 'printify') return raw;
+  const host = String(storeUrl || '').toLowerCase();
+  if (/myshopify\.com|shopify\.com|\.shop\b/i.test(host) || /shopify/i.test(host)) return 'shopify';
+  if (/printify\.me|printify\.com/i.test(host)) return 'printify';
+  return 'shopify';
 }
 
 function normalizeProduct(raw, index = 0) {
@@ -63,9 +72,9 @@ function parseProductsJson(raw) {
   try {
     parsed = JSON.parse(String(raw));
   } catch {
-    throw new Error('PRINTIFY_PRODUCTS must be valid JSON');
+    throw new Error('MERCH_PRODUCTS / PRINTIFY_PRODUCTS must be valid JSON');
   }
-  if (!Array.isArray(parsed)) throw new Error('PRINTIFY_PRODUCTS must be a JSON array');
+  if (!Array.isArray(parsed)) throw new Error('MERCH_PRODUCTS / PRINTIFY_PRODUCTS must be a JSON array');
   return parsed.map(normalizeProduct).filter(Boolean);
 }
 
@@ -74,20 +83,21 @@ function loadCatalogFile(filePath = DEFAULT_CATALOG_PATH) {
     const raw = fs.readFileSync(filePath, 'utf8');
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { storeUrl: null, storeName: null, products: [] };
+      return { storeUrl: null, storeName: null, provider: null, products: [] };
     }
     const list = Array.isArray(parsed.products) ? parsed.products : [];
     return {
       storeUrl: trimUrl(parsed.storeUrl),
       storeName: String(parsed.storeName || '').trim() || null,
+      provider: String(parsed.provider || '').trim().toLowerCase() || null,
       products: list.map(normalizeProduct).filter(Boolean),
     };
   } catch (err) {
     if (err && err.code === 'ENOENT') {
-      return { storeUrl: null, storeName: null, products: [] };
+      return { storeUrl: null, storeName: null, provider: null, products: [] };
     }
     console.warn('[merch] catalog file skipped:', err.message);
-    return { storeUrl: null, storeName: null, products: [] };
+    return { storeUrl: null, storeName: null, provider: null, products: [] };
   }
 }
 
@@ -96,22 +106,42 @@ function merchConfig(env = process.env, { catalogPath = DEFAULT_CATALOG_PATH } =
   let products = file.products;
 
   // Env product list is an escape hatch; the JSON file is the normal path.
-  if (env.PRINTIFY_PRODUCTS) {
+  const productsEnv = env.MERCH_PRODUCTS || env.PRINTIFY_PRODUCTS;
+  if (productsEnv) {
     try {
-      const fromEnv = parseProductsJson(env.PRINTIFY_PRODUCTS);
+      const fromEnv = parseProductsJson(productsEnv);
       if (fromEnv.length) products = fromEnv;
     } catch (err) {
       console.warn('[merch]', err.message);
     }
   }
 
-  const storeUrl = trimUrl(env.PRINTIFY_STORE_URL) || file.storeUrl;
+  const storeUrl =
+    trimUrl(env.MERCH_STORE_URL) ||
+    trimUrl(env.SHOPIFY_STORE_URL) ||
+    trimUrl(env.PRINTIFY_STORE_URL) ||
+    file.storeUrl;
+  const storeName =
+    String(
+      env.MERCH_STORE_NAME ||
+        env.SHOPIFY_STORE_NAME ||
+        env.PRINTIFY_STORE_NAME ||
+        file.storeName ||
+        'Florida Buzz Merch'
+    ).trim() || 'Florida Buzz Merch';
+  const provider = detectProvider(storeUrl, env.MERCH_PROVIDER || file.provider);
   const enabled = Boolean(storeUrl || products.length);
+  const checkoutLabel = provider === 'printify' ? 'Buy on Printify' : 'Buy on Shopify';
+  const storefrontLabel = provider === 'printify' ? 'Printify store' : 'Shopify store';
+
   return {
     enabled,
     storeUrl,
     products,
-    storeName: String(env.PRINTIFY_STORE_NAME || file.storeName || 'Florida Buzz Merch').trim() || 'Florida Buzz Merch',
+    storeName,
+    provider,
+    checkoutLabel,
+    storefrontLabel,
   };
 }
 
@@ -121,5 +151,6 @@ module.exports = {
   normalizeProduct,
   trimUrl,
   loadCatalogFile,
+  detectProvider,
   DEFAULT_CATALOG_PATH,
 };
