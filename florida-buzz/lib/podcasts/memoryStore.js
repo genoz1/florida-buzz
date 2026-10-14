@@ -22,7 +22,7 @@ function seedShow() {
     title: 'Florida Buzz: Disney',
     publisher: 'The Florida Buzz',
     description:
-      'Geno hosts The Florida Buzz Disney Podcast — Walt Disney World news, updates, and commentary. A conversational roundup of park developments, restaurant changes, announcements, and operations — not a vacation planning seminar. Find the stories at https://thefloridabuzz.com.',
+      'Florida Buzz: Disney is your place for real conversations about Walt Disney World. Hosted by Geno, a lifelong Disney World visitor who first experienced Magic Kingdom at 18 months old, the show brings decades of park perspective to today’s news — new attractions, announcements, prices, restaurants, resorts, and the little things longtime fans notice. Pull up a chair and join the conversation. Presented by TheFloridaBuzz.com. An independent fan podcast not affiliated with or endorsed by The Walt Disney Company.',
     hosts: [{ name: 'Geno', role: 'host' }],
     disclosure: DEFAULT_DISCLOSURE,
     language: 'en-us',
