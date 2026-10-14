@@ -601,13 +601,17 @@ router.get('/about', (req, res) => {
   res.render('about');
 });
 
-router.get('/merch', (req, res) => {
-  const { merchConfig } = require('../lib/merch');
-  const merch = merchConfig(process.env);
-  res.render('merch', {
-    merch,
-    pageTitle: 'Buzz Merch — The Florida Buzz',
-  });
+router.get('/merch', async (req, res, next) => {
+  try {
+    const { merchConfigAsync } = require('../lib/merch');
+    const merch = await merchConfigAsync(process.env);
+    res.render('merch', {
+      merch,
+      pageTitle: 'Buzz Merch — The Florida Buzz',
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get('/editorial-standards', (req, res) => {

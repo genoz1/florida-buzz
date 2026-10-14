@@ -60,7 +60,7 @@ const VERIFIED_SITE_TOOLS = Object.freeze([
     title: 'Florida Buzz Merch',
     path: '/merch',
     when:
-      'closing CTA / soft show support — Florida Buzz merchandise, including the I Caught My Buzz in Florida t-shirts',
+      'closing CTA / soft show support — Florida Buzz merchandise, including the I Caught a Buzz in Florida t-shirts',
   },
 ]);
 
