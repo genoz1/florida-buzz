@@ -36,4 +36,10 @@ test('newsletter popup script snoozes and respects subscribe cookie', () => {
   assert.match(js, /fb_newsletter/);
   assert.match(js, /DELAY_MS/);
   assert.match(js, /mouseout/);
+  assert.match(js, /14000/);
+});
+
+test('server exposes request path as canonicalPath for subscribe return_to', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  assert.match(source, /res\.locals\.canonicalPath\s*=\s*req\.path/);
 });

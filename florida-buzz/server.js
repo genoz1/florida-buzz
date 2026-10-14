@@ -14,6 +14,17 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
+// Newsletter popup / footer subscribe forms need the current path for
+// return_to. Views often pass canonicalPath only into the header include,
+// which does not leak to the footer — without this, story pages always
+// redirected subscribers back to "/".
+app.use((req, res, next) => {
+  if (typeof res.locals.canonicalPath === 'undefined') {
+    res.locals.canonicalPath = req.path || '/';
+  }
+  next();
+});
+
 // Private reader-authentication foundation. Disabled by default and deliberately
 // not linked from the public site. Enabling it requires all server-side security
 // configuration to validate at startup; production also requires Turnstile.
