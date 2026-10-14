@@ -54,6 +54,14 @@ const VERIFIED_SITE_TOOLS = Object.freeze([
     path: '/buzz',
     when: 'community questions, opinions, and follow-up discussions',
   },
+  {
+    key: 'merch',
+    spoken: 'the merch section on The Florida Buzz',
+    title: 'Florida Buzz Merch',
+    path: '/merch',
+    when:
+      'closing CTA / soft show support — Florida Buzz merchandise, including the I Caught My Buzz in Florida t-shirts',
+  },
 ]);
 
 function siteBase(site) {

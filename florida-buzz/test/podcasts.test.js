@@ -387,6 +387,8 @@ test('full-episode prompts keep solo Geno news-roundup host bible and structure'
   assert.match(HOST_BIBLE, /Four to six NEWS STORIES|4–6|story-\*/i);
   assert.match(HOST_BIBLE, /NO Deep Dive|not a vacation-planning/i);
   assert.match(HOST_BIBLE, /SEGMENT:/i);
+  assert.match(HOST_BIBLE, /merch section|Florida Buzz Merch/i);
+  assert.match(HOST_BIBLE, /I Caught My Buzz in Florida/i);
   assert.match(HOST_BIBLE, /HARD BAN/i);
   assert.match(HOST_BIBLE, /Gena|Diane/);
   assert.match(HOST_BIBLE, /Do NOT cold-open|Never cold-open|do NOT cold-open/i);
@@ -468,6 +470,9 @@ test('full-episode prompts keep solo Geno news-roundup host bible and structure'
   assert.match(conversation.system, /Nomad Lounge|mixed feelings|across from someone/i);
   assert.match(conversation.system, /HARD BAN lecture|HARD BAN vacation-planning/i);
   assert.match(conversation.system, /SEGMENT:/);
+  assert.match(conversation.system, /I Caught My Buzz in Florida/i);
+  assert.match(conversation.system, /merch section/i);
+  assert.match(conversation.user, /I Caught My Buzz in Florida|merch section/i);
   assert.match(conversation.system, /Full stop/i);
   assert.match(conversation.system, /sunscreen/i);
   assert.match(conversation.system, /swimsuit/i);
@@ -478,6 +483,7 @@ test('full-episode prompts keep solo Geno news-roundup host bible and structure'
   assert.match(conversation.user, /\/wait-times/);
   assert.match(conversation.user, /\/planner/);
   assert.match(conversation.user, /\/dining/);
+  assert.match(conversation.user, /\/merch/);
 });
 
 test('outline and conversation prompts require solo Geno structure', () => {
