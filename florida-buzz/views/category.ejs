@@ -1,8 +1,8 @@
-<%- include('partials/header', { pageTitle: (typeof seoTitle !== 'undefined' && seoTitle ? seoTitle : categoryLabels[category]) + ' — The Florida Buzz', pageDescription: typeof seoDescription !== 'undefined' ? seoDescription : undefined, category, tickerItems: ticker, canonicalPath: '/category/' + category }) %>
+<%- include('partials/header', { pageTitle: (typeof seoTitle !== 'undefined' && seoTitle ? seoTitle : categoryLabels[category]) + ' — The Florida Buzz', pageDescription: typeof seoDescription !== 'undefined' ? seoDescription : undefined, category, tickerItems: ticker, canonicalPath: typeof canonicalPath !== 'undefined' ? canonicalPath : ('/category/' + category) }) %>
 
 <main class="wrap">
   <section class="section" style="border-bottom:none; padding-bottom:0;">
-    <span class="eyebrow"><%= articles.length %> stories</span>
+    <span class="eyebrow"><%= (typeof pagination !== 'undefined' && pagination ? pagination.total : articles.length) %> stories</span>
     <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;"><%= categoryLabels[category] %></h1>
     <% if (typeof seoIntro !== 'undefined' && seoIntro) { %>
     <p style="color:var(--ink-600); max-width:640px; margin-top:10px;"><%= seoIntro %></p>
@@ -31,6 +31,13 @@
         </a>
       <% }) %>
     </div>
+    <% if (typeof pagination !== 'undefined' && pagination && pagination.totalPages > 1) { %>
+    <nav class="archive-pagination" aria-label="Category pages" style="margin-top:28px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+      <% if (pagination.prevHref) { %><a href="<%= pagination.prevHref %>" rel="prev">← Newer</a><% } %>
+      <span style="color:var(--ink-600); font-size:14px;">Page <%= pagination.page %> of <%= pagination.totalPages %></span>
+      <% if (pagination.nextHref) { %><a href="<%= pagination.nextHref %>" rel="next">Older →</a><% } %>
+    </nav>
+    <% } %>
     <% } %>
   </section>
 </main>

@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-10-14T23:52:38.356Z",
+  "article_count": 3712,
+  "recommended_review_unique_articles": 93,
+  "multi_numbered_groups": 7,
+  "machine_or_placeholder_slugs": [
+    {
+      "slug": "priscilla-hotel-facade-scrim-at-universal-studios-florida",
+      "title": "Themed Scrim Covers Priscilla Hotel Facade at Universal"
+    },
+    {
+      "slug": "haunted-mansion-facade-overhaul-magic-kingdom-august-2026",
+      "title": "Haunted Mansion's Hillside Gets Fresh Landscaping at Magic Kingdom"
+    },
+    {
+      "slug": "insufficient-source-content",
+      "title": "Insufficient source content — story cannot be published"
+    },
+    {
+      "slug": "insufficient-source-material",
+      "title": "Insufficient Source Material"
+    }
+  ],
+  "near_identical_pairs": 31,
+  "near_high_confidence_ge_0_70": 7,
+  "soft_numbered_singles_optional": 226,
+  "note": "Report-only. Full JSON at /tmp on audit host; re-run scripts/duplicate-content-report.js in prod."
+}
