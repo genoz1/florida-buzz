@@ -19,6 +19,15 @@ test('FWC duplicate slug permanently redirects to the kept article', () => {
   assert.equal(isRedirectedArticleSlug('fwc-wildlife-safety-tips-after-major-storms'), true);
 });
 
+test('Key West sargassum duplicate slug permanently redirects to the kept article', () => {
+  assert.equal(
+    resolveArticleRedirect('key-west-sargassum-cleanup-pilot-plan'),
+    'key-west-sargassum-cleanup-pilot-plans'
+  );
+  assert.equal(resolveArticleRedirect('key-west-sargassum-cleanup-pilot-plans'), null);
+  assert.equal(isRedirectedArticleSlug('key-west-sargassum-cleanup-pilot-plan'), true);
+});
+
 test('listing helpers hide redirected duplicate losers', () => {
   const rows = filterRedirectedArticles([
     { slug: 'florida-wildlife-safety-tips-after-a-major-storm' },
