@@ -40,11 +40,21 @@ test('stripeConfigured requires secret and all three price IDs', () => {
   assert.equal(
     stripeConfigured({
       STRIPE_SECRET_KEY: 'sk_test_x',
-      STRIPE_PRICE_SPONSOR_SUPPORTING: 'price_s',
-      STRIPE_PRICE_SPONSOR_FEATURED: 'price_f',
-      STRIPE_PRICE_SPONSOR_PREMIER: 'price_p',
+      STRIPE_PRICE_SUPPORTING: 'price_s',
+      STRIPE_PRICE_FEATURED: 'price_f',
+      STRIPE_PRICE_PREMIER: 'price_p',
     }),
     true
+  );
+  assert.equal(
+    stripeConfigured({
+      STRIPE_SECRET_KEY: 'sk_test_x',
+      SPONSOR_CHECKOUT_ENABLED: 'false',
+      STRIPE_PRICE_SUPPORTING: 'price_s',
+      STRIPE_PRICE_FEATURED: 'price_f',
+      STRIPE_PRICE_PREMIER: 'price_p',
+    }),
+    false
   );
 });
 

@@ -213,7 +213,11 @@
     </form>
   </section>
 
-  <p class="wrap sponsors-note">Sponsorship does not buy editorial coverage. Questions: <a href="mailto:<%= packet.contactEmail %>"><%= packet.contactEmail %></a>.</p>
+  <p class="wrap sponsors-note">
+    <%= typeof legalSellerLine !== 'undefined' ? legalSellerLine : 'Sponsorships are sold by Cartzilla LLC, doing business as Florida Buzz.' %>
+    Sponsorship does not buy editorial coverage.
+    Questions: <a href="mailto:<%= packet.contactEmail %>"><%= packet.contactEmail %></a>.
+  </p>
 </main>
 
 <script>

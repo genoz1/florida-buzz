@@ -6,7 +6,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { getTier, formatUsdFromCents, stripeConfigured, stripePriceEnvKey } = require('./sponsors');
+const {
+  getTier,
+  formatUsdFromCents,
+  stripeConfigured,
+  stripePriceIdForTier,
+} = require('./sponsors');
 
 const DATA_DIR = path.join(__dirname, '..', 'data', 'sponsor-applications');
 const LOGO_DIR = path.join(__dirname, '..', 'public', 'images', 'sponsors', 'applications');
@@ -115,7 +120,15 @@ async function notifyTeam(record) {
   if (!process.env.RESEND_API_KEY) return { sent: false, reason: 'no_resend' };
   const tier = getTier(record.tierId);
   const { sendEmail } = require('./resend');
-  const to = process.env.SPONSOR_NOTIFY_EMAIL || 'floridabuzzonline@gmail.com';
+  const to =
+    process.env.SPONSOR_ADMIN_NOTIFICATION_EMAILS ||
+    process.env.SPONSOR_NOTIFY_EMAIL ||
+    'floridabuzzonline@gmail.com';
+  const recipients = String(to)
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s && !/REPLACE/i.test(s));
+  if (!recipients.length) return { sent: false, reason: 'no_recipients' };
   const html = `
     <p>New Florida Buzz sponsor application</p>
     <ul>
@@ -132,7 +145,7 @@ async function notifyTeam(record) {
     <p>${escapeHtml(record.description)}</p>
   `;
   await sendEmail({
-    to,
+    to: recipients,
     subject: `Sponsor application: ${record.companyName} (${tier?.name || record.tierId})`,
     html,
   });
@@ -147,20 +160,40 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
+function withCheckoutPlaceholders(url, record) {
+  return String(url || '')
+    .replaceAll('{CHECKOUT_SESSION_ID}', '{CHECKOUT_SESSION_ID}')
+    .replaceAll('{APPLICATION_ID}', encodeURIComponent(record.id));
+}
+
 async function createStripeCheckout({ record, env = process.env, siteUrl }) {
   if (!stripeConfigured(env)) {
     return { ok: false, reason: 'stripe_not_ready' };
   }
-  const priceId = env[stripePriceEnvKey(record.tierId)];
+  const priceId = stripePriceIdForTier(record.tierId, env);
+  if (!priceId) return { ok: false, reason: 'missing_price' };
+
   const Stripe = require('stripe');
   const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-  const base = (siteUrl || env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  const base = (siteUrl || env.APP_BASE_URL || env.SITE_URL || 'https://thefloridabuzz.com').replace(
+    /\/$/,
+    ''
+  );
+  const successUrl =
+    env.SPONSOR_SUCCESS_URL && !/REPLACE/i.test(env.SPONSOR_SUCCESS_URL)
+      ? withCheckoutPlaceholders(env.SPONSOR_SUCCESS_URL, record)
+      : `${base}/sponsors/become/success?application=${encodeURIComponent(record.id)}&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl =
+    env.SPONSOR_CANCEL_URL && !/REPLACE/i.test(env.SPONSOR_CANCEL_URL)
+      ? withCheckoutPlaceholders(env.SPONSOR_CANCEL_URL, record)
+      : `${base}/sponsors/become?canceled=1&application=${encodeURIComponent(record.id)}#apply`;
+
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     customer_email: record.email,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${base}/sponsors/become/success?application=${encodeURIComponent(record.id)}&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${base}/sponsors/become?canceled=1&application=${encodeURIComponent(record.id)}#apply`,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
     metadata: {
       application_id: record.id,
       tier_id: record.tierId,
