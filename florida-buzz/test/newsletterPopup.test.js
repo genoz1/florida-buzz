@@ -36,4 +36,21 @@ test('newsletter popup script snoozes and respects subscribe cookie', () => {
   assert.match(js, /fb_newsletter/);
   assert.match(js, /DELAY_MS/);
   assert.match(js, /mouseout/);
+  assert.match(js, /14000/);
+});
+
+test('newsletter popup only opens on the first page of a visit', () => {
+  const js = fs.readFileSync(
+    path.join(__dirname, '../public/js/newsletter-popup.js'),
+    'utf8'
+  );
+  assert.match(js, /fb_nl_popup_session_v1/);
+  assert.match(js, /isFirstPageOfVisit/);
+  assert.match(js, /markShownThisVisit/);
+  assert.match(js, /sessionStorage/);
+});
+
+test('server exposes request path as canonicalPath for subscribe return_to', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  assert.match(source, /res\.locals\.canonicalPath\s*=\s*req\.path/);
 });

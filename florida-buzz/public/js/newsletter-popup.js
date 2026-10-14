@@ -1,5 +1,6 @@
 (function () {
   var STORAGE_KEY = 'fb_nl_popup_v1';
+  var SESSION_KEY = 'fb_nl_popup_session_v1';
   var COOKIE_NAME = 'fb_newsletter';
   var DELAY_MS = 14000;
   var SNOOZE_DAYS = 14;
@@ -42,6 +43,28 @@
     } catch (e) { /* private mode */ }
   }
 
+  // One chance per browser tab/session: only the first page they land on
+  // may open the popup. Later story/tool navigations in the same visit stay quiet.
+  function isFirstPageOfVisit() {
+    try {
+      var existing = sessionStorage.getItem(SESSION_KEY);
+      if (!existing) {
+        sessionStorage.setItem(SESSION_KEY, window.location.pathname || '/');
+        return true;
+      }
+      if (existing === 'shown') return false;
+      return existing === (window.location.pathname || '/');
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function markShownThisVisit() {
+    try {
+      sessionStorage.setItem(SESSION_KEY, 'shown');
+    } catch (e) { /* private mode */ }
+  }
+
   function showToast(message, isError) {
     var toast = document.createElement('div');
     toast.className = 'nl-toast' + (isError ? ' nl-toast--error' : '');
@@ -67,6 +90,7 @@
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ until: Date.now() + 365 * 24 * 60 * 60 * 1000 }));
       } catch (e) { /* ignore */ }
+      markShownThisVisit();
       showToast('You’re on the list — watch for the daily Buzz.');
     } else if (status === 'error') {
       showToast('Something went wrong. Please try again.', true);
@@ -86,6 +110,7 @@
   function closePopup(popup) {
     popup.hidden = true;
     document.documentElement.classList.remove('nl-popup-open');
+    markShownThisVisit();
     snooze();
   }
 
@@ -95,6 +120,7 @@
     var popup = $('#nl-popup');
     if (!popup) return;
     if (alreadySubscribed() || dismissedRecently()) return;
+    if (!isFirstPageOfVisit()) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       // Still show, just without fancy transitions via CSS.
     }
@@ -102,7 +128,9 @@
     var opened = false;
     function tryOpen() {
       if (opened || alreadySubscribed() || dismissedRecently()) return;
+      if (!isFirstPageOfVisit()) return;
       opened = true;
+      markShownThisVisit();
       openPopup(popup);
     }
 

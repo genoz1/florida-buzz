@@ -614,6 +614,41 @@ async function isDuplicateOfRecent(title, category) {
   return data.some((a) => titleSimilarity(title, a.title) >= 0.5);
 }
 
+function startSameDayImageRepair(slug, {
+  spawnImpl = require('node:child_process').spawn,
+  execPath = process.execPath,
+  scriptPath = require('node:path').join(__dirname, 'repair-article-images.js'),
+  env = process.env,
+  logger = console,
+} = {}) {
+  if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return false;
+  if (env.SKIP_SAME_DAY_IMAGE_REPAIR === 'true') return false;
+  try {
+    const child = spawnImpl(
+      execPath,
+      [scriptPath, slug],
+      {
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...env,
+          APPLY_IMAGE_REPAIR: 'true',
+          PRODUCTION_IMAGE_REPAIR_APPROVED: 'true',
+          VERIFY_IMAGE_BYTES: 'false',
+          IMAGE_REPAIR_GENERATION_LIMIT: env.SAME_DAY_IMAGE_REPAIR_LIMIT || '2',
+          IMAGE_REPAIR_SLUGS: slug,
+        },
+      }
+    );
+    child.unref?.();
+    logger.log(`  Started same-day image repair for /article/${slug}.`);
+    return true;
+  } catch (error) {
+    logger.error(`  [warning] Could not start same-day image repair (${error.message}).`);
+    return false;
+  }
+}
+
 async function run() {
   console.log(`=== The Florida Buzz automation run — ${new Date().toISOString()} ===`);
   if (DRY_RUN) console.log('DRY RUN: nothing will be saved or posted.\n');
@@ -929,6 +964,12 @@ async function run() {
         console.log(queued
           ? '  Image is pending durable repair; article publication and unrelated automation continue.'
           : '  [warning] Image remains missing and could not be queued; article publication still continues.');
+        // Same-day follow-up: do not leave readers on "Story image coming soon"
+        // until the next multi-hour repair cron. Detached so RSS automation
+        // never blocks on image generation/review.
+        if (queued && publication.article?.slug) {
+          startSameDayImageRepair(publication.article.slug);
+        }
       } catch (error) {
         console.error(`  [warning] Image repair state could not be persisted (${error.message}); article publication and unrelated automation continue.`);
       }
@@ -1020,6 +1061,7 @@ module.exports = {
   originCropPercent,
   titleSimilarity,
   createArticleRetryQueue,
+  startSameDayImageRepair,
   toFacebookFeedCaption,
   toInstagramCaption,
   toThreadsPost,

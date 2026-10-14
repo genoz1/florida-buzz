@@ -1,0 +1,75 @@
+<%- include('partials/header', {
+  pageTitle: typeof pageTitle !== 'undefined' ? pageTitle : 'Sponsors — The Florida Buzz',
+  pageDescription: typeof pageDescription !== 'undefined' ? pageDescription : 'Meet the partners who support Florida Buzz — starting with Rook Careers — and learn how to sponsor our site and podcasts.',
+  category: null,
+  tickerItems: [],
+  canonicalPath: '/sponsors',
+  isSponsorsPage: true,
+}) %>
+<link rel="stylesheet" href="/css/sponsors.css">
+
+<main class="sponsors-page">
+  <section class="sponsors-hero">
+    <div class="wrap sponsors-hero-inner">
+      <p class="sponsors-eyebrow">Partners</p>
+      <h1>Sponsors</h1>
+      <p class="sponsors-lede">Companies and brands that help keep Florida Buzz free for readers and listeners. We keep this page short on purpose — real partners, not a wall of empty logos.</p>
+    </div>
+  </section>
+
+  <% if (sponsors.featured && sponsors.featured.length) { %>
+    <section class="wrap sponsors-featured" aria-label="Featured sponsor">
+      <p class="sponsors-section-label">Featured sponsor</p>
+      <% sponsors.featured.forEach((sponsor) => { %>
+        <article class="sponsor-feature">
+          <a class="sponsor-feature-logo" href="<%= sponsor.url %>" target="_blank" rel="noopener noreferrer sponsored">
+            <img src="<%= sponsor.logoUrl %>" alt="<%= sponsor.logoAlt || sponsor.name %>" width="260" height="87" loading="eager" decoding="async">
+          </a>
+          <div class="sponsor-feature-body">
+            <h2><a href="<%= sponsor.url %>" target="_blank" rel="noopener noreferrer sponsored"><%= sponsor.name %></a></h2>
+            <% if (sponsor.tagline) { %><p class="sponsor-tagline"><%= sponsor.tagline %></p><% } %>
+            <p class="sponsor-blurb"><%= sponsor.description %></p>
+            <p class="sponsor-cta-row">
+              <a class="btn" href="<%= sponsor.url %>" target="_blank" rel="noopener noreferrer sponsored"><%= sponsor.ctaLabel || ('Visit ' + sponsor.name) %></a>
+            </p>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  <% } %>
+
+  <% if (sponsors.partners && sponsors.partners.length) { %>
+    <section class="wrap sponsors-partners" aria-label="Sponsors">
+      <p class="sponsors-section-label">Also supporting Florida Buzz</p>
+      <ul class="sponsors-partner-grid">
+        <% sponsors.partners.forEach((sponsor) => { %>
+          <li class="sponsor-tile">
+            <a class="sponsor-tile-logo" href="<%= sponsor.url %>" target="_blank" rel="noopener noreferrer sponsored">
+              <img src="<%= sponsor.logoUrl %>" alt="<%= sponsor.logoAlt || sponsor.name %>" width="180" height="72" loading="lazy" decoding="async">
+            </a>
+            <h3><a href="<%= sponsor.url %>" target="_blank" rel="noopener noreferrer sponsored"><%= sponsor.name %></a></h3>
+            <% if (sponsor.tagline) { %><p><%= sponsor.tagline %></p><% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+  <% } %>
+
+  <section class="wrap sponsors-inquire" id="become-a-sponsor">
+    <h2>Become a sponsor</h2>
+    <p>Looking for readers who care about Florida parks, travel, and living — or listeners of Florida Buzz podcasts? Review the sponsor packet, compare founding packages, and apply with your logo and listing.</p>
+    <ul class="sponsors-inquire-list">
+      <li>Supporting, Featured, and Premier annual packages</li>
+      <li>Website listing, podcast recognition, and mentions by tier</li>
+      <li>Founding rates locked for 12 months</li>
+    </ul>
+    <p class="sponsor-cta-row">
+      <a class="btn" href="/sponsors/become">Become a sponsor</a>
+      <a class="btn btn-outline" href="/docs/Florida_Buzz_Sponsor_Packet.pdf" target="_blank" rel="noopener">Sponsor packet (PDF)</a>
+    </p>
+  </section>
+
+  <p class="wrap sponsors-note">Sponsorship does not buy editorial coverage. Florida Buzz remains an independent publication; park and attraction names are trademarks of their respective owners.</p>
+</main>
+
+<%- include('partials/footer') %>

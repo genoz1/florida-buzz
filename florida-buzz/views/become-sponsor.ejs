@@ -1,0 +1,238 @@
+<%- include('partials/header', {
+  pageTitle: typeof pageTitle !== 'undefined' ? pageTitle : 'Become a Sponsor — The Florida Buzz',
+  pageDescription: typeof pageDescription !== 'undefined' ? pageDescription : 'View the Florida Buzz sponsor packet, compare Supporting, Featured, and Premier annual packages, and apply with your logo and listing description.',
+  category: null,
+  tickerItems: [],
+  canonicalPath: '/sponsors/become',
+  isSponsorsPage: true,
+}) %>
+<link rel="stylesheet" href="/css/sponsors.css">
+<link rel="stylesheet" href="/css/become-sponsor.css">
+
+<main class="become-page">
+  <section class="sponsors-hero become-hero">
+    <div class="wrap sponsors-hero-inner">
+      <p class="sponsors-eyebrow">Sponsorship</p>
+      <h1>Become a sponsor</h1>
+      <p class="sponsors-lede">Review the sponsor packet, pick a founding annual package, then send your listing details and logo. Stripe checkout for payment is wired here and goes live as soon as price IDs are connected.</p>
+      <p class="sponsor-cta-row">
+        <a class="btn" href="#opportunities">See packages</a>
+        <a class="btn btn-outline" href="#packet">Sponsor packet</a>
+        <a class="btn btn-outline" href="#apply">Apply &amp; pay</a>
+      </p>
+    </div>
+  </section>
+
+  <% if (typeof flash === 'object' && flash) { %>
+    <div class="wrap">
+      <% if (flash.errors && flash.errors.length) { %>
+        <div class="become-alert become-alert-error" role="alert">
+          <p>Please fix the following:</p>
+          <ul><% flash.errors.forEach((err) => { %><li><%= err %></li><% }) %></ul>
+        </div>
+      <% } %>
+      <% if (flash.canceled) { %>
+        <div class="become-alert" role="status">Checkout was canceled. Your application is saved — you can try payment again below once Stripe is ready, or email us.</div>
+      <% } %>
+      <% if (flash.stripePending) { %>
+        <div class="become-alert become-alert-ok" role="status">
+          Thanks — we received your application<%= flash.companyName ? (' for ' + flash.companyName) : '' %>. Stripe checkout is still being connected; we will follow up by email to complete payment.
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+
+  <section class="wrap become-packet" id="packet" aria-labelledby="packet-heading">
+    <p class="sponsors-section-label">Sponsor packet</p>
+    <h2 id="packet-heading"><%= packet.title %></h2>
+    <p class="become-packet-sub"><%= packet.subtitle %></p>
+    <p><%= packet.audience %></p>
+    <ul class="become-packet-list">
+      <% packet.highlights.forEach((item) => { %>
+        <li><%= item %></li>
+      <% }) %>
+    </ul>
+    <p class="become-packet-actions">
+      <a class="btn btn-outline" href="<%= packet.pdfPath || '/docs/Florida_Buzz_Sponsor_Packet.pdf' %>" target="_blank" rel="noopener">Download sponsor packet (PDF)</a>
+      <a class="btn btn-outline" href="/sponsors">See current sponsors</a>
+    </p>
+  </section>
+
+  <section class="wrap become-opportunities" id="opportunities" aria-labelledby="opportunities-heading">
+    <p class="sponsors-section-label">Sponsor opportunities</p>
+    <h2 id="opportunities-heading">Annual founding packages</h2>
+    <p class="become-section-lede">Billed annually. Monthly equivalents are shown for comparison. Founding rates stay locked for 12 months.</p>
+
+    <div class="become-tier-cards" role="list">
+      <% tiers.forEach((tier) => { %>
+        <article class="become-tier-card<%= tier.highlight ? ' is-highlight' : '' %><%= tier.id === defaultTierId ? ' is-default' : '' %>" role="listitem" data-tier="<%= tier.id %>">
+          <% if (tier.highlight) { %><p class="become-tier-badge">Most popular</p><% } %>
+          <h3><%= tier.name %></h3>
+          <p class="become-tier-price">
+            <span class="become-tier-annual"><%= tier.annualLabel %></span>
+            <span class="become-tier-period"> / year</span>
+          </p>
+          <p class="become-tier-monthly"><%= tier.monthlyLabel %>/mo equivalent</p>
+          <ul>
+            <% tier.benefits.forEach((b) => { %>
+              <li class="<%= b.included ? 'is-yes' : 'is-no' %>">
+                <span class="become-check" aria-hidden="true"><%= b.included ? '✓' : '—' %></span>
+                <span><%= b.label %><% if (b.detail) { %> <em>(<%= b.detail %>)</em><% } %></span>
+              </li>
+            <% }) %>
+          </ul>
+          <p class="sponsor-cta-row">
+            <a class="btn<%= tier.highlight ? '' : ' btn-outline' %>" href="#apply" data-select-tier="<%= tier.id %>">Choose <%= tier.name.replace(' Sponsor', '') %></a>
+          </p>
+        </article>
+      <% }) %>
+    </div>
+
+    <div class="become-compare-wrap">
+      <h3>Compare benefits</h3>
+      <div class="become-table-scroll" tabindex="0">
+        <table class="become-compare">
+          <thead>
+            <tr>
+              <th scope="col">Benefits</th>
+              <% tiers.forEach((tier) => { %>
+                <th scope="col"><%= tier.name %></th>
+              <% }) %>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Monthly equivalent</th>
+              <% tiers.forEach((tier) => { %><td><%= tier.monthlyLabel %></td><% }) %>
+            </tr>
+            <tr>
+              <th scope="row">Annual payment</th>
+              <% tiers.forEach((tier) => { %><td><strong><%= tier.annualLabel %></strong></td><% }) %>
+            </tr>
+            <% const benefitRows = tiers[0].benefits.map((_, i) => i); %>
+            <% benefitRows.forEach((i) => { %>
+              <tr>
+                <th scope="row"><%= tiers[0].benefits[i].label %></th>
+                <% tiers.forEach((tier) => {
+                  const b = tier.benefits[i];
+                %>
+                  <td><% if (b.included) { %><% if (b.detail) { %><%= b.detail %><% } else { %>✓<% } %><% } else { %>—<% } %></td>
+                <% }) %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap become-apply" id="apply" aria-labelledby="apply-heading">
+    <p class="sponsors-section-label">Application</p>
+    <h2 id="apply-heading">Your info, logo &amp; listing</h2>
+    <p class="become-section-lede">Tell us how you want to appear on Florida Buzz. After you submit, you will continue to Stripe payment when checkout is connected.</p>
+
+    <form class="become-form" action="/sponsors/become" method="POST" enctype="multipart/form-data" novalidate>
+      <input type="hidden" name="form_rendered_at" value="<%= Date.now() %>">
+      <!-- Honeypot -->
+      <input type="text" name="company_website" class="become-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+      <fieldset class="become-fieldset">
+        <legend>Contact &amp; company</legend>
+        <div class="become-grid">
+          <label>
+            <span>Company / brand name</span>
+            <input type="text" name="company_name" required maxlength="120" value="<%= formValues.companyName || '' %>">
+          </label>
+          <label>
+            <span>Contact name</span>
+            <input type="text" name="contact_name" required maxlength="120" value="<%= formValues.contactName || '' %>">
+          </label>
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" required maxlength="200" value="<%= formValues.email || '' %>">
+          </label>
+          <label>
+            <span>Phone <em>(optional)</em></span>
+            <input type="tel" name="phone" maxlength="40" value="<%= formValues.phone || '' %>">
+          </label>
+          <label class="become-span-2">
+            <span>Website</span>
+            <input type="url" name="website_url" required placeholder="https://" maxlength="300" value="<%= formValues.website || '' %>">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="become-fieldset">
+        <legend>Sponsorship package</legend>
+        <div class="become-tier-radios">
+          <% tiers.forEach((tier) => { %>
+            <label class="become-radio">
+              <input type="radio" name="tier_id" value="<%= tier.id %>" <%= (formValues.tierId || defaultTierId) === tier.id ? 'checked' : '' %> required>
+              <span>
+                <strong><%= tier.name %></strong>
+                <span class="become-radio-meta"><%= tier.annualLabel %>/year · <%= tier.monthlyLabel %>/mo eq.</span>
+              </span>
+            </label>
+          <% }) %>
+        </div>
+      </fieldset>
+
+      <fieldset class="become-fieldset">
+        <legend>Listing content</legend>
+        <label class="become-block">
+          <span>Description for the sponsors page</span>
+          <textarea name="description" rows="5" required maxlength="600" placeholder="How you want Florida Buzz readers to understand your brand (about 1–3 sentences)."><%= formValues.description || '' %></textarea>
+          <span class="become-hint">Shown with your logo on the sponsors page. Max 600 characters.</span>
+        </label>
+        <label class="become-block">
+          <span>Logo</span>
+          <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg" required>
+          <span class="become-hint">PNG, JPG, WebP, or SVG. Prefer a wide logo on a transparent or light background.</span>
+        </label>
+      </fieldset>
+
+      <section class="become-payment" aria-labelledby="payment-heading">
+        <h3 id="payment-heading">Payment</h3>
+        <% if (stripeReady) { %>
+          <p>After you submit, you will be redirected to secure Stripe Checkout to pay the annual sponsorship for your selected package.</p>
+          <ul class="become-payment-notes">
+            <li>Annual payment only (founding rates)</li>
+            <li>Card processing via Stripe</li>
+            <li>Confirmation email after successful checkout</li>
+          </ul>
+        <% } else { %>
+          <div class="become-payment-pending">
+            <p><strong>Stripe checkout is being set up.</strong> You can still submit your application, logo, and listing description now. We will email you a payment link as soon as Stripe prices are connected — or complete checkout here once it is live.</p>
+          </div>
+        <% } %>
+        <p class="sponsor-cta-row">
+          <button type="submit" class="btn"><%= stripeReady ? 'Continue to payment' : 'Submit application' %></button>
+          <a class="btn btn-outline" href="/sponsors">Back to sponsors</a>
+        </p>
+      </section>
+    </form>
+  </section>
+
+  <p class="wrap sponsors-note">
+    <%= typeof legalSellerLine !== 'undefined' ? legalSellerLine : 'Sponsorships are sold by Cartzilla LLC, doing business as Florida Buzz.' %>
+    Sponsorship does not buy editorial coverage.
+    Questions: <a href="mailto:<%= packet.contactEmail %>"><%= packet.contactEmail %></a>.
+  </p>
+</main>
+
+<script>
+  (function () {
+    var links = document.querySelectorAll('[data-select-tier]');
+    var radios = document.querySelectorAll('input[name="tier_id"]');
+    links.forEach(function (link) {
+      link.addEventListener('click', function () {
+        var id = link.getAttribute('data-select-tier');
+        radios.forEach(function (radio) {
+          if (radio.value === id) radio.checked = true;
+        });
+      });
+    });
+  })();
+</script>
+
+<%- include('partials/footer') %>

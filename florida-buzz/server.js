@@ -14,6 +14,17 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
+// Newsletter popup / footer subscribe forms need the current path for
+// return_to. Views often pass canonicalPath only into the header include,
+// which does not leak to the footer — without this, story pages always
+// redirected subscribers back to "/".
+app.use((req, res, next) => {
+  if (typeof res.locals.canonicalPath === 'undefined') {
+    res.locals.canonicalPath = req.path || '/';
+  }
+  next();
+});
+
 // Private reader-authentication foundation. Disabled by default and deliberately
 // not linked from the public site. Enabling it requires all server-side security
 // configuration to validate at startup; production also requires Turnstile.
@@ -251,18 +262,21 @@ if (scheduleFlags.buzzBoardSocial) {
   console.log('Buzz Board opinion social posts NOT scheduled — paused while short-form video is the engagement focus. Set BUZZ_BOARD_SOCIAL_ENABLED=true and BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true to resume.');
 }
 
-// Repairs a small bounded number of image jobs each night. Technical review
-// failures keep and re-review the same stored candidate; they do not purchase
-// another generation. The queue survives deploys and provider outages.
+// Repairs a small bounded number of image jobs throughout the day. Publishing
+// can leave a story on the designed placeholder when AI review rejects a
+// candidate; waiting until a single 2:30am batch left those holes visible for
+// hours. Technical review failures keep and re-review the same stored
+// candidate; they do not purchase another generation. The queue survives
+// deploys and provider outages.
 if (scheduleFlags.imageRepair) {
-  cron.schedule('30 2 * * *', () => {
+  cron.schedule('30 2,6,10,14,18,22 * * *', () => {
     console.log('Running bounded article image repair batch...');
     runScheduledCommand(
       'article image repair',
       'APPLY_IMAGE_REPAIR=true PRODUCTION_IMAGE_REPAIR_APPROVED=true VERIFY_IMAGE_BYTES=false node scripts/repair-article-images.js'
     );
   }, { timezone: 'America/New_York' });
-  console.log('Article image repair scheduled: 2:30am daily (Eastern time), bounded by IMAGE_REPAIR_GENERATION_LIMIT.');
+  console.log('Article image repair scheduled: 2:30am / 6:30am / 10:30am / 2:30pm / 6:30pm / 10:30pm Eastern, bounded by IMAGE_REPAIR_GENERATION_LIMIT.');
 } else {
   console.log('Article image repair NOT scheduled — enable AI schedules and configure OpenAI/Supabase.');
 }
