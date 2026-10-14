@@ -36,19 +36,29 @@ SPONSOR_SUPPORTING_CAP=6
 SPONSOR_FEATURED_CAP=4
 SPONSOR_PREMIER_CAP=2
 
-# Dedicated Florida Buzz Stripe account only
+# Dedicated Florida Buzz Stripe account only.
+# Use matching mode everywhere: sk_live + pk_live + live price IDs, or
+# sk_test + pk_test + test price IDs. Mixing modes will fail checkout.
 STRIPE_EXPECTED_ACCOUNT_ID=acct_1UQUAyANlemH6ld3
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_REPLACE_FROM_FLORIDA_BUZZ
-STRIPE_SECRET_KEY=sk_test_REPLACE_FROM_FLORIDA_BUZZ
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_REPLACE_FROM_FLORIDA_BUZZ
+STRIPE_SECRET_KEY=sk_live_REPLACE_FROM_FLORIDA_BUZZ
 STRIPE_WEBHOOK_SECRET=whsec_REPLACE_FROM_FLORIDA_BUZZ_ENDPOINT
-# These sandbox IDs already exist in the Florida Buzz account. Replace them
-# with separately created live-mode IDs only after owner approval and activation.
-STRIPE_PRODUCT_SUPPORTING=prod_VRN3YgsL1s5KHW
-STRIPE_PRODUCT_FEATURED=prod_VRN3UjopCJxVa9
-STRIPE_PRODUCT_PREMIER=prod_VRN3LwTygs37tS
-STRIPE_PRICE_SUPPORTING=price_1UQUIwANlemH6ld3oB46y3ST
-STRIPE_PRICE_FEATURED=price_1UQUJBANlemH6ld30mQHn9nj
-STRIPE_PRICE_PREMIER=price_1UQUJNANlemH6ld3BetxEAW8
+# Product/price IDs below were created in Stripe test mode. If DigitalOcean
+# is on a live secret key, replace all six with live-mode IDs from the
+# Florida Buzz Stripe Dashboard (Products → each tier → Price ID).
+STRIPE_PRODUCT_SUPPORTING=prod_REPLACE_LIVE_OR_KEEP_TEST
+STRIPE_PRODUCT_FEATURED=prod_REPLACE_LIVE_OR_KEEP_TEST
+STRIPE_PRODUCT_PREMIER=prod_REPLACE_LIVE_OR_KEEP_TEST
+STRIPE_PRICE_SUPPORTING=price_REPLACE_LIVE_SUPPORTING
+STRIPE_PRICE_FEATURED=price_REPLACE_LIVE_FEATURED
+STRIPE_PRICE_PREMIER=price_REPLACE_LIVE_PREMIER
+# Previous test-mode references (do not use with sk_live_):
+# STRIPE_PRODUCT_SUPPORTING=prod_VRN3YgsL1s5KHW
+# STRIPE_PRODUCT_FEATURED=prod_VRN3UjopCJxVa9
+# STRIPE_PRODUCT_PREMIER=prod_VRN3LwTygs37tS
+# STRIPE_PRICE_SUPPORTING=price_1UQUIwANlemH6ld3oB46y3ST
+# STRIPE_PRICE_FEATURED=price_1UQUJBANlemH6ld30mQHn9nj
+# STRIPE_PRICE_PREMIER=price_1UQUJNANlemH6ld3BetxEAW8
 
 # Persistence — use the site's existing database if present
 DATABASE_URL=REPLACE_WITH_SERVER_ONLY_DATABASE_URL
