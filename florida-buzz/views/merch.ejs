@@ -12,7 +12,7 @@
     <div class="wrap merch-hero-inner">
       <p class="merch-eyebrow">Florida Buzz Merch</p>
       <h1>Wear the Buzz</h1>
-      <p class="merch-lede">Official Florida Buzz gear — including the soon-to-be-famous <em>I Caught My Buzz in Florida</em> tee. Same Florida Buzz brand you already know. Pick a design here, then choose size and color at secure checkout.</p>
+      <p class="merch-lede">Official Florida Buzz gear — led by the soon-to-be-famous <em>I Caught a Buzz in Florida</em> tee. Same Florida Buzz brand you already know. Pick a design here, then choose size and color at secure checkout.</p>
       <% if (merch.storeUrl) { %>
         <p class="merch-cta-row">
           <a class="btn" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Shop merch</a>
@@ -24,12 +24,12 @@
   </section>
 
   <% if (merch.products.length) { %>
-    <section class="wrap merch-catalog" aria-label="Featured merch">
+    <section class="wrap merch-catalog<%= merch.products.length > 2 ? ' merch-catalog-grid' : '' %>" aria-label="Florida Buzz merch">
       <% merch.products.forEach((product, i) => { %>
         <article class="merch-product<%= i === 0 ? ' merch-product-featured' : '' %>">
           <a class="merch-product-media" href="<%= product.url %>" target="_blank" rel="noopener noreferrer">
             <% if (product.imageUrl) { %>
-              <img src="<%= product.imageUrl %>" alt="<%= product.title %>" width="720" height="720" loading="<%= i === 0 ? 'eager' : 'lazy' %>" decoding="async">
+              <img src="<%= product.imageUrl %>" alt="<%= product.title %>" width="720" height="720" loading="<%= i < 2 ? 'eager' : 'lazy' %>" decoding="async">
             <% } else { %>
               <div class="merch-product-placeholder" aria-hidden="true">Florida Buzz</div>
             <% } %>
@@ -40,20 +40,22 @@
             <% if (product.description) { %><p class="merch-product-dek"><%= product.description %></p><% } %>
             <p class="merch-cta-row">
               <a class="btn" href="<%= product.url %>" target="_blank" rel="noopener noreferrer"><%= merch.checkoutLabel || 'Get yours' %></a>
-              <% if (merch.storeUrl) { %>
-                <a class="btn btn-outline" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer"><%= merch.browseLabel || 'Browse all merch' %></a>
-              <% } %>
             </p>
           </div>
         </article>
       <% }) %>
     </section>
+    <% if (merch.storeUrl) { %>
+      <p class="wrap merch-store-link">
+        <a class="btn btn-outline" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer"><%= merch.browseLabel || 'Browse all merch' %></a>
+      </p>
+    <% } %>
   <% } else if (merch.storeUrl) { %>
     <section class="wrap merch-catalog">
       <article class="merch-product merch-product-featured merch-product-store-only">
         <div class="merch-product-body">
           <h2>Visit the Florida Buzz store</h2>
-          <p class="merch-product-dek">See the latest shirts and designs — including <em>I Caught My Buzz in Florida</em>. New drops show up there first.</p>
+          <p class="merch-product-dek">See the latest shirts and designs — including <em>I Caught a Buzz in Florida</em>. New drops show up there first.</p>
           <p class="merch-cta-row">
             <a class="btn" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Shop merch</a>
           </p>

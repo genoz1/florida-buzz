@@ -38,7 +38,7 @@ Open `content/merch-products.json` and fill in your real store + products:
   "products": [
     {
       "id": "caught-my-buzz-tee",
-      "title": "I Caught My Buzz in Florida Tee",
+      "title": "I Caught a Buzz in Florida Tee",
       "url": "https://your-store.myshopify.com/products/i-caught-my-buzz-in-florida",
       "imageUrl": "https://cdn.shopify.com/s/files/....jpg",
       "description": "The soon-to-be-famous Florida Buzz tee. Pick size and color at checkout on Shopify."
@@ -55,7 +55,7 @@ Commit and deploy. Placeholder `YOUR-STORE` / `Replace with…` rows are ignored
    (`.myshopify.com` is fine; a custom domain like `shop.thefloridabuzz.com` is better once connected)
 2. Products → open product → copy the product page URL → `products[n].url`
 3. Product media → copy image URL (or right-click the storefront image) → `imageUrl`
-4. Feature the **I Caught My Buzz in Florida** tee first
+4. Feature the **I Caught a Buzz in Florida** tee first
 
 Optional: omit `price` on the site so you don’t fight Shopify when variants differ.
 

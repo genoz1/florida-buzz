@@ -63,14 +63,35 @@
   padding-top: 40px;
 }
 
+.merch-catalog-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 28px 22px;
+  align-items: start;
+}
+
+.merch-catalog-grid .merch-product-featured {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
 .merch-product {
   display: grid;
   gap: 22px;
   align-items: center;
 }
 
+.merch-catalog-grid .merch-product:not(.merch-product-featured) {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 14px;
+}
+
 .merch-product-featured {
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+.merch-store-link {
+  margin-top: 28px;
 }
 
 .merch-product-store-only {
@@ -169,7 +190,8 @@
     padding: 40px 0 32px;
   }
 
-  .merch-product-featured {
+  .merch-product-featured,
+  .merch-catalog-grid .merch-product-featured {
     grid-template-columns: 1fr;
   }
 }

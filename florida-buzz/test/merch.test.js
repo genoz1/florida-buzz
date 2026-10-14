@@ -7,9 +7,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const express = require('express');
-const { merchConfig, parseProductsJson, loadCatalogFile } = require('../lib/merch');
+const {
+  merchConfig,
+  merchConfigAsync,
+  parseProductsJson,
+  loadCatalogFile,
+  fetchShopifyProducts,
+  clearShopifyCache,
+  featureRank,
+} = require('../lib/merch');
 
-test('catalog file drives two product cards; placeholders ignored', () => {
+test('catalog file drives product cards; placeholders ignored', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-'));
   const file = path.join(dir, 'merch-products.json');
   fs.writeFileSync(
@@ -48,6 +56,7 @@ test('default catalog file loads without throwing', () => {
   const file = loadCatalogFile();
   assert.ok(file);
   assert.ok(Array.isArray(file.products));
+  assert.match(String(file.storeUrl || ''), /40tfyd-gr\.myshopify\.com/);
 });
 
 test('SHOPIFY_STORE_URL / MERCH_STORE_URL override catalog storeUrl', () => {
@@ -92,7 +101,85 @@ test('MERCH_PRODUCTS / PRINTIFY_PRODUCTS JSON still works as override', () => {
   assert.equal(products[0].title, 'Hat');
 });
 
-test('merch page renders two products from catalog file', async () => {
+test('featureRank prefers I Caught a Buzz tee', () => {
+  assert.ok(featureRank('I Caught a Buzz in Florida T-Shirt') < featureRank('Theme Park Dad Tee'));
+});
+
+test('fetchShopifyProducts maps live catalog and sorts featured first', async () => {
+  clearShopifyCache();
+  const payload = {
+    products: [
+      {
+        id: 1,
+        title: 'Theme Park Dad Tee',
+        handle: 'dad',
+        body_html: '<p>Comfort Colors introduces the tee.</p>',
+        images: [{ src: 'https://cdn.shopify.com/dad.jpg' }],
+        variants: [{ price: '22.00' }],
+      },
+      {
+        id: 2,
+        title: 'I Caught a Buzz in Florida T-Shirt',
+        handle: 'caught-buzz',
+        body_html: '<p>Comfort Colors introduces the tee.</p>',
+        images: [{ src: 'https://cdn.shopify.com/caught.jpg' }],
+        variants: [{ price: '20.00' }, { price: '25.00' }],
+      },
+    ],
+  };
+  const fetcher = async () => ({
+    ok: true,
+    async json() {
+      return payload;
+    },
+  });
+  const products = await fetchShopifyProducts('https://40tfyd-gr.myshopify.com', {
+    fetcher,
+    now: Date.now(),
+  });
+  assert.equal(products.length, 2);
+  assert.equal(products[0].title, 'I Caught a Buzz in Florida T-Shirt');
+  assert.equal(products[0].url, 'https://40tfyd-gr.myshopify.com/products/caught-buzz');
+  assert.equal(products[0].price, 'From $20');
+  assert.match(products[0].description, /soon-to-be-famous/i);
+});
+
+test('merchConfigAsync live-syncs when catalog products are empty', async () => {
+  clearShopifyCache();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-async-'));
+  const file = path.join(dir, 'merch-products.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      provider: 'shopify',
+      storeUrl: 'https://40tfyd-gr.myshopify.com',
+      products: [],
+    })
+  );
+  const fetcher = async () => ({
+    ok: true,
+    async json() {
+      return {
+        products: [
+          {
+            id: 9,
+            title: 'I Caught a Buzz in Florida T-Shirt',
+            handle: 'caught',
+            body_html: '',
+            images: [{ src: 'https://cdn.shopify.com/x.jpg' }],
+            variants: [{ price: '20.00' }],
+          },
+        ],
+      };
+    },
+  });
+  const cfg = await merchConfigAsync({}, { catalogPath: file, fetcher, now: Date.now() });
+  assert.equal(cfg.products.length, 1);
+  assert.equal(cfg.products[0].title, 'I Caught a Buzz in Florida T-Shirt');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('merch page renders products from catalog file', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-merch-page-'));
   const catalogPath = path.join(dir, 'merch-products.json');
   fs.writeFileSync(
@@ -102,8 +189,9 @@ test('merch page renders two products from catalog file', async () => {
       storeUrl: 'https://florida-buzz.myshopify.com',
       products: [
         {
-          title: 'I Caught My Buzz in Florida Tee',
+          title: 'I Caught a Buzz in Florida Tee',
           url: 'https://florida-buzz.myshopify.com/products/caught-my-buzz',
+          imageUrl: 'https://cdn.shopify.com/caught.jpg',
         },
         { title: 'Second Drop', url: 'https://florida-buzz.myshopify.com/products/two' },
       ],
@@ -113,8 +201,8 @@ test('merch page renders two products from catalog file', async () => {
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
-  app.get('/merch', (req, res) => {
-    const merch = merchConfig({}, { catalogPath });
+  app.get('/merch', async (req, res) => {
+    const merch = await merchConfigAsync({}, { catalogPath });
     res.render('merch', { merch, pageTitle: 'Buzz Merch — The Florida Buzz' });
   });
 
@@ -134,7 +222,7 @@ test('merch page renders two products from catalog file', async () => {
         .on('error', reject);
     });
     assert.match(body, /Wear the Buzz/);
-    assert.match(body, /I Caught My Buzz in Florida Tee/);
+    assert.match(body, /I Caught a Buzz in Florida Tee/);
     assert.match(body, /Second Drop/);
     assert.match(body, /Get yours/);
     assert.match(body, /choose size and color/i);

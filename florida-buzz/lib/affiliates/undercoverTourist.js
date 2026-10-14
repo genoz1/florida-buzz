@@ -39,7 +39,7 @@ const PODCAST_MIDROLL_DIRECTION =
 
 /** Soft outro reminder direction. */
 const PODCAST_OUTRO_DIRECTION =
-  'Brief reminder: the Undercover Tourist partner link for tickets and hotels is in the show notes. Also leave room for the separate Florida Buzz merch close beat (merch section / I Caught My Buzz in Florida tees). Then warm goodbye. No hard sell, no planner lecture.';
+  'Brief reminder: the Undercover Tourist partner link for tickets and hotels is in the show notes. Also leave room for the separate Florida Buzz merch close beat (merch section / I Caught a Buzz in Florida tees). Then warm goodbye. No hard sell, no planner lecture.';
 
 function undercoverTouristBase(env = process.env) {
   return String(env.UNDERCOVER_TOURIST_LINK || CJ_EVERGREEN_BASE).replace(/\/$/, '');
