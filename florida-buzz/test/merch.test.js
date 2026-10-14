@@ -66,7 +66,8 @@ test('SHOPIFY_STORE_URL / MERCH_STORE_URL override catalog storeUrl', () => {
   );
   assert.equal(shopify.storeUrl, 'https://florida-buzz.myshopify.com/');
   assert.equal(shopify.provider, 'shopify');
-  assert.equal(shopify.checkoutLabel, 'Buy on Shopify');
+  assert.equal(shopify.checkoutLabel, 'Get yours');
+  assert.equal(shopify.browseLabel, 'Browse all merch');
 
   const merchEnv = merchConfig(
     { MERCH_STORE_URL: 'https://shop.thefloridabuzz.com' },
@@ -135,7 +136,7 @@ test('merch page renders two products from catalog file', async () => {
     assert.match(body, /Wear the Buzz/);
     assert.match(body, /I Caught My Buzz in Florida Tee/);
     assert.match(body, /Second Drop/);
-    assert.match(body, /Buy on Shopify/);
+    assert.match(body, /Get yours/);
     assert.match(body, /choose size and color/i);
   } finally {
     server.close();
