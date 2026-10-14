@@ -1,4 +1,4 @@
-/* Buzz Merch — Printify Pop-Up Store showcase */
+/* Buzz Merch — Florida Buzz–native Shopify showcase */
 
 .merch-page {
   padding-bottom: 72px;
@@ -54,54 +54,43 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 18px 0 0;
+  margin: 14px 0 0;
 }
 
-.merch-catalog {
-  display: grid;
-  gap: 40px;
-  padding-top: 40px;
-}
-
+.merch-catalog,
 .merch-catalog-grid {
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 28px 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px 20px;
+  padding-top: 40px;
   align-items: start;
 }
 
+/* No full-bleed featured card — every product is a compact grid tile */
 .merch-catalog-grid .merch-product-featured {
-  grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-column: auto;
+  grid-template-columns: 1fr;
 }
 
 .merch-product {
   display: grid;
-  gap: 22px;
-  align-items: center;
-}
-
-.merch-catalog-grid .merch-product:not(.merch-product-featured) {
   grid-template-columns: 1fr;
+  gap: 12px;
   align-items: start;
-  gap: 14px;
 }
 
-.merch-product-featured {
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+.merch-product-store-only {
+  grid-column: 1 / -1;
+  max-width: 640px;
 }
 
 .merch-store-link {
   margin-top: 28px;
 }
 
-.merch-product-store-only {
-  grid-template-columns: 1fr;
-  max-width: 640px;
-}
-
 .merch-product-media {
   display: block;
-  background: var(--sand-50);
+  background: #fff;
   border: 1px solid var(--line);
   overflow: hidden;
   aspect-ratio: 1;
@@ -116,11 +105,11 @@
 .merch-product-placeholder {
   width: 100%;
   height: 100%;
-  min-height: 240px;
+  min-height: 160px;
   display: grid;
   place-items: center;
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: 1.2rem;
   color: var(--teal-700);
   background:
     repeating-linear-gradient(
@@ -135,8 +124,9 @@
 
 .merch-product-body h2 {
   font-family: var(--font-display);
-  font-size: clamp(1.6rem, 3vw, 2.1rem);
-  margin: 0 0 8px;
+  font-size: 1.15rem;
+  line-height: 1.25;
+  margin: 0 0 6px;
   color: var(--teal-900);
 }
 
@@ -144,16 +134,23 @@
   text-decoration: underline;
 }
 
+/* Body font — avoid mono slashed-zero looking like an 8 ($20 ≠ $28) */
 .merch-price {
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
+  font-family: var(--font-body, system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--ink-900);
-  margin: 0 0 10px;
+  margin: 0 0 8px;
 }
 
 .merch-product-dek {
   color: var(--ink-600);
   margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .merch-how {
@@ -185,13 +182,28 @@
   margin: 0;
 }
 
+@media (max-width: 1100px) {
+  .merch-catalog,
+  .merch-catalog-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .merch-hero {
     padding: 40px 0 32px;
   }
 
-  .merch-product-featured,
-  .merch-catalog-grid .merch-product-featured {
+  .merch-catalog,
+  .merch-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .merch-catalog,
+  .merch-catalog-grid {
     grid-template-columns: 1fr;
   }
 }
