@@ -588,6 +588,15 @@ function normalizeForSimilarity(text) {
   return (text || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
 }
 
+const TITLE_STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'for', 'of', 'to', 'in', 'on', 'at', 'from', 'with',
+  'after', 'along', 'has', 'have', 'new', 'its', 'into', 'over', 'under', 'near',
+]);
+
+function contentWords(text) {
+  return normalizeForSimilarity(text).filter((w) => w.length > 3 && !TITLE_STOPWORDS.has(w));
+}
+
 function titleSimilarity(a, b) {
   const wordsA = new Set(normalizeForSimilarity(a));
   const wordsB = new Set(normalizeForSimilarity(b));
@@ -595,6 +604,28 @@ function titleSimilarity(a, b) {
   const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
   const union = new Set([...wordsA, ...wordsB]).size;
   return union === 0 ? 0 : intersection / union;
+}
+
+// Overlap coefficient on content words — catches paraphrased cross-feed
+// duplicates where Jaccard stays low because filler verbs differ
+// (e.g. "Weighs … Cleanup Pilot" vs "Studies Pilot Cleanup …").
+function contentTitleOverlap(a, b) {
+  const wordsA = new Set(contentWords(a));
+  const wordsB = new Set(contentWords(b));
+  if (wordsA.size < 3 || wordsB.size < 3) return 0;
+  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
+  return intersection / Math.min(wordsA.size, wordsB.size);
+}
+
+function titlesLookLikeDuplicate(a, b) {
+  // Threshold lowered from 0.6 to 0.5, and > changed to >=, after a real duplicate
+  // pair ("Animal Kingdom's New Silverback Gorilla Has Arrived" vs "Animal Kingdom's
+  // Gorilla Troop Has a New Silverback Leader") scored exactly 0.6 and slipped through
+  // the old strict-greater-than check. Paraphrased duplicates commonly lose 40%+ of
+  // their word overlap just from natural rewording, so 0.6 was already cutting it close.
+  if (titleSimilarity(a, b) >= 0.5) return true;
+  // Key West sargassum pair scored ~0.42 on Jaccard but 0.60 on content overlap.
+  return contentTitleOverlap(a, b) >= 0.6;
 }
 
 async function isDuplicateOfRecent(title, category) {
@@ -606,12 +637,7 @@ async function isDuplicateOfRecent(title, category) {
     .eq('category', category)
     .gte('published_at', since);
   if (!data) return false;
-  // Threshold lowered from 0.6 to 0.5, and > changed to >=, after a real duplicate
-  // pair ("Animal Kingdom's New Silverback Gorilla Has Arrived" vs "Animal Kingdom's
-  // Gorilla Troop Has a New Silverback Leader") scored exactly 0.6 and slipped through
-  // the old strict-greater-than check. Paraphrased duplicates commonly lose 40%+ of
-  // their word overlap just from natural rewording, so 0.6 was already cutting it close.
-  return data.some((a) => titleSimilarity(title, a.title) >= 0.5);
+  return data.some((a) => titlesLookLikeDuplicate(title, a.title));
 }
 
 function startSameDayImageRepair(slug, {
@@ -1060,6 +1086,8 @@ module.exports = {
   extractImage,
   originCropPercent,
   titleSimilarity,
+  contentTitleOverlap,
+  titlesLookLikeDuplicate,
   createArticleRetryQueue,
   startSameDayImageRepair,
   toFacebookFeedCaption,

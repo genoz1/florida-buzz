@@ -10,6 +10,10 @@ const ARTICLE_SLUG_REDIRECTS = Object.freeze({
   // Winner: florida-wildlife-safety-tips-after-a-major-storm
   'fwc-wildlife-safety-tips-after-major-storms':
     'florida-wildlife-safety-tips-after-a-major-storm',
+  // Cross-feed Key West sargassum pilot (Yahoo vs The Cool Down rewrites).
+  // Winner: key-west-sargassum-cleanup-pilot-plans
+  'key-west-sargassum-cleanup-pilot-plan':
+    'key-west-sargassum-cleanup-pilot-plans',
 });
 
 function resolveArticleRedirect(slug) {
