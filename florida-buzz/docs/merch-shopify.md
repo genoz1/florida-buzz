@@ -1,6 +1,18 @@
 # Buzz Merch + Shopify
 
-Florida Buzz does **not** run checkout itself. Your Shopify store collects payment and handles fulfillment/shipping. The website page at `/merch` showcases featured products and deep-links into Shopify.
+## Integration model (brand-first)
+
+Florida Buzz owns the **merch experience**. Shopify is the **checkout engine**.
+
+| Layer | Where | What the visitor sees |
+|---|---|---|
+| Browse / brand | `thefloridabuzz.com/merch` | Full Florida Buzz header, fonts, colors, copy, featured tees |
+| Product detail + cart + pay | Shopify storefront | Prefer a custom domain like `shop.thefloridabuzz.com` so it still feels like us |
+| Fulfillment | Shopify (+ print-on-demand app if connected) | Behind the scenes |
+
+Do **not** iframe a raw Shopify catalog into the site — that looks bolted on. Do keep `/merch` as a first-class Florida Buzz page (already in the main nav next to Podcasts / Guides).
+
+Button copy stays Florida Buzz–native (“Get yours”, “Shop merch”) — never “Buy on Shopify” in the hero.
 
 (Printify Pop-Up Store is still supported if you ever switch back — same JSON shape.)
 
