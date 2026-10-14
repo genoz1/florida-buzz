@@ -24,12 +24,12 @@
   </section>
 
   <% if (merch.products.length) { %>
-    <section class="wrap merch-catalog<%= merch.products.length > 2 ? ' merch-catalog-grid' : '' %>" aria-label="Florida Buzz merch">
+    <section class="wrap merch-catalog merch-catalog-grid" aria-label="Florida Buzz merch">
       <% merch.products.forEach((product, i) => { %>
-        <article class="merch-product<%= i === 0 ? ' merch-product-featured' : '' %>">
+        <article class="merch-product">
           <a class="merch-product-media" href="<%= product.url %>" target="_blank" rel="noopener noreferrer">
             <% if (product.imageUrl) { %>
-              <img src="<%= product.imageUrl %>" alt="<%= product.title %>" width="720" height="720" loading="<%= i < 2 ? 'eager' : 'lazy' %>" decoding="async">
+              <img src="<%= product.imageUrl %>" alt="<%= product.title %>" width="480" height="480" loading="<%= i < 4 ? 'eager' : 'lazy' %>" decoding="async">
             <% } else { %>
               <div class="merch-product-placeholder" aria-hidden="true">Florida Buzz</div>
             <% } %>
