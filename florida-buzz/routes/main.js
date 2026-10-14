@@ -614,6 +614,16 @@ router.get('/merch', async (req, res, next) => {
   }
 });
 
+router.get('/sponsors', (req, res) => {
+  const { sponsorsConfig } = require('../lib/sponsors');
+  res.render('sponsors', {
+    sponsors: sponsorsConfig(),
+    pageTitle: 'Sponsors — The Florida Buzz',
+    pageDescription:
+      'Meet the partners who support Florida Buzz — starting with Rook Careers — and learn how to sponsor our site and podcasts.',
+  });
+});
+
 router.get('/editorial-standards', (req, res) => {
   res.render('editorial-standards');
 });
@@ -785,6 +795,7 @@ router.get('/sitemap.xml', async (req, res) => {
     ...Object.keys(PILLARS).map((slug) => ({ loc: `${siteUrl}/guide/${slug}`, priority: '0.8' })),
     { loc: `${siteUrl}/about`, priority: '0.5' },
     { loc: `${siteUrl}/merch`, priority: '0.7' },
+    { loc: `${siteUrl}/sponsors`, priority: '0.6' },
     { loc: `${siteUrl}/gene-zentko`, priority: '0.5' },
     { loc: `${siteUrl}/privacy`, priority: '0.3' },
     { loc: `${siteUrl}/terms`, priority: '0.3' },

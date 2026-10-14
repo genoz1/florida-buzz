@@ -1,0 +1,222 @@
+/* Sponsors — Florida Buzz partners (merch/podcast visual language) */
+
+.sponsors-page {
+  padding-bottom: 72px;
+}
+
+.sponsors-hero {
+  background:
+    radial-gradient(ellipse 70% 55% at 90% 0%, rgba(21, 82, 92, 0.12), transparent 55%),
+    linear-gradient(165deg, var(--sand-50) 0%, var(--sand-100) 50%, #e8f1f0 100%);
+  border-bottom: 1px solid var(--line);
+  padding: 56px 0 48px;
+}
+
+.sponsors-hero-inner {
+  max-width: 640px;
+}
+
+.sponsors-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+  margin: 0 0 12px;
+}
+
+.sponsors-hero h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(2.4rem, 5vw, 3.5rem);
+  line-height: 1.1;
+  color: var(--teal-900);
+  margin: 0 0 14px;
+}
+
+.sponsors-lede {
+  font-size: 1.15rem;
+  color: var(--ink-600);
+  margin: 0;
+  max-width: 36em;
+}
+
+.sponsors-featured {
+  padding-top: 40px;
+}
+
+.sponsors-section-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal-700);
+  margin: 0 0 16px;
+}
+
+.sponsor-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 32px 40px;
+  align-items: center;
+  padding: 28px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sponsor-feature-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 28px 32px;
+  min-height: 160px;
+}
+
+.sponsor-feature-logo img {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  object-fit: contain;
+}
+
+.sponsor-feature-body h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  color: var(--teal-900);
+  margin: 0 0 8px;
+}
+
+.sponsor-feature-body h2 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sponsor-tagline {
+  font-size: 1.05rem;
+  color: var(--teal-700);
+  margin: 0 0 12px;
+}
+
+.sponsor-blurb {
+  color: var(--ink-600);
+  margin: 0 0 18px;
+  max-width: 40em;
+}
+
+.sponsor-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.sponsors-partners {
+  padding-top: 40px;
+}
+
+.sponsors-partner-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sponsor-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sponsor-tile-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 20px;
+  min-height: 120px;
+}
+
+.sponsor-tile-logo img {
+  max-width: 180px;
+  max-height: 72px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.sponsor-tile h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--teal-900);
+  margin: 0;
+}
+
+.sponsor-tile p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--ink-600);
+}
+
+.sponsors-inquire {
+  margin-top: 48px;
+  padding: 36px 0 8px;
+  border-top: 1px solid var(--line);
+  max-width: 640px;
+}
+
+.sponsors-inquire h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  color: var(--teal-900);
+  margin: 0 0 12px;
+}
+
+.sponsors-inquire > p {
+  color: var(--ink-600);
+  margin: 0 0 18px;
+  max-width: 38em;
+}
+
+.sponsors-inquire-list {
+  margin: 0 0 22px;
+  padding-left: 1.2em;
+  color: var(--ink-600);
+}
+
+.sponsors-inquire-list li {
+  margin-bottom: 6px;
+}
+
+.sponsors-note {
+  margin-top: 36px;
+  font-size: 0.92rem;
+  color: var(--ink-600);
+  max-width: 48em;
+}
+
+@media (max-width: 760px) {
+  .sponsors-hero {
+    padding: 40px 0 36px;
+  }
+
+  .sponsor-feature {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .sponsor-feature-logo {
+    min-height: 120px;
+    padding: 24px;
+  }
+
+  .sponsors-partner-grid {
+    grid-template-columns: 1fr;
+  }
+}
