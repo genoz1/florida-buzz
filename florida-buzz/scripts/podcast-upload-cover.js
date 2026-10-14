@@ -28,7 +28,7 @@ const COVER_ALT =
 const ARTWORK_BUCKET = process.env.PODCASTS_ARTWORK_BUCKET || 'podcast-artwork';
 
 const SHOW_DESCRIPTION =
-  'Geno hosts Florida Buzz: Disney — an unofficial fan podcast with park news, attractions, food, resorts, events, and Disney World vacation planning. Energetic solo coverage of Magic Kingdom, EPCOT, Disney’s Animal Kingdom, Hollywood Studios, wait times, dining, and practical trip tips. Find planning guides, wait times, dining tips, and the Buzz Board at https://thefloridabuzz.com.';
+  'Florida Buzz: Disney is your place for real conversations about Walt Disney World. Hosted by Geno, a lifelong Disney World visitor who first experienced Magic Kingdom at 18 months old, the show brings decades of park perspective to today’s news — new attractions, announcements, prices, restaurants, resorts, and the little things longtime fans notice. Pull up a chair and join the conversation. Presented by TheFloridaBuzz.com.';
 
 async function main() {
   if (!FB_URL || !FB_KEY) throw new Error('Florida Buzz Supabase URL/key required');
