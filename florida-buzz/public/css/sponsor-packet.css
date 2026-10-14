@@ -1,0 +1,125 @@
+:root {
+  --teal: #0e3b43;
+  --ink: #1f2421;
+  --muted: #4a5350;
+  --line: rgba(14, 59, 67, 0.18);
+  --sand: #f8f3e8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--sand);
+  color: var(--ink);
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+a { color: var(--teal); }
+
+.packet-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.packet-brand {
+  margin: 0;
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 600;
+  color: var(--teal);
+}
+
+.packet-actions {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.packet-actions button {
+  font: inherit;
+  background: none;
+  border: 0;
+  color: var(--teal);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.packet {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 36px 28px 64px;
+}
+
+.packet h1 {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 600;
+  font-size: 2.2rem;
+  color: var(--teal);
+  margin: 0 0 8px;
+}
+
+.packet-sub {
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+.packet h2 {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 600;
+  color: var(--teal);
+  margin: 28px 0 10px;
+}
+
+.packet ul {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--muted);
+}
+
+.packet table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--line);
+  font-size: 0.95rem;
+}
+
+.packet th,
+.packet td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.packet thead th {
+  background: #fff;
+  color: var(--teal);
+}
+
+.packet-cta {
+  margin: 28px 0 12px;
+}
+
+.packet-cta a {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.packet-foot {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+@media print {
+  .packet-top { display: none; }
+  body { background: #fff; }
+  .packet { padding: 0; }
+}

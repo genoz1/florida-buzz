@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 npm-debug.log*
 supabase/.temp/
+data/sponsor-applications/
+public/images/sponsors/applications/

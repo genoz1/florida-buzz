@@ -624,6 +624,114 @@ router.get('/sponsors', (req, res) => {
   });
 });
 
+const sponsorLogoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 },
+  fileFilter(req, file, cb) {
+    const ok = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'].includes(file.mimetype);
+    cb(ok ? null : new Error('Logo must be PNG, JPG, WebP, or SVG.'), ok);
+  },
+});
+
+router.get('/sponsors/become', (req, res) => {
+  const { becomeSponsorPageData } = require('../lib/sponsors');
+  const page = becomeSponsorPageData(process.env);
+  const flash = {
+    errors: [],
+    canceled: req.query.canceled === '1',
+    stripePending: req.query.received === '1',
+    companyName: typeof req.query.company === 'string' ? req.query.company : '',
+  };
+  res.render('become-sponsor', {
+    ...page,
+    formValues: {},
+    flash,
+    pageTitle: 'Become a Sponsor — The Florida Buzz',
+    pageDescription:
+      'View the Florida Buzz sponsor packet, compare Supporting, Featured, and Premier annual packages, and apply with your logo and listing description.',
+  });
+});
+
+router.get('/sponsors/packet', (req, res) => {
+  const { becomeSponsorPageData } = require('../lib/sponsors');
+  const page = becomeSponsorPageData(process.env);
+  res.render('sponsor-packet', {
+    packet: page.packet,
+    tiers: page.tiers,
+  });
+});
+
+router.get('/sponsors/become/success', (req, res) => {
+  res.render('become-sponsor-success', {
+    paid: Boolean(req.query.session_id),
+    companyName: typeof req.query.company === 'string' ? req.query.company : '',
+  });
+});
+
+router.post('/sponsors/become', (req, res) => {
+  sponsorLogoUpload.single('logo')(req, res, async (uploadErr) => {
+    const { becomeSponsorPageData } = require('../lib/sponsors');
+    const { submitApplication } = require('../lib/sponsorApplications');
+    const page = becomeSponsorPageData(process.env);
+
+    const renderForm = (errors, values, extraFlash = {}) => {
+      res.status(errors.length ? 400 : 200).render('become-sponsor', {
+        ...page,
+        formValues: values || {},
+        flash: { errors, canceled: false, stripePending: false, companyName: '', ...extraFlash },
+        pageTitle: 'Become a Sponsor — The Florida Buzz',
+      });
+    };
+
+    if (uploadErr) {
+      return renderForm([uploadErr.message || 'Logo upload failed.'], {
+        companyName: req.body?.company_name,
+        contactName: req.body?.contact_name,
+        email: req.body?.email,
+        phone: req.body?.phone,
+        website: req.body?.website_url,
+        description: req.body?.description,
+        tierId: req.body?.tier_id,
+      });
+    }
+
+    try {
+      const siteUrl = `${req.protocol}://${req.get('host')}`;
+      const result = await submitApplication({
+        body: req.body || {},
+        file: req.file,
+        env: process.env,
+        siteUrl,
+      });
+
+      if (result.spam) {
+        return res.redirect('/sponsors/become/success');
+      }
+      if (!result.ok) {
+        return renderForm(result.errors, result.values);
+      }
+      if (result.checkoutUrl) {
+        return res.redirect(303, result.checkoutUrl);
+      }
+      return res.redirect(
+        303,
+        `/sponsors/become?received=1&company=${encodeURIComponent(result.record.companyName)}#apply`
+      );
+    } catch (err) {
+      console.error('[sponsors] application failed:', err);
+      return renderForm(['Something went wrong saving your application. Please try again.'], {
+        companyName: req.body?.company_name,
+        contactName: req.body?.contact_name,
+        email: req.body?.email,
+        phone: req.body?.phone,
+        website: req.body?.website_url,
+        description: req.body?.description,
+        tierId: req.body?.tier_id,
+      });
+    }
+  });
+});
+
 router.get('/editorial-standards', (req, res) => {
   res.render('editorial-standards');
 });
@@ -796,6 +904,8 @@ router.get('/sitemap.xml', async (req, res) => {
     { loc: `${siteUrl}/about`, priority: '0.5' },
     { loc: `${siteUrl}/merch`, priority: '0.7' },
     { loc: `${siteUrl}/sponsors`, priority: '0.6' },
+    { loc: `${siteUrl}/sponsors/become`, priority: '0.6' },
+    { loc: `${siteUrl}/sponsors/packet`, priority: '0.5' },
     { loc: `${siteUrl}/gene-zentko`, priority: '0.5' },
     { loc: `${siteUrl}/privacy`, priority: '0.3' },
     { loc: `${siteUrl}/terms`, priority: '0.3' },

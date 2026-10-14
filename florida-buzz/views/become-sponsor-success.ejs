@@ -1,0 +1,32 @@
+<%- include('partials/header', {
+  pageTitle: 'Sponsorship received — The Florida Buzz',
+  pageDescription: 'Thanks for supporting Florida Buzz.',
+  category: null,
+  tickerItems: [],
+  canonicalPath: '/sponsors/become/success',
+  isSponsorsPage: true,
+}) %>
+<link rel="stylesheet" href="/css/sponsors.css">
+<link rel="stylesheet" href="/css/become-sponsor.css">
+
+<main class="become-page">
+  <section class="sponsors-hero">
+    <div class="wrap sponsors-hero-inner">
+      <p class="sponsors-eyebrow">Thank you</p>
+      <h1>You're in</h1>
+      <p class="sponsors-lede">
+        <% if (paid) { %>
+          Payment received — thank you for sponsoring Florida Buzz<%= companyName ? (' as ' + companyName) : '' %>. We will review your listing and logo and follow up by email.
+        <% } else { %>
+          Your sponsorship application is on file<%= companyName ? (' for ' + companyName) : '' %>. If payment is still pending, we will email next steps.
+        <% } %>
+      </p>
+      <p class="sponsor-cta-row">
+        <a class="btn" href="/sponsors">View sponsors</a>
+        <a class="btn btn-outline" href="/">Back to Florida Buzz</a>
+      </p>
+    </div>
+  </section>
+</main>
+
+<%- include('partials/footer') %>

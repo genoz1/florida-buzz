@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= packet.title %> — The Florida Buzz</title>
+  <meta name="description" content="Florida Buzz founding sponsor packages: Supporting $588/year, Featured $1,188/year, Premier $2,388/year.">
+  <link rel="canonical" href="<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/sponsors/packet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/sponsor-packet.css">
+</head>
+<body>
+  <header class="packet-top">
+    <p class="packet-brand">Florida Buzz™</p>
+    <p class="packet-actions">
+      <a href="/sponsors/become">Apply to sponsor</a>
+      ·
+      <button type="button" onclick="window.print()">Print / save PDF</button>
+    </p>
+  </header>
+
+  <main class="packet">
+    <h1><%= packet.title %></h1>
+    <p class="packet-sub"><%= packet.subtitle %></p>
+    <p><%= packet.audience %></p>
+
+    <h2>What you get</h2>
+    <ul>
+      <% packet.highlights.forEach((item) => { %><li><%= item %></li><% }) %>
+    </ul>
+
+    <h2>Founding packages (annual)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Benefits</th>
+          <% tiers.forEach((tier) => { %><th><%= tier.name %></th><% }) %>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Monthly equivalent</th>
+          <% tiers.forEach((tier) => { %><td><%= tier.monthlyLabel %></td><% }) %>
+        </tr>
+        <tr>
+          <th>Annual payment</th>
+          <% tiers.forEach((tier) => { %><td><strong><%= tier.annualLabel %></strong></td><% }) %>
+        </tr>
+        <% tiers[0].benefits.forEach((_, i) => { %>
+          <tr>
+            <th><%= tiers[0].benefits[i].label %></th>
+            <% tiers.forEach((tier) => {
+              const b = tier.benefits[i];
+            %>
+              <td><% if (b.included) { %><% if (b.detail) { %><%= b.detail %><% } else { %>Yes<% } %><% } else { %>—<% } %></td>
+            <% }) %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <p class="packet-cta"><a href="/sponsors/become#apply">Become a sponsor →</a></p>
+    <p class="packet-foot">Contact: <a href="mailto:<%= packet.contactEmail %>"><%= packet.contactEmail %></a>. Sponsorship does not buy editorial coverage.</p>
+  </main>
+</body>
+</html>
