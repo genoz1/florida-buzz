@@ -149,6 +149,7 @@ Outline rules:
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions. Label rumors as rumors.
 - Plan 1–2 light Florida Buzz mentions total (not a tool tour) plus a brief CTA near the close.
+- REQUIRED close merch beat (mark as "Merch:"): mention the merch section on The Florida Buzz with Florida Buzz merchandise, including the soon-to-be-famous “I Caught My Buzz in Florida” t-shirts. One breath, human, not a hard sell.
 - REQUIRED Partner mid-roll segment (mark as "Partner mid-roll:"): ${PODCAST_MIDROLL_DIRECTION}
 - REQUIRED Soft outro partner reminder in the close (mark as "Partner outro:"): ${PODCAST_OUTRO_DIRECTION}
 - Never invent breaking-news facts, exact current wait times, closures, prices, policies, dates, guides, features, or URLs.
@@ -210,7 +211,8 @@ Conversation requirements:
      Then one breath teaser of the stories coming up.
   2) === SEGMENT: story-1 === … story-4/5/6 === — four to six verified news stories. Vary length. Change topics before listeners get bored.
   3) === SEGMENT: midroll === once after story 2 or 3 — SHORT (~15–25 seconds): ${PODCAST_MIDROLL_DIRECTION}
-  4) === SEGMENT: close === — brief Florida Buzz CTA + soft ${PARTNER_NAME} show-notes reminder + warm goodbye
+  4) === SEGMENT: close === — REQUIRED merch beat + soft ${PARTNER_NAME} show-notes reminder + warm goodbye
+     Merch beat (REQUIRED, ~10–20 seconds, before or after the partner soft outro): mention that Florida Buzz has a new merch section with awesome Florida Buzz merchandise — including the soon-to-be-famous “I Caught My Buzz in Florida” t-shirts — on The Florida Buzz dot com. Keep it casual and proud, not a hard sell. Do not read /merch aloud as a URL path.
 - HARD BAN dual-host dialogue (no Gena:/Diane: lines, no cohost reactions, no answering yourself as a second person).
 - HARD BAN opening with "Okay, how was your week" weather essays that skip I'm Geno + welcome + thank-you + Let's go.
 - HARD BAN the eighteen-months / fifty-years longevity monologue in the Named Open.
@@ -231,9 +233,10 @@ Conversation requirements:
 
 Florida Buzz listener guidance (light touch):
 - Mention The Florida Buzz sparingly — usually the article you're talking about and a brief close CTA.
-- About 1–2 natural Florida Buzz references in a 12–15 minute episode (not a tool tour).
+- About 1–2 natural Florida Buzz references in a 12–15 minute episode (not a tool tour), plus the REQUIRED merch close beat.
 - Say “The Florida Buzz dot com” when speaking; never read long URLs aloud.
 - Do not interrupt a thoughtful observation with a promotion.
+- REQUIRED close merch mention: Florida Buzz merch section + “I Caught My Buzz in Florida” t-shirts (soon-to-be-famous / fun energy OK; no hard sell; once only).
 - REQUIRED mid-episode partner mention: after a couple of stories, include one short human line about partner ${PARTNER_NAME} for Disney tickets/hotels, disclose partner/affiliate nature, point listeners to the show notes link, and note that booking there helps support the show. No hard-sell spam; do not invent prices or deals.
 - Soft outro: briefly remind that the ${PARTNER_NAME} link is in the show notes, then close.
 - Closing may briefly mention listeners can find the stories at The Florida Buzz dot com — keep it short.
@@ -258,7 +261,7 @@ ${sourceBlock || '(none — do not invent dated news)'}
 Verified Florida Buzz tools (mention lightly near close only if natural; do not demo planner tips):
 ${verifiedToolsBlock()}
 
-Length requirement: produce a full ~12–15 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: short Geno Option A — welcome to the Florida Buzz Disney podcast / I'm your host Geno / thank you for joining us (or being here / listening) / what's happening at Disney World / let's go — before stories. Never say “unofficial.” Never open with the eighteen-months longevity monologue. Talk about the news like a person across the table — mixed feelings OK, skepticism OK, no vacation-planning lectures. Structure: 4–6 story segments + short ${PARTNER_NAME} mid-roll + close with soft ${PARTNER_NAME} show-notes reminder. Include === SEGMENT: … === markers. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
+Length requirement: produce a full ~12–15 minute solo Geno episode script of about ${CONVERSATION_MIN_WORDS}–${CONVERSATION_TARGET_MAX_WORDS} spoken words (Geno lines only). REQUIRED open: short Geno Option A — welcome to the Florida Buzz Disney podcast / I'm your host Geno / thank you for joining us (or being here / listening) / what's happening at Disney World / let's go — before stories. Never say “unofficial.” Never open with the eighteen-months longevity monologue. Talk about the news like a person across the table — mixed feelings OK, skepticism OK, no vacation-planning lectures. Structure: 4–6 story segments + short ${PARTNER_NAME} mid-roll + close that includes the merch section / “I Caught My Buzz in Florida” t-shirts mention + soft ${PARTNER_NAME} show-notes reminder. Include === SEGMENT: … === markers. End with a full standalone wrap-up and goodbye — never tease Part 2.`,
   };
 }
 
