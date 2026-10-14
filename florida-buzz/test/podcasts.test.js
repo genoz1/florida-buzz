@@ -943,7 +943,7 @@ test('memory show seed is solo Geno with hosted-by-Geno cover alt', async () => 
   assert.deepEqual(show.hosts, [{ name: 'Geno', role: 'host' }]);
   assert.match(show.cover_alt, /hosted by Geno/i);
   assert.doesNotMatch(show.cover_alt, /Gene Zentko/i);
-  assert.match(show.description, /Geno hosts/i);
+  assert.match(show.description, /real conversations about Walt Disney World/i);
 });
 
 test('RSS itunes:author lists Geno (not Gena & Diane)', async () => {

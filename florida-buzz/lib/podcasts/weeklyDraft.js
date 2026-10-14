@@ -286,9 +286,11 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
     .slice(0, 6);
   const focusHint = articleTitles[0]
     ? articleTitles[0].slice(0, 48)
-    : `${slot.label} planning talk & park opinions`;
-  const fallbackTitle = `Florida Buzz: Disney — ${focusHint}`;
-  const fallbackDescription = `Standalone ${slot.label} episode: Geno covers Walt Disney World news and commentary in a short conversational roundup from The Florida Buzz. Visit https://thefloridabuzz.com.`;
+    : `${slot.label} Disney World news`;
+  const fallbackTitle = articleTitles[0]
+    ? `Disney World News: ${articleTitles[0].slice(0, 52)}`
+    : `Disney World News Roundup — ${slot.label}`;
+  const fallbackDescription = `Geno talks through what’s happening at Walt Disney World this week — news, opinions, and the details longtime fans notice. From The Florida Buzz. https://thefloridabuzz.com`;
 
   if (!aiText) {
     return {
@@ -300,14 +302,29 @@ async function buildEpisodeCopy({ aiText, weekKey, collection, releaseSlot }) {
   }
 
   const prompt = {
-    system: `You write concise podcast packaging for Florida Buzz: Disney.
+    system: `You write Apple Podcasts packaging for Florida Buzz: Disney (Walt Disney World news + commentary with Geno).
 Return plain text with two lines only:
 TITLE: ...
 DESCRIPTION: ...
-Rules: title under 80 chars; description under 320 chars; solo host Geno (never dual-host Gena/Diane packaging); no Disney affiliation claims; do not invent news facts.
-This is a standalone ~20–25 minute weekly episode intended for ${slot.label} release — not "Part 1/Part 2" of another show.
-Never use the words "Part 1", "Part 2", "part of", or similar multi-part episode language in the title or description.
-Give this episode its own distinct title based on its focus sources (different from other episodes this week).`,
+
+Title rules:
+- Under 80 characters
+- Create curiosity AND keep Disney World search terms (Disney World, Magic Kingdom, EPCOT, Hollywood Studios, Animal Kingdom, Lightning Lane, etc. when relevant)
+- Prefer a hook + question or stakes over a flat news bulletin list
+- GOOD: "Disney World's New Mandalorian Experience — Plus, Is Lightning Lane Worth It?"
+- BAD: "Mandalorian & Grogu Meet-and-Greet, Nomad Lounge Perks and Park Updates"
+- Solo Geno show — never dual-host packaging
+- Never invent news facts; never claim Disney affiliation
+- Never use "Part 1", "Part 2", or multi-part language
+- Distinct title for this episode's focus sources
+
+Description rules:
+- Under 320 characters before any partner blurb is appended
+- First 1–2 sentences: why someone should hit play (news + conversation, not a vacation-planning seminar)
+- Then briefly name the topics covered
+- Do NOT put affiliate/partner/Undercover Tourist language in the description — that is appended separately after your text
+- May mention TheFloridaBuzz.com once
+- This is a standalone ~12–15 minute ${slot.label} episode`,
     user: `Week key: ${weekKey}
 Intended publish day: ${slot.label}
 Focus source titles for THIS episode only: ${articleTitles.join(' | ') || '(none — evergreen/Buzz Board heavy episode)'}
