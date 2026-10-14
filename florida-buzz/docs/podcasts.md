@@ -146,7 +146,7 @@ After the announcer bumper, first spoken lines must be Geno Option A:
 
 > Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. Here's what's happening at Disney World. Let's go.
 
-Then: 4–6 news story segments (with `=== SEGMENT: story-N ===` markers for per-story TTS) → short partner mid-roll once → Florida Buzz CTA / close.
+Then: 4–6 news story segments (with `=== SEGMENT: story-N ===` markers for per-story TTS) → short partner mid-roll once → close with merch section CTA (including “I Caught My Buzz in Florida” tees) + soft partner reminder.
 
 ### Drive listeners to TheFloridaBuzz.com
 
