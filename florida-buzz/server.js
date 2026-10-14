@@ -6,11 +6,24 @@ const { logNotFound } = require('./lib/notFoundLog');
 const { createScheduledRunner } = require('./lib/scheduledRun');
 const { getScheduleFlags, parseBuzzFacebookSlots, FACEBOOK_FEED_DRAIN_CRONS } = require('./lib/scheduleConfig');
 
+const { createCanonicalHostRedirect } = require('./lib/canonicalHost');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.set('trust proxy', 1);
+
+// www → apex before any other Florida Buzz routing (single 301 hop).
+app.use(
+  createCanonicalHostRedirect({
+    apexHost: 'thefloridabuzz.com',
+    wwwHost: 'www.thefloridabuzz.com',
+    enabled: process.env.CANONICAL_HOST_REDIRECT !== 'false',
+  })
+);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 

@@ -20,13 +20,48 @@ const {
 } = require('../lib/affiliates');
 const { normalizeHotelsDest } = require('../lib/affiliates/hotelsCom');
 const { afterSubscribeWelcome } = require('../lib/email/welcomeSeries');
+const {
+  UpstreamError,
+  isUpstreamError,
+  isPlaceholderSlug,
+  createArticlesQuery,
+} = require('../lib/articlesQuery');
+const { createSitemapBuilder } = require('../lib/sitemapBuilder');
+const {
+  logRequestOutcome,
+  recordArticle404,
+  recordArticle503,
+  recordSitemapUrlCount,
+} = require('../lib/requestObservability');
+
+const ARCHIVE_PAGE_SIZE = 24;
+
+const articlesQuery = createArticlesQuery({ client: supabase, env: process.env });
 
 // Logs the 404 and renders the page — a drop-in replacement for the old
 // `res.status(404).render('404')`, used everywhere a route matches but the
 // specific requested item (article slug, category, etc.) doesn't exist.
-function render404(req, res) {
+function render404(req, res, { routeType = 'page', slug = null } = {}) {
+  if (routeType === 'article') recordArticle404();
+  logRequestOutcome({ status: 404, routeType, slug });
   logNotFound(req.originalUrl, req.get('referer'));
   return res.status(404).render('404');
+}
+
+function render503(req, res, { routeType = 'page', slug = null, error = null } = {}) {
+  if (routeType === 'article') recordArticle503();
+  logRequestOutcome({
+    status: 503,
+    routeType,
+    slug,
+    errorCategory: error?.category || 'supabase_query',
+    message: error?.message || null,
+  });
+  res.set('Retry-After', '300');
+  res.set('Cache-Control', 'no-store');
+  return res.status(503).render('unavailable', {
+    canonicalPath: req.path || '',
+  });
 }
 
 const CATEGORY_LABELS = {
@@ -273,116 +308,50 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
-function sampleArticles() {
-  const now = new Date();
-  const mk = (i, category, title, dek, source) => ({
-    slug: `sample-${category}-${i}`,
-    title,
-    dek,
-    body_html: `<p>This is placeholder content. Once the automation is connected to Supabase and the RSS sources, real articles will replace this sample.</p><p>${dek}</p>`,
-    category,
-    source_name: source,
-    source_url: '#',
-    image_url: null,
-    featured: i === 0,
-    published_at: new Date(now - i * 3600000).toISOString(),
-  });
-
-  return [
-    mk(0, 'theme-parks', 'Disney Unveils New Holiday Parade for Magic Kingdom', 'A first look at the new floats, music, and characters coming this winter season.', 'Disney Parks Blog'),
-    mk(1, 'space', 'SpaceX Targets Tonight for Falcon 9 Launch from the Cape', 'Here is the best viewing spot if you want to catch tonight\'s liftoff from the Space Coast.', 'NASA'),
-    mk(2, 'beaches', 'Five Quiet Florida Beaches Locals Don\'t Want You to Know About', 'Skip the crowds at these lesser-known stretches of sand from the Panhandle to the Keys.', 'Visit Florida'),
-    mk(3, 'wildlife', 'Rare Manatee Gathering Spotted Near Crystal River', 'Wildlife officials confirm an unusually large pod has moved into the springs this week.', 'Florida Fish & Wildlife'),
-    mk(4, 'theme-parks', 'Universal Epic Universe Adds New Seasonal Event', 'Universal Orlando has announced details for its next limited-time experience.', 'Universal Orlando Blog'),
-    mk(5, 'florida-living', 'Cold Front to Bring Rare Chill to Central Florida This Week', 'Temperatures could dip into the 40s overnight across several counties.', 'National Weather Service'),
-    mk(6, 'cruises', 'New Cruise Itinerary Launches from Port Canaveral', 'A major cruise line just added a new four-night Bahamas sailing.', 'Cruise Line News'),
-    mk(7, 'events', 'Fourth of July Fireworks Guide: Best Shows Across Florida', 'Our roundup of the top fireworks displays from Pensacola to Miami.', 'Visit Florida'),
-  ];
+/**
+ * Public article loader. Distinguishes:
+ * - successful empty result → []
+ * - upstream/query failure after retries → throws UpstreamError (never [])
+ * Sample/demo rows are never returned on production-like hosts.
+ */
+async function getArticles(opts = {}) {
+  const result = await articlesQuery.queryArticles(opts);
+  return result.articles;
 }
 
 async function hasAnyRealArticles() {
-  if (!supabase) return false;
-  const { count } = await supabase.from('articles').select('*', { count: 'exact', head: true });
-  return !!count && count > 0;
-}
-
-async function getArticles({ category, city, limit, evergreenOnly, excludeEvergreen, slug, author } = {}) {
-  const { filterRedirectedArticles } = require('../lib/articleRedirects');
-
-  if (supabase) {
-    const runQuery = async () => {
-      // When listing (no exact slug), over-fetch slightly so redirected
-      // duplicate losers can be filtered without shrinking the page.
-      const fetchLimit = !slug && limit ? Math.min(Number(limit) + 8, 1000) : limit;
-      let query = supabase.from('articles').select('*').order('published_at', { ascending: false });
-      if (category) query = query.eq('category', category);
-      if (city) query = query.eq('city', city);
-      if (evergreenOnly) query = query.eq('is_evergreen', true);
-      if (excludeEvergreen) query = query.eq('is_evergreen', false);
-      if (slug) query = query.eq('slug', slug); // exact match — not subject to `limit`, so old articles are always findable
-      if (author) query = query.eq('source_name', author);
-      if (fetchLimit) query = query.limit(fetchLimit);
-      return query;
-    };
-
-    let { data, error } = await runQuery();
-    if (error) {
-      // A real query error (e.g. the ongoing Supabase JWT-rejection platform
-      // incident) is NOT the same thing as "no matching rows" — treating it
-      // as such was silently rendering real, valid article links as 404s to
-      // real visitors. These errors are documented as often resolving within
-      // under a second, so one short retry recovers the real data instead of
-      // falsely reporting the article doesn't exist. Logged now too, since
-      // this was previously invisible even when it was happening.
-      console.error(`  [warning] Supabase query failed (retrying once): ${error.message}`);
-      await new Promise((r) => setTimeout(r, 800));
-      ({ data, error } = await runQuery());
-      if (error) {
-        console.error(`  [error] Supabase query failed again after retry: ${error.message}`);
-      }
-    }
-    if (!error && data && data.length) {
-      // Exact slug lookups still return the row (route may 301); listings hide losers.
-      const rows = slug ? data : filterRedirectedArticles(data);
-      return limit && !slug ? rows.slice(0, limit) : rows;
-    }
-    // A persistent error (still failing after the retry above) falls
-    // through to the fallback logic below, same as before this change —
-    // that's a real safety net (showing something rather than nothing) and
-    // shouldn't have been bypassed. The retry above already handles the
-    // common transient case (the false-404 bug); this just stops a
-    // sustained outage from producing a completely empty homepage.
-  }
-
-  const hasReal = await hasAnyRealArticles();
-  if (hasReal) return [];
-
-  let sample = sampleArticles();
-  if (category) sample = sample.filter((a) => a.category === category);
-  if (slug) sample = sample.filter((a) => a.slug === slug);
-  if (author) sample = sample.filter((a) => a.source_name === author);
-  if (!slug) sample = filterRedirectedArticles(sample);
-  return limit ? sample.slice(0, limit) : sample;
+  const result = await articlesQuery.hasAnyRealArticles();
+  if (!result.ok) throw result.error;
+  return result.hasArticles;
 }
 
 router.get('/', async (req, res) => {
-  // News feed excludes evergreen guides so the homepage can showcase guides separately.
-  const news = await getArticles({ excludeEvergreen: true, limit: 30 });
-  const tickerPool = await getArticles({ limit: 8 });
-  const featured = news[0];
-  const secondary = news.slice(1, 4);
-  const guides = (await getArticles({ evergreenOnly: true, author: 'Gene Zentko', limit: 6 })).slice(0, 3);
-
+  let news;
+  let tickerPool;
+  let guides;
+  let featured;
+  let secondary;
   const byCategory = {};
-  await Promise.all(
-    CATEGORY_ORDER.map(async (cat) => {
-      const categoryArticles = await getArticles({ category: cat, excludeEvergreen: true, limit: 6 });
-      // Exclude anything already shown in the featured/secondary slots above,
-      // so the same article doesn't appear twice on the homepage.
-      const usedSlugs = new Set([featured, ...secondary].filter(Boolean).map((a) => a.slug));
-      byCategory[cat] = categoryArticles.filter((a) => !usedSlugs.has(a.slug)).slice(0, 3);
-    })
-  );
+  try {
+    // News feed excludes evergreen guides so the homepage can showcase guides separately.
+    news = await getArticles({ excludeEvergreen: true, limit: 30 });
+    tickerPool = await getArticles({ limit: 8 });
+    guides = (await getArticles({ evergreenOnly: true, author: 'Gene Zentko', limit: 6 })).slice(0, 3);
+    featured = news[0];
+    secondary = news.slice(1, 4);
+    await Promise.all(
+      CATEGORY_ORDER.map(async (cat) => {
+        const categoryArticles = await getArticles({ category: cat, excludeEvergreen: true, limit: 6 });
+        // Exclude anything already shown in the featured/secondary slots above,
+        // so the same article doesn't appear twice on the homepage.
+        const usedSlugs = new Set([featured, ...secondary].filter(Boolean).map((a) => a.slug));
+        byCategory[cat] = categoryArticles.filter((a) => !usedSlugs.has(a.slug)).slice(0, 3);
+      })
+    );
+  } catch (err) {
+    if (isUpstreamError(err)) return render503(req, res, { routeType: 'home', error: err });
+    throw err;
+  }
 
   let podcastShow = null;
   let podcastLatest = null;
@@ -452,51 +421,106 @@ router.get('/', async (req, res) => {
   });
 });
 
-router.get('/category/:cat', async (req, res) => {
-  const { cat } = req.params;
-  if (!CATEGORY_LABELS[cat]) return render404(req, res);
+async function renderArchivePage(req, res, {
+  kind,
+  key,
+  labels,
+  seoMap,
+  filter,
+  extra = {},
+}) {
+  if (!labels[key]) return render404(req, res, { routeType: kind });
 
-  const articles = await getArticles({ category: cat });
-  const ticker = await getArticles({ limit: 8 });
-  const seo = CATEGORY_SEO[cat] || {};
+  const pageRaw = Number(req.params.page || req.query.page || 1);
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+  if (req.params.page && page < 2) {
+    return res.redirect(301, kind === 'category' ? `/category/${key}` : `/city/${key}`);
+  }
 
-  res.render('category', {
-    category: cat,
+  let all;
+  let ticker;
+  try {
+    all = await getArticles(filter);
+    ticker = await getArticles({ limit: 8 });
+  } catch (err) {
+    if (isUpstreamError(err)) return render503(req, res, { routeType: kind, error: err });
+    throw err;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(all.length / ARCHIVE_PAGE_SIZE));
+  if (page > totalPages && all.length) {
+    return render404(req, res, { routeType: kind });
+  }
+  const start = (page - 1) * ARCHIVE_PAGE_SIZE;
+  const articles = all.slice(start, start + ARCHIVE_PAGE_SIZE);
+  const seo = seoMap[key] || {};
+  const basePath = kind === 'category' ? `/category/${key}` : `/city/${key}`;
+  const canonicalPath = page > 1 ? `${basePath}/page/${page}` : basePath;
+
+  const view = kind === 'category' ? 'category' : 'city';
+  return res.render(view, {
+    [kind === 'category' ? 'category' : 'city']: key,
     articles,
     ticker,
     categoryLabels: CATEGORY_LABELS,
+    cityLabels: kind === 'category' && key === 'events' ? CITY_LABELS : kind === 'city' ? CITY_LABELS : null,
     seoTitle: seo.title,
     seoDescription: seo.description,
     seoIntro: seo.intro,
-    cityLabels: cat === 'events' ? CITY_LABELS : null,
     placeholderImg,
     thumbUrl,
     resizeImg,
     timeAgo,
+    pagination: {
+      page,
+      totalPages,
+      total: all.length,
+      basePath,
+      prevHref: page <= 1 ? null : page === 2 ? basePath : `${basePath}/page/${page - 1}`,
+      nextHref: page >= totalPages ? null : `${basePath}/page/${page + 1}`,
+    },
+    canonicalPath,
+    ...extra,
+  });
+}
+
+router.get('/category/:cat', async (req, res) => {
+  return renderArchivePage(req, res, {
+    kind: 'category',
+    key: req.params.cat,
+    labels: CATEGORY_LABELS,
+    seoMap: CATEGORY_SEO,
+    filter: { category: req.params.cat },
+  });
+});
+
+router.get('/category/:cat/page/:page', async (req, res) => {
+  return renderArchivePage(req, res, {
+    kind: 'category',
+    key: req.params.cat,
+    labels: CATEGORY_LABELS,
+    seoMap: CATEGORY_SEO,
+    filter: { category: req.params.cat },
   });
 });
 
 router.get('/city/:city', async (req, res) => {
-  const { city } = req.params;
-  if (!CITY_LABELS[city]) return render404(req, res);
+  return renderArchivePage(req, res, {
+    kind: 'city',
+    key: req.params.city,
+    labels: CITY_LABELS,
+    seoMap: CITY_SEO,
+    filter: { city: req.params.city },
+  });
+});
 
-  const articles = await getArticles({ city });
-  const ticker = await getArticles({ limit: 8 });
-  const seo = CITY_SEO[city] || {};
-
-  res.render('city', {
-    city,
-    articles,
-    ticker,
-    cityLabels: CITY_LABELS,
-    categoryLabels: CATEGORY_LABELS,
-    seoTitle: seo.title,
-    seoDescription: seo.description,
-    seoIntro: seo.intro,
-    placeholderImg,
-    thumbUrl,
-    resizeImg,
-    timeAgo,
+router.get('/city/:city/page/:page', async (req, res) => {
+  return renderArchivePage(req, res, {
+    kind: 'city',
+    key: req.params.city,
+    labels: CITY_LABELS,
+    seoMap: CITY_SEO,
+    filter: { city: req.params.city },
   });
 });
 
@@ -508,17 +532,28 @@ router.get('/article/:slug', async (req, res) => {
     return res.redirect(301, `/article/${redirectTo}`);
   }
 
-  // Fetch this specific article directly by slug — NOT by fetching a
-  // capped "200 most recent" list and searching in memory. That older
-  // approach silently 404'd any article older than your 200 most recent
-  // posts, which becomes a real, growing problem as the site accumulates
-  // more content (the exact bug behind the site-wide 404 pattern).
-  const [article] = await getArticles({ slug, limit: 1 });
-  if (!article) return render404(req, res);
+  let article;
+  let related = [];
+  let ticker = [];
+  try {
+    // Exact slug lookup — successful empty result is a genuine 404;
+    // upstream failures throw UpstreamError and become 503.
+    const rows = await getArticles({ slug, limit: 1 });
+    article = rows[0];
+    if (!article) {
+      return render404(req, res, { routeType: 'article', slug });
+    }
 
-  const categoryArticles = await getArticles({ category: article.category, limit: 4 });
-  const related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
-  const ticker = await getArticles({ limit: 8 });
+    const categoryArticles = await getArticles({ category: article.category, limit: 4 });
+    related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
+    ticker = await getArticles({ limit: 8 });
+  } catch (err) {
+    if (isUpstreamError(err)) {
+      return render503(req, res, { routeType: 'article', slug, error: err });
+    }
+    throw err;
+  }
+
   const buzzDiscussion = await loadArticleDiscussion(
     supabase,
     article,
@@ -535,6 +570,10 @@ router.get('/article/:slug', async (req, res) => {
       : /disney/i.test(`${article.title} ${article.dek || ''}`)
         ? 'disney'
         : null;
+
+  const noindexPlaceholder = isPlaceholderSlug(article.slug)
+    || /insufficient source material/i.test(article.title || '');
+
   res.render('article', {
     article,
     buzzDiscussion,
@@ -552,12 +591,20 @@ router.get('/article/:slug', async (req, res) => {
     thumbUrl,
     resizeImg,
     timeAgo,
+    robots: noindexPlaceholder ? 'noindex,follow' : undefined,
   });
 });
 
 router.get('/guides', async (req, res) => {
-  const guides = await getArticles({ evergreenOnly: true, limit: 50 });
-  const ticker = await getArticles({ limit: 8 });
+  let guides;
+  let ticker;
+  try {
+    guides = await getArticles({ evergreenOnly: true, limit: 50 });
+    ticker = await getArticles({ limit: 8 });
+  } catch (err) {
+    if (isUpstreamError(err)) return render503(req, res, { routeType: 'guides', error: err });
+    throw err;
+  }
 
   res.render('guides', {
     guides,
@@ -575,10 +622,17 @@ router.get('/guide/:pillarSlug', async (req, res) => {
   const pillar = PILLARS[pillarSlug];
   if (!pillar) return render404(req, res);
 
-  const categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true, limit: 200 });
+  let categoryGuides;
+  let ticker;
+  try {
+    categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true, limit: 200 });
+    ticker = await getArticles({ limit: 8 });
+  } catch (err) {
+    if (isUpstreamError(err)) return render503(req, res, { routeType: 'pillar', error: err });
+    throw err;
+  }
   const keywordRegex = new RegExp(pillar.keywords.join('|'), 'i');
   const guides = categoryGuides.filter((g) => keywordRegex.test(g.title) || keywordRegex.test(g.dek));
-  const ticker = await getArticles({ limit: 8 });
 
   res.render('pillar', {
     pillar,
@@ -893,62 +947,81 @@ ${items}
   res.send(xml);
 });
 
-router.get('/sitemap.xml', async (req, res) => {
-  const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
-  const articles = await getArticles({ limit: 1000 });
-
-  const staticUrls = [
-    { loc: siteUrl, priority: '1.0' },
-    { loc: `${siteUrl}/wait-times`, priority: '0.9' },
-    { loc: `${siteUrl}/planner`, priority: '0.9' },
-    { loc: `${siteUrl}/dining`, priority: '0.8' },
-    ...Object.keys(DINING_PARK_LABELS).map((park) => ({ loc: `${siteUrl}/dining/${park}`, priority: '0.8' })),
-    ...CATEGORY_ORDER.map((cat) => ({ loc: `${siteUrl}/category/${cat}`, priority: '0.8' })),
-    ...CITY_ORDER.map((city) => ({ loc: `${siteUrl}/city/${city}`, priority: '0.7' })),
-    ...Object.keys(PILLARS).map((slug) => ({ loc: `${siteUrl}/guide/${slug}`, priority: '0.8' })),
-    { loc: `${siteUrl}/about`, priority: '0.5' },
-    { loc: `${siteUrl}/merch`, priority: '0.7' },
-    { loc: `${siteUrl}/sponsors`, priority: '0.6' },
-    { loc: `${siteUrl}/sponsors/become`, priority: '0.6' },
-    { loc: `${siteUrl}/docs/Florida_Buzz_Sponsor_Packet.pdf`, priority: '0.5' },
-    { loc: `${siteUrl}/gene-zentko`, priority: '0.5' },
-    { loc: `${siteUrl}/privacy`, priority: '0.3' },
-    { loc: `${siteUrl}/terms`, priority: '0.3' },
-  ];
-
-  const articleUrls = articles
-    .filter((a) => !a.slug.startsWith('sample-'))
-    .map((a) => ({
-      loc: `${siteUrl}/article/${a.slug}`,
-      lastmod: new Date(a.published_at).toISOString().split('T')[0],
-      priority: '0.6',
-    }));
-
-  // Additive podcast URLs (isolated module). Safe when podcasts are disabled.
-  let podcastUrls = [];
-  try {
-    podcastUrls = await require('../lib/podcasts').sitemapEntries(process.env);
-  } catch (err) {
-    console.error('[sitemap] podcast entries skipped:', err.message);
+function getSitemapBuilder() {
+  if (!router._sitemapBuilder) {
+    const siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com';
+    router._sitemapBuilder = createSitemapBuilder({
+      siteUrl,
+      categoryOrder: CATEGORY_ORDER,
+      cityOrder: CITY_ORDER,
+      pillars: PILLARS,
+      diningParks: DINING_PARK_LABELS,
+      fetchArticles: () => articlesQuery.fetchAllIndexableArticles({ batchSize: 500 }),
+      fetchPodcastEntries: async () => {
+        try {
+          return await require('../lib/podcasts').sitemapEntries(process.env);
+        } catch (err) {
+          console.error('[sitemap] podcast entries skipped:', err.message);
+          return [];
+        }
+      },
+    });
   }
+  return router._sitemapBuilder;
+}
 
-  const allUrls = [...staticUrls, ...articleUrls, ...podcastUrls];
+async function sendSitemapResult(req, res, pick) {
+  const builder = getSitemapBuilder();
+  const result = await builder.getBundle({ allowStale: true });
+  if (!result.ok) {
+    logRequestOutcome({
+      status: 503,
+      routeType: 'sitemap',
+      errorCategory: 'sitemap_build',
+      message: result.error?.message || 'sitemap unavailable',
+    });
+    res.set('Retry-After', '300');
+    res.set('Cache-Control', 'no-store');
+    return res.status(503).type('text/plain').send('Sitemap temporarily unavailable');
+  }
+  recordSitemapUrlCount(result.bundle.urlCount);
+  if (result.stale) res.set('X-Sitemap-Stale', '1');
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.set('Cache-Control', result.stale ? 'no-store' : 'public, max-age=300');
+  return res.send(pick(result.bundle));
+}
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${allUrls
-  .map(
-    (u) => `  <url>
-    <loc>${u.loc}</loc>
-    ${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}
-    <priority>${u.priority}</priority>
-  </url>`
-  )
-  .join('\n')}
-</urlset>`;
+router.get('/sitemap.xml', async (req, res) => {
+  return sendSitemapResult(req, res, (b) => b.indexXml);
+});
 
-  res.set('Content-Type', 'application/xml');
-  res.send(xml);
+router.get('/sitemap-static.xml', async (req, res) => {
+  return sendSitemapResult(req, res, (b) => b.staticXml);
+});
+
+router.get('/sitemap-articles-:n.xml', async (req, res) => {
+  const n = Number(req.params.n);
+  if (!Number.isInteger(n) || n < 1) return render404(req, res, { routeType: 'sitemap' });
+  const builder = getSitemapBuilder();
+  const result = await builder.getBundle({ allowStale: true });
+  if (!result.ok) {
+    logRequestOutcome({
+      status: 503,
+      routeType: 'sitemap',
+      errorCategory: 'sitemap_build',
+      message: result.error?.message || 'sitemap unavailable',
+    });
+    res.set('Retry-After', '300');
+    res.set('Cache-Control', 'no-store');
+    return res.status(503).type('text/plain').send('Sitemap temporarily unavailable');
+  }
+  const xml = result.bundle.articleXml[n - 1];
+  if (!xml) return render404(req, res, { routeType: 'sitemap' });
+  recordSitemapUrlCount(result.bundle.urlCount);
+  if (result.stale) res.set('X-Sitemap-Stale', '1');
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.set('Cache-Control', result.stale ? 'no-store' : 'public, max-age=300');
+  return res.send(xml);
 });
 
 router.get('/robots.txt', (req, res) => {
@@ -956,6 +1029,8 @@ router.get('/robots.txt', (req, res) => {
   res.set('Content-Type', 'text/plain');
   res.send(`User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /internal/
 
 Sitemap: ${siteUrl}/sitemap.xml`);
 });

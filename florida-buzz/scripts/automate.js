@@ -943,6 +943,21 @@ async function run() {
       return;
     }
 
+    // Never publish placeholder / failure pages that pollute Google indexing.
+    const titleBlob = `${article.title || ''} ${article.meta_title || ''} ${slug || ''}`;
+    if (
+      /insufficient[- ]source[- ](material|content)/i.test(titleBlob) ||
+      /^insufficient-source-(material|content)$/i.test(slug || '')
+    ) {
+      console.warn('  [reject] Refusing to publish insufficient-source placeholder page.');
+      await retryQueue.recordFailure(
+        source,
+        item,
+        new Error('insufficient source material — not publishable')
+      );
+      return;
+    }
+
     const articleRow = {
       slug,
       title: article.title,
