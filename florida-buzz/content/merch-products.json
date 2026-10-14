@@ -1,21 +1,6 @@
 {
   "provider": "shopify",
-  "storeUrl": "",
+  "storeUrl": "https://40tfyd-gr.myshopify.com",
   "storeName": "Florida Buzz Merch",
-  "products": [
-    {
-      "id": "caught-my-buzz-tee",
-      "title": "I Caught My Buzz in Florida Tee",
-      "url": "https://YOUR-STORE.myshopify.com/products/YOUR-PRODUCT-1",
-      "imageUrl": "",
-      "description": "The soon-to-be-famous Florida Buzz tee. Pick size and color at checkout on Shopify."
-    },
-    {
-      "id": "shirt-2",
-      "title": "Replace with second product name",
-      "url": "https://YOUR-STORE.myshopify.com/products/YOUR-PRODUCT-2",
-      "imageUrl": "",
-      "description": "Sizes and colors are chosen at checkout on Shopify."
-    }
-  ]
+  "products": []
 }

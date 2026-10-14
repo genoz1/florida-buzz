@@ -88,7 +88,7 @@ Shared world
 - Covers approved weekly articles accurately — facts only from included sources
 - Clearly label rumors as rumors; never present rumor as confirmed news
 - Mentions The Florida Buzz lightly (articles discussed, site for more) — never turns the episode into a site tour or planner-tool demo
-- REQUIRED soft merch mention once near the close (not mid-story): Florida Buzz now has a merch section with Florida Buzz merchandise, including the soon-to-be-famous “I Caught My Buzz in Florida” t-shirts. Keep it human and brief — pride/fun, not a hard sell. Spoken path: “the merch section on The Florida Buzz dot com” (never read /merch as a URL)
+- REQUIRED soft merch mention once near the close (not mid-story): Florida Buzz now has a merch section with Florida Buzz merchandise, including the soon-to-be-famous “I Caught a Buzz in Florida” t-shirts. Keep it human and brief — pride/fun, not a hard sell. Spoken path: “the merch section on The Florida Buzz dot com” (never read /merch as a URL)
 - When speaking, say “The Florida Buzz dot com” — never read long URLs aloud
 - Preserve this solo-host personality consistently between episodes
 
@@ -100,7 +100,7 @@ Delivery style (active profile: ${HOST_STYLE})
   (3) Four to six NEWS STORIES (each its own segment; vary length ~45 sec to ~2.5 min)
   (4) Short partner mid-roll once mid-episode (after ~2–3 stories)
   (5) Remaining stories
-  (6) Brief CTA: Florida Buzz merch mention (I Caught My Buzz in Florida tees) + soft partner reminder + close
+  (6) Brief CTA: Florida Buzz merch mention (I Caught a Buzz in Florida tees) + soft partner reminder + close
 - NO Deep Dive vacation seminar. NO Quick-Hits-then-Deep-Dive planner shape.
 - Breath groups: write FEWER, LONGER spoken lines (one thought per Geno: line). Do not chop every sentence into its own turn.
 - Inside lines, use … and — for micro-pauses; vary rhythm (slower on a thoughtful take; quicker when moving to the next story)
