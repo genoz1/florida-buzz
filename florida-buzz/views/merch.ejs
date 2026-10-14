@@ -12,13 +12,13 @@
     <div class="wrap merch-hero-inner">
       <p class="merch-eyebrow">Florida Buzz Merch</p>
       <h1>Wear the Buzz</h1>
-      <p class="merch-lede">Official Florida Buzz shirts and gear — printed on demand. Pick a design here, then choose size and color at checkout on Printify (they handle payment, print, and shipping).</p>
+      <p class="merch-lede">Official Florida Buzz shirts and gear — including the soon-to-be-famous <em>I Caught My Buzz in Florida</em> tees. Pick a design here, then choose size and color at checkout in our Shopify store (they handle payment and shipping).</p>
       <% if (merch.storeUrl) { %>
         <p class="merch-cta-row">
           <a class="btn" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Shop the store</a>
         </p>
       <% } else if (!merch.products.length) { %>
-        <p class="merch-setup">Merch is almost ready — the Printify store link still needs to be connected on the server.</p>
+        <p class="merch-setup">Merch is almost ready — the Shopify store link still needs to be connected.</p>
       <% } %>
     </div>
   </section>
@@ -39,7 +39,7 @@
             <% if (product.price) { %><p class="merch-price"><%= product.price %></p><% } %>
             <% if (product.description) { %><p class="merch-product-dek"><%= product.description %></p><% } %>
             <p class="merch-cta-row">
-              <a class="btn" href="<%= product.url %>" target="_blank" rel="noopener noreferrer">Buy on Printify</a>
+              <a class="btn" href="<%= product.url %>" target="_blank" rel="noopener noreferrer"><%= merch.checkoutLabel || 'Shop now' %></a>
               <% if (merch.storeUrl) { %>
                 <a class="btn btn-outline" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Browse all</a>
               <% } %>
@@ -53,7 +53,7 @@
       <article class="merch-product merch-product-featured merch-product-store-only">
         <div class="merch-product-body">
           <h2>Visit the Florida Buzz store</h2>
-          <p class="merch-product-dek">See the latest shirts and designs on our Printify Pop-Up Store. New drops show up there first.</p>
+          <p class="merch-product-dek">See the latest shirts and designs — including <em>I Caught My Buzz in Florida</em> — in our <%= merch.storefrontLabel || 'Shopify store' %>. New drops show up there first.</p>
           <p class="merch-cta-row">
             <a class="btn" href="<%= merch.storeUrl %>" target="_blank" rel="noopener noreferrer">Open store</a>
           </p>
@@ -66,10 +66,10 @@
     <h2>How ordering works</h2>
     <ol>
       <li>Pick a design on this page (or browse the full store).</li>
-      <li>On Printify, choose size and color, then checkout securely.</li>
-      <li>Your item is printed on demand and shipped to you.</li>
+      <li>In our Shopify store, choose size and color, then checkout securely.</li>
+      <li>Your order is fulfilled and shipped to you.</li>
     </ol>
-    <p class="merch-note">Florida Buzz earns from merch sold through our Printify store. Printify handles payment processing, production, shipping, and order support.</p>
+    <p class="merch-note">Florida Buzz merch is sold through our Shopify store. Shopify handles payment processing; fulfillment and shipping follow the store’s setup (including print-on-demand if connected).</p>
   </section>
 </main>
 
