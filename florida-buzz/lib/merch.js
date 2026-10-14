@@ -131,8 +131,10 @@ function merchConfig(env = process.env, { catalogPath = DEFAULT_CATALOG_PATH } =
     ).trim() || 'Florida Buzz Merch';
   const provider = detectProvider(storeUrl, env.MERCH_PROVIDER || file.provider);
   const enabled = Boolean(storeUrl || products.length);
-  const checkoutLabel = provider === 'printify' ? 'Buy on Printify' : 'Buy on Shopify';
-  const storefrontLabel = provider === 'printify' ? 'Printify store' : 'Shopify store';
+  // Keep button copy Florida Buzz–native. Provider is the checkout engine, not the brand.
+  const checkoutLabel = 'Get yours';
+  const browseLabel = 'Browse all merch';
+  const storefrontLabel = 'Florida Buzz store';
 
   return {
     enabled,
@@ -141,6 +143,7 @@ function merchConfig(env = process.env, { catalogPath = DEFAULT_CATALOG_PATH } =
     storeName,
     provider,
     checkoutLabel,
+    browseLabel,
     storefrontLabel,
   };
 }
