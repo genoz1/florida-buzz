@@ -183,7 +183,9 @@ async function processImageRepairJob(client, queue, job, {
 }
 
 async function runImageRepairBatch(client, {
-  limit = Number(process.env.IMAGE_REPAIR_GENERATION_LIMIT || 3),
+  // Daytime cadence + same-day publish hooks need enough headroom to clear
+  // a few rejected/missing images without waiting for the next overnight pass.
+  limit = Number(process.env.IMAGE_REPAIR_GENERATION_LIMIT || 5),
   logger = console,
   slugs = [],
   recoverLegacy = false,
