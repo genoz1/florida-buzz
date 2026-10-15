@@ -7,7 +7,7 @@ const multer = require('multer');
 const reviewPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 const { logNotFound } = require('../lib/notFoundLog');
 const { createPin } = require('../lib/pinterest');
-const { ARTICLE_PLACEHOLDER_PATH } = require('../lib/articleImages');
+const { ARTICLE_PLACEHOLDER_PATH, isUsableArticleImage } = require('../lib/articleImages');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
 const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
@@ -337,15 +337,20 @@ router.get('/', async (req, res) => {
     news = await getArticles({ excludeEvergreen: true, limit: 30 });
     tickerPool = await getArticles({ limit: 8 });
     guides = (await getArticles({ evergreenOnly: true, author: 'Gene Zentko', limit: 6 })).slice(0, 3);
-    featured = news[0];
-    secondary = news.slice(1, 4);
+    // Never put a "Story image coming soon" placeholder in the homepage feature
+    // slots — prefer the next recent story that already has a real image.
+    const newsWithImages = news.filter((a) => isUsableArticleImage(a.image_url));
+    featured = newsWithImages[0] || null;
+    secondary = newsWithImages.filter((a) => a.slug !== featured?.slug).slice(0, 3);
     await Promise.all(
       CATEGORY_ORDER.map(async (cat) => {
         const categoryArticles = await getArticles({ category: cat, excludeEvergreen: true, limit: 6 });
         // Exclude anything already shown in the featured/secondary slots above,
         // so the same article doesn't appear twice on the homepage.
         const usedSlugs = new Set([featured, ...secondary].filter(Boolean).map((a) => a.slug));
-        byCategory[cat] = categoryArticles.filter((a) => !usedSlugs.has(a.slug)).slice(0, 3);
+        byCategory[cat] = categoryArticles
+          .filter((a) => !usedSlugs.has(a.slug) && isUsableArticleImage(a.image_url))
+          .slice(0, 3);
       })
     );
   } catch (err) {

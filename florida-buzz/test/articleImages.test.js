@@ -92,6 +92,13 @@ test('automate holds publication when a usable story image is missing', () => {
   assert.match(automate, /isUsableArticleImage\(finalImage\)/);
 });
 
+test('homepage feature slots skip articles without usable story images', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'routes', 'main.js'), 'utf8');
+  assert.match(main, /isUsableArticleImage/);
+  assert.match(main, /newsWithImages/);
+  assert.match(main, /Never put a "Story image coming soon" placeholder/);
+});
+
 
 test('an accepted article hero renders only its canonical image URL', async () => {
   const acceptedImage = 'https://project.supabase.co/storage/v1/object/public/article-images/article-accepted.jpg';
