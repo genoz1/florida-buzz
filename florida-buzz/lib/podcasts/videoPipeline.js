@@ -60,7 +60,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     const existing = await findAsset(storagePath);
     if (existing?.public_url) return existing.public_url;
     const publicUrl = await store.uploadBytes(cfg.artworkBucket, storagePath, buffer, 'image/png');
-    await store.createAsset({ kind: 'image', storage_path: storagePath, public_url: publicUrl, content_type: 'image/png', byte_size: buffer.length, checksum: crypto.createHash('sha256').update(buffer).digest('hex') });
+    await store.createAsset({ kind: 'youtube_image', storage_path: storagePath, public_url: publicUrl, content_type: 'image/png', byte_size: buffer.length, checksum: crypto.createHash('sha256').update(buffer).digest('hex') });
     return publicUrl;
   }
 
