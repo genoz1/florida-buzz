@@ -50,6 +50,11 @@ most likely official path but couldn't confirm they resolve from my end. Once de
 1. Set `DRY_RUN=true` in your environment variables.
 2. Run the automation once (DigitalOcean → Console → `npm run automate:dry`).
 
+By default, automation **will not publish** a story until it has a real hosted
+image (`REQUIRE_ARTICLE_IMAGE=true`). Failed image generation leaves the RSS
+item queued for retry instead of shipping the “Story image coming soon”
+fallback. Set `REQUIRE_ARTICLE_IMAGE=false` only for emergency rollback.
+
 Buzz Board opinion/QOTD social posts are paused by default while short-form
 video is the engagement focus. To resume them, set both
 `BUZZ_BOARD_SOCIAL_ENABLED=true` and `BUZZ_BOARD_OPINION_SOCIAL_ENABLED=true`,
