@@ -11,6 +11,8 @@ const {
   findDuplicateImage,
   imageIdentity,
   isLikelyGenericSourceImage,
+  isUsableArticleImage,
+  requireArticleImageEnabled,
 } = require('../lib/articleImages');
 
 test('image relevance metadata preserves the concrete subject, entities, and location', () => {
@@ -64,6 +66,30 @@ test('the fallback is a local branded asset rather than a random remote photogra
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'public', ARTICLE_PLACEHOLDER_PATH)), true);
   const route = fs.readFileSync(path.join(__dirname, '..', 'routes', 'main.js'), 'utf8');
   assert.doesNotMatch(route, /picsum\.photos/);
+});
+
+test('usable story images exclude nulls and the designed coming-soon fallback', () => {
+  assert.equal(isUsableArticleImage(null), false);
+  assert.equal(isUsableArticleImage(''), false);
+  assert.equal(isUsableArticleImage(ARTICLE_PLACEHOLDER_PATH), false);
+  assert.equal(isUsableArticleImage('https://picsum.photos/1200/800'), false);
+  assert.equal(
+    isUsableArticleImage('https://project.supabase.co/storage/v1/object/public/article-images/article-abc.jpg'),
+    true
+  );
+});
+
+test('REQUIRE_ARTICLE_IMAGE defaults on and only disables with exact false', () => {
+  assert.equal(requireArticleImageEnabled({}), true);
+  assert.equal(requireArticleImageEnabled({ REQUIRE_ARTICLE_IMAGE: 'true' }), true);
+  assert.equal(requireArticleImageEnabled({ REQUIRE_ARTICLE_IMAGE: 'false' }), false);
+});
+
+test('automate holds publication when a usable story image is missing', () => {
+  const automate = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'automate.js'), 'utf8');
+  assert.match(automate, /Refusing to publish without a usable story image/);
+  assert.match(automate, /requireArticleImageEnabled/);
+  assert.match(automate, /isUsableArticleImage\(finalImage\)/);
 });
 
 

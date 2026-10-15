@@ -10,6 +10,7 @@
  */
 
 const { isFacebookTopicAllowed } = require('./facebookDistribution');
+const { isUsableArticleImage } = require('./articleImages');
 
 async function markFacebookFeedResolved(client, slug, { dryRun = false, logger = console } = {}) {
   if (!client || !slug || dryRun) return true;
@@ -48,6 +49,11 @@ async function loadPendingFacebookFeedPosts(client, {
 
   const pending = [];
   for (const row of data || []) {
+    if (!isUsableArticleImage(row.image_url)) {
+      // Keep fb_posted=false so the story can post once a real image lands.
+      logger.log(`  [defer] Facebook: ${row.slug} waiting for a usable story image`);
+      continue;
+    }
     const topic = isFacebookTopicAllowed({
       category: row.category,
       title: row.title,
