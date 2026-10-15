@@ -179,3 +179,36 @@ Requires `ELEVENLABS_API_KEY` (same key as TTS). Does **not** require `PODCASTS_
 ## ElevenLabs bakeoff scripts
 
 Historical bakeoff notes live in `podcast-tts-elevenlabs-bakeoff.md`. Production no longer defaults to fal Gemini multi-speaker.
+
+
+## YouTube video automation (no third-party app)
+
+When a podcast episode is published in the Florida Buzz admin, the optional native video pipeline can:
+
+1. Keep the approved podcast cover on screen through the announcer bumper and Geno's “Let's go.”
+2. Show a branded agenda card during Geno's topic summary.
+3. Create two topic-matched, photorealistic editorial visuals per story (maximum three when configured).
+4. Reuse previously approved visuals from the podcast artwork bucket using deterministic topic keys.
+5. Assemble a 1920×1080 MP4 with the published episode audio.
+6. Upload through the official YouTube Data API with `selfDeclaredMadeForKids=false`.
+
+This does not use AI-generated motion video and does not require Metricool or another publishing service. Topic images may include families and children naturally; the upload is still marked not specifically made for children.
+
+The feature is off until OAuth is configured:
+
+```
+PODCASTS_YOUTUBE_ENABLED=false
+PODCASTS_YOUTUBE_IMAGES_PER_TOPIC=2
+PODCASTS_YOUTUBE_INTRO_SECONDS=8.3
+PODCASTS_YOUTUBE_PRIVACY=private
+YOUTUBE_CHANNEL_ID=UCYFeYqxaQ1ue1UK_4oqsNxw
+YOUTUBE_CLIENT_ID=<Google OAuth client id>
+YOUTUBE_CLIENT_SECRET=<Google OAuth client secret>
+YOUTUBE_REFRESH_TOKEN=<offline refresh token with youtube.upload scope>
+```
+
+Use the narrow `https://www.googleapis.com/auth/youtube.upload` OAuth scope. Keep all three OAuth values in DigitalOcean encrypted environment variables; never commit them. Enable `PODCASTS_YOUTUBE_ENABLED=true` only after a private end-to-end upload succeeds.
+
+New, unverified Google API projects may have API uploads restricted to private visibility. Leave `PODCASTS_YOUTUBE_PRIVACY=private` during setup. Change it to `public` only after the Google project is eligible and a private test has been reviewed.
+
+The upload is idempotent: an existing `podcast_assets` row at `youtube/<episode-id>` prevents duplicate uploads.
