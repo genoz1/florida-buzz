@@ -82,6 +82,17 @@ function config(env = process.env) {
     weeklyCron: env.PODCASTS_WEEKLY_CRON_ENABLED !== 'false',
     site: (env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     ownerEmail: env.PODCASTS_OWNER_EMAIL || 'floridabuzzonline@gmail.com',
+    // Native podcast video generation + official YouTube Data API upload.
+    youtubeEnabled: String(env.PODCASTS_YOUTUBE_ENABLED || 'false').toLowerCase() === 'true',
+    youtubePrivacyStatus: ['private', 'unlisted', 'public'].includes(String(env.PODCASTS_YOUTUBE_PRIVACY || '').toLowerCase())
+      ? String(env.PODCASTS_YOUTUBE_PRIVACY).toLowerCase()
+      : 'private',
+    youtubeImagesPerTopic: Math.max(1, Math.min(3, Number(env.PODCASTS_YOUTUBE_IMAGES_PER_TOPIC || 2))),
+    youtubeIntroSeconds: Math.max(0, Number(env.PODCASTS_YOUTUBE_INTRO_SECONDS || 8.3)),
+    youtubeClientId: env.YOUTUBE_CLIENT_ID || null,
+    youtubeClientSecret: env.YOUTUBE_CLIENT_SECRET || null,
+    youtubeRefreshToken: env.YOUTUBE_REFRESH_TOKEN || null,
+    youtubeChannelId: env.YOUTUBE_CHANNEL_ID || 'UCYFeYqxaQ1ue1UK_4oqsNxw',
     ttsProvider,
     hostMode,
     elevenApiKey: env.ELEVENLABS_API_KEY || null,
