@@ -30,6 +30,8 @@ const { notifyIndexNow } = require('../lib/indexnow');
 const {
   findDuplicateImage,
   isLikelyGenericSourceImage,
+  isUsableArticleImage,
+  requireArticleImageEnabled,
 } = require('../lib/articleImages');
 const {
   integrateArticleDiscussion,
@@ -873,7 +875,7 @@ async function run() {
           { store: (buffer, filename) => storeGeneratedImage(buffer, filename, 'image/png', { contentAddressed: true }) }
         );
       } catch (error) {
-        console.error(`  [error] Unexpected image workflow failure: ${error.message}. Article publishing will continue.`);
+        console.error(`  [error] Unexpected image workflow failure: ${error.message}.`);
         return { status: 'generation_failed', error: error.message, generationAttempts: 0, reviewAttempts: 0 };
       }
     }
@@ -892,7 +894,7 @@ async function run() {
           console.log(`  Stored real photo permanently.`);
           finalImage = storedUrl;
         } else {
-          console.log(`  Could not download/store the real photo — attempting a validated AI image without blocking publication.`);
+          console.log(`  Could not download/store the real photo — attempting a validated AI image.`);
           imageResult = await attemptGeneratedImage();
           finalImage = imageResult.status === 'accepted' ? imageResult.url : null;
         }
@@ -954,6 +956,19 @@ async function run() {
         source,
         item,
         new Error('insufficient source material — not publishable')
+      );
+      return;
+    }
+
+    // Hold the story off the live site until it has a real image — never ship
+    // the "Story image coming soon" fallback as a published article hero.
+    if (!isUsableArticleImage(finalImage) && requireArticleImageEnabled()) {
+      const detail = imageResult?.error || imageResult?.status || 'missing_image';
+      console.warn(`  [hold] Refusing to publish without a usable story image (${detail}). Item stays queued for retry.`);
+      await retryQueue.recordFailure(
+        source,
+        item,
+        new Error(`usable story image required before publish: ${detail}`)
       );
       return;
     }

@@ -41,6 +41,27 @@ function isLikelyGenericSourceImage(url) {
   return /(?:^|[\/_-])(default|placeholder|fallback|site[-_]?logo|logo|blank|no[-_]?image|spacer)(?:[\/_\-.]|$)/i.test(pathname);
 }
 
+/**
+ * True when the article has a real hosted story image (not null/empty and not
+ * the designed "Story image coming soon" fallback).
+ */
+function isUsableArticleImage(url) {
+  if (typeof url !== 'string' || !url.trim()) return false;
+  const identity = imageIdentity(url);
+  if (!identity || identity === ARTICLE_PLACEHOLDER_PATH) return false;
+  if (/picsum\.photos|via\.placeholder|placehold\.it|placeholder\.com/i.test(url)) return false;
+  return true;
+}
+
+/**
+ * When enabled (default), automate refuses to publish articles that still lack
+ * a usable story image. Set REQUIRE_ARTICLE_IMAGE=false only for emergency
+ * rollback — that restores the old publish-then-repair behavior.
+ */
+function requireArticleImageEnabled(env = process.env) {
+  return String(env.REQUIRE_ARTICLE_IMAGE || 'true').toLowerCase() !== 'false';
+}
+
 function contentAddressedName(originalFilename, fingerprint) {
   const ext = path.extname(originalFilename).toLowerCase() || '.jpg';
   return `article-${fingerprint.slice(0, 32)}${ext === '.png' ? '.jpg' : ext}`;
@@ -53,5 +74,7 @@ module.exports = {
   findDuplicateImage,
   imageIdentity,
   isLikelyGenericSourceImage,
+  isUsableArticleImage,
   normalizeEntities,
+  requireArticleImageEnabled,
 };
