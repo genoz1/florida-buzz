@@ -7,6 +7,7 @@ const { createElevenTts } = require('./elevenTts');
 const { createAudioPipeline } = require('./audioPipeline');
 const { createPublicRouter } = require('./routerPublic');
 const { createAdminRouter } = require('./routerAdmin');
+const { createVideoPipeline } = require('./videoPipeline');
 
 function resolveFfmpegPath(env = process.env) {
   if (env.FFMPEG_PATH) return env.FFMPEG_PATH;
@@ -34,14 +35,10 @@ function production(env = process.env) {
   } catch {
     aiText = null;
   }
-  const pipeline = createAudioPipeline({
-    cfg,
-    store,
-    fal,
-    eleven,
-    ffmpegPath: resolveFfmpegPath(env),
-  });
-  return { cfg, store, fal, eleven, pipeline, aiText, supabase };
+  const ffmpegPath = resolveFfmpegPath(env);
+  const pipeline = createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath });
+  const videoPipeline = createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath });
+  return { cfg, store, fal, eleven, pipeline, videoPipeline, aiText, supabase };
 }
 
 function mount(app, env = process.env) {
@@ -66,6 +63,7 @@ function mount(app, env = process.env) {
         store: runtime.store,
         cfg: runtime.cfg,
         pipeline: runtime.pipeline,
+        videoPipeline: runtime.videoPipeline,
         aiText: runtime.aiText,
         supabase: runtime.supabase,
         sendEmail,
@@ -111,6 +109,7 @@ module.exports = {
   createAudioPipeline,
   createPublicRouter,
   createAdminRouter,
+  createVideoPipeline,
   createWeeklyDraft: (...args) => require('./weeklyDraft').createWeeklyDraft(...args),
   tickWeeklyDraft: (...args) => require('./weeklyDraft').tickWeeklyDraft(...args),
 };

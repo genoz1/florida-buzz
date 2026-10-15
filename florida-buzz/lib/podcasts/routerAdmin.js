@@ -21,7 +21,7 @@ const { EVERGREEN_TOPICS } = require('./evergreenTopics');
 const { recoverStuckPodcastWork } = require('./recoverStuck');
 const { describeAudioProgress } = require('./audioStatus');
 
-function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, sendEmail = null, env = process.env }) {
+function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText, supabase = null, sendEmail = null, env = process.env }) {
   const router = express.Router();
   const secret = env.ADMIN_PASSWORD;
   if (!secret || secret.length < 12) {
@@ -681,6 +681,15 @@ function createAdminRouter({ store, cfg, pipeline, aiText, supabase = null, send
       if (!episode.audio_url) throw new Error('Cannot publish without permanent audio URL');
       await store.setStatus(episode.id, 'published');
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=published`);
+      // Publishing the podcast is the trigger. Video work runs after the response and is
+      // idempotent, so a retry cannot create a duplicate YouTube upload.
+      if (cfg.youtubeEnabled && videoPipeline?.publishEpisode) {
+        setImmediate(() => {
+          videoPipeline.publishEpisode({ ...episode, status: 'published' }).catch((err) => {
+            console.error(`[podcasts] YouTube automation failed for episode ${episode.id}:`, err.message);
+          });
+        });
+      }
     })
   );
 
