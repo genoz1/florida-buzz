@@ -8,6 +8,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { generateValidatedImageResult } = require('../imageGen');
 const { buildScenePlan, parseMarkedSegments } = require('./videoPlan');
+const { broadenVisualPrompt } = require('./videoVisuals');
 const { renderAgendaCard, renderBrandCard } = require('./videoCards');
 const { uploadVideo, youtubeConfigured } = require('./youtubeClient');
 
@@ -57,26 +58,66 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   }
 
   async function saveVisual(buffer, storagePath) {
-    const existing = await findAsset(storagePath);
-    if (existing?.public_url) return existing.public_url;
+    // Always upload bytes so a later accepted still can replace a prior candidate.
     const publicUrl = await store.uploadBytes(cfg.artworkBucket, storagePath, buffer, 'image/png');
-    await store.createAsset({ kind: 'youtube_image', storage_path: storagePath, public_url: publicUrl, content_type: 'image/png', byte_size: buffer.length, checksum: crypto.createHash('sha256').update(buffer).digest('hex') });
+    const existing = await findAsset(storagePath);
+    if (existing?.public_url) return publicUrl || existing.public_url;
+    await store.createAsset({
+      kind: 'youtube_image',
+      storage_path: storagePath,
+      public_url: publicUrl,
+      content_type: 'image/png',
+      byte_size: buffer.length,
+      checksum: crypto.createHash('sha256').update(buffer).digest('hex'),
+    });
     return publicUrl;
   }
 
-  async function topicImage(scene) {
-    const storagePath = `youtube-visuals/v1/${safeSlug(scene.category)}/${scene.visualKey}.png`;
+  async function tryGenerateTopicStill(prompt, scene, storagePath) {
+    let captured = null;
+    const result = await generateValidatedImageResult(
+      prompt,
+      { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' },
+      {
+        // Keep rejected candidates out of durable storage — only persist after accept.
+        store: async (buffer) => {
+          captured = buffer;
+          return `memory://${storagePath}`;
+        },
+      }
+    );
+    if (result.status === 'accepted' && captured) {
+      await saveVisual(captured, storagePath);
+      return captured;
+    }
+    return { rejected: true, correction: result.correction || result.error || result.status };
+  }
+
+  async function topicImage(scene, { episode, coverBuffer }) {
+    const storagePath = `youtube-visuals/v1/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     const existing = await findAsset(storagePath);
     if (existing?.public_url) return fetchBuffer(existing.public_url);
-    let captured = null;
-    const result = await generateValidatedImageResult(scene.prompt, { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' }, {
-      store: async (buffer) => {
-        captured = buffer;
-        return saveVisual(buffer, storagePath);
-      },
-    });
-    if (result.status !== 'accepted' || !captured) throw new Error(`No approved visual for ${scene.label}: ${result.correction || result.error || result.status}`);
-    return captured;
+
+    let lastCorrection = '';
+    const first = await tryGenerateTopicStill(scene.prompt, scene, storagePath);
+    if (Buffer.isBuffer(first)) return first;
+    lastCorrection = first.correction || '';
+
+    for (let level = 1; level <= 2; level += 1) {
+      const broader = broadenVisualPrompt(scene.prompt, {
+        label: scene.label,
+        category: scene.category,
+        level,
+        rejection: lastCorrection,
+      });
+      console.warn(`[podcasts] Broadening YouTube visual for ${scene.label} (level ${level})`);
+      const next = await tryGenerateTopicStill(broader, scene, storagePath);
+      if (Buffer.isBuffer(next)) return next;
+      lastCorrection = next.correction || lastCorrection;
+    }
+
+    console.warn(`[podcasts] Using episode cover fallback for ${scene.label}: ${lastCorrection || 'no approved visual'}`);
+    return coverBuffer;
   }
 
   async function runFfmpeg(args) {
@@ -98,6 +139,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         bumperSeconds: cfg.youtubeIntroSeconds,
         topicMeta,
         imagesPerTopic: cfg.youtubeImagesPerTopic,
+        episodeId: episode.id,
       });
       const audioPath = path.join(workDir, 'episode.mp3');
       await fs.promises.writeFile(audioPath, audioBuffer);
@@ -106,7 +148,14 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       const sceneClips = [];
       for (let i = 0; i < plan.scenes.length; i += 1) {
         const scene = plan.scenes[i];
-        const imageBuffer = scene.kind === 'topic' ? await topicImage(scene) : scene.kind === 'agenda' ? agendaBuffer : scene.kind === 'brand' ? brandBuffer : coverBuffer;
+        const imageBuffer =
+          scene.kind === 'topic'
+            ? await topicImage(scene, { episode, coverBuffer })
+            : scene.kind === 'agenda'
+              ? agendaBuffer
+              : scene.kind === 'brand'
+                ? brandBuffer
+                : coverBuffer;
         const imagePath = path.join(workDir, `scene-${String(i).padStart(3, '0')}.png`);
         const clipPath = path.join(workDir, `clip-${String(i).padStart(3, '0')}.mp4`);
         await fs.promises.writeFile(imagePath, imageBuffer);
@@ -162,4 +211,11 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   return { planTopicVisuals, publishEpisode, renderVideo };
 }
 
-module.exports = { createVideoPipeline, fetchBuffer, parseJsonObject, planTopicVisuals, stripHtml };
+module.exports = {
+  createVideoPipeline,
+  fetchBuffer,
+  parseJsonObject,
+  planTopicVisuals,
+  stripHtml,
+  broadenVisualPrompt,
+};

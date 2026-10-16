@@ -69,8 +69,9 @@ function defaultTopic(segment, index) {
   };
 }
 
-function stableVisualKey(topic, prompt, index) {
-  const raw = `${topic.category}|${topic.title}|${prompt}|${index}`.toLowerCase();
+/** Stable across re-runs — do not hash prompt text (AI prompts change wording every time). */
+function stableVisualKey({ episodeId = 'episode', segmentSlug = 'story', index = 0 } = {}) {
+  const raw = `${episodeId}|${segmentSlug}|${Number(index) || 0}`.toLowerCase();
   return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 20);
 }
 
@@ -89,7 +90,14 @@ function allocateDurations({ segments, totalSeconds, introSeconds = 8.3, topicMe
   });
 }
 
-function buildScenePlan({ scriptText, totalSeconds, bumperSeconds = 8.3, topicMeta = [], imagesPerTopic = DEFAULT_IMAGES_PER_TOPIC }) {
+function buildScenePlan({
+  scriptText,
+  totalSeconds,
+  bumperSeconds = 8.3,
+  topicMeta = [],
+  imagesPerTopic = DEFAULT_IMAGES_PER_TOPIC,
+  episodeId = 'episode',
+} = {}) {
   const segments = parseMarkedSegments(scriptText);
   if (!segments.length) throw new Error('Podcast script has no usable segments');
   const timed = allocateDurations({ segments, totalSeconds, introSeconds: bumperSeconds, topicMeta });
@@ -123,7 +131,8 @@ function buildScenePlan({ scriptText, totalSeconds, bumperSeconds = 8.3, topicMe
         label: segment.title,
         category: segment.category,
         prompt,
-        visualKey: stableVisualKey(segment, prompt, i),
+        imageIndex: i,
+        visualKey: stableVisualKey({ episodeId, segmentSlug: segment.slug, index: i }),
         segmentSlug: segment.slug,
       });
     }
