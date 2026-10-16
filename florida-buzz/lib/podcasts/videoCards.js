@@ -70,4 +70,27 @@ async function renderBrandCard({ coverBuffer, label }) {
   return image.getBuffer('image/png');
 }
 
-module.exports = { HEIGHT, WIDTH, renderAgendaCard, renderBrandCard };
+/** Story-locked title card used only when photo generation fails for that topic. */
+async function renderTopicCard({ label, category }) {
+  const f = await fonts();
+  const image = rectangle(WIDTH, HEIGHT, COLORS.deep);
+  image.composite(rectangle(WIDTH, 16, COLORS.coral), 0, 0);
+  image.composite(rectangle(WIDTH, 16, COLORS.coral), 0, HEIGHT - 16);
+  image.print({ font: f.white32, x: 160, y: 280, text: 'FLORIDA BUZZ STORY', maxWidth: 1600 });
+  image.composite(rectangle(420, 6, COLORS.coral), 160, 340);
+  image.print({
+    font: f.white64,
+    x: 160,
+    y: 400,
+    text: normalize(label || category || 'Disney World Update'),
+    maxWidth: 1600,
+    maxHeight: 320,
+  });
+  if (category) {
+    image.print({ font: f.white32, x: 160, y: 780, text: normalize(category.replace(/-/g, ' ')), maxWidth: 1600 });
+  }
+  image.print({ font: f.white32, x: 160, y: 930, text: 'thefloridabuzz.com', maxWidth: 800 });
+  return image.getBuffer('image/png');
+}
+
+module.exports = { HEIGHT, WIDTH, renderAgendaCard, renderBrandCard, renderTopicCard };
