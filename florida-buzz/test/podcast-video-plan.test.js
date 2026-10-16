@@ -136,12 +136,15 @@ test('topic frames burn header and caption without AI illustration badge', async
 
 test('agenda card matches the first-episode menu layout', async () => {
   const { Jimp } = require('jimp');
-  const { renderAgendaCard } = require('../lib/podcasts/videoCards');
+  const { renderAgendaCard, shortAgendaBlurb } = require('../lib/podcasts/videoCards');
+  assert.equal(shortAgendaBlurb('Higher Single Pass ceilings for major headliners'), 'Higher Single Pass ceilings for major');
+  assert.ok(shortAgendaBlurb('Higher Single Pass ceilings for major headliners').length <= 38);
+  assert.ok(shortAgendaBlurb('A new park specific collectible joins the retail mix').split(/\s+/).length <= 6);
   const cover = new Jimp({ width: 800, height: 800, color: 0xff6452ff });
   const buffer = await renderAgendaCard({
     coverBuffer: await cover.getBuffer('image/png'),
     topics: [
-      { title: 'Mandalorian & Grogu', description: 'Scheduled appearances at Hollywood Studios' },
+      { title: 'Lightning Lane Price Hike', description: 'Higher Single Pass ceilings for major headliners' },
       { title: 'Nomad Lounge', description: 'Reservations and Annual Passholder perks' },
     ],
     footer: 'FLORIDA BUZZ: DISNEY • OCTOBER 14, 2026',
@@ -152,6 +155,9 @@ test('agenda card matches the first-episode menu layout', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoCards.js'), 'utf8');
   assert.match(source, /TODAY'S DISNEY WORLD ROUNDUP/);
   assert.match(source, /What's in this episode/);
+  assert.match(source, /shortAgendaBlurb/);
+  const planner = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
+  assert.match(planner, /max 6 words, under 38 characters/);
 });
 
 test('visual keys stay stable when AI prompt wording changes', () => {
