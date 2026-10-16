@@ -38,13 +38,14 @@ function defaultSettings(showSlug = DISNEY_SHOW_SLUG) {
     generate_weekday_b: 5,
     generate_hour_b: 7,
     generate_minute_b: 0,
-    // Intended public release times — intent only; auto_publish stays off.
+    // Intended public release day labels (episode branding / notify copy).
     intended_publish_weekday: 2,
     intended_publish_hour: 6,
     intended_publish_minute: 0,
     intended_publish_weekday_b: 5,
     intended_publish_hour_b: 6,
     intended_publish_minute_b: 0,
+    // Preference only — live auto-publish is PODCASTS_AUTO_PUBLISH_ENABLED.
     auto_publish_enabled: false,
     notify_email: null,
   };
@@ -720,7 +721,9 @@ async function createWeeklyDraft({
         next_step: anyFallback
           ? 'Clear scaffold script and use Save / generate script on this standalone episode'
           : autoPreview
-            ? `Private preview TTS started automatically for the ${slot.label} draft — open the episode and wait for preview_ready (publish stays manual)`
+            ? cfg.autoPublish
+              ? `Private preview TTS started for the ${slot.label} draft — will auto-approve and publish when preview_ready`
+              : `Private preview TTS started automatically for the ${slot.label} draft — open the episode and wait for preview_ready (publish stays manual)`
             : `Open the ${slot.label} draft and click Generate private preview (ElevenLabs TTS)`,
       },
       error_detail: null,
@@ -733,7 +736,8 @@ async function createWeeklyDraft({
       const episodeForPreview = freshEpisode;
       const scriptForPreview = String(freshEpisode.script_text || '');
       console.info(
-        `[podcasts] weekly draft ready — 1 standalone ${slot.label} episode; starting background private preview (auto-publish still off)`
+        `[podcasts] weekly draft ready — 1 standalone ${slot.label} episode; starting background private preview` +
+          (cfg.autoPublish ? ' (auto-publish ON after preview_ready)' : ' (auto-publish off)')
       );
       setImmediate(() => {
         Promise.resolve()

@@ -37,14 +37,18 @@
 
     <section class="card">
       <h3>Weekly draft schedule (America/New_York)</h3>
-      <p class="muted">Default: generate on <strong>Tuesday 7:00 AM ET</strong> (Tuesday episode) and <strong>Friday 7:00 AM ET</strong> (Friday episode). Separate runs — one episode each. Publication stays manual.</p>
+      <p class="muted">Default: generate on <strong>Tuesday 7:00 AM ET</strong> (Tuesday episode) and <strong>Friday 7:00 AM ET</strong> (Friday episode). Separate runs — one episode each.</p>
       <p><strong>Current generate windows:</strong> <%= scheduleLabels.generateLabel %> —
         weekly drafts <strong><%= schedule.weekly_draft_enabled ? 'ENABLED' : 'DISABLED' %></strong></p>
-      <p class="muted">Intended publish targets (manual): <%= scheduleLabels.publishLabel %></p>
+      <p><strong>Hands-off publish:</strong> <%= cfg.autoPublish ? 'ON (PODCASTS_AUTO_PUBLISH_ENABLED)' : 'OFF' %> — when on, preview_ready auto-approves and publishes (YouTube queues if enabled).</p>
+      <p class="muted">Release day labels: <%= scheduleLabels.publishLabel %></p>
       <p class="muted">Tue slot → <%= scheduleLabels.publishSlotALabel || 'Tuesday 6:00 AM' %> · Fri slot → <%= scheduleLabels.publishSlotBLabel || 'Friday 6:00 AM' %></p>
       <form method="post" action="/admin/podcasts/schedule">
         <input type="hidden" name="csrf" value="<%= scheduleCsrf %>">
         <label><input type="checkbox" name="weekly_draft_enabled" value="true" <%= schedule.weekly_draft_enabled ? 'checked' : '' %>> Enable weekly draft generation</label>
+        <% if (cfg.autoPublish) { %>
+        <label><input type="checkbox" name="auto_publish_enabled" value="true" <%= schedule.auto_publish_enabled ? 'checked' : '' %>> Prefer auto-publish after preview (env already allows it)</label>
+        <% } %>
         <h4 style="margin:16px 0 8px;font-size:1rem">Generate slot A (Tuesday episode)</h4>
         <div class="grid">
           <label>Day
@@ -80,7 +84,7 @@
             <input name="notify_email" type="email" value="<%= schedule.notify_email || '' %>" placeholder="you@example.com">
           </label>
         </div>
-        <p class="muted">Auto-publish is intentionally locked off in code until you ask to enable Tuesday/Friday publishing.</p>
+        <p class="muted"><%= cfg.autoPublish ? 'Auto-publish is enabled via PODCASTS_AUTO_PUBLISH_ENABLED — finished previews go live without Approve → Publish.' : 'Set PODCASTS_AUTO_PUBLISH_ENABLED=true on the app to auto-approve and publish after preview audio finishes.' %></p>
         <button class="btn" type="submit">Save schedule</button>
       </form>
       <form method="post" action="/admin/podcasts/run-weekly-draft" style="margin-top:12px">

@@ -54,12 +54,14 @@ PODCASTS_VOICE_FAL_SOLO=Aoede
 PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=false
 PODCASTS_AUTO_PREVIEW_ENABLED=true
+PODCASTS_AUTO_PUBLISH_ENABLED=false
 ```
 
 Set `PODCASTS_ENABLED=false` to unmount public/admin podcast routes.
 
 - `PODCASTS_GENERATION_ENABLED=true` — allows paid ElevenLabs TTS.
-- `PODCASTS_AUTO_PREVIEW_ENABLED` — defaults **on** when generation is enabled. After each successful weekly draft (full AI script, not a scaffold), the server kicks **private** preview TTS in the background. Status moves to `generating_audio` → `preview_ready`. Nothing is published to the site or RSS until you Approve → Publish. Set to `false` / `0` if you want TTS only via the admin **Generate private preview** button.
+- `PODCASTS_AUTO_PREVIEW_ENABLED` — defaults **on** when generation is enabled. After each successful weekly draft (full AI script, not a scaffold), the server kicks **private** preview TTS in the background. Status moves to `generating_audio` → `preview_ready`. Set to `false` / `0` if you want TTS only via the admin **Generate private preview** button.
+- `PODCASTS_AUTO_PUBLISH_ENABLED=true` — when generation is on, each finished preview is **auto-approved and published** (site + RSS). YouTube upload queues automatically when `PODCASTS_YOUTUBE_ENABLED=true`. Scaffold/fallback scripts are never auto-published.
 
 Other optional overrides:
 
@@ -108,12 +110,14 @@ Confirm the DigitalOcean app and Supabase project are **Florida Buzz** (`tcrfirz
 PODCASTS_ENABLED=true
 PODCASTS_GENERATION_ENABLED=true          # enables paid TTS + auto private preview after drafts
 PODCASTS_AUTO_PREVIEW_ENABLED=true        # default; set false for click-only TTS
+PODCASTS_AUTO_PUBLISH_ENABLED=true        # approve + publish when preview_ready (hands-off)
+PODCASTS_YOUTUBE_ENABLED=true             # queue YouTube video after publish
 ELEVENLABS_API_KEY=sk_***                 # required for ElevenLabs path
 PODCASTS_TTS_PROVIDER=elevenlabs          # or omit for auto-when-key-present
 PODCASTS_ELEVEN_VOICE_GENO=EK1vMGRoEG4LXcQRzXam
 ```
 
-Keep schedule **auto_publish** off in admin while you listen to previews. Rotate any ElevenLabs key that was pasted into chat.
+Also enable **weekly draft generation** in `/admin/podcasts` (or set `weekly_draft_enabled=true` in `podcast_schedule_settings`). Hands-off loop: Tue/Fri generate → auto preview → auto publish → YouTube.
 
 ## Manual setup checklist
 
@@ -134,7 +138,7 @@ Default: **two generate windows**, each creating **one** standalone review draft
 
 Admin controls (`/admin/podcasts`): enable/disable weekly drafts, review sources, regenerate scripts, listen to private previews, approve/publish.
 
-Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. Drafts are never auto-published. With generation enabled, private preview audio starts after each full script so you can listen first.
+Cron: every 15 minutes ET the server may tick `scripts/podcast-weekly-draft.js`. With generation + auto-preview on, private audio starts after each full script. With `PODCASTS_AUTO_PUBLISH_ENABLED=true`, that preview then auto-approves and publishes (YouTube when enabled).
 
 ## Host (full episodes)
 
