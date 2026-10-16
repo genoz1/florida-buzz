@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildScenePlan, parseMarkedSegments, splitNamedOpen } = require('../lib/podcasts/videoPlan');
@@ -43,4 +45,10 @@ test('limits story visuals to two reusable images by default', () => {
   assert.equal(plan.scenes.filter((scene) => scene.segmentSlug === 'story-2').length, 2);
   assert.equal(plan.scenes[0].kind, 'cover');
   assert.equal(plan.scenes.some((scene) => scene.kind === 'agenda'), true);
+});
+
+test('podcast video scenes stay stationary without zoompan drift', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
+  assert.equal(/zoompan\s*=/.test(source), false);
+  assert.match(source, /scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30/);
 });
