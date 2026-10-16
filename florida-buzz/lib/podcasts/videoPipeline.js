@@ -7,10 +7,26 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { generateValidatedImageResult } = require('../imageGen');
+const { probeMp3DurationSec } = require('./audioPipeline');
 const { buildScenePlan, parseMarkedSegments } = require('./videoPlan');
 const { broadenVisualPrompt } = require('./videoVisuals');
 const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicCard, renderTopicFrame } = require('./videoCards');
 const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
+
+/** Prefer a real probed MP3 length when episode.duration_seconds is missing or tiny. */
+function resolveVideoTotalSeconds(episodeDurationSeconds, probedSeconds) {
+  const stored = Number(episodeDurationSeconds);
+  const probed = Number(probedSeconds);
+  if (Number.isFinite(probed) && probed >= 30) {
+    // Stored duration is often null after upload-only publishes; probe is source of truth.
+    if (!Number.isFinite(stored) || stored < 30 || Math.abs(stored - probed) > 15) return probed;
+    return stored;
+  }
+  if (Number.isFinite(stored) && stored >= 30) return stored;
+  throw new Error(
+    `Cannot build a YouTube video without a usable audio duration (stored=${episodeDurationSeconds}, probed=${probedSeconds})`
+  );
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -182,16 +198,29 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         fetchBuffer(episode.artwork_url || show.cover_url),
         planTopicVisuals({ episode, aiText }),
       ]);
+      const audioPath = path.join(workDir, 'episode.mp3');
+      await fs.promises.writeFile(audioPath, audioBuffer);
+      const probedSeconds = await probeMp3DurationSec(audioBuffer, ffmpegPath);
+      const totalSeconds = resolveVideoTotalSeconds(episode.duration_seconds, probedSeconds);
+      if (!Number(episode.duration_seconds) || Math.abs(Number(episode.duration_seconds) - totalSeconds) > 1) {
+        console.warn(
+          `[podcasts] YouTube timing uses probed audio duration ${totalSeconds.toFixed(1)}s ` +
+            `(episode.duration_seconds=${episode.duration_seconds == null ? 'null' : episode.duration_seconds})`
+        );
+        if (typeof store.updateEpisode === 'function') {
+          await store.updateEpisode(episode.id, { duration_seconds: Math.round(totalSeconds) }).catch((err) => {
+            console.warn(`[podcasts] Could not backfill duration_seconds for ${episode.id}: ${err.message}`);
+          });
+        }
+      }
       const plan = buildScenePlan({
         scriptText: episode.script_text,
-        totalSeconds: episode.duration_seconds,
+        totalSeconds,
         bumperSeconds: cfg.youtubeIntroSeconds,
         topicMeta,
         imagesPerTopic: cfg.youtubeImagesPerTopic,
         episodeId: episode.id,
       });
-      const audioPath = path.join(workDir, 'episode.mp3');
-      await fs.promises.writeFile(audioPath, audioBuffer);
       const agendaFooter = episode.published_at
         ? `FLORIDA BUZZ: DISNEY - ${new Date(episode.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })}`
         : 'FLORIDA BUZZ: DISNEY WORLD';
@@ -312,6 +341,7 @@ module.exports = {
   fetchBuffer,
   parseJsonObject,
   planTopicVisuals,
+  resolveVideoTotalSeconds,
   stripHtml,
   broadenVisualPrompt,
 };
