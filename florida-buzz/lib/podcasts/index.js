@@ -5,6 +5,7 @@ const { createStore } = require('./store');
 const { createFalTts } = require('./falTts');
 const { createElevenTts } = require('./elevenTts');
 const { createAudioPipeline } = require('./audioPipeline');
+const { maybeAutoPublishAfterPreview } = require('./autoPublish');
 const { createPublicRouter } = require('./routerPublic');
 const { createAdminRouter } = require('./routerAdmin');
 const { createVideoPipeline } = require('./videoPipeline');
@@ -36,8 +37,16 @@ function production(env = process.env) {
     aiText = null;
   }
   const ffmpegPath = resolveFfmpegPath(env);
-  const pipeline = createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath });
   const videoPipeline = createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath });
+  const pipeline = createAudioPipeline({
+    cfg,
+    store,
+    fal,
+    eleven,
+    ffmpegPath,
+    onPreviewReady: (episode) =>
+      maybeAutoPublishAfterPreview({ store, episode, cfg, videoPipeline }),
+  });
   return { cfg, store, fal, eleven, pipeline, videoPipeline, aiText, supabase };
 }
 
@@ -74,7 +83,7 @@ function mount(app, env = process.env) {
     console.error('[podcasts] admin router not mounted:', err.message);
   }
   console.log(
-    `[podcasts] mounted (generation=${runtime.cfg.generation ? 'ON' : 'OFF'}; weeklyCron=${runtime.cfg.weeklyCron ? 'ON' : 'OFF'}; tts=${runtime.cfg.ttsProvider}; elevenModel=${runtime.cfg.elevenModel}; fal endpoint=${runtime.cfg.falEndpoint})`
+    `[podcasts] mounted (generation=${runtime.cfg.generation ? 'ON' : 'OFF'}; autoPreview=${runtime.cfg.autoPreview ? 'ON' : 'OFF'}; autoPublish=${runtime.cfg.autoPublish ? 'ON' : 'OFF'}; weeklyCron=${runtime.cfg.weeklyCron ? 'ON' : 'OFF'}; youtube=${runtime.cfg.youtubeEnabled ? 'ON' : 'OFF'}; tts=${runtime.cfg.ttsProvider}; elevenModel=${runtime.cfg.elevenModel}; fal endpoint=${runtime.cfg.falEndpoint})`
   );
   return { ...runtime, sendEmail, mounted: true };
 }

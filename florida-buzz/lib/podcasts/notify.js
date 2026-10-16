@@ -45,16 +45,21 @@ async function notifyDraftReady({
       return `<li><strong>${escape(ep.title)}</strong> — intended ${escape(day)} · <a href="${epUrl}">Open</a></li>`;
     })
     .join('');
+  const autoPublishOn = !!cfg.autoPublish;
   const html = `
-    <p>A standalone <strong>Florida Buzz: Disney</strong> podcast draft is ready for review (one episode per run — not Part 1/Part 2).</p>
+    <p>A standalone <strong>Florida Buzz: Disney</strong> podcast draft is ready${autoPublishOn ? ' and will publish automatically after preview audio finishes' : ' for review'} (one episode per run — not Part 1/Part 2).</p>
     <ul>
       <li><strong>Week:</strong> ${escape(run.week_key)}</li>
       <li><strong>Attempt:</strong> ${Number(run.attempt) || 1}</li>
-      <li><strong>Slot:</strong> ${escape(releaseLabel)} (auto-publish off)</li>
+      <li><strong>Slot:</strong> ${escape(releaseLabel)} (auto-publish ${autoPublishOn ? 'ON' : 'off'})</li>
     </ul>
     <ul>${episodeRows}</ul>
-    <p><a href="${adminUrl}">Review in podcast admin</a></p>
-    <p>Nothing was published to the website or RSS feed. If auto-preview is on, private ElevenLabs audio may already be generating — open the episode and wait for <code>preview_ready</code>, then listen before Approve → Publish. Tuesday and Friday each get their own separate run.</p>
+    <p><a href="${adminUrl}">Open in podcast admin</a></p>
+    <p>${
+      autoPublishOn
+        ? 'Auto-preview TTS is generating private audio, then the episode will be approved and published to the site/RSS (and YouTube when enabled). Tuesday and Friday each get their own separate run.'
+        : 'Nothing was published to the website or RSS feed. If auto-preview is on, private ElevenLabs audio may already be generating — open the episode and wait for <code>preview_ready</code>, then listen before Approve → Publish. Tuesday and Friday each get their own separate run.'
+    }</p>
   `;
 
   await sendEmail({

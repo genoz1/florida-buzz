@@ -235,7 +235,8 @@ function createSupabaseStore(client) {
         intended_publish_weekday_b: row.intended_publish_weekday_b ?? 5,
         intended_publish_hour_b: row.intended_publish_hour_b ?? 6,
         intended_publish_minute_b: row.intended_publish_minute_b ?? 0,
-        auto_publish_enabled: false,
+        // Persisted preference; live hands-off publish still requires PODCASTS_AUTO_PUBLISH_ENABLED.
+        auto_publish_enabled: row.auto_publish_enabled === true,
       };
     },
     async upsertScheduleSettings(showSlug, patch) {

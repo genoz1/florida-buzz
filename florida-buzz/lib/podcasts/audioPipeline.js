@@ -385,7 +385,26 @@ async function loadIntroBuffer({ show, cfg, fetcher = fetch }) {
   return buffer;
 }
 
-function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
+function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath, onPreviewReady = null }) {
+  async function markPreviewReady(episode) {
+    try {
+      await store.setStatus(episode.id, 'preview_ready');
+    } catch {
+      await store.updateEpisode(episode.id, { status: 'preview_ready' });
+    }
+    const fresh = (await store.getEpisodeById(episode.id).catch(() => null)) || {
+      ...episode,
+      status: 'preview_ready',
+    };
+    if (typeof onPreviewReady === 'function') {
+      try {
+        await onPreviewReady(fresh);
+      } catch (err) {
+        console.error(`[podcasts] onPreviewReady failed for ${episode.id}:`, err.message);
+      }
+    }
+    return fresh;
+  }
   async function persistMaster(episode, buffer, meta = {}) {
     const maxBytes = Number(process.env.PODCASTS_MAX_AUDIO_UPLOAD_BYTES || 48 * 1024 * 1024);
     if (buffer.length > maxBytes) {
@@ -710,7 +729,7 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
           master_bytes: saved.buffer.length,
         },
       });
-      await store.setStatus(episode.id, 'preview_ready');
+      await markPreviewReady(episode);
       return saved;
     } catch (err) {
       await store.updateJob(job.id, { status: 'failed', error_detail: err.message });
@@ -726,12 +745,8 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
       : episode.status === 'generating_audio'
         ? 'preview_ready'
         : episode.status;
-    if (next !== episode.status) {
-      try {
-        await store.setStatus(episode.id, next);
-      } catch {
-        await store.updateEpisode(episode.id, { status: 'preview_ready' });
-      }
+    if (next === 'preview_ready') {
+      await markPreviewReady(episode);
     }
     return saved;
   }
@@ -793,11 +808,7 @@ function createAudioPipeline({ cfg, store, fal, eleven, ffmpegPath }) {
     }
 
     const saved = await persistMaster(episode, master, {});
-    try {
-      await store.setStatus(episode.id, 'preview_ready');
-    } catch {
-      await store.updateEpisode(episode.id, { status: 'preview_ready' });
-    }
+    await markPreviewReady(episode);
     await store
       .updateEpisode(episode.id, {
         last_error: null,

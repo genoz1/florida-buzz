@@ -20,6 +20,7 @@ const { describeSchedule, WEEKDAY_NAMES } = require('./timeEt');
 const { EVERGREEN_TOPICS } = require('./evergreenTopics');
 const { recoverStuckPodcastWork } = require('./recoverStuck');
 const { describeAudioProgress } = require('./audioStatus');
+const { queueYouTubePublish } = require('./autoPublish');
 
 function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText, supabase = null, sendEmail = null, env = process.env }) {
   const router = express.Router();
@@ -141,8 +142,8 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
         intended_publish_weekday_b: 5,
         intended_publish_hour_b: 6,
         intended_publish_minute_b: 0,
-        // Never allow enabling auto-publish from admin until explicitly built/tested.
-        auto_publish_enabled: false,
+        // Admin toggle is advisory UI; live auto-publish is gated by PODCASTS_AUTO_PUBLISH_ENABLED.
+        auto_publish_enabled: cfg.autoPublish && req.body.auto_publish_enabled === 'true',
         notify_email: String(req.body.notify_email || '').trim() || null,
       });
       res.redirect(303, '/admin/podcasts?notice=schedule-saved');
@@ -683,34 +684,9 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=published`);
       // Publishing the podcast is the trigger. Video work runs after the response and is
       // idempotent, so a retry cannot create a duplicate YouTube upload.
-      queueYouTubePublish({ ...episode, status: 'published' });
+      queueYouTubePublish({ episode: { ...episode, status: 'published' }, cfg, videoPipeline });
     })
   );
-
-  function queueYouTubePublish(episode) {
-    if (!cfg.youtubeEnabled) {
-      console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: PODCASTS_YOUTUBE_ENABLED is false`);
-      return;
-    }
-    if (!videoPipeline?.publishEpisode) {
-      console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: video pipeline unavailable`);
-      return;
-    }
-    setImmediate(() => {
-      Promise.resolve()
-        .then(() => videoPipeline.publishEpisode(episode))
-        .then((result) => {
-          if (result?.skipped) {
-            console.warn(`[podcasts] YouTube queue finished for episode ${episode.id}: skipped (${result.reason})`);
-            return;
-          }
-          console.log(`[podcasts] YouTube queue finished for episode ${episode.id}: ${result?.url || result?.id || 'ok'}`);
-        })
-        .catch((err) => {
-          console.error(`[podcasts] YouTube automation failed for episode ${episode.id}:`, err.message);
-        });
-    });
-  }
 
   router.post(
     '/episodes/:id/youtube-retry',
@@ -721,7 +697,7 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       if (episode.status !== 'published') throw new Error('YouTube retry requires a published episode');
       if (!episode.audio_url) throw new Error('Cannot build YouTube video without permanent audio URL');
       // Video-only retry — does not change podcast publish state, script, or audio.
-      queueYouTubePublish({ ...episode, status: 'published' });
+      queueYouTubePublish({ episode: { ...episode, status: 'published' }, cfg, videoPipeline });
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-retry-queued')}`);
     })
   );
