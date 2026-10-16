@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { buildScenePlan, parseMarkedSegments, splitCaptionChunks, splitNamedOpen, stableVisualKey } = require('../lib/podcasts/videoPlan');
 const { broadenVisualPrompt } = require('../lib/podcasts/videoVisuals');
 const { fitCoverFrame, renderTopicFrame, wrapWords } = require('../lib/podcasts/videoCards');
+const { parseJsonObject } = require('../lib/podcasts/videoPipeline');
 
 const SCRIPT = `=== SEGMENT: open ===
 Geno: Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. Here's what's happening at Disney World. Let's go.
@@ -193,11 +194,12 @@ test('pipeline does not fall back to episode cover art for failed topic stills',
   assert.match(source, /renderTopicCard/);
   assert.equal(/Using episode cover fallback/.test(source), false);
   assert.match(source, /still locked to this story/);
-  assert.match(source, /ONE real, currently recognizable Walt Disney World place/);
-  assert.match(source, /never combine multiple lands/);
+  assert.match(source, /one real Walt Disney World place/);
+  assert.match(source, /Never mashups|never combine multiple lands|Never invent mashup/i);
   assert.match(source, /uploadThumbnail/);
   assert.match(source, /renderThumbnailFrame/);
   assert.match(source, /youtube-visuals\/v2\//);
+  assert.match(source, /Continuing YouTube render with default story titles/);
 });
 
 test('broaden prompts forbid multi-land mashups', () => {
@@ -207,4 +209,21 @@ test('broaden prompts forbid multi-land mashups', () => {
     level: 1,
   });
   assert.match(prompt, /one real place|never a mashup/i);
+});
+
+test('topic planner JSON parser tolerates trailing commas and newlines in strings', () => {
+  const parsed = parseJsonObject(`{
+    "topics": [
+      {
+        "slug": "story-1",
+        "title": "Lightning Lane",
+        "description": "Price hike details",
+        "category": "genie-plus",
+        "prompts": ["Wide view of
+a queue exterior", "Closer pavilion exterior"],
+      },
+    ]
+  }`);
+  assert.equal(parsed.topics.length, 1);
+  assert.match(parsed.topics[0].prompts[0], /Wide view of/);
 });
