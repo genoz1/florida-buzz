@@ -51,17 +51,17 @@ test('limits story visuals to two reusable images by default', () => {
   assert.equal(plan.scenes.some((scene) => scene.kind === 'agenda'), true);
 });
 
-test('uses the cinematic editorial photo style for broaden prompts', () => {
-  const { EDITORIAL_PHOTO_STYLE } = require('../lib/editorialPhotoStyle');
-  assert.match(EDITORIAL_PHOTO_STYLE, /cinematic, photorealistic editorial travel photograph/i);
-  assert.match(EDITORIAL_PHOTO_STYLE, /bright natural daylight|golden-hour/i);
+test('uses the painterly podcast YouTube illustration style for broaden prompts', () => {
+  const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('../lib/editorialPhotoStyle');
+  assert.match(PODCAST_YOUTUBE_ILLUSTRATION_STYLE, /digital travel illustration/i);
+  assert.match(PODCAST_YOUTUBE_ILLUSTRATION_STYLE, /painterly/i);
   const room = broadenVisualPrompt('photoreal BoardWalk Inn guest room beds and furnishings', {
     label: 'Refreshed BoardWalk Inn Rooms',
     category: 'resort-room-refurbishment',
     level: 1,
   });
-  assert.match(room, /cinematic, photorealistic editorial travel photograph/i);
-  assert.match(room, /premium travel-magazine/i);
+  assert.match(room, /digital travel illustration/i);
+  assert.match(room, /painterly/i);
 });
 
 test('podcast video scenes stay stationary without zoompan drift', () => {
@@ -88,35 +88,54 @@ test('topic scenes carry short burned-in caption chunks', () => {
   assert.deepEqual(wrapWords('The Nomad Lounge deal is the one that stands out to me just because it is so specific.', 44, 2).length, 2);
 });
 
-test('cover frame letterboxes square artwork instead of cropping the title', async () => {
+test('cover frame keeps full square artwork over a blurred fill', async () => {
   const { Jimp } = require('jimp');
   const square = new Jimp({ width: 800, height: 800, color: 0xff6452ff });
   const buffer = await square.getBuffer('image/png');
-  const fitted = await fitCoverFrame(buffer);
+  const fitted = await fitCoverFrame(buffer, { caption: '' });
   const frame = await Jimp.read(fitted);
   assert.equal(frame.width, 1920);
   assert.equal(frame.height, 1080);
-  // Side pillar boxes stay black; center keeps artwork color.
-  assert.equal(frame.getPixelColor(10, 540), 0x000000ff);
+  // Center keeps artwork color; sides are a darkened blurred fill (not flat black).
   assert.equal(frame.getPixelColor(960, 540), 0xff6452ff);
+  assert.notEqual(frame.getPixelColor(10, 540), 0x000000ff);
 });
 
-test('topic frames burn header, caption, and AI illustration label', async () => {
+test('topic frames burn header and caption without AI illustration badge', async () => {
   const { Jimp } = require('jimp');
+  const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoCards.js'), 'utf8');
+  assert.match(source, /AI badge intentionally omitted/);
   const photo = new Jimp({ width: 1280, height: 720, color: 0x226688ff });
   const framed = await renderTopicFrame(await photo.getBuffer('image/png'), {
     label: '$49 Nomad Lounge fall offer',
-    description: 'Annual Passholder dining perk details',
     category: 'passholder-perks',
     caption: 'The Nomad Lounge deal is the one that stands out to me just because it is so specific.',
-    aiLabel: true,
   });
   const image = await Jimp.read(framed);
   assert.equal(image.width, 1920);
   assert.equal(image.height, 1080);
-  // Header plate and caption plate are dark overlays, not the photo teal.
+  // Header plate is a dark overlay, not the photo teal.
   assert.notEqual(image.getPixelColor(80, 60), 0x226688ff);
-  assert.notEqual(image.getPixelColor(960, 920), 0x226688ff);
+});
+
+test('agenda card matches the first-episode menu layout', async () => {
+  const { Jimp } = require('jimp');
+  const { renderAgendaCard } = require('../lib/podcasts/videoCards');
+  const cover = new Jimp({ width: 800, height: 800, color: 0xff6452ff });
+  const buffer = await renderAgendaCard({
+    coverBuffer: await cover.getBuffer('image/png'),
+    topics: [
+      { title: 'Mandalorian & Grogu', description: 'Scheduled appearances at Hollywood Studios' },
+      { title: 'Nomad Lounge', description: 'Reservations and Annual Passholder perks' },
+    ],
+    footer: 'FLORIDA BUZZ: DISNEY • OCTOBER 14, 2026',
+  });
+  const image = await Jimp.read(buffer);
+  assert.equal(image.width, 1920);
+  assert.equal(image.height, 1080);
+  const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoCards.js'), 'utf8');
+  assert.match(source, /TODAY'S DISNEY WORLD ROUNDUP/);
+  assert.match(source, /What's in this episode/);
 });
 
 test('visual keys stay stable when AI prompt wording changes', () => {
@@ -176,6 +195,9 @@ test('pipeline does not fall back to episode cover art for failed topic stills',
   assert.match(source, /still locked to this story/);
   assert.match(source, /ONE real, currently recognizable Walt Disney World place/);
   assert.match(source, /never combine multiple lands/);
+  assert.match(source, /uploadThumbnail/);
+  assert.match(source, /renderThumbnailFrame/);
+  assert.match(source, /youtube-visuals\/v2\//);
 });
 
 test('broaden prompts forbid multi-land mashups', () => {

@@ -9,8 +9,8 @@ const { promisify } = require('util');
 const { generateValidatedImageResult } = require('../imageGen');
 const { buildScenePlan, parseMarkedSegments } = require('./videoPlan');
 const { broadenVisualPrompt } = require('./videoVisuals');
-const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderTopicCard, renderTopicFrame } = require('./videoCards');
-const { uploadVideo, youtubeConfigured } = require('./youtubeClient');
+const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicCard, renderTopicFrame } = require('./videoCards');
+const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
 
 const execFileAsync = promisify(execFile);
 
@@ -41,10 +41,10 @@ async function planTopicVisuals({ episode, aiText }) {
   const storySegments = segments.filter((segment) => !/^(open|midroll|partner|close|outro)/.test(segment.slug));
   if (!storySegments.length || !aiText?.generateText) return [];
   const evidence = storySegments.map((segment) => ({ slug: segment.slug, transcript: segment.text.slice(0, 2600) }));
-  const system = `You plan accurate cinematic photorealistic visuals for the Florida Buzz Disney World news podcast.
-Return strict JSON only: {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"one short descriptive line for the top-left overlay","category":"stable reusable category","prompts":["prompt 1","prompt 2"]}]}.
+  const system = `You plan accurate cinematic illustrated visuals for the Florida Buzz Disney World news podcast YouTube episode.
+Return strict JSON only: {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"one short menu sub-line","category":"stable reusable category","prompts":["prompt 1","prompt 2"]}]}.
 Use exactly two prompts per story.
-Each prompt must be a detailed visual brief (not a stub): name the ONE real, currently recognizable Walt Disney World place from that story; specify foreground subject, background environment, camera (immersive eye-level), and lighting (bright daylight or warm golden hour). Style target: cinematic photorealistic editorial travel photograph — premium travel-magazine photo, not painting, cartoon, poster, collage, or obvious AI illustration.
+Each prompt must be a detailed visual brief (not a stub): name the ONE real, currently recognizable Walt Disney World place from that story; specify foreground subject, background environment with dense fine detail, camera (immersive eye-level), and lighting (bright clear Florida daylight with natural white balance — no heavy yellow/golden-hour cast). Style target: richly detailed cinematic digital travel illustration with a painterly finish — intricate architecture and textures, vibrant natural color, polished concept-art look (like the first Florida Buzz YouTube episode), not a soft blurry wash, sterile corporate photo, cartoon, poster, or collage. Never request celebrities, named characters, or identifiable public figures.
 Each prompt depicts one hotel, one attraction, one land gateway, or one construction site of that named place. Prefer one closer view and one wider exterior of that same subject when an interior would be hard to depict honestly.
 If a story mentions several projects, pick at most one real named place per prompt — never combine multiple lands, attractions, or architectural styles into one collage.
 Never invent mashup parkscapes, fictional rides, or generic "theme park walkway" scenes that are not a real WDW location.
@@ -82,10 +82,14 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
 
   async function tryGenerateTopicStill(prompt, scene, storagePath) {
     let captured = null;
+    const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('./videoVisuals');
+    const { generateImage } = require('../openai');
     const result = await generateValidatedImageResult(
       prompt,
       { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' },
       {
+        styleRequirements: PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+        generate: (text) => generateImage(text, { quality: 'high' }),
         // Keep rejected candidates out of durable storage — only persist after accept.
         store: async (buffer) => {
           captured = buffer;
@@ -101,7 +105,8 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   }
 
   async function topicImage(scene, { episode }) {
-    const storagePath = `youtube-visuals/v1/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
+    // v2 = painterly podcast illustration style (do not reuse v1 photoreal stills).
+    const storagePath = `youtube-visuals/v2/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     const existing = await findAsset(storagePath);
     if (existing?.public_url) {
       console.log(`[podcasts] Reusing YouTube still ${storagePath}`);
@@ -155,11 +160,15 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       });
       const audioPath = path.join(workDir, 'episode.mp3');
       await fs.promises.writeFile(audioPath, audioBuffer);
-      const agendaBuffer = await renderAgendaCard({ coverBuffer, topics: plan.topics });
+      const agendaFooter = episode.published_at
+        ? `FLORIDA BUZZ: DISNEY - ${new Date(episode.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })}`
+        : 'FLORIDA BUZZ: DISNEY WORLD';
+      const agendaBuffer = await renderAgendaCard({ coverBuffer, topics: plan.topics, footer: agendaFooter });
       const brandBuffer = await renderBrandCard({ coverBuffer, label: 'Florida Buzz Disney Podcast' });
       // Square podcast artwork must letterbox into 16:9 — never crop FLORIDA BUZZ off the top.
       const coverFrame = await fitCoverFrame(coverBuffer);
       const sceneClips = [];
+      let thumbnailBuffer = null;
       for (let i = 0; i < plan.scenes.length; i += 1) {
         const scene = plan.scenes[i];
         let imageBuffer;
@@ -167,11 +176,16 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
           const still = await topicImage(scene, { episode });
           imageBuffer = await renderTopicFrame(still, {
             label: scene.label,
-            description: scene.description,
             category: scene.category,
             caption: scene.caption,
-            aiLabel: true,
+            aiLabel: false,
           });
+          if (!thumbnailBuffer) {
+            thumbnailBuffer = await renderThumbnailFrame(still, {
+              label: scene.label,
+              category: scene.category,
+            });
+          }
         } else if (scene.kind === 'agenda') {
           imageBuffer = agendaBuffer;
         } else if (scene.kind === 'brand') {
@@ -198,7 +212,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', concatList, '-c', 'copy', silentVideo]);
       const outputPath = path.join(workDir, 'florida-buzz-podcast.mp4');
       await runFfmpeg(['-i', silentVideo, '-i', audioPath, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', outputPath]);
-      return { outputPath, workDir, plan };
+      return { outputPath, workDir, plan, thumbnailBuffer };
     } catch (error) {
       await fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {});
       throw error;
@@ -227,7 +241,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     const rendered = await renderVideo({ episode, show });
     try {
       console.log(`[podcasts] YouTube video rendered for episode ${episodeId}; uploading`);
-      const description = `${stripHtml(episode.show_notes_html || episode.description || '')}\n\nListen and read more: ${cfg.site}/podcasts/${show.slug}/${episode.slug}\n\nAI-generated editorial illustrations are used for visual context. Florida Buzz is not affiliated with or endorsed by Disney.`;
+      const description = `${stripHtml(episode.show_notes_html || episode.description || '')}\n\nListen and read more: ${cfg.site}/podcasts/${show.slug}/${episode.slug}\n\nFlorida Buzz is not affiliated with or endorsed by Disney.`;
       const uploaded = await uploadVideo({
         cfg,
         filePath: rendered.outputPath,
@@ -237,6 +251,19 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         privacyStatus: cfg.youtubePrivacyStatus,
         madeForKids: false,
       });
+      if (rendered.thumbnailBuffer) {
+        try {
+          await uploadThumbnail({
+            cfg,
+            videoId: uploaded.id,
+            imageBuffer: rendered.thumbnailBuffer,
+            token: uploaded.token,
+          });
+          console.log(`[podcasts] YouTube custom thumbnail set for episode ${episodeId}`);
+        } catch (thumbErr) {
+          console.warn(`[podcasts] YouTube thumbnail upload failed for episode ${episodeId}: ${thumbErr.message}`);
+        }
+      }
       await store.createAsset({ kind: 'youtube', storage_path: key, public_url: uploaded.url, content_type: 'video/youtube', byte_size: null, duration_seconds: episode.duration_seconds || null, checksum: uploaded.id });
       console.log(`[podcasts] YouTube upload complete for episode ${episodeId}: ${uploaded.url}`);
       return uploaded;

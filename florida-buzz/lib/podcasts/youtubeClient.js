@@ -82,7 +82,24 @@ async function uploadVideo({ cfg, filePath, title, description, tags = [], priva
   if (!response.ok) throw await responseError(response, 'YouTube video upload');
   const video = await response.json();
   if (!video.id) throw new Error('YouTube upload completed without a video ID');
-  return { id: video.id, url: `https://youtu.be/${video.id}`, privacyStatus: metadata.status.privacyStatus };
+  return { id: video.id, url: `https://youtu.be/${video.id}`, privacyStatus: metadata.status.privacyStatus, token };
 }
 
-module.exports = { accessToken, beginResumableUpload, uploadVideo, youtubeConfigured };
+/** Upload a custom thumbnail so Studio does not fall back to the cover frame. */
+async function uploadThumbnail({ cfg, videoId, imageBuffer, token, fetchImpl = fetch }) {
+  const access = token || (await accessToken(cfg, fetchImpl));
+  const endpoint = `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(videoId)}`;
+  const response = await fetchImpl(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${access}`,
+      'Content-Type': 'image/png',
+      'Content-Length': String(imageBuffer.length),
+    },
+    body: imageBuffer,
+  });
+  if (!response.ok) throw await responseError(response, 'YouTube thumbnail upload');
+  return response.json();
+}
+
+module.exports = { accessToken, beginResumableUpload, uploadThumbnail, uploadVideo, youtubeConfigured };
