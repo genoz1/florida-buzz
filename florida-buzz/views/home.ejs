@@ -94,6 +94,7 @@
             <% }) %>
           </ul>
         <% } %>
+        <%- include('partials/podcast-platform-badges', { links: podcastPlatformLinks || [] }) %>
         <p class="podcast-links" style="margin-top:16px;">
           <a class="btn" href="/podcasts/<%= podcastShow.slug %>">Browse all episodes</a>
           <a class="btn btn-outline" href="/podcasts">Podcast directory</a>
