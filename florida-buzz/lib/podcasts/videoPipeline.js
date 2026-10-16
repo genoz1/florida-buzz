@@ -111,11 +111,11 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         const clipPath = path.join(workDir, `clip-${String(i).padStart(3, '0')}.mp4`);
         await fs.promises.writeFile(imagePath, imageBuffer);
         const duration = Math.max(0.8, Number(scene.durationSeconds) || 1);
-        const frames = Math.max(24, Math.ceil(duration * 30));
         const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
+        // Keep stills fully stationary — no Ken Burns / zoompan drift between sections.
         await runFfmpeg([
           '-loop', '1', '-i', imagePath,
-          '-vf', `scale=2000:1125:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.00018,1.035)':d=${frames}:s=1920x1080:fps=30,fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`,
+          '-vf', `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30,fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`,
           '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
         ]);
         sceneClips.push(clipPath);
