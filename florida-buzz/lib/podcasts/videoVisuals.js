@@ -31,7 +31,8 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
 
   const banGeneric =
     'Do not show Cinderella Castle, Magic Kingdom castle, Spaceship Earth, or any unrelated park icon. ' +
-    `The image must clearly depict ${subject} (or its real exterior), not a generic Disney World postcard.`;
+    `The image must clearly depict ${subject} (or its real exterior), not a generic Disney World postcard. ` +
+    'Show only that one real place — never a mashup of multiple lands, attractions, or invented architecture.';
 
   if (level <= 1) {
     if (wantsInterior && wantsHotel) {

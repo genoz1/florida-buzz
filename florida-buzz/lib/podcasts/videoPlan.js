@@ -123,6 +123,7 @@ function buildScenePlan({
 
     const prompts = Array.isArray(segment.prompts) ? segment.prompts.filter(Boolean) : [];
     const count = Math.max(1, Math.min(3, Number(imagesPerTopic) || DEFAULT_IMAGES_PER_TOPIC, prompts.length || DEFAULT_IMAGES_PER_TOPIC));
+    const captionChunks = splitCaptionChunks(plainSpeech(segment.text), count);
     for (let i = 0; i < count; i += 1) {
       const prompt = prompts[i] || `${segment.title}, Disney World editorial travel photograph, realistic Florida setting, no text or logos`;
       scenes.push({
@@ -131,6 +132,7 @@ function buildScenePlan({
         label: segment.title,
         category: segment.category,
         prompt,
+        caption: captionChunks[i] || '',
         imageIndex: i,
         visualKey: stableVisualKey({ episodeId, segmentSlug: segment.slug, index: i }),
         segmentSlug: segment.slug,
@@ -140,6 +142,19 @@ function buildScenePlan({
   return { scenes, topics: timed.filter((segment) => !/^(open|midroll|partner|close|outro)/.test(segment.slug)) };
 }
 
+/** Split spoken story text across stills so each frame can burn a short caption. */
+function splitCaptionChunks(speech, count = 2) {
+  const words = plainSpeech(speech).split(/\s+/).filter(Boolean);
+  const parts = Math.max(1, Number(count) || 1);
+  if (!words.length) return Array.from({ length: parts }, () => '');
+  const size = Math.ceil(words.length / parts);
+  return Array.from({ length: parts }, (_, index) => {
+    const slice = words.slice(index * size, index * size + size);
+    // Keep captions short like the first YouTube video (~12–18 words).
+    return slice.slice(0, 18).join(' ');
+  });
+}
+
 module.exports = {
   DEFAULT_IMAGES_PER_TOPIC,
   allocateDurations,
@@ -147,6 +162,7 @@ module.exports = {
   cleanTitle,
   parseMarkedSegments,
   plainSpeech,
+  splitCaptionChunks,
   splitNamedOpen,
   stableVisualKey,
   wordCount,
