@@ -120,10 +120,11 @@ async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel
 
   if (aiLabel) {
     const badge = 'AI-GENERATED ILLUSTRATION';
-    const badgeWidth = Math.min(420, measureText(f.white32, badge) + 36);
+    const badgeWidth = Math.max(420, measureText(f.white32, badge) + 48);
     const badgeHeight = 44;
-    image.composite(rectangle(badgeWidth, badgeHeight, COLORS.ink), 48, HEIGHT - 72);
-    image.print({ font: f.white32, x: 60, y: HEIGHT - 62, text: badge, maxWidth: badgeWidth - 20 });
+    const badgeY = HEIGHT - 92;
+    image.composite(rectangle(badgeWidth, badgeHeight, COLORS.ink), 48, badgeY);
+    image.print({ font: f.white32, x: 66, y: badgeY + 8, text: badge, maxWidth: badgeWidth - 24 });
   }
 
   return image.getBuffer('image/png');
