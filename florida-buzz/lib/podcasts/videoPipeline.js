@@ -41,10 +41,11 @@ async function planTopicVisuals({ episode, aiText }) {
   const storySegments = segments.filter((segment) => !/^(open|midroll|partner|close|outro)/.test(segment.slug));
   if (!storySegments.length || !aiText?.generateText) return [];
   const evidence = storySegments.map((segment) => ({ slug: segment.slug, transcript: segment.text.slice(0, 2600) }));
-  const system = `You plan accurate photorealistic visuals for the Florida Buzz Disney World news podcast.
-Return strict JSON only: {"topics":[{"slug":"story-1","title":"short on-screen topic","category":"stable reusable category","prompts":["prompt 1","prompt 2"]}]}.
+  const system = `You plan accurate cinematic photorealistic visuals for the Florida Buzz Disney World news podcast.
+Return strict JSON only: {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"one short descriptive line for the top-left overlay","category":"stable reusable category","prompts":["prompt 1","prompt 2"]}]}.
 Use exactly two prompts per story.
-Each prompt must depict ONE real, currently recognizable Walt Disney World place named or clearly implied in that story (one hotel, one attraction, one land gateway, or one construction site of that named place). Prefer one closer view and one wider exterior of that same subject when an interior would be hard to depict honestly.
+Each prompt must be a detailed visual brief (not a stub): name the ONE real, currently recognizable Walt Disney World place from that story; specify foreground subject, background environment, camera (immersive eye-level), and lighting (bright daylight or warm golden hour). Style target: cinematic photorealistic editorial travel photograph — premium travel-magazine photo, not painting, cartoon, poster, collage, or obvious AI illustration.
+Each prompt depicts one hotel, one attraction, one land gateway, or one construction site of that named place. Prefer one closer view and one wider exterior of that same subject when an interior would be hard to depict honestly.
 If a story mentions several projects, pick at most one real named place per prompt — never combine multiple lands, attractions, or architectural styles into one collage.
 Never invent mashup parkscapes, fictional rides, or generic "theme park walkway" scenes that are not a real WDW location.
 Never substitute Cinderella Castle, Spaceship Earth, or a postcard skyline unless that landmark is the story subject.
@@ -166,6 +167,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
           const still = await topicImage(scene, { episode });
           imageBuffer = await renderTopicFrame(still, {
             label: scene.label,
+            description: scene.description,
             category: scene.category,
             caption: scene.caption,
             aiLabel: true,

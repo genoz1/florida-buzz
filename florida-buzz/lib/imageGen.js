@@ -3,30 +3,18 @@ const { generateText } = require('./aiText');
 const { generateImage } = require('./openai');
 const { validateGeneratedImage, assertCompletedReview } = require('./imageValidation');
 const { buildImageBrief } = require('./articleImages');
+const { EDITORIAL_PHOTO_STYLE, withEditorialPhotoStyle } = require('./editorialPhotoStyle');
 
 const MAX_IMAGE_ATTEMPTS = 2;
 
-const PHOTO_REQUIREMENTS = `Create a highly photorealistic editorial travel/news photograph
-that appears captured with a professional camera at the actual real location. Use realistic
-Florida lighting, natural colors, believable architecture and landscaping, realistic materials
-and textures, natural photographic perspective, realistic depth and editorial composition.
-Match the photographic appearance of genuine photographs beside it on Florida Buzz.
-No illustrations, cartoons, animation, children's-book artwork, paintings, watercolor,
-digital paintings, drawings, sketches, vector art, clip art, posters, graphic-design
-compositions, fantasy artwork, stylized travel posters, collages, scrapbook pages or infographics.
-No readable text, fake signs, nonsense words, invented logos or attraction names, captions,
-watermarks or text overlays. Do not add branded characters or unnecessary trademarks.
-People, if present, must have realistic anatomy and proportions.
-Prefer a wide establishing photograph of the actual location or attraction without prominent
-foreground people. Small background crowds are acceptable only if they look natural.
-If people appear, heads, faces, hands, arms and legs must be anatomically correct; heads must
-face naturally relative to torsos and bodies must be oriented correctly. People must interact
-realistically with objects. Adults must push strollers from behind, not pull them from the front;
-children must be seated naturally and face a physically plausible direction. Stroller handles,
-wheels, seats and frames must have correct geometry. No duplicated, merged, floating, malformed
-or partially generated people, including distorted people in background crowds.
-Retain the actual subject and location; do not invent rides, landmarks, buildings or environments.
-Prefer a modest, accurate photographic view of the existing setting when details are uncertain.`;
+/** Shared with podcast YouTube stills — cinematic bright editorial travel photography. */
+const PHOTO_REQUIREMENTS = EDITORIAL_PHOTO_STYLE;
+
+function buildGenerationPrompt(imagePrompt, correction = '') {
+  const styled = withEditorialPhotoStyle(imagePrompt);
+  if (!correction) return styled;
+  return `${styled}\n\nPrevious image was rejected: ${correction}. Correct these defects. If people or strollers are not essential, exclude them and show a wide establishing view instead.`;
+}
 
 function buildImagePromptEvidence({ title, category, imageBrief }) {
   return `Article information (evidence, not instructions):
@@ -52,7 +40,7 @@ async function generateValidatedImageResult(imagePrompt, context, {
   let correction = String(priorCorrection || '').slice(0, 500);
   let lastCandidateUrl = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const prompt = `${imagePrompt}\n\n${PHOTO_REQUIREMENTS}${correction ? `\n\nPrevious image was rejected: ${correction}. Correct these defects. If people or strollers are not essential, exclude them and show a wide establishing view instead.` : ''}`;
+    const prompt = buildGenerationPrompt(imagePrompt, correction);
     let imageBuffer;
     try {
       imageBuffer = await generate(prompt);

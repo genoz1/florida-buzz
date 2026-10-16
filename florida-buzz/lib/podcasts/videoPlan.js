@@ -102,14 +102,20 @@ function buildScenePlan({
   if (!segments.length) throw new Error('Podcast script has no usable segments');
   const timed = allocateDurations({ segments, totalSeconds, introSeconds: bumperSeconds, topicMeta });
   const scenes = [];
-  if (bumperSeconds > 0) scenes.push({ kind: 'cover', durationSeconds: bumperSeconds, label: 'Florida Buzz intro' });
+  // Keep one continuous cover through bumper + “Let’s go” so the train-horn outro
+  // does not fade the same artwork off and back on.
+  let coverSeconds = Math.max(0, Number(bumperSeconds) || 0);
 
   timed.forEach((segment, index) => {
     if (index === 0 || segment.slug === 'open') {
       const split = splitNamedOpen(segment);
       const words = Math.max(1, split.introWords + split.agendaWords);
       const introDuration = segment.durationSeconds * (Math.max(1, split.introWords) / words);
-      scenes.push({ kind: 'cover', durationSeconds: introDuration, label: 'Geno welcome' });
+      coverSeconds += introDuration;
+      if (coverSeconds > 0) {
+        scenes.push({ kind: 'cover', durationSeconds: coverSeconds, label: 'Florida Buzz intro' });
+        coverSeconds = 0;
+      }
       if (split.agendaWords > 0) {
         scenes.push({ kind: 'agenda', durationSeconds: Math.max(1, segment.durationSeconds - introDuration), label: 'Today’s topics' });
       }
@@ -125,11 +131,15 @@ function buildScenePlan({
     const count = Math.max(1, Math.min(3, Number(imagesPerTopic) || DEFAULT_IMAGES_PER_TOPIC, prompts.length || DEFAULT_IMAGES_PER_TOPIC));
     const captionChunks = splitCaptionChunks(plainSpeech(segment.text), count);
     for (let i = 0; i < count; i += 1) {
-      const prompt = prompts[i] || `${segment.title}, Disney World editorial travel photograph, realistic Florida setting, no text or logos`;
+      const prompt =
+        prompts[i] ||
+        `Cinematic photorealistic editorial travel photograph of ${segment.title} at Walt Disney World, ` +
+          `immersive eye-level view, bright Florida daylight, strong foreground subject, no text or logos`;
       scenes.push({
         kind: 'topic',
         durationSeconds: segment.durationSeconds / count,
         label: segment.title,
+        description: segment.description || '',
         category: segment.category,
         prompt,
         caption: captionChunks[i] || '',
@@ -139,6 +149,9 @@ function buildScenePlan({
       });
     }
   });
+  if (coverSeconds > 0) {
+    scenes.unshift({ kind: 'cover', durationSeconds: coverSeconds, label: 'Florida Buzz intro' });
+  }
   return { scenes, topics: timed.filter((segment) => !/^(open|midroll|partner|close|outro)/.test(segment.slug)) };
 }
 

@@ -81,7 +81,7 @@ async function fitCoverFrame(coverBuffer) {
 }
 
 /** Fill 16:9 for topic photos (crop edges OK), then burn captions like the first YouTube video. */
-async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel = true } = {}) {
+async function renderTopicFrame(imageBuffer, { label, description, category, caption, aiLabel = true } = {}) {
   const f = await fonts();
   const photo = await Jimp.read(imageBuffer);
   photo.cover({ w: WIDTH, h: HEIGHT });
@@ -89,16 +89,24 @@ async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel
 
   const eyebrow = eyebrowFromCategory(category, label);
   const title = normalize(label || 'Disney World Update');
-  const titleLines = wrapWords(title, 36, 2);
-  const headerWidth = 860;
-  const headerHeight = 48 + titleLines.length * 46 + 28;
+  const titleLines = wrapWords(title, 34, 2);
+  const descText = normalize(description || '');
+  const descLines = descText && descText.toLowerCase() !== title.toLowerCase()
+    ? wrapWords(descText, 40, 2)
+    : [];
+  const headerWidth = 920;
+  const headerHeight = 48 + titleLines.length * 44 + (descLines.length ? descLines.length * 36 + 12 : 0) + 28;
   image.composite(rectangle(headerWidth, headerHeight, COLORS.ink), 48, 40);
   image.print({ font: f.white32, x: 72, y: 54, text: eyebrow, maxWidth: headerWidth - 48 });
-  titleLines.forEach((line, index) => {
-    image.print({ font: f.white32, x: 72, y: 100 + index * 44, text: line, maxWidth: headerWidth - 48 });
-  });
   // Accent bar under eyebrow (coral strip like brand cards).
   image.composite(rectangle(220, 4, COLORS.coral), 72, 90);
+  titleLines.forEach((line, index) => {
+    image.print({ font: f.white32, x: 72, y: 104 + index * 42, text: line, maxWidth: headerWidth - 48 });
+  });
+  const descY = 104 + titleLines.length * 42 + 6;
+  descLines.forEach((line, index) => {
+    image.print({ font: f.white32, x: 72, y: descY + index * 34, text: line, maxWidth: headerWidth - 48 });
+  });
 
   const captionLines = wrapWords(caption, 44, 2);
   if (captionLines.length) {
@@ -132,19 +140,27 @@ async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel
 
 async function renderAgendaCard({ coverBuffer, topics }) {
   const f = await fonts();
-  const image = rectangle(WIDTH, HEIGHT, COLORS.deep);
-  image.composite(rectangle(WIDTH, 16, COLORS.coral), 0, 0);
-  image.composite(await coverPanel(coverBuffer), 110, 160);
-  image.print({ font: f.white64, x: 980, y: 120, text: 'TODAY ON FLORIDA BUZZ', maxWidth: 820 });
-  image.composite(rectangle(760, 6, COLORS.coral), 980, 215);
+  // Brighter teal menu — closer to the first ChatGPT-built episode look.
+  const image = rectangle(WIDTH, HEIGHT, COLORS.teal);
+  image.composite(rectangle(WIDTH, 14, COLORS.coral), 0, 0);
+  image.composite(rectangle(WIDTH, 14, COLORS.coral), 0, HEIGHT - 14);
+  image.composite(await coverPanel(coverBuffer), 120, 150);
+  image.print({ font: f.white64, x: 980, y: 110, text: 'TODAY ON FLORIDA BUZZ', maxWidth: 840 });
+  image.composite(rectangle(420, 6, COLORS.coral), 980, 200);
+  image.print({ font: f.white32, x: 980, y: 220, text: "Here's what we're covering", maxWidth: 800 });
   const list = (topics || []).slice(0, 6);
   list.forEach((topic, index) => {
-    const y = 280 + index * 118;
-    image.composite(rectangle(56, 56, COLORS.coral), 980, y);
-    image.print({ font: f.white32, x: 980, y: y + 8, text: { text: String(index + 1), alignmentX: HorizontalAlign.CENTER }, maxWidth: 56 });
-    image.print({ font: f.white32, x: 1060, y: y + 4, text: normalize(topic.title), maxWidth: 700, maxHeight: 90 });
+    const y = 290 + index * 108;
+    image.composite(rectangle(52, 52, COLORS.coral), 980, y);
+    image.print({ font: f.white32, x: 980, y: y + 6, text: { text: String(index + 1), alignmentX: HorizontalAlign.CENTER }, maxWidth: 52 });
+    const title = normalize(topic.title);
+    const blurb = normalize(topic.description || '');
+    image.print({ font: f.white32, x: 1056, y: y + 2, text: title, maxWidth: 720, maxHeight: 44 });
+    if (blurb && blurb.toLowerCase() !== title.toLowerCase()) {
+      image.print({ font: f.white32, x: 1056, y: y + 44, text: wrapWords(blurb, 48, 1)[0] || blurb, maxWidth: 720 });
+    }
   });
-  image.print({ font: f.white32, x: 980, y: 930, text: 'thefloridabuzz.com', maxWidth: 700 });
+  image.print({ font: f.white32, x: 980, y: 960, text: 'thefloridabuzz.com', maxWidth: 700 });
   return image.getBuffer('image/png');
 }
 
