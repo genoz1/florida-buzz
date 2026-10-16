@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const { buildScenePlan, parseMarkedSegments, splitCaptionChunks, splitNamedOpen, stableVisualKey } = require('../lib/podcasts/videoPlan');
 const { broadenVisualPrompt } = require('../lib/podcasts/videoVisuals');
 const { fitCoverFrame, renderTopicFrame, wrapWords } = require('../lib/podcasts/videoCards');
-const { parseJsonObject } = require('../lib/podcasts/videoPipeline');
+const { parseJsonObject, resolveVideoTotalSeconds } = require('../lib/podcasts/videoPipeline');
 
 const SCRIPT = `=== SEGMENT: open ===
 Geno: Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. Here's what's happening at Disney World. Let's go.
@@ -71,6 +71,21 @@ test('podcast video scenes stay stationary without zoompan drift', () => {
   assert.match(source, /fps=30,fade=t=in/);
   assert.match(source, /fitCoverFrame/);
   assert.match(source, /renderTopicFrame/);
+  assert.match(source, /probeMp3DurationSec/);
+  assert.match(source, /resolveVideoTotalSeconds/);
+});
+
+test('YouTube scene timing uses probed audio when episode duration is missing', () => {
+  assert.equal(resolveVideoTotalSeconds(null, 811.65), 811.65);
+  assert.equal(resolveVideoTotalSeconds(0, 811.65), 811.65);
+  assert.equal(resolveVideoTotalSeconds(12, 811.65), 811.65);
+  assert.equal(resolveVideoTotalSeconds(800, 811.65), 800);
+  assert.throws(() => resolveVideoTotalSeconds(null, 10), /usable audio duration/i);
+  const collapsed = buildScenePlan({ scriptText: SCRIPT, totalSeconds: null, bumperSeconds: 8.3 });
+  const synced = buildScenePlan({ scriptText: SCRIPT, totalSeconds: 720, bumperSeconds: 8.3 });
+  const sum = (plan) => plan.scenes.reduce((total, scene) => total + scene.durationSeconds, 0);
+  assert.ok(sum(collapsed) < 30, 'null duration must not be treated as a full episode');
+  assert.ok(Math.abs(sum(synced) - 720) < 0.01);
 });
 
 test('topic scenes carry short burned-in caption chunks', () => {
