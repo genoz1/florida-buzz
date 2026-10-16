@@ -955,6 +955,14 @@ footer a:hover { opacity: 1; }
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
+/* Keep listen-on SVGs tiny even if a broader rule targets svg/img sizing. */
+.home-podcast .podcast-platform-badge svg,
+.home-podcast .podcast-platform-icon {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+}
 .home-news-feature-title {
   font-family: var(--font-display);
   font-size: 34px;
