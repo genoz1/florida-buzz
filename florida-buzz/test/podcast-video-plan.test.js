@@ -46,7 +46,22 @@ test('limits story visuals to two reusable images by default', () => {
   assert.equal(plan.scenes.filter((scene) => scene.segmentSlug === 'story-1').length, 2);
   assert.equal(plan.scenes.filter((scene) => scene.segmentSlug === 'story-2').length, 2);
   assert.equal(plan.scenes[0].kind, 'cover');
+  assert.equal(plan.scenes.filter((scene) => scene.kind === 'cover').length, 1);
+  assert.ok(plan.scenes[0].durationSeconds > 8.3);
   assert.equal(plan.scenes.some((scene) => scene.kind === 'agenda'), true);
+});
+
+test('uses the cinematic editorial photo style for broaden prompts', () => {
+  const { EDITORIAL_PHOTO_STYLE } = require('../lib/editorialPhotoStyle');
+  assert.match(EDITORIAL_PHOTO_STYLE, /cinematic, photorealistic editorial travel photograph/i);
+  assert.match(EDITORIAL_PHOTO_STYLE, /bright natural daylight|golden-hour/i);
+  const room = broadenVisualPrompt('photoreal BoardWalk Inn guest room beds and furnishings', {
+    label: 'Refreshed BoardWalk Inn Rooms',
+    category: 'resort-room-refurbishment',
+    level: 1,
+  });
+  assert.match(room, /cinematic, photorealistic editorial travel photograph/i);
+  assert.match(room, /premium travel-magazine/i);
 });
 
 test('podcast video scenes stay stationary without zoompan drift', () => {
@@ -91,6 +106,7 @@ test('topic frames burn header, caption, and AI illustration label', async () =>
   const photo = new Jimp({ width: 1280, height: 720, color: 0x226688ff });
   const framed = await renderTopicFrame(await photo.getBuffer('image/png'), {
     label: '$49 Nomad Lounge fall offer',
+    description: 'Annual Passholder dining perk details',
     category: 'passholder-perks',
     caption: 'The Nomad Lounge deal is the one that stands out to me just because it is so specific.',
     aiLabel: true,

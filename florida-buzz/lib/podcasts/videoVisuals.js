@@ -1,5 +1,7 @@
 'use strict';
 
+const { EDITORIAL_PHOTO_STYLE, withEditorialPhotoStyle } = require('../editorialPhotoStyle');
+
 /**
  * When a very specific podcast still fails review (guest-room interior, ride cabin,
  * etc.), broaden to a clearly related exterior of the SAME story subject.
@@ -34,38 +36,37 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
     `The image must clearly depict ${subject} (or its real exterior), not a generic Disney World postcard. ` +
     'Show only that one real place — never a mashup of multiple lands, attractions, or invented architecture.';
 
+  let scene;
   if (level <= 1) {
     if (wantsInterior && wantsHotel) {
-      return (
-        `Wide daytime exterior photograph of the ${subject} hotel or resort building at Walt Disney World, ` +
-        `showing that specific property from outside, photorealistic Florida travel editorial, ` +
-        `guests optional in the distance, no readable text or logos. ${banGeneric}`
-      );
+      scene =
+        `Foreground: the recognizable exterior facade and entrance of the ${subject} hotel or resort at Walt Disney World. ` +
+        `Background: Florida sky, landscaping, and optional distant guests. ${banGeneric}`;
+    } else if (wantsInterior || wantsAttraction) {
+      scene =
+        `Foreground: the outside of ${subject} at Walt Disney World (queue entrance, show building, or landmark exterior — not a ride-vehicle interior). ` +
+        `Background: the same attraction's real surroundings only. ${banGeneric}`;
+    } else {
+      scene =
+        `Foreground: a clear view of ${subject} at Walt Disney World Resort. ` +
+        `Background: only that place's real environment. ${banGeneric}`;
     }
-    if (wantsInterior || wantsAttraction) {
-      return (
-        `Wide daytime exterior photograph of ${subject} at Walt Disney World, showing the outside of that ` +
-        `same attraction or landmark, photorealistic travel editorial, no ride-vehicle interiors, ` +
-        `no readable text or logos. ${banGeneric}`
-      );
-    }
-    return (
-      `Wide daytime exterior photograph focused on ${subject} at Walt Disney World Resort, ` +
-      `photorealistic Florida travel editorial, no close-up interiors, no readable text or logos. ${banGeneric}`
-    );
+  } else if (wantsHotel) {
+    scene =
+      `Simple wide exterior establishing view of the ${subject} resort hotel facade and entrance area ` +
+      `at Walt Disney World. No interiors. ${banGeneric}`;
+  } else {
+    scene =
+      `Simple wide exterior establishing view of ${subject} at Walt Disney World, ` +
+      `clearly the same place from the story. No interiors. ${banGeneric}`;
   }
 
-  // Level 2: still the same subject, just a simpler recognizable exterior angle.
-  if (wantsHotel) {
-    return (
-      `Simple wide exterior establishing photograph of the ${subject} resort hotel facade and entrance area ` +
-      `at Walt Disney World in daytime, photorealistic, no interiors, no readable text or logos. ${banGeneric}`
-    );
-  }
-  return (
-    `Simple wide exterior establishing photograph of ${subject} at Walt Disney World in daytime, ` +
-    `photorealistic, clearly the same place from the story, no interiors, no readable text or logos. ${banGeneric}`
-  );
+  return withEditorialPhotoStyle(scene);
 }
 
-module.exports = { broadenVisualPrompt, storySubject };
+module.exports = {
+  EDITORIAL_PHOTO_STYLE,
+  broadenVisualPrompt,
+  storySubject,
+  withEditorialPhotoStyle,
+};
