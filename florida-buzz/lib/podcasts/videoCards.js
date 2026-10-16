@@ -67,19 +67,25 @@ function wrapWords(text, maxChars = 42, maxLines = 2) {
   return lines.slice(0, maxLines);
 }
 
+const AGENDA_TRAILING_STOP = new Set(['a', 'an', 'and', 'at', 'for', 'from', 'in', 'of', 'on', 'the', 'to', 'with']);
+
 /** One short agenda sub-line that fits a menu card without wrapping/clipping. */
-function shortAgendaBlurb(text, { maxChars = 38, maxWords = 6 } = {}) {
+function shortAgendaBlurb(text, { maxChars = 32, maxWords = 5 } = {}) {
   const words = normalize(String(text || '').replace(/-/g, ' '))
     .split(/\s+/)
     .filter(Boolean)
-    .slice(0, Math.max(1, Number(maxWords) || 6));
+    .slice(0, Math.max(1, Number(maxWords) || 5));
   if (!words.length) return '';
-  let line = '';
+  let kept = [];
   for (const word of words) {
-    const next = line ? `${line} ${word}` : word;
-    if (next.length > maxChars && line) break;
-    line = next;
+    const next = kept.length ? `${kept.join(' ')} ${word}` : word;
+    if (next.length > maxChars && kept.length) break;
+    kept.push(word);
   }
+  while (kept.length > 1 && AGENDA_TRAILING_STOP.has(kept[kept.length - 1].toLowerCase())) {
+    kept.pop();
+  }
+  const line = kept.join(' ');
   return line || words[0].slice(0, maxChars);
 }
 

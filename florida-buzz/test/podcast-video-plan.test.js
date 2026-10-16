@@ -137,9 +137,11 @@ test('topic frames burn header and caption without AI illustration badge', async
 test('agenda card matches the first-episode menu layout', async () => {
   const { Jimp } = require('jimp');
   const { renderAgendaCard, shortAgendaBlurb } = require('../lib/podcasts/videoCards');
-  assert.equal(shortAgendaBlurb('Higher Single Pass ceilings for major headliners'), 'Higher Single Pass ceilings for major');
-  assert.ok(shortAgendaBlurb('Higher Single Pass ceilings for major headliners').length <= 38);
-  assert.ok(shortAgendaBlurb('A new park specific collectible joins the retail mix').split(/\s+/).length <= 6);
+  assert.equal(shortAgendaBlurb('Higher Single Pass ceilings for major headliners'), 'Higher Single Pass ceilings');
+  assert.ok(shortAgendaBlurb('Higher Single Pass ceilings for major headliners').length <= 32);
+  assert.ok(shortAgendaBlurb('A new park specific collectible joins the retail mix').split(/\s+/).length <= 5);
+  assert.equal(shortAgendaBlurb('Set element installation points to tangible progress'), 'Set element installation points');
+  assert.doesNotMatch(shortAgendaBlurb('Savannah Bananas tournament dates spark trip'), /\b(for|to|the|a|of)\s*$/i);
   const cover = new Jimp({ width: 800, height: 800, color: 0xff6452ff });
   const buffer = await renderAgendaCard({
     coverBuffer: await cover.getBuffer('image/png'),
@@ -157,7 +159,7 @@ test('agenda card matches the first-episode menu layout', async () => {
   assert.match(source, /What's in this episode/);
   assert.match(source, /shortAgendaBlurb/);
   const planner = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
-  assert.match(planner, /max 6 words, under 38 characters/);
+  assert.match(planner, /max 5 words, under 32 characters/);
 });
 
 test('visual keys stay stable when AI prompt wording changes', () => {
