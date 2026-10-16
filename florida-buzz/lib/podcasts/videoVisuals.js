@@ -9,6 +9,7 @@ function storySubject(label = '', category = '') {
   const subject = String(label || category || '')
     .replace(/\s+/g, ' ')
     .replace(/^(refreshed|updated|new|the)\s+/i, '')
+    .replace(/\s+rooms?\s*$/i, '')
     .trim();
   return subject || 'this Disney World story location';
 }
