@@ -73,15 +73,26 @@ test('visual keys stay stable when AI prompt wording changes', () => {
   assert.equal(stableVisualKey({ episodeId: 'ep-1', segmentSlug: 'story-1', index: 0 }), keysA[0]);
 });
 
-test('broadens specific interiors to related exteriors', () => {
+test('broadens specific interiors to related exteriors of the same subject', () => {
   const room = broadenVisualPrompt('photoreal BoardWalk Inn guest room beds and furnishings', {
     label: 'Refreshed BoardWalk Inn Rooms',
     category: 'resort-room-refurbishment',
     level: 1,
   });
   assert.match(room, /exterior/i);
+  assert.match(room, /BoardWalk Inn/i);
   assert.match(room, /hotel|resort/i);
-  assert.equal(/guest room|beds and furnishings/i.test(room), false);
+  assert.match(room, /Do not show Cinderella Castle/i);
+  assert.match(room, /BoardWalk Inn Rooms|BoardWalk Inn/i);
+  assert.doesNotMatch(room, /guest room beds and furnishings/i);
+
+  const roomWide = broadenVisualPrompt('photoreal BoardWalk Inn guest room beds and furnishings', {
+    label: 'Refreshed BoardWalk Inn Rooms',
+    level: 2,
+  });
+  assert.match(roomWide, /BoardWalk Inn/i);
+  assert.match(roomWide, /Do not show Cinderella Castle/i);
+  assert.match(roomWide, /resort hotel facade|entrance area|specific property/i);
 
   const ride = broadenVisualPrompt('inside Space Mountain ride vehicle in the dark', {
     label: 'Space Mountain',
@@ -90,5 +101,12 @@ test('broadens specific interiors to related exteriors', () => {
   });
   assert.match(ride, /exterior/i);
   assert.match(ride, /Space Mountain/i);
-  assert.equal(/ride vehicle|inside/i.test(ride), false);
+  assert.match(ride, /Do not show Cinderella Castle/i);
+});
+
+test('pipeline does not fall back to episode cover art for failed topic stills', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
+  assert.match(source, /renderTopicCard/);
+  assert.equal(/Using episode cover fallback/.test(source), false);
+  assert.match(source, /still locked to this story/);
 });

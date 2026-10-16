@@ -189,7 +189,7 @@ When a podcast episode is published in the Florida Buzz admin, the optional nati
 2. Show a branded agenda card during Geno's topic summary.
 3. Create two topic-matched, photorealistic editorial visuals per story (maximum three when configured).
 4. Reuse previously approved visuals from the podcast artwork bucket using stable episode + story keys (so retries do not regenerate).
-5. If a very specific still fails review (for example a hotel room interior), broaden to a related exterior (the hotel/attraction outside) before falling back to the episode cover.
+5. If a very specific still fails review (for example a hotel room interior), broaden to a related exterior of the **same** story subject (that hotel/attraction outside)—never a generic castle postcard or the episode cover. If photos still fail, use a story title card for that topic.
 6. Assemble a 1920×1080 MP4 with the published episode audio.
 7. Upload through the official YouTube Data API with `selfDeclaredMadeForKids=false`.
 
