@@ -4,8 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildScenePlan, parseMarkedSegments, splitNamedOpen, stableVisualKey } = require('../lib/podcasts/videoPlan');
+const { buildScenePlan, parseMarkedSegments, splitCaptionChunks, splitNamedOpen, stableVisualKey } = require('../lib/podcasts/videoPlan');
 const { broadenVisualPrompt } = require('../lib/podcasts/videoVisuals');
+const { fitCoverFrame, renderTopicFrame, wrapWords } = require('../lib/podcasts/videoCards');
 
 const SCRIPT = `=== SEGMENT: open ===
 Geno: Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. Here's what's happening at Disney World. Let's go.
@@ -51,7 +52,55 @@ test('limits story visuals to two reusable images by default', () => {
 test('podcast video scenes stay stationary without zoompan drift', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.equal(/zoompan\s*=/.test(source), false);
-  assert.match(source, /scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30/);
+  assert.match(source, /fps=30,fade=t=in/);
+  assert.match(source, /fitCoverFrame/);
+  assert.match(source, /renderTopicFrame/);
+});
+
+test('topic scenes carry short burned-in caption chunks', () => {
+  const plan = buildScenePlan({
+    scriptText: SCRIPT,
+    totalSeconds: 720,
+    topicMeta: [
+      { slug: 'story-2', title: 'Nomad Lounge Perk', category: 'passholder-perks', prompts: ['a', 'b'] },
+    ],
+  });
+  const captions = plan.scenes.filter((scene) => scene.segmentSlug === 'story-2').map((scene) => scene.caption);
+  assert.equal(captions.length, 2);
+  assert.ok(captions.every((caption) => String(caption || '').trim().length > 0));
+  assert.match(captions.join(' '), /Nomad Lounge/i);
+  assert.deepEqual(splitCaptionChunks('one two three four five six', 2).map((part) => part.split(/\s+/).length), [3, 3]);
+  assert.deepEqual(wrapWords('The Nomad Lounge deal is the one that stands out to me just because it is so specific.', 44, 2).length, 2);
+});
+
+test('cover frame letterboxes square artwork instead of cropping the title', async () => {
+  const { Jimp } = require('jimp');
+  const square = new Jimp({ width: 800, height: 800, color: 0xff6452ff });
+  const buffer = await square.getBuffer('image/png');
+  const fitted = await fitCoverFrame(buffer);
+  const frame = await Jimp.read(fitted);
+  assert.equal(frame.width, 1920);
+  assert.equal(frame.height, 1080);
+  // Side pillar boxes stay black; center keeps artwork color.
+  assert.equal(frame.getPixelColor(10, 540), 0x000000ff);
+  assert.equal(frame.getPixelColor(960, 540), 0xff6452ff);
+});
+
+test('topic frames burn header, caption, and AI illustration label', async () => {
+  const { Jimp } = require('jimp');
+  const photo = new Jimp({ width: 1280, height: 720, color: 0x226688ff });
+  const framed = await renderTopicFrame(await photo.getBuffer('image/png'), {
+    label: '$49 Nomad Lounge fall offer',
+    category: 'passholder-perks',
+    caption: 'The Nomad Lounge deal is the one that stands out to me just because it is so specific.',
+    aiLabel: true,
+  });
+  const image = await Jimp.read(framed);
+  assert.equal(image.width, 1920);
+  assert.equal(image.height, 1080);
+  // Header plate and caption plate are dark overlays, not the photo teal.
+  assert.notEqual(image.getPixelColor(80, 60), 0x226688ff);
+  assert.notEqual(image.getPixelColor(960, 920), 0x226688ff);
 });
 
 test('visual keys stay stable when AI prompt wording changes', () => {
@@ -109,4 +158,15 @@ test('pipeline does not fall back to episode cover art for failed topic stills',
   assert.match(source, /renderTopicCard/);
   assert.equal(/Using episode cover fallback/.test(source), false);
   assert.match(source, /still locked to this story/);
+  assert.match(source, /ONE real, currently recognizable Walt Disney World place/);
+  assert.match(source, /never combine multiple lands/);
+});
+
+test('broaden prompts forbid multi-land mashups', () => {
+  const prompt = broadenVisualPrompt('busy Disney World construction overview', {
+    label: 'Disney World 2027 project slate',
+    category: 'resort-wide-development',
+    level: 1,
+  });
+  assert.match(prompt, /one real place|never a mashup/i);
 });
