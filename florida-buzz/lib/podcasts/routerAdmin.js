@@ -683,13 +683,46 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=published`);
       // Publishing the podcast is the trigger. Video work runs after the response and is
       // idempotent, so a retry cannot create a duplicate YouTube upload.
-      if (cfg.youtubeEnabled && videoPipeline?.publishEpisode) {
-        setImmediate(() => {
-          videoPipeline.publishEpisode({ ...episode, status: 'published' }).catch((err) => {
-            console.error(`[podcasts] YouTube automation failed for episode ${episode.id}:`, err.message);
-          });
+      queueYouTubePublish({ ...episode, status: 'published' });
+    })
+  );
+
+  function queueYouTubePublish(episode) {
+    if (!cfg.youtubeEnabled) {
+      console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: PODCASTS_YOUTUBE_ENABLED is false`);
+      return;
+    }
+    if (!videoPipeline?.publishEpisode) {
+      console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: video pipeline unavailable`);
+      return;
+    }
+    setImmediate(() => {
+      Promise.resolve()
+        .then(() => videoPipeline.publishEpisode(episode))
+        .then((result) => {
+          if (result?.skipped) {
+            console.warn(`[podcasts] YouTube queue finished for episode ${episode.id}: skipped (${result.reason})`);
+            return;
+          }
+          console.log(`[podcasts] YouTube queue finished for episode ${episode.id}: ${result?.url || result?.id || 'ok'}`);
+        })
+        .catch((err) => {
+          console.error(`[podcasts] YouTube automation failed for episode ${episode.id}:`, err.message);
         });
-      }
+    });
+  }
+
+  router.post(
+    '/episodes/:id/youtube-retry',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (episode.status !== 'published') throw new Error('YouTube retry requires a published episode');
+      if (!episode.audio_url) throw new Error('Cannot build YouTube video without permanent audio URL');
+      // Video-only retry — does not change podcast publish state, script, or audio.
+      queueYouTubePublish({ ...episode, status: 'published' });
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-retry-queued')}`);
     })
   );
 

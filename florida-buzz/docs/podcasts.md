@@ -213,3 +213,5 @@ Use the narrow `https://www.googleapis.com/auth/youtube.upload` OAuth scope. Kee
 New, unverified Google API projects may have API uploads restricted to private visibility. Leave `PODCASTS_YOUTUBE_PRIVACY=private` during setup. Change it to `public` only after the Google project is eligible and a private test has been reviewed.
 
 The upload is idempotent: an existing `podcast_assets` row at `youtube/<episode-id>` prevents duplicate uploads.
+
+Published episodes can re-queue video work without changing podcast publish state via **Retry YouTube video** in admin (`POST /admin/podcasts/episodes/:id/youtube-retry`). Job start, still reuse/generate, skips, and failures are logged under `[podcasts] YouTube…`.

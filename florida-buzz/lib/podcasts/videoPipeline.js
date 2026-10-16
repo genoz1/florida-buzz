@@ -96,8 +96,12 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   async function topicImage(scene, { episode }) {
     const storagePath = `youtube-visuals/v1/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     const existing = await findAsset(storagePath);
-    if (existing?.public_url) return fetchBuffer(existing.public_url);
+    if (existing?.public_url) {
+      console.log(`[podcasts] Reusing YouTube still ${storagePath}`);
+      return fetchBuffer(existing.public_url);
+    }
 
+    console.log(`[podcasts] Generating YouTube still ${storagePath} for ${scene.label}`);
     let lastCorrection = '';
     const first = await tryGenerateTopicStill(scene.prompt, scene, storagePath);
     if (Buffer.isBuffer(first)) return first;
@@ -184,14 +188,27 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   }
 
   async function publishEpisode(episode) {
-    if (!cfg.youtubeEnabled) return { skipped: true, reason: 'disabled' };
-    if (!youtubeConfigured(cfg)) return { skipped: true, reason: 'oauth_not_configured' };
+    const episodeId = episode?.id || 'unknown';
+    if (!cfg.youtubeEnabled) {
+      console.warn(`[podcasts] YouTube skipped for episode ${episodeId}: disabled`);
+      return { skipped: true, reason: 'disabled' };
+    }
+    if (!youtubeConfigured(cfg)) {
+      console.warn(`[podcasts] YouTube skipped for episode ${episodeId}: oauth_not_configured`);
+      return { skipped: true, reason: 'oauth_not_configured' };
+    }
     const key = `youtube/${episode.id}`;
     const existing = await findAsset(key);
-    if (existing?.public_url) return { skipped: true, reason: 'already_uploaded', url: existing.public_url };
+    if (existing?.public_url) {
+      console.log(`[podcasts] YouTube skipped for episode ${episodeId}: already_uploaded ${existing.public_url}`);
+      return { skipped: true, reason: 'already_uploaded', url: existing.public_url };
+    }
+    console.log(`[podcasts] YouTube job started for episode ${episodeId}`);
     const show = await store.getShowById(episode.show_id);
+    if (!show) throw new Error(`Show not found for episode ${episodeId}`);
     const rendered = await renderVideo({ episode, show });
     try {
+      console.log(`[podcasts] YouTube video rendered for episode ${episodeId}; uploading`);
       const description = `${stripHtml(episode.show_notes_html || episode.description || '')}\n\nListen and read more: ${cfg.site}/podcasts/${show.slug}/${episode.slug}\n\nAI-generated editorial illustrations are used for visual context. Florida Buzz is not affiliated with or endorsed by Disney.`;
       const uploaded = await uploadVideo({
         cfg,
@@ -203,6 +220,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         madeForKids: false,
       });
       await store.createAsset({ kind: 'youtube', storage_path: key, public_url: uploaded.url, content_type: 'video/youtube', byte_size: null, duration_seconds: episode.duration_seconds || null, checksum: uploaded.id });
+      console.log(`[podcasts] YouTube upload complete for episode ${episodeId}: ${uploaded.url}`);
       return uploaded;
     } finally {
       await fs.promises.rm(rendered.workDir, { recursive: true, force: true }).catch(() => {});

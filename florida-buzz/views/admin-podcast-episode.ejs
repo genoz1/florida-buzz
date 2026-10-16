@@ -218,6 +218,12 @@
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn btn-secondary" type="submit">Unpublish</button>
     </form>
+    <% if (episode.status === 'published') { %>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-retry" style="display:inline">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn btn-secondary" type="submit">Retry YouTube video</button>
+    </form>
+    <% } %>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reject-regenerate" style="margin-top:16px" onsubmit="return confirm('Reject this draft and generate a new weekly attempt?');">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn btn-secondary" type="submit">Reject and regenerate draft</button>
