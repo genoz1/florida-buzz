@@ -17,13 +17,8 @@
           <a class="btn btn-outline" href="/podcasts">All podcasts</a>
           <a class="btn btn-outline" href="/sponsors">Sponsors</a>
         </p>
-        <% if (links && links.length) { %>
-          <p class="podcast-follow">Follow:
-            <% links.forEach((link, i) => { %>
-              <a href="<%= link.url %>" rel="noopener noreferrer" target="_blank"><%= link.platform %></a><%= i < links.length - 1 ? ' · ' : '' %>
-            <% }) %>
-          </p>
-        <% } else { %>
+        <%- include('partials/podcast-platform-badges', { links: links || [] }) %>
+        <% if (!links || !links.length) { %>
           <p class="podcast-follow">Follow / subscribe links will appear here when platform listings go live.</p>
         <% } %>
       </div>

@@ -361,6 +361,7 @@ router.get('/', async (req, res) => {
   let podcastShow = null;
   let podcastLatest = null;
   let podcastRecent = [];
+  let podcastPlatformLinks = [];
   try {
     const podcasts = require('../lib/podcasts');
     if (podcasts.config(process.env).enabled !== false) {
@@ -370,6 +371,9 @@ router.get('/', async (req, res) => {
         const published = await store.listPublishedEpisodes(podcastShow.id);
         podcastLatest = published[0] || null;
         podcastRecent = published.slice(0, 5);
+        if (typeof store.listPlatformLinks === 'function') {
+          podcastPlatformLinks = await store.listPlatformLinks(podcastShow.id);
+        }
       }
     }
   } catch (err) {
@@ -417,6 +421,7 @@ router.get('/', async (req, res) => {
     podcastShow,
     podcastLatest,
     podcastRecent,
+    podcastPlatformLinks,
     ticker: tickerPool,
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
