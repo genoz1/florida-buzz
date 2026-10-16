@@ -1,11 +1,22 @@
 'use strict';
 
 const path = require('path');
-const { HorizontalAlign, Jimp, loadFont, measureText } = require('jimp');
+const { HorizontalAlign, Jimp, loadFont, measureText, intToRGBA, rgbaToInt } = require('jimp');
 
 const WIDTH = 1920;
 const HEIGHT = 1080;
-const COLORS = { teal: 0x0e3b43ff, deep: 0x082b31ff, coral: 0xff6452ff, white: 0xffffffff, sand: 0xf5efe3ff, ink: 0x000000cc, inkSoft: 0x00000099 };
+const COLORS = {
+  teal: 0x0e3b43ff,
+  deep: 0x082b31ff,
+  navy: 0x0b1f33ee,
+  coral: 0xff6452ff,
+  gold: 0xf5c518ff,
+  white: 0xffffffff,
+  sand: 0xf5efe3ff,
+  ink: 0x0b1f33ee,
+  inkSoft: 0x00000099,
+};
+const COVER_INTRO_CAPTION = 'Welcome aboard. Your next stop, the Florida Buzz Disney Podcast.';
 
 function fontPath(size, color) {
   const pluginRoot = path.resolve(path.dirname(require.resolve('@jimp/plugin-print')), '../..');
@@ -47,10 +58,10 @@ function wrapWords(text, maxChars = 42, maxLines = 2) {
     if (next.length > maxChars && current) {
       lines.push(current);
       current = word;
-      if (lines.length >= maxLines) break;
     } else {
       current = next;
     }
+    if (lines.length >= maxLines) break;
   }
   if (current && lines.length < maxLines) lines.push(current);
   return lines.slice(0, maxLines);
@@ -63,60 +74,63 @@ function eyebrowFromCategory(category, label) {
   return raw.split(/\s+/).slice(0, 4).join(' ') || 'DISNEY WORLD';
 }
 
+/** Soft blur by downscale/upscale — matches the first episode’s filled cover backdrop. */
+async function blurredBackdrop(cover) {
+  const filled = cover.clone().cover({ w: WIDTH, h: HEIGHT });
+  const tiny = filled.clone().resize({ w: 64, h: 36 });
+  const blurred = tiny.resize({ w: WIDTH, h: HEIGHT });
+  blurred.scan(0, 0, WIDTH, HEIGHT, function darken(x, y, idx) {
+    this.bitmap.data[idx] = Math.round(this.bitmap.data[idx] * 0.42);
+    this.bitmap.data[idx + 1] = Math.round(this.bitmap.data[idx + 1] * 0.42);
+    this.bitmap.data[idx + 2] = Math.round(this.bitmap.data[idx + 2] * 0.42);
+  });
+  return blurred;
+}
+
+async function printGoldText(image, { font, x, y, text, maxWidth }) {
+  const width = Math.max(8, Number(maxWidth) || 100);
+  const height = 48;
+  const layer = new Jimp({ width, height, color: 0x00000000 });
+  layer.print({ font, x: 0, y: 0, text, maxWidth: width });
+  const gold = intToRGBA(COLORS.gold);
+  layer.scan(0, 0, width, height, function tint(px, py, idx) {
+    const a = this.bitmap.data[idx + 3];
+    if (a < 8) return;
+    this.bitmap.data[idx] = gold.r;
+    this.bitmap.data[idx + 1] = gold.g;
+    this.bitmap.data[idx + 2] = gold.b;
+  });
+  image.composite(layer, x, y);
+}
+
 async function coverPanel(coverBuffer) {
   const cover = await Jimp.read(coverBuffer);
   cover.cover({ w: 760, h: 760 });
   return cover;
 }
 
-/** Fit the full square podcast cover into 16:9 without cropping title text. */
-async function fitCoverFrame(coverBuffer) {
+/**
+ * Fit the full square podcast cover into 16:9 with a darkened blurred fill
+ * (first ChatGPT episode style) — never crop FLORIDA BUZZ off the top.
+ */
+async function fitCoverFrame(coverBuffer, { caption = COVER_INTRO_CAPTION } = {}) {
+  const f = await fonts();
   const cover = await Jimp.read(coverBuffer);
-  const frame = rectangle(WIDTH, HEIGHT, 0x000000ff);
-  const fitted = cover.contain({ w: WIDTH, h: HEIGHT });
+  const frame = await blurredBackdrop(cover);
+  const fitted = cover.clone().contain({ w: WIDTH, h: HEIGHT });
   const x = Math.max(0, Math.round((WIDTH - fitted.width) / 2));
   const y = Math.max(0, Math.round((HEIGHT - fitted.height) / 2));
   frame.composite(fitted, x, y);
-  return frame.getBuffer('image/png');
-}
 
-/** Fill 16:9 for topic photos (crop edges OK), then burn captions like the first YouTube video. */
-async function renderTopicFrame(imageBuffer, { label, description, category, caption, aiLabel = true } = {}) {
-  const f = await fonts();
-  const photo = await Jimp.read(imageBuffer);
-  photo.cover({ w: WIDTH, h: HEIGHT });
-  const image = photo;
-
-  const eyebrow = eyebrowFromCategory(category, label);
-  const title = normalize(label || 'Disney World Update');
-  const titleLines = wrapWords(title, 34, 2);
-  const descText = normalize(description || '');
-  const descLines = descText && descText.toLowerCase() !== title.toLowerCase()
-    ? wrapWords(descText, 40, 2)
-    : [];
-  const headerWidth = 920;
-  const headerHeight = 48 + titleLines.length * 44 + (descLines.length ? descLines.length * 36 + 12 : 0) + 28;
-  image.composite(rectangle(headerWidth, headerHeight, COLORS.ink), 48, 40);
-  image.print({ font: f.white32, x: 72, y: 54, text: eyebrow, maxWidth: headerWidth - 48 });
-  // Accent bar under eyebrow (coral strip like brand cards).
-  image.composite(rectangle(220, 4, COLORS.coral), 72, 90);
-  titleLines.forEach((line, index) => {
-    image.print({ font: f.white32, x: 72, y: 104 + index * 42, text: line, maxWidth: headerWidth - 48 });
-  });
-  const descY = 104 + titleLines.length * 42 + 6;
-  descLines.forEach((line, index) => {
-    image.print({ font: f.white32, x: 72, y: descY + index * 34, text: line, maxWidth: headerWidth - 48 });
-  });
-
-  const captionLines = wrapWords(caption, 44, 2);
+  const captionLines = wrapWords(caption, 52, 2);
   if (captionLines.length) {
-    const captionWidth = 1320;
+    const captionWidth = 1400;
     const captionHeight = 28 + captionLines.length * 44;
     const captionX = Math.round((WIDTH - captionWidth) / 2);
     const captionY = HEIGHT - 150 - captionHeight;
-    image.composite(rectangle(captionWidth, captionHeight, COLORS.inkSoft), captionX, captionY);
+    frame.composite(rectangle(captionWidth, captionHeight, COLORS.inkSoft), captionX, captionY);
     captionLines.forEach((line, index) => {
-      image.print({
+      frame.print({
         font: f.white32,
         x: captionX + 24,
         y: captionY + 18 + index * 44,
@@ -126,41 +140,140 @@ async function renderTopicFrame(imageBuffer, { label, description, category, cap
     });
   }
 
-  if (aiLabel) {
-    const badge = 'AI-GENERATED ILLUSTRATION';
-    const badgeWidth = Math.max(420, measureText(f.white32, badge) + 48);
-    const badgeHeight = 44;
-    const badgeY = HEIGHT - 92;
-    image.composite(rectangle(badgeWidth, badgeHeight, COLORS.ink), 48, badgeY);
-    image.print({ font: f.white32, x: 66, y: badgeY + 8, text: badge, maxWidth: badgeWidth - 24 });
+  return frame.getBuffer('image/png');
+}
+
+/**
+ * Topic still overlays matching the first published YouTube episode:
+ * gold category eyebrow, white title, caption with soft shadow (no heavy plate).
+ */
+function fillCircle(image, cx, cy, radius, color) {
+  const r = Math.max(1, Math.round(radius));
+  for (let y = -r; y <= r; y += 1) {
+    for (let x = -r; x <= r; x += 1) {
+      if (x * x + y * y > r * r) continue;
+      const px = cx + x;
+      const py = cy + y;
+      if (px < 0 || py < 0 || px >= image.width || py >= image.height) continue;
+      image.setPixelColor(color, px, py);
+    }
   }
+}
+
+function roundedCard(width, height, fill, border) {
+  const card = rectangle(width, height, border);
+  const inset = 3;
+  card.composite(rectangle(width - inset * 2, height - inset * 2, fill), inset, inset);
+  return card;
+}
+
+async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel = false } = {}) {
+  const f = await fonts();
+  const photo = await Jimp.read(imageBuffer);
+  photo.cover({ w: WIDTH, h: HEIGHT });
+  const image = photo;
+
+  const eyebrow = eyebrowFromCategory(category, label);
+  const title = normalize(label || 'Disney World Update');
+  const titleLines = wrapWords(title, 34, 2);
+  const headerWidth = 860;
+  const headerHeight = 52 + titleLines.length * 48 + 24;
+  image.composite(rectangle(headerWidth, headerHeight, COLORS.navy), 48, 40);
+  await printGoldText(image, { font: f.white32, x: 72, y: 54, text: eyebrow, maxWidth: headerWidth - 56 });
+  titleLines.forEach((line, index) => {
+    image.print({ font: f.white32, x: 72, y: 100 + index * 46, text: line, maxWidth: headerWidth - 56 });
+  });
+
+  const captionLines = wrapWords(caption, 48, 2);
+  if (captionLines.length) {
+    const captionY = HEIGHT - 140;
+    captionLines.forEach((line, index) => {
+      const y = captionY + index * 44;
+      // Soft drop shadow like the first episode (no opaque caption plate).
+      image.print({
+        font: f.black32,
+        x: 2,
+        y: y + 2,
+        text: { text: line, alignmentX: HorizontalAlign.CENTER },
+        maxWidth: WIDTH - 80,
+      });
+      image.print({
+        font: f.white32,
+        x: 0,
+        y,
+        text: { text: line, alignmentX: HorizontalAlign.CENTER },
+        maxWidth: WIDTH - 80,
+      });
+    });
+  }
+
+  // AI badge intentionally omitted — illustrations are obvious; badge was distracting.
+  void aiLabel;
 
   return image.getBuffer('image/png');
 }
 
-async function renderAgendaCard({ coverBuffer, topics }) {
+/**
+ * Opening menu matching the first ChatGPT-built episode:
+ * navy abstract backdrop, cover left, gold eyebrow + “What's in this episode”,
+ * numbered topic cards with short descriptions.
+ */
+async function renderAgendaCard({ coverBuffer, topics, footer = '' } = {}) {
   const f = await fonts();
-  // Brighter teal menu — closer to the first ChatGPT-built episode look.
-  const image = rectangle(WIDTH, HEIGHT, COLORS.teal);
-  image.composite(rectangle(WIDTH, 14, COLORS.coral), 0, 0);
-  image.composite(rectangle(WIDTH, 14, COLORS.coral), 0, HEIGHT - 14);
-  image.composite(await coverPanel(coverBuffer), 120, 150);
-  image.print({ font: f.white64, x: 980, y: 110, text: 'TODAY ON FLORIDA BUZZ', maxWidth: 840 });
-  image.composite(rectangle(420, 6, COLORS.coral), 980, 200);
-  image.print({ font: f.white32, x: 980, y: 220, text: "Here's what we're covering", maxWidth: 800 });
+  const image = rectangle(WIDTH, HEIGHT, 0x071628ff);
+  // Soft abstract circles like the first episode backdrop.
+  fillCircle(image, 420, 220, 260, 0x0d2740ff);
+  fillCircle(image, 1600, 780, 340, 0x0a2036ff);
+  fillCircle(image, 980, 120, 180, 0x102c48ff);
+
+  const cover = await coverPanel(coverBuffer);
+  image.composite(cover, 110, 160);
+
+  await printGoldText(image, {
+    font: f.white32,
+    x: 980,
+    y: 110,
+    text: "TODAY'S DISNEY WORLD ROUNDUP",
+    maxWidth: 820,
+  });
+  image.print({ font: f.white64, x: 980, y: 160, text: "What's in this episode", maxWidth: 860 });
+
   const list = (topics || []).slice(0, 6);
+  const cardW = 820;
+  const cardH = 96;
   list.forEach((topic, index) => {
-    const y = 290 + index * 108;
-    image.composite(rectangle(52, 52, COLORS.coral), 980, y);
-    image.print({ font: f.white32, x: 980, y: y + 6, text: { text: String(index + 1), alignmentX: HorizontalAlign.CENTER }, maxWidth: 52 });
+    const y = 280 + index * 112;
+    image.composite(roundedCard(cardW, cardH, 0x0d2740ff, 0x2a4d6dff), 960, y);
+    fillCircle(image, 1010, y + Math.round(cardH / 2), 22, COLORS.coral);
+    image.print({
+      font: f.white32,
+      x: 986,
+      y: y + 30,
+      text: { text: String(index + 1), alignmentX: HorizontalAlign.CENTER },
+      maxWidth: 48,
+    });
     const title = normalize(topic.title);
-    const blurb = normalize(topic.description || '');
-    image.print({ font: f.white32, x: 1056, y: y + 2, text: title, maxWidth: 720, maxHeight: 44 });
+    const blurb = normalize(topic.description || topic.category || '');
+    image.print({ font: f.white32, x: 1060, y: y + 18, text: title, maxWidth: 680, maxHeight: 40 });
     if (blurb && blurb.toLowerCase() !== title.toLowerCase()) {
-      image.print({ font: f.white32, x: 1056, y: y + 44, text: wrapWords(blurb, 48, 1)[0] || blurb, maxWidth: 720 });
+      image.print({
+        font: f.white32,
+        x: 1060,
+        y: y + 54,
+        text: wrapWords(blurb.replace(/-/g, ' '), 52, 1)[0] || blurb,
+        maxWidth: 680,
+      });
     }
   });
-  image.print({ font: f.white32, x: 980, y: 960, text: 'thefloridabuzz.com', maxWidth: 700 });
+
+  const footerText = normalize(footer) || 'FLORIDA BUZZ: DISNEY WORLD';
+  image.print({
+    font: f.white32,
+    x: 0,
+    y: 1000,
+    text: { text: footerText.toUpperCase(), alignmentX: HorizontalAlign.CENTER },
+    maxWidth: WIDTH,
+  });
   return image.getBuffer('image/png');
 }
 
@@ -196,13 +309,28 @@ async function renderTopicCard({ label, category }) {
   return image.getBuffer('image/png');
 }
 
+/** Build a 1280×720 JPEG-friendly PNG for YouTube custom thumbnails from a topic frame. */
+async function renderThumbnailFrame(imageBuffer, { label, category } = {}) {
+  const framed = await renderTopicFrame(imageBuffer, {
+    label,
+    category,
+    caption: '',
+    aiLabel: false,
+  });
+  const full = await Jimp.read(framed);
+  full.cover({ w: 1280, h: 720 });
+  return full.getBuffer('image/png');
+}
+
 module.exports = {
+  COVER_INTRO_CAPTION,
   HEIGHT,
   WIDTH,
   eyebrowFromCategory,
   fitCoverFrame,
   renderAgendaCard,
   renderBrandCard,
+  renderThumbnailFrame,
   renderTopicCard,
   renderTopicFrame,
   wrapWords,

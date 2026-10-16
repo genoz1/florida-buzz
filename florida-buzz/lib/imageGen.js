@@ -3,15 +3,15 @@ const { generateText } = require('./aiText');
 const { generateImage } = require('./openai');
 const { validateGeneratedImage, assertCompletedReview } = require('./imageValidation');
 const { buildImageBrief } = require('./articleImages');
-const { EDITORIAL_PHOTO_STYLE, withEditorialPhotoStyle } = require('./editorialPhotoStyle');
+const { EDITORIAL_PHOTO_STYLE, applyStyleBlock } = require('./editorialPhotoStyle');
 
 const MAX_IMAGE_ATTEMPTS = 2;
 
-/** Shared with podcast YouTube stills — cinematic bright editorial travel photography. */
+/** Default for site article photos. Podcast YouTube stills pass their own style block. */
 const PHOTO_REQUIREMENTS = EDITORIAL_PHOTO_STYLE;
 
-function buildGenerationPrompt(imagePrompt, correction = '') {
-  const styled = withEditorialPhotoStyle(imagePrompt);
+function buildGenerationPrompt(imagePrompt, correction = '', styleRequirements = PHOTO_REQUIREMENTS) {
+  const styled = applyStyleBlock(imagePrompt, styleRequirements);
   if (!correction) return styled;
   return `${styled}\n\nPrevious image was rejected: ${correction}. Correct these defects. If people or strollers are not essential, exclude them and show a wide establishing view instead.`;
 }
@@ -36,11 +36,12 @@ async function generateValidatedImageResult(imagePrompt, context, {
   store = storeGeneratedImage,
   maxAttempts = MAX_IMAGE_ATTEMPTS,
   priorCorrection = '',
+  styleRequirements = PHOTO_REQUIREMENTS,
 } = {}) {
   let correction = String(priorCorrection || '').slice(0, 500);
   let lastCandidateUrl = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const prompt = buildGenerationPrompt(imagePrompt, correction);
+    const prompt = buildGenerationPrompt(imagePrompt, correction, styleRequirements);
     let imageBuffer;
     try {
       imageBuffer = await generate(prompt);

@@ -3,7 +3,7 @@
 // current model. Unlike DALL-E, it always returns base64 image data directly
 // rather than a temporary URL, which is actually simpler to work with.
 
-async function generateImage(prompt) {
+async function generateImage(prompt, { quality = 'medium', size = '1536x1024' } = {}) {
   const res = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: {
@@ -14,8 +14,8 @@ async function generateImage(prompt) {
       model: 'gpt-image-1',
       prompt,
       n: 1,
-      size: '1536x1024',
-      quality: 'medium',
+      size,
+      quality,
     }),
   });
 

@@ -1,6 +1,9 @@
 'use strict';
 
-const { EDITORIAL_PHOTO_STYLE, withEditorialPhotoStyle } = require('../editorialPhotoStyle');
+const {
+  PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+  withPodcastYoutubeStyle,
+} = require('../editorialPhotoStyle');
 
 /**
  * When a very specific podcast still fails review (guest-room interior, ride cabin,
@@ -61,12 +64,12 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
       `clearly the same place from the story. No interiors. ${banGeneric}`;
   }
 
-  return withEditorialPhotoStyle(scene);
+  return withPodcastYoutubeStyle(scene);
 }
 
 module.exports = {
-  EDITORIAL_PHOTO_STYLE,
+  PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
   broadenVisualPrompt,
   storySubject,
-  withEditorialPhotoStyle,
+  withPodcastYoutubeStyle,
 };
