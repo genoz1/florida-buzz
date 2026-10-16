@@ -188,9 +188,10 @@ When a podcast episode is published in the Florida Buzz admin, the optional nati
 1. Keep the approved podcast cover on screen through the announcer bumper and Geno's “Let's go.”
 2. Show a branded agenda card during Geno's topic summary.
 3. Create two topic-matched, photorealistic editorial visuals per story (maximum three when configured).
-4. Reuse previously approved visuals from the podcast artwork bucket using deterministic topic keys.
-5. Assemble a 1920×1080 MP4 with the published episode audio.
-6. Upload through the official YouTube Data API with `selfDeclaredMadeForKids=false`.
+4. Reuse previously approved visuals from the podcast artwork bucket using stable episode + story keys (so retries do not regenerate).
+5. If a very specific still fails review (for example a hotel room interior), broaden to a related exterior (the hotel/attraction outside) before falling back to the episode cover.
+6. Assemble a 1920×1080 MP4 with the published episode audio.
+7. Upload through the official YouTube Data API with `selfDeclaredMadeForKids=false`.
 
 This does not use AI-generated motion video and does not require Metricool or another publishing service. Topic images may include families and children naturally; the upload is still marked not specifically made for children.
 

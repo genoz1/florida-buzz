@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildScenePlan, parseMarkedSegments, splitNamedOpen } = require('../lib/podcasts/videoPlan');
+const { buildScenePlan, parseMarkedSegments, splitNamedOpen, stableVisualKey } = require('../lib/podcasts/videoPlan');
+const { broadenVisualPrompt } = require('../lib/podcasts/videoVisuals');
 
 const SCRIPT = `=== SEGMENT: open ===
 Geno: Welcome to the Florida Buzz Disney podcast. I'm your host Geno, and thank you for joining us. Here's what's happening at Disney World. Let's go.
@@ -51,4 +52,43 @@ test('podcast video scenes stay stationary without zoompan drift', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.equal(/zoompan\s*=/.test(source), false);
   assert.match(source, /scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30/);
+});
+
+test('visual keys stay stable when AI prompt wording changes', () => {
+  const a = buildScenePlan({
+    scriptText: SCRIPT,
+    totalSeconds: 720,
+    episodeId: 'ep-1',
+    topicMeta: [{ slug: 'story-1', title: 'Mandalorian', category: 'meets', prompts: ['prompt one', 'prompt two'] }],
+  });
+  const b = buildScenePlan({
+    scriptText: SCRIPT,
+    totalSeconds: 720,
+    episodeId: 'ep-1',
+    topicMeta: [{ slug: 'story-1', title: 'Mandalorian', category: 'meets', prompts: ['totally different wording', 'another wording'] }],
+  });
+  const keysA = a.scenes.filter((scene) => scene.segmentSlug === 'story-1').map((scene) => scene.visualKey);
+  const keysB = b.scenes.filter((scene) => scene.segmentSlug === 'story-1').map((scene) => scene.visualKey);
+  assert.deepEqual(keysA, keysB);
+  assert.equal(stableVisualKey({ episodeId: 'ep-1', segmentSlug: 'story-1', index: 0 }), keysA[0]);
+});
+
+test('broadens specific interiors to related exteriors', () => {
+  const room = broadenVisualPrompt('photoreal BoardWalk Inn guest room beds and furnishings', {
+    label: 'Refreshed BoardWalk Inn Rooms',
+    category: 'resort-room-refurbishment',
+    level: 1,
+  });
+  assert.match(room, /exterior/i);
+  assert.match(room, /hotel|resort/i);
+  assert.equal(/guest room|beds and furnishings/i.test(room), false);
+
+  const ride = broadenVisualPrompt('inside Space Mountain ride vehicle in the dark', {
+    label: 'Space Mountain',
+    category: 'attractions',
+    level: 1,
+  });
+  assert.match(ride, /exterior/i);
+  assert.match(ride, /Space Mountain/i);
+  assert.equal(/ride vehicle|inside/i.test(ride), false);
 });
