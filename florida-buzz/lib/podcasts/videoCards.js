@@ -67,6 +67,22 @@ function wrapWords(text, maxChars = 42, maxLines = 2) {
   return lines.slice(0, maxLines);
 }
 
+/** One short agenda sub-line that fits a menu card without wrapping/clipping. */
+function shortAgendaBlurb(text, { maxChars = 38, maxWords = 6 } = {}) {
+  const words = normalize(String(text || '').replace(/-/g, ' '))
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, Math.max(1, Number(maxWords) || 6));
+  if (!words.length) return '';
+  let line = '';
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length > maxChars && line) break;
+    line = next;
+  }
+  return line || words[0].slice(0, maxChars);
+}
+
 function eyebrowFromCategory(category, label) {
   const raw = normalize(category || label || 'Disney World')
     .replace(/-/g, ' ')
@@ -253,15 +269,16 @@ async function renderAgendaCard({ coverBuffer, topics, footer = '' } = {}) {
       maxWidth: 48,
     });
     const title = normalize(topic.title);
-    const blurb = normalize(topic.description || topic.category || '');
+    const blurb = shortAgendaBlurb(topic.description || topic.category || '');
     image.print({ font: f.white32, x: 1060, y: y + 18, text: title, maxWidth: 680, maxHeight: 40 });
     if (blurb && blurb.toLowerCase() !== title.toLowerCase()) {
       image.print({
         font: f.white32,
         x: 1060,
         y: y + 54,
-        text: wrapWords(blurb.replace(/-/g, ' '), 52, 1)[0] || blurb,
+        text: blurb,
         maxWidth: 680,
+        maxHeight: 36,
       });
     }
   });
@@ -332,6 +349,7 @@ module.exports = {
   renderBrandCard,
   renderThumbnailFrame,
   renderTopicCard,
+  shortAgendaBlurb,
   renderTopicFrame,
   wrapWords,
 };

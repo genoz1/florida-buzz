@@ -83,8 +83,8 @@ async function planTopicVisuals({ episode, aiText }) {
   // Keep evidence short so the model returns valid JSON under the token budget.
   const evidence = storySegments.map((segment) => ({ slug: segment.slug, transcript: segment.text.slice(0, 900) }));
   const system = `You plan accurate cinematic illustrated visuals for the Florida Buzz Disney World news podcast YouTube episode.
-Return strict JSON only (no markdown): {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"one short menu sub-line","category":"stable-reusable-category","prompts":["prompt 1","prompt 2"]}]}.
-Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World place from that story, with dense detail and bright natural Florida daylight (no yellow cast). Style: richly detailed cinematic digital travel illustration. Never celebrities/named characters. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.`;
+Return strict JSON only (no markdown): {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"max 6 words, under 38 characters","category":"stable-reusable-category","prompts":["prompt 1","prompt 2"]}]}.
+Keep each description to at most 6 words and 38 characters so it fits one agenda-menu line. Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World place from that story, with dense detail and bright natural Florida daylight (no yellow cast). Style: richly detailed cinematic digital travel illustration. Never celebrities/named characters. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.`;
   const user = JSON.stringify({ episodeTitle: episode.title, segments: evidence });
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
