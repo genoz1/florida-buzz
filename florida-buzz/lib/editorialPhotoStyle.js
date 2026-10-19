@@ -9,7 +9,7 @@ The image should look like a premium travel-magazine photograph—not a painting
 
 Composition: immersive eye-level perspective, strong foreground subject, recognizable story-relevant environment in the background, natural depth of field, and a balanced 16:9 horizontal composition suitable for a news article or YouTube video.
 
-Lighting and color: bright natural daylight or warm golden-hour light, realistic shadows, rich but believable colors, sharp focus, and polished cinematic contrast.
+Lighting and color: bright natural Florida daylight with NATURAL white balance, realistic shadows, rich but believable colors, sharp focus, and polished cinematic contrast. Keep sunlight and contrast, but avoid heavy yellow/amber/orange golden-hour grading washes. Whites should read clean (not cream), skies can hold true blue, foliage true green, and skin tones natural — not a muddy yellow cast.
 
 People may appear naturally as park visitors in the background, but no person should be the primary identifiable subject unless the story requires it. Prefer a wide establishing photograph of the actual location without prominent foreground people when possible. Small background crowds are acceptable only if they look natural. If people appear, heads, faces, hands, arms and legs must be anatomically correct; heads must face naturally relative to torsos and bodies must be oriented correctly. People must interact realistically with objects. Adults must push strollers from behind, not pull them from the front; children must be seated naturally. Stroller handles, wheels, seats and frames must have correct geometry. No duplicated, merged, floating, malformed or partially generated people, including distorted people in background crowds.
 

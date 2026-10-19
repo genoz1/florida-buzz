@@ -8,6 +8,7 @@ const {
   processSourceImageInWorker,
 } = require('./sourceImageProcessor');
 const { contentAddressedName } = require('./articleImages');
+const { coolYellowCast } = require('./coolYellowCast');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   console.warn('[supabase] SUPABASE_URL / SUPABASE_SERVICE_KEY not set yet — site will run with sample data only.');
@@ -182,6 +183,8 @@ async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/p
       if (img.width > GENERATED_IMAGE_MAX_WIDTH) {
         img.resize({ w: GENERATED_IMAGE_MAX_WIDTH });
       }
+      // Soften AI golden-hour / amber washes before JPEG encode.
+      coolYellowCast(img);
       const originalSize = imageBuffer.length;
       finalBuffer = await img.getBuffer('image/jpeg', { quality: GENERATED_IMAGE_JPEG_QUALITY });
       finalContentType = 'image/jpeg';
