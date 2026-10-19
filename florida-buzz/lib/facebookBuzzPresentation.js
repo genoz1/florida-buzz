@@ -28,7 +28,7 @@ const FACEBOOK_PRESENTATIONS = {
   'rope-drop-or-slow-disney-morning': {
     hook: 'Rope drop at Disney: worth it or overrated?',
     setup: 'Shorter morning lines sound great until the whole family is exhausted by dinner. Which approach makes a better park day for you?',
-    imageSubject: 'Disney World guests arriving at a theme park entrance just after sunrise, photographed candidly from behind with warm morning light',
+    imageSubject: 'Disney World guests arriving at a theme park entrance just after sunrise, photographed candidly from behind with natural morning daylight and clean white balance',
   },
   'what-epcot-should-protect-most': {
     hook: 'Has EPCOT gotten better—or lost what made it special?',
