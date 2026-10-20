@@ -226,7 +226,9 @@ test('pipeline does not fall back to episode cover art for failed topic stills',
   assert.match(source, /Never mashups|never combine multiple lands|Never invent mashup/i);
   assert.match(source, /uploadThumbnail/);
   assert.match(source, /renderThumbnailFrame/);
-  assert.match(source, /youtube-visuals\/v3\//);
+  assert.match(source, /youtube-visuals\/v4\//);
+  assert.match(source, /findPlaceReferencePhoto/);
+  assert.match(source, /editImageFromReference/);
   assert.match(source, /hardenPlacePrompt/);
   assert.match(source, /PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS/);
   assert.match(source, /Geography locks for prompts/);

@@ -122,12 +122,14 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
 /** Stricter visual review for podcast YouTube stills (place honesty matters on-screen). */
 const PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS = `Review this AI-generated Florida Buzz podcast YouTube still.
 PASS only a densely detailed cinematic travel illustration of ONE real Walt Disney World place that matches the story subject.
+When a real reference photograph was used, the still must preserve that photo's real architecture and layout — reject invented neighboring buildings, impossible monorail paths, or landmarks that are not supported by the reference.
 Reject multi-land mashups, invented park geography, and material layout lies about the named place.
 Hard rejects for known Disney geography:
 - BoardWalk / BoardWalk Inn with cars, buses, or asphalt vehicle roads in front of the pedestrian boardwalk
 - runDisney / race scenes with runners in car traffic lanes beside buses
 - Contemporary Resort monorail drawn only around the outside instead of through the A-frame
 - Magic Kingdom entrance station glued against Cinderella Castle as one impossible plaza
+- Spaceship Earth / EPCOT mashed into Magic Kingdom or Contemporary Resort views
 Also reject obvious AI anatomy failures, cartoon look, wrong destination, or a subject with no credible connection to the story.
 List only high-confidence visible defects. On acceptance return no issues and an empty correction.`;
 
