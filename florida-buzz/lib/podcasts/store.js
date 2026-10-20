@@ -373,6 +373,14 @@ function createSupabaseStore(client) {
           .single()
       );
     },
+    async deleteAssetByStoragePath(storagePath) {
+      return checked(
+        client
+          .from('podcast_assets')
+          .delete()
+          .eq('storage_path', storagePath)
+      );
+    },
     async createJob(episodeId, patch = {}) {
       return checked(
         client

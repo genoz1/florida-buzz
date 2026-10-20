@@ -696,8 +696,9 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       if (episode.status !== 'published') throw new Error('YouTube retry requires a published episode');
       if (!episode.audio_url) throw new Error('Cannot build YouTube video without permanent audio URL');
-      // Video-only retry — does not change podcast publish state, script, or audio.
-      queueYouTubePublish({ episode: { ...episode, status: 'published' }, cfg, videoPipeline });
+      // Force rebuild: regenerate place-accurate stills and upload a fresh YouTube video.
+      // Does not change podcast publish state, script, or audio.
+      queueYouTubePublish({ episode: { ...episode, status: 'published' }, cfg, videoPipeline, force: true });
       res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-retry-queued')}`);
     })
   );

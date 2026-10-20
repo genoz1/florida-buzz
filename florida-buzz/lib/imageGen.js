@@ -37,6 +37,8 @@ async function generateValidatedImageResult(imagePrompt, context, {
   maxAttempts = MAX_IMAGE_ATTEMPTS,
   priorCorrection = '',
   styleRequirements = PHOTO_REQUIREMENTS,
+  reviewInstructions = null,
+  reviewQuestion = null,
 } = {}) {
   let correction = String(priorCorrection || '').slice(0, 500);
   let lastCandidateUrl = null;
@@ -60,7 +62,14 @@ async function generateValidatedImageResult(imagePrompt, context, {
 
     let review;
     try {
-      review = assertCompletedReview(await validate(imageBuffer, { ...context, imagePrompt: prompt }));
+      review = assertCompletedReview(
+        await validate(imageBuffer, {
+          ...context,
+          imagePrompt: prompt,
+          reviewInstructions,
+          reviewQuestion,
+        })
+      );
     } catch (err) {
       console.error(`  [error] Image review unavailable (${err.message}) — preserving the generated candidate for review retry.`);
       return {
