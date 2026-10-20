@@ -13,6 +13,10 @@ const INTER_SECTION_GAP_MS = Object.freeze([140, 220, 160, 280, 180, 240, 150, 3
 
 function runFfmpeg(ffmpegPath, args) {
   return new Promise((resolve, reject) => {
+    if (!ffmpegPath || typeof ffmpegPath !== 'string') {
+      reject(new Error('ffmpeg path is missing or invalid'));
+      return;
+    }
     const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let err = '';
     child.stderr.on('data', (chunk) => {
@@ -22,6 +26,38 @@ function runFfmpeg(ffmpegPath, args) {
     child.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`ffmpeg failed (${code}): ${err.slice(-500)}`));
+    });
+  });
+}
+
+/** Run ffmpeg and collect stdout bytes (avoids temp-file race on /tmp). */
+function runFfmpegStdout(ffmpegPath, args) {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath || typeof ffmpegPath !== 'string') {
+      reject(new Error('ffmpeg path is missing or invalid'));
+      return;
+    }
+    const child = spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const chunks = [];
+    let err = '';
+    child.stdout.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      err += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`ffmpeg failed (${code}): ${err.slice(-500)}`));
+        return;
+      }
+      const buf = Buffer.concat(chunks);
+      if (!buf.length) {
+        reject(new Error(`ffmpeg produced empty stdout: ${err.slice(-300)}`));
+        return;
+      }
+      resolve(buf);
     });
   });
 }
@@ -77,27 +113,26 @@ async function trimEdgeSilence(buffer, ffmpegPath) {
 
 async function makeSilenceBuffer(ffmpegPath, durationMs) {
   const seconds = Math.max(0.02, Math.min(0.55, Number(durationMs) / 1000));
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fb-podcast-silence-'));
-  try {
-    const outPath = path.join(dir, 'silence.mp3');
-    await runFfmpeg(ffmpegPath, [
-      '-y',
-      '-f',
-      'lavfi',
-      '-i',
-      'anullsrc=channel_layout=mono:sample_rate=44100',
-      '-t',
-      String(seconds),
-      '-codec:a',
-      'libmp3lame',
-      '-b:a',
-      '96k',
-      outPath,
-    ]);
-    return fsp.readFile(outPath);
-  } finally {
-    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
-  }
+  // Pipe MP3 to stdout — no /tmp file. Writing silence.mp3 then reading it raced
+  // with the temp-dir cleanup on App Platform (EINVAL/ENOENT on open).
+  return runFfmpegStdout(ffmpegPath, [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'anullsrc=channel_layout=mono:sample_rate=44100',
+    '-t',
+    String(seconds),
+    '-codec:a',
+    'libmp3lame',
+    '-b:a',
+    '96k',
+    '-f',
+    'mp3',
+    'pipe:1',
+  ]);
 }
 
 /**
@@ -147,7 +182,7 @@ async function concatMp3Buffers(buffers, ffmpegPath, { varySectionGaps = true } 
       '44100',
       outPath,
     ]);
-    return fsp.readFile(outPath);
+    return await fsp.readFile(outPath);
   } finally {
     await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -319,7 +354,7 @@ async function encodePodcastMaster(buffer, ffmpegPath, { bitrate = '96k', channe
       '44100',
       outPath,
     ]);
-    return fsp.readFile(outPath);
+    return await fsp.readFile(outPath);
   } finally {
     await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -356,7 +391,7 @@ async function prependAudioBuffer(introBuffer, bodyBuffer, ffmpegPath) {
       '44100',
       outPath,
     ]);
-    return fsp.readFile(outPath);
+    return await fsp.readFile(outPath);
   } finally {
     await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
   }

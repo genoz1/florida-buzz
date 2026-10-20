@@ -170,6 +170,22 @@ test('prependAudioBuffer puts intro bytes ahead of body audio', async () => {
   }
 });
 
+test('makeSilenceBuffer pipes MP3 silence without a /tmp silence.mp3 file', async () => {
+  const { makeSilenceBuffer } = require('../lib/podcasts/audioPipeline');
+  const ffmpegPath = (() => {
+    try {
+      return require('ffmpeg-static');
+    } catch {
+      return 'ffmpeg';
+    }
+  })();
+  const buf = await makeSilenceBuffer(ffmpegPath, 180);
+  assert.ok(buf.length > 200);
+  // MPEG frame sync word
+  assert.equal(buf[0], 0xff);
+  assert.ok((buf[1] & 0xe0) === 0xe0);
+});
+
 test('concatMp3Buffers trims section padding and uses varied inter-section gaps', async () => {
   const {
     concatMp3Buffers,
