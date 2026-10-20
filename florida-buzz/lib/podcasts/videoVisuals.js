@@ -19,6 +19,58 @@ function storySubject(label = '', category = '') {
   return subject || 'this Disney World story location';
 }
 
+/** Extra place locks appended when the story clearly names a known inaccurate trap. */
+function placeAccuracyRules(text = '') {
+  const t = String(text || '').toLowerCase();
+  const rules = [];
+
+  if (/\bboard\s*-?\s*walk\b/.test(t)) {
+    rules.push(
+      "Disney's BoardWalk is a wooden pedestrian boardwalk and lakeside promenade — show people walking on wood planks by the water. " +
+        'No cars, buses, asphalt roads, parking, or vehicle traffic in front of the BoardWalk Inn / BoardWalk buildings.'
+    );
+  }
+
+  if (/\b(rundisney|run disney|wine\s*&\s*dine|wine and dine|road closure|race weekend|5k|10k|half marathon|marathon)\b/.test(t)) {
+    rules.push(
+      'runDisney athletes run on park paths, plaza pavement, or a marked race course through Walt Disney World parks and resort walking areas. ' +
+        'Do not show runners in automotive traffic lanes, beside transit buses, or on ordinary car roads.'
+    );
+  }
+
+  if (/\bcontemporary\b/.test(t) || /\bmonorail\b/.test(t)) {
+    rules.push(
+      "At Disney's Contemporary Resort, the monorail beamway passes THROUGH the A-frame hotel building (the iconic through-the-building view). " +
+        'Do not draw the monorail only circling outside around the hotel.'
+    );
+  }
+
+  if (/\b(magic kingdom|cinderella|main street|premier pass|lightning lane|turnstile|ticket)\b/.test(t)) {
+    rules.push(
+      'Keep Magic Kingdom geography honest: entrance plaza / turnstiles, Main Street, and Cinderella Castle are separate spaces — ' +
+        'do not glue the train station facade and castle into one invented continuous plaza.'
+    );
+  }
+
+  if (/\bbell services?\b|\bcold grocery|\bluggage cart|\bbellhop\b/.test(t)) {
+    rules.push(
+      'Bell services / luggage: show luggage carts and bags at a real resort arrival area. ' +
+        'If the Contemporary appears, keep the monorail through the A-frame, not wrapped around the exterior only.'
+    );
+  }
+
+  return rules;
+}
+
+function hardenPlacePrompt(prompt, { label = '', category = '' } = {}) {
+  const body = String(prompt || '').trim();
+  const rules = placeAccuracyRules(`${body} ${label} ${category}`);
+  if (!rules.length) return body;
+  const block = `Place accuracy locks:\n- ${rules.join('\n- ')}`;
+  if (body.includes('Place accuracy locks:')) return body;
+  return `${body}\n\n${block}`.trim();
+}
+
 function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rejection = '' } = {}) {
   const subject = storySubject(label, category);
   const evidence = `${prompt} ${label} ${category} ${rejection}`.toLowerCase();
@@ -64,12 +116,27 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
       `clearly the same place from the story. No interiors. ${banGeneric}`;
   }
 
-  return withPodcastYoutubeStyle(scene);
+  return withPodcastYoutubeStyle(hardenPlacePrompt(scene, { label, category }));
 }
+
+/** Stricter visual review for podcast YouTube stills (place honesty matters on-screen). */
+const PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS = `Review this AI-generated Florida Buzz podcast YouTube still.
+PASS only a densely detailed cinematic travel illustration of ONE real Walt Disney World place that matches the story subject.
+Reject multi-land mashups, invented park geography, and material layout lies about the named place.
+Hard rejects for known Disney geography:
+- BoardWalk / BoardWalk Inn with cars, buses, or asphalt vehicle roads in front of the pedestrian boardwalk
+- runDisney / race scenes with runners in car traffic lanes beside buses
+- Contemporary Resort monorail drawn only around the outside instead of through the A-frame
+- Magic Kingdom entrance station glued against Cinderella Castle as one impossible plaza
+Also reject obvious AI anatomy failures, cartoon look, wrong destination, or a subject with no credible connection to the story.
+List only high-confidence visible defects. On acceptance return no issues and an empty correction.`;
 
 module.exports = {
   PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+  PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
   broadenVisualPrompt,
+  hardenPlacePrompt,
+  placeAccuracyRules,
   storySubject,
   withPodcastYoutubeStyle,
 };

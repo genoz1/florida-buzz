@@ -37,6 +37,13 @@ Anonymous park visitors may appear naturally when they help the scene feel alive
 
 The visual must directly represent the ONE story place being discussed — one real Walt Disney World hotel, attraction, land gateway, or construction site. Never invent mashup parkscapes or unrelated icons. Do not invent announced designs as completed attractions.
 
+Hard Disney World geography (reject invented layouts):
+- Disney's BoardWalk / BoardWalk Inn / BoardWalk Villas: wooden boardwalk and lakeside promenade for pedestrians only. No cars, buses, asphalt roadways, parking lanes, or vehicle traffic in front of the BoardWalk buildings.
+- runDisney / Wine & Dine / race weekend: runners on park paths, plaza pavement, or marked race course through parks and resort walking areas — never running in car lanes beside buses or road traffic.
+- Disney's Contemporary Resort monorail: the monorail beamway runs THROUGH the A-frame hotel (the classic through-the-lobby look), never only looping around the outside of the building as a ring road.
+- Magic Kingdom: do not mash the entrance plaza train station against Cinderella Castle as if they share one continuous plaza; keep real spatial relationships.
+- Never invent a place that does not exist by combining landmarks from different parks or resorts into one impossible view.
+
 No captions, headlines, readable signs, official logos, watermarks, borders, or distorted text.`;
 
 function applyStyleBlock(prompt, styleBlock) {

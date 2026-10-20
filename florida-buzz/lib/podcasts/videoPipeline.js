@@ -9,7 +9,11 @@ const { promisify } = require('util');
 const { generateValidatedImageResult } = require('../imageGen');
 const { probeMp3DurationSec } = require('./audioPipeline');
 const { buildScenePlan, parseMarkedSegments } = require('./videoPlan');
-const { broadenVisualPrompt } = require('./videoVisuals');
+const {
+  broadenVisualPrompt,
+  hardenPlacePrompt,
+  PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
+} = require('./videoVisuals');
 const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicCard, renderTopicFrame } = require('./videoCards');
 const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
 
@@ -84,7 +88,8 @@ async function planTopicVisuals({ episode, aiText }) {
   const evidence = storySegments.map((segment) => ({ slug: segment.slug, transcript: segment.text.slice(0, 900) }));
   const system = `You plan accurate cinematic illustrated visuals for the Florida Buzz Disney World news podcast YouTube episode.
 Return strict JSON only (no markdown): {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"max 5 words, under 32 characters","category":"stable-reusable-category","prompts":["prompt 1","prompt 2"]}]}.
-Keep each description to at most 5 words and 32 characters so it fits one agenda-menu line. End on a real noun or verb — never on for/to/the/a/of. Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World place from that story, with dense detail and bright natural Florida daylight (no yellow cast). Style: richly detailed cinematic digital travel illustration. Never celebrities/named characters. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.`;
+Keep each description to at most 5 words and 32 characters so it fits one agenda-menu line. End on a real noun or verb — never on for/to/the/a/of. Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World place from that story, with dense detail and bright natural Florida daylight (no yellow cast). Style: richly detailed cinematic digital travel illustration. Never celebrities/named characters. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.
+Geography locks for prompts: Disney's BoardWalk is pedestrian wood boardwalk only (no cars/buses/asphalt in front of it). runDisney runners stay on park paths/plazas/race courses, never car lanes beside buses. Contemporary Resort monorail goes THROUGH the A-frame hotel, not around the outside. Do not invent impossible Magic Kingdom layouts that glue the entrance station to Cinderella Castle.`;
   const user = JSON.stringify({ episodeTitle: episode.title, segments: evidence });
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
@@ -132,11 +137,20 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     let captured = null;
     const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('./videoVisuals');
     const { generateImage } = require('../openai');
+    const lockedPrompt = hardenPlacePrompt(prompt, {
+      label: scene.label,
+      category: scene.category,
+    });
     const result = await generateValidatedImageResult(
-      prompt,
+      lockedPrompt,
       { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' },
       {
         styleRequirements: PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+        reviewInstructions: PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
+        reviewQuestion:
+          `Podcast story title: ${String(scene.label).slice(0, 180)}\n` +
+          `Category: ${String(scene.category || '').slice(0, 80)}\n` +
+          'Is this still an accurate single-place Walt Disney World illustration for this story (no invented mashup geography)?',
         generate: (text) => generateImage(text, { quality: 'high' }),
         // Keep rejected candidates out of durable storage — only persist after accept.
         store: async (buffer) => {
@@ -152,13 +166,15 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     return { rejected: true, correction: result.correction || result.error || result.status };
   }
 
-  async function topicImage(scene, { episode }) {
-    // v2 = painterly podcast illustration style (do not reuse v1 photoreal stills).
-    const storagePath = `youtube-visuals/v2/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
-    const existing = await findAsset(storagePath);
-    if (existing?.public_url) {
-      console.log(`[podcasts] Reusing YouTube still ${storagePath}`);
-      return fetchBuffer(existing.public_url);
+  async function topicImage(scene, { episode, force = false } = {}) {
+    // v3 = place-accurate podcast illustration style (do not reuse v1/v2 stills with bad geography).
+    const storagePath = `youtube-visuals/v3/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
+    if (!force) {
+      const existing = await findAsset(storagePath);
+      if (existing?.public_url) {
+        console.log(`[podcasts] Reusing YouTube still ${storagePath}`);
+        return fetchBuffer(existing.public_url);
+      }
     }
 
     console.log(`[podcasts] Generating YouTube still ${storagePath} for ${scene.label}`);
@@ -189,7 +205,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     await execFileAsync(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { maxBuffer: 8 * 1024 * 1024 });
   }
 
-  async function renderVideo({ episode, show }) {
+  async function renderVideo({ episode, show, force = false } = {}) {
     if (!episode.audio_url) throw new Error('Episode has no permanent audio URL');
     const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'florida-buzz-youtube-'));
     try {
@@ -234,7 +250,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         const scene = plan.scenes[i];
         let imageBuffer;
         if (scene.kind === 'topic') {
-          const still = await topicImage(scene, { episode });
+          const still = await topicImage(scene, { episode, force });
           imageBuffer = await renderTopicFrame(still, {
             label: scene.label,
             category: scene.category,
@@ -280,7 +296,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
   }
 
-  async function publishEpisode(episode) {
+  async function publishEpisode(episode, { force = false } = {}) {
     const episodeId = episode?.id || 'unknown';
     if (!cfg.youtubeEnabled) {
       console.warn(`[podcasts] YouTube skipped for episode ${episodeId}: disabled`);
@@ -292,14 +308,22 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
     const key = `youtube/${episode.id}`;
     const existing = await findAsset(key);
-    if (existing?.public_url) {
+    if (existing?.public_url && !force) {
       console.log(`[podcasts] YouTube skipped for episode ${episodeId}: already_uploaded ${existing.public_url}`);
       return { skipped: true, reason: 'already_uploaded', url: existing.public_url };
     }
-    console.log(`[podcasts] YouTube job started for episode ${episodeId}`);
+    if (force && existing?.public_url) {
+      console.warn(`[podcasts] YouTube force rebuild for episode ${episodeId}; prior upload was ${existing.public_url}`);
+      if (typeof store.deleteAssetByStoragePath === 'function') {
+        await store.deleteAssetByStoragePath(key).catch((err) => {
+          console.warn(`[podcasts] Could not clear prior YouTube asset row: ${err.message}`);
+        });
+      }
+    }
+    console.log(`[podcasts] YouTube job started for episode ${episodeId}${force ? ' (force)' : ''}`);
     const show = await store.getShowById(episode.show_id);
     if (!show) throw new Error(`Show not found for episode ${episodeId}`);
-    const rendered = await renderVideo({ episode, show });
+    const rendered = await renderVideo({ episode, show, force });
     try {
       console.log(`[podcasts] YouTube video rendered for episode ${episodeId}; uploading`);
       const description = `${stripHtml(episode.show_notes_html || episode.description || '')}\n\nListen and read more: ${cfg.site}/podcasts/${show.slug}/${episode.slug}\n\nFlorida Buzz is not affiliated with or endorsed by Disney.`;

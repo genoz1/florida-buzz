@@ -299,6 +299,11 @@ function createMemoryStore() {
         .filter((s) => s.episode_id === episodeId && s.kind === kind)
         .sort((a, b) => b.version - a.version)[0] || null;
     },
+    async deleteAssetByStoragePath(storagePath) {
+      const before = state.assets.length;
+      state.assets = state.assets.filter((asset) => asset.storage_path !== storagePath);
+      return { deleted: before - state.assets.length };
+    },
     async createAsset(asset) {
       const row = {
         id: id(),

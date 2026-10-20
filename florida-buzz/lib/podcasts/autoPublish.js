@@ -14,7 +14,7 @@ function isScaffoldEpisode(episode) {
   return false;
 }
 
-function queueYouTubePublish({ episode, cfg, videoPipeline }) {
+function queueYouTubePublish({ episode, cfg, videoPipeline, force = false }) {
   if (!cfg?.youtubeEnabled) {
     console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: PODCASTS_YOUTUBE_ENABLED is false`);
     return { queued: false, reason: 'youtube_disabled' };
@@ -25,7 +25,7 @@ function queueYouTubePublish({ episode, cfg, videoPipeline }) {
   }
   setImmediate(() => {
     Promise.resolve()
-      .then(() => videoPipeline.publishEpisode({ ...episode, status: 'published' }))
+      .then(() => videoPipeline.publishEpisode({ ...episode, status: 'published' }, { force }))
       .then((result) => {
         if (result?.skipped) {
           console.warn(`[podcasts] YouTube queue finished for episode ${episode.id}: skipped (${result.reason})`);

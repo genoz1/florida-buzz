@@ -5,7 +5,12 @@ const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildScenePlan, parseMarkedSegments, splitCaptionChunks, splitNamedOpen, stableVisualKey } = require('../lib/podcasts/videoPlan');
-const { broadenVisualPrompt } = require('../lib/podcasts/videoVisuals');
+const {
+  broadenVisualPrompt,
+  hardenPlacePrompt,
+  placeAccuracyRules,
+  PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
+} = require('../lib/podcasts/videoVisuals');
 const { fitCoverFrame, renderTopicFrame, wrapWords } = require('../lib/podcasts/videoCards');
 const { parseJsonObject, resolveVideoTotalSeconds } = require('../lib/podcasts/videoPipeline');
 
@@ -221,7 +226,10 @@ test('pipeline does not fall back to episode cover art for failed topic stills',
   assert.match(source, /Never mashups|never combine multiple lands|Never invent mashup/i);
   assert.match(source, /uploadThumbnail/);
   assert.match(source, /renderThumbnailFrame/);
-  assert.match(source, /youtube-visuals\/v2\//);
+  assert.match(source, /youtube-visuals\/v3\//);
+  assert.match(source, /hardenPlacePrompt/);
+  assert.match(source, /PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS/);
+  assert.match(source, /Geography locks for prompts/);
   assert.match(source, /Continuing YouTube render with default story titles/);
 });
 
@@ -232,6 +240,46 @@ test('broaden prompts forbid multi-land mashups', () => {
     level: 1,
   });
   assert.match(prompt, /one real place|never a mashup/i);
+});
+
+test('place accuracy locks BoardWalk, runDisney, Contemporary monorail, and MK mashups', () => {
+  const boardwalk = placeAccuracyRules('Wine & Dine road closures near BoardWalk');
+  assert.ok(boardwalk.some((rule) => /pedestrian boardwalk/i.test(rule)));
+  assert.ok(boardwalk.some((rule) => /No cars, buses/i.test(rule)));
+  assert.ok(boardwalk.some((rule) => /runDisney|park paths/i.test(rule)));
+
+  const contemporary = hardenPlacePrompt('Luggage carts outside Contemporary Resort with monorail', {
+    label: 'Resort Bell Services Cold Grocery Transfers',
+    category: 'resort-services',
+  });
+  assert.match(contemporary, /Place accuracy locks:/i);
+  assert.match(contemporary, /THROUGH the A-frame/i);
+  assert.match(contemporary, /around the hotel|wrapped around the exterior/i);
+
+  const runners = broadenVisualPrompt('runners waiting beside a transit bus at BoardWalk', {
+    label: 'runDisney Wine & Dine Road Closures',
+    category: 'rundisney-events',
+    level: 1,
+  });
+  assert.match(runners, /No cars, buses/i);
+  assert.match(runners, /park paths|race course/i);
+  assert.match(runners, /Do not show runners in automotive traffic/i);
+
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /BoardWalk/);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /Contemporary Resort monorail/);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /car traffic lanes beside buses/);
+});
+
+test('youtube retry force-rebuilds stills instead of reusing already_uploaded', () => {
+  const admin = fs.readFileSync(path.join(__dirname, '../lib/podcasts/routerAdmin.js'), 'utf8');
+  const auto = fs.readFileSync(path.join(__dirname, '../lib/podcasts/autoPublish.js'), 'utf8');
+  const pipeline = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
+  assert.match(admin, /youtube-retry/);
+  assert.match(admin, /force:\s*true/);
+  assert.match(auto, /force\s*=\s*false/);
+  assert.match(pipeline, /already_uploaded.*!force|!force[\s\S]*already_uploaded/);
+  assert.match(pipeline, /deleteAssetByStoragePath/);
+  assert.match(pipeline, /YouTube force rebuild/);
 });
 
 test('topic planner JSON parser tolerates trailing commas and newlines in strings', () => {
