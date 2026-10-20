@@ -14,6 +14,11 @@ const {
   hardenPlacePrompt,
   PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
 } = require('./videoVisuals');
+const {
+  findPlaceReferencePhoto,
+  referenceReviewQuestion,
+  withReferencePrompt,
+} = require('./placeReferencePhoto');
 const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicCard, renderTopicFrame } = require('./videoCards');
 const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
 
@@ -133,25 +138,37 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     return publicUrl;
   }
 
-  async function tryGenerateTopicStill(prompt, scene, storagePath) {
+  async function tryGenerateTopicStill(prompt, scene, storagePath, reference = null) {
     let captured = null;
     const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('./videoVisuals');
-    const { generateImage } = require('../openai');
-    const lockedPrompt = hardenPlacePrompt(prompt, {
-      label: scene.label,
-      category: scene.category,
-    });
+    const { generateImage, editImageFromReference } = require('../openai');
+    const lockedPrompt = withReferencePrompt(
+      hardenPlacePrompt(prompt, {
+        label: scene.label,
+        category: scene.category,
+      }),
+      reference
+    );
+    const generate = reference?.buffer
+      ? (text) =>
+          editImageFromReference(text, reference.buffer, {
+            quality: 'high',
+            mimeType: reference.mimeType || 'image/png',
+            inputFidelity: 'high',
+          })
+      : (text) => generateImage(text, { quality: 'high' });
     const result = await generateValidatedImageResult(
       lockedPrompt,
       { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' },
       {
         styleRequirements: PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
         reviewInstructions: PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
-        reviewQuestion:
-          `Podcast story title: ${String(scene.label).slice(0, 180)}\n` +
-          `Category: ${String(scene.category || '').slice(0, 80)}\n` +
-          'Is this still an accurate single-place Walt Disney World illustration for this story (no invented mashup geography)?',
-        generate: (text) => generateImage(text, { quality: 'high' }),
+        reviewQuestion: referenceReviewQuestion({
+          label: scene.label,
+          category: scene.category,
+          reference,
+        }),
+        generate,
         // Keep rejected candidates out of durable storage — only persist after accept.
         store: async (buffer) => {
           captured = buffer;
@@ -167,8 +184,8 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   }
 
   async function topicImage(scene, { episode, force = false } = {}) {
-    // v3 = place-accurate podcast illustration style (do not reuse v1/v2 stills with bad geography).
-    const storagePath = `youtube-visuals/v3/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
+    // v4 = real place-photo reference stills (do not reuse v1–v3 invented geography).
+    const storagePath = `youtube-visuals/v4/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     if (!force) {
       const existing = await findAsset(storagePath);
       if (existing?.public_url) {
@@ -178,8 +195,24 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
 
     console.log(`[podcasts] Generating YouTube still ${storagePath} for ${scene.label}`);
+    const reference = await findPlaceReferencePhoto({
+      label: scene.label,
+      category: scene.category,
+      prompt: scene.prompt,
+      episodeId: episode.id,
+      store,
+      supabase,
+    });
+    if (reference) {
+      console.log(
+        `[podcasts] Place reference for ${scene.label}: ${reference.source} — ${reference.title || reference.imageUrl} (${reference.credit})`
+      );
+    } else {
+      console.warn(`[podcasts] No place reference photo found for ${scene.label}; generating without photo anchor`);
+    }
+
     let lastCorrection = '';
-    const first = await tryGenerateTopicStill(scene.prompt, scene, storagePath);
+    const first = await tryGenerateTopicStill(scene.prompt, scene, storagePath, reference);
     if (Buffer.isBuffer(first)) return first;
     lastCorrection = first.correction || '';
 
@@ -191,9 +224,20 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         rejection: lastCorrection,
       });
       console.warn(`[podcasts] Broadening YouTube visual for ${scene.label} (level ${level}) — still locked to this story`);
-      const next = await tryGenerateTopicStill(broader, scene, storagePath);
+      const next = await tryGenerateTopicStill(broader, scene, storagePath, reference);
       if (Buffer.isBuffer(next)) return next;
       lastCorrection = next.correction || lastCorrection;
+    }
+
+    // Prefer the real reference photo over a blank title card so every story has a place image.
+    if (reference?.buffer) {
+      console.warn(
+        `[podcasts] Using real reference photo for ${scene.label} after AI review rejects: ${lastCorrection || 'no approved illustration'}`
+      );
+      await saveVisual(reference.buffer, storagePath).catch((err) => {
+        console.warn(`[podcasts] Could not persist reference photo still: ${err.message}`);
+      });
+      return reference.buffer;
     }
 
     // Last resort: story title card for THIS topic — never generic castle / cover art.
