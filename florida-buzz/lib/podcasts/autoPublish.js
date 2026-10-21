@@ -28,7 +28,10 @@ function queueYouTubePublish({ episode, cfg, videoPipeline, force = false }) {
       .then(() => videoPipeline.publishEpisode({ ...episode, status: 'published' }, { force }))
       .then((result) => {
         if (result?.skipped) {
-          console.warn(`[podcasts] YouTube queue finished for episode ${episode.id}: skipped (${result.reason})`);
+          const detail = result.reason === 'stills_incomplete' && Array.isArray(result.failures)
+            ? ` — ${result.failures.map((f) => `${f.label}:${f.reason}`).join('; ')}`
+            : '';
+          console.warn(`[podcasts] YouTube queue finished for episode ${episode.id}: skipped (${result.reason})${detail}`);
           return;
         }
         console.log(`[podcasts] YouTube queue finished for episode ${episode.id}: ${result?.url || result?.id || 'ok'}`);
