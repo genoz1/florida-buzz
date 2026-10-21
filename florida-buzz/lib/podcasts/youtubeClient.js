@@ -102,4 +102,41 @@ async function uploadThumbnail({ cfg, videoId, imageBuffer, token, fetchImpl = f
   return response.json();
 }
 
-module.exports = { accessToken, beginResumableUpload, uploadThumbnail, uploadVideo, youtubeConfigured };
+/** Patch title/description on an existing YouTube video (no re-upload). */
+async function updateVideoSnippet({
+  cfg,
+  videoId,
+  title,
+  description,
+  tags,
+  categoryId = '24',
+  token,
+  fetchImpl = fetch,
+} = {}) {
+  const access = token || (await accessToken(cfg, fetchImpl));
+  const snippet = {
+    categoryId: String(categoryId || '24'),
+  };
+  if (title != null) snippet.title = String(title).slice(0, 100);
+  if (description != null) snippet.description = String(description).slice(0, 5000);
+  if (Array.isArray(tags)) snippet.tags = tags.map(String).slice(0, 30);
+  const response = await fetchImpl('https://www.googleapis.com/youtube/v3/videos?part=snippet', {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${access}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: JSON.stringify({ id: videoId, snippet }),
+  });
+  if (!response.ok) throw await responseError(response, 'YouTube video snippet update');
+  return response.json();
+}
+
+module.exports = {
+  accessToken,
+  beginResumableUpload,
+  uploadThumbnail,
+  uploadVideo,
+  updateVideoSnippet,
+  youtubeConfigured,
+};

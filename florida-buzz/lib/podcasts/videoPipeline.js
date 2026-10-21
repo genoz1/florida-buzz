@@ -20,8 +20,9 @@ const {
   withReferencePrompt,
 } = require('./placeReferencePhoto');
 const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicFrame } = require('./videoCards');
-const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
+const { uploadThumbnail, uploadVideo, updateVideoSnippet, youtubeConfigured } = require('./youtubeClient');
 const { stillKey } = require('./youtubeStillsReview');
+const { buildYoutubeDescription } = require('./youtubeDescription');
 
 /** Prefer a real probed MP3 length when episode.duration_seconds is missing or tiny. */
 function resolveVideoTotalSeconds(episodeDurationSeconds, probedSeconds) {
@@ -46,6 +47,42 @@ function safeSlug(value) {
 
 function stripHtml(value) {
   return String(value || '').replace(/<br\s*\/?\s*>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Real camera move for topic stills: upscale ~8%, then pan the 1920×1080 crop.
+ * Avoids the old zoompan "breathing"/jitter look from the first episode.
+ * Cover/agenda/brand stay stationary so text stays readable.
+ */
+function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
+  const duration = Math.max(0.8, Number(durationSeconds) || 1);
+  const frames = Math.max(2, Math.round(duration * 30));
+  const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
+  const scaleW = 2074;
+  const scaleH = 1166;
+  const maxX = scaleW - 1920;
+  const maxY = scaleH - 1080;
+  const dirs = [
+    { x0: 0, y0: Math.round(maxY * 0.15), x1: maxX, y1: Math.round(maxY * 0.85) },
+    { x0: maxX, y0: Math.round(maxY * 0.2), x1: 0, y1: Math.round(maxY * 0.8) },
+    { x0: Math.round(maxX * 0.1), y0: maxY, x1: Math.round(maxX * 0.9), y1: 0 },
+    { x0: Math.round(maxX * 0.9), y0: 0, x1: Math.round(maxX * 0.1), y1: maxY },
+  ];
+  const dir = dirs[Math.abs(Number(sceneIndex) || 0) % dirs.length];
+  const denom = Math.max(1, frames - 1);
+  const xExpr = `${dir.x0}+(${dir.x1 - dir.x0})*n/${denom}`;
+  const yExpr = `${dir.y0}+(${dir.y1 - dir.y0})*n/${denom}`;
+  return (
+    `fps=30,scale=${scaleW}:${scaleH},` +
+    `crop=1920:1080:'${xExpr}':'${yExpr}',` +
+    `fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`
+  );
+}
+
+function stationaryFilter(durationSeconds) {
+  const duration = Math.max(0.8, Number(durationSeconds) || 1);
+  const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
+  return `fps=30,fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`;
 }
 
 async function fetchBuffer(url, fetchImpl = fetch) {
@@ -603,11 +640,16 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       }
 
       const agendaBuffer = await renderAgendaCard({ coverBuffer, topics: plan.topics, footer: agendaFooter });
-      const brandBuffer = await renderBrandCard({ coverBuffer, label: 'Florida Buzz Disney Podcast' });
+      const brandBuffer = await renderBrandCard({
+        coverBuffer,
+        label: 'Florida Buzz Disney Podcast',
+        cta: 'Like & Subscribe',
+      });
       // Square podcast artwork must letterbox into 16:9 — never crop FLORIDA BUZZ off the top.
       const coverFrame = await fitCoverFrame(coverBuffer);
       const sceneClips = [];
       let thumbnailBuffer = null;
+      let topicMotionIndex = 0;
       for (let i = 0; i < plan.scenes.length; i += 1) {
         const scene = plan.scenes[i];
         let imageBuffer;
@@ -642,11 +684,14 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         const clipPath = path.join(workDir, `clip-${String(i).padStart(3, '0')}.mp4`);
         await fs.promises.writeFile(imagePath, imageBuffer);
         const duration = Math.max(0.8, Number(scene.durationSeconds) || 1);
-        const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
-        // Frames are already 1920×1080. Keep stills stationary — no Ken Burns / zoompan.
+        // Topic stills get a real pan (scale+crop). Cover/agenda/brand stay still for readability.
+        const vf =
+          scene.kind === 'topic'
+            ? topicMotionFilter({ durationSeconds: duration, sceneIndex: topicMotionIndex++ })
+            : stationaryFilter(duration);
         await runFfmpeg([
           '-loop', '1', '-i', imagePath,
-          '-vf', `fps=30,fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`,
+          '-vf', vf,
           '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
         ]);
         sceneClips.push(clipPath);
@@ -714,13 +759,22 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
     try {
       console.log(`[podcasts] YouTube video rendered for episode ${episodeId}; uploading`);
-      const description = `${stripHtml(episode.show_notes_html || episode.description || '')}\n\nListen and read more: ${cfg.site}/podcasts/${show.slug}/${episode.slug}\n\nFlorida Buzz is not affiliated with or endorsed by Disney.`;
+      let sources = [];
+      if (typeof store.listSources === 'function') {
+        sources = await store.listSources(episode.id).catch(() => []);
+      }
+      const description = buildYoutubeDescription({
+        episode,
+        show,
+        site: cfg.site,
+        sources,
+      });
       const uploaded = await uploadVideo({
         cfg,
         filePath: rendered.outputPath,
         title: episode.title,
         description,
-        tags: ['Florida Buzz', 'Disney World', 'Disney World news', 'Florida travel', 'podcast'],
+        tags: ['Florida Buzz', 'Disney World', 'Disney World news', 'Florida travel', 'podcast', 'like and subscribe'],
         privacyStatus: cfg.youtubePrivacyStatus,
         madeForKids: false,
       });
@@ -745,6 +799,32 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
   }
 
+  async function updatePublishedDescription(episode) {
+    const episodeId = episode?.id || 'unknown';
+    if (!youtubeConfigured(cfg)) throw new Error('YouTube OAuth credentials are not configured');
+    const key = `youtube/${episode.id}`;
+    const existing = await findAsset(key);
+    const url = existing?.public_url || getStillsBoardYoutubeUrl(episode);
+    const videoId = youtubeIdFromUrl(url) || existing?.checksum;
+    if (!videoId) throw new Error('No YouTube video id found for this episode');
+    const show = await store.getShowById(episode.show_id);
+    if (!show) throw new Error(`Show not found for episode ${episodeId}`);
+    let sources = [];
+    if (typeof store.listSources === 'function') {
+      sources = await store.listSources(episode.id).catch(() => []);
+    }
+    const description = buildYoutubeDescription({ episode, show, site: cfg.site, sources });
+    const result = await updateVideoSnippet({
+      cfg,
+      videoId,
+      title: episode.title,
+      description,
+      tags: ['Florida Buzz', 'Disney World', 'Disney World news', 'Florida travel', 'podcast', 'like and subscribe'],
+    });
+    console.log(`[podcasts] YouTube description updated for episode ${episodeId}: https://youtu.be/${videoId}`);
+    return { id: videoId, url: `https://youtu.be/${videoId}`, description, result };
+  }
+
   return {
     planTopicVisuals,
     publishEpisode,
@@ -754,7 +834,22 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     prepareStillsBoard,
     regenerateStillForReview,
     buildScenePlanForEpisode,
+    updatePublishedDescription,
   };
+}
+
+function youtubeIdFromUrl(url) {
+  const text = String(url || '');
+  const m =
+    text.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/) ||
+    text.match(/[?&]v=([a-zA-Z0-9_-]{6,})/) ||
+    text.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{6,})/);
+  return m ? m[1] : null;
+}
+
+function getStillsBoardYoutubeUrl(episode) {
+  const outline = episode?.outline_json && typeof episode.outline_json === 'object' ? episode.outline_json : {};
+  return outline.youtube_stills?.youtube_url || null;
 }
 
 module.exports = {
@@ -764,5 +859,7 @@ module.exports = {
   planTopicVisuals,
   resolveVideoTotalSeconds,
   stripHtml,
+  topicMotionFilter,
+  stationaryFilter,
   broadenVisualPrompt,
 };
