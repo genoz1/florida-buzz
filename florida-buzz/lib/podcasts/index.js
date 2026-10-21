@@ -9,6 +9,7 @@ const { maybeAutoPublishAfterPreview } = require('./autoPublish');
 const { createPublicRouter } = require('./routerPublic');
 const { createAdminRouter } = require('./routerAdmin');
 const { createVideoPipeline } = require('./videoPipeline');
+const { createYoutubeStillsReview } = require('./youtubeStillsReview');
 
 function resolveFfmpegPath(env = process.env) {
   if (env.FFMPEG_PATH) return env.FFMPEG_PATH;
@@ -38,6 +39,7 @@ function production(env = process.env) {
   }
   const ffmpegPath = resolveFfmpegPath(env);
   const videoPipeline = createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath });
+  const stillsReview = createYoutubeStillsReview({ store, cfg, videoPipeline });
   const pipeline = createAudioPipeline({
     cfg,
     store,
@@ -45,9 +47,9 @@ function production(env = process.env) {
     eleven,
     ffmpegPath,
     onPreviewReady: (episode) =>
-      maybeAutoPublishAfterPreview({ store, episode, cfg, videoPipeline }),
+      maybeAutoPublishAfterPreview({ store, episode, cfg, videoPipeline, stillsReview }),
   });
-  return { cfg, store, fal, eleven, pipeline, videoPipeline, aiText, supabase };
+  return { cfg, store, fal, eleven, pipeline, videoPipeline, stillsReview, aiText, supabase };
 }
 
 function mount(app, env = process.env) {
@@ -73,6 +75,7 @@ function mount(app, env = process.env) {
         cfg: runtime.cfg,
         pipeline: runtime.pipeline,
         videoPipeline: runtime.videoPipeline,
+        stillsReview: runtime.stillsReview,
         aiText: runtime.aiText,
         supabase: runtime.supabase,
         sendEmail,

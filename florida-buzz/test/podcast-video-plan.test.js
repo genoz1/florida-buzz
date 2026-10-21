@@ -275,13 +275,17 @@ test('place accuracy locks BoardWalk, runDisney, Contemporary monorail, and MK m
   assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /railroad bridge/);
 });
 
-test('youtube retry force-rebuilds stills instead of reusing already_uploaded', () => {
+test('youtube retry regenerates stills for review; video needs approved board', () => {
   const admin = fs.readFileSync(path.join(__dirname, '../lib/podcasts/routerAdmin.js'), 'utf8');
   const auto = fs.readFileSync(path.join(__dirname, '../lib/podcasts/autoPublish.js'), 'utf8');
   const pipeline = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.match(admin, /youtube-retry/);
+  assert.match(admin, /youtube-stills-regenerate-queued/);
   assert.match(admin, /force:\s*true/);
   assert.match(auto, /force\s*=\s*false/);
+  assert.match(auto, /queueStillsPrepare/);
+  assert.match(pipeline, /stills_review_required/);
+  assert.match(pipeline, /approvedStillsBoard/);
   assert.match(pipeline, /already_uploaded.*!force|!force[\s\S]*already_uploaded/);
   assert.match(pipeline, /deleteAssetByStoragePath/);
   assert.match(pipeline, /YouTube force rebuild/);
