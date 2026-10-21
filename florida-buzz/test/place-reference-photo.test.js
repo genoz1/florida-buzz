@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   buildPlaceSearchQuery,
+  extractPlaceFromDirection,
   findPlaceReferencePhoto,
   licenseLooksOk,
   looksLikePeoplePrimaryText,
@@ -13,6 +14,30 @@ const {
   withReferencePrompt,
   referenceReviewQuestion,
 } = require('../lib/podcasts/placeReferencePhoto');
+
+test('admin direction overrides Premier Pass entrance remap to Space Mountain', () => {
+  assert.match(extractPlaceFromDirection('change to space mountain exterior'), /Space Mountain/i);
+  const query = buildPlaceSearchQuery({
+    label: '$499 Premier Pass',
+    prompt: 'Magic Kingdom ticket gates',
+    category: 'ticketing',
+    direction: 'change to space mountain exterior',
+  });
+  assert.match(query, /Space Mountain/i);
+  assert.equal(/\bentrance railroad station\b/i.test(query), false);
+});
+
+test('generic Disney Parks direction yields a searchable place for D23 failures', () => {
+  const place = extractPlaceFromDirection('create a Photo realistic image from inside one of the Disney Parks');
+  assert.match(place, /Walt Disney World|Magic Kingdom|Tomorrowland/i);
+  const query = buildPlaceSearchQuery({
+    label: 'D23 Gold Theater Panels',
+    prompt: 'panel guests',
+    direction: 'Photo realistic image from inside one of the Disney Parks',
+  });
+  assert.match(query, /Walt Disney World/i);
+  assert.equal(/\bGold Theater Panels\b/i.test(query), false);
+});
 
 test('buildPlaceSearchQuery keeps real place names for BoardWalk and Contemporary', () => {
   const boardwalk = buildPlaceSearchQuery({

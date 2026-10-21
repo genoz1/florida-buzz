@@ -297,7 +297,7 @@
             </p>
             <% if (item.public_url) { %>
               <a href="<%= item.public_url %>" target="_blank" rel="noopener">
-                <img src="<%= item.public_url %>" alt="<%= item.label || 'YouTube still' %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#ddd">
+                <img src="<%= item.public_url %><%= item.public_url.indexOf('?') >= 0 ? '&' : '?' %>v=<%= encodeURIComponent((stills && stills.updated_at) || item.storage_path || item.id) %>" alt="<%= item.label || 'YouTube still' %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#ddd">
               </a>
             <% } else { %>
               <div style="width:100%;aspect-ratio:16/9;background:#e8eef0;display:flex;align-items:center;justify-content:center;color:#5a6a70;font-size:14px">

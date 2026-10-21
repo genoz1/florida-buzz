@@ -37,52 +37,92 @@ function looksLikePeoplePrimaryText(...parts) {
   return PEOPLE_PRIMARY.test(hay);
 }
 
-function buildPlaceSearchQuery({ label = '', category = '', prompt = '' } = {}) {
-  const raw = `${label} ${prompt} ${category}`.replace(/\s+/g, ' ').trim();
+const PLACE_NAME_PATTERNS = [
+  /\bDisney'?s?\s+Board\s*-?\s*Walk(?:\s+Inn|\s+Villas)?\b/i,
+  /\bContemporary(?:\s+Resort)?\b/i,
+  /\bMagic Kingdom(?:\s+entrance|\s+railroad|\s+train station)?\b/i,
+  /\bCinderella Castle\b/i,
+  /\bSpaceship Earth\b/i,
+  /\bEPCOT\b/i,
+  /\bHollywood Studios\b/i,
+  /\bAnimal Kingdom\b/i,
+  /\bPandora\b/i,
+  /\bGertie\b/i,
+  /\bEcho Lake\b/i,
+  /\bDisney Springs\b/i,
+  /\bWorld of Disney\b/i,
+  /\bmonorail\b/i,
+  /\bMain Street(?:\s*,?\s*U\.?S\.?A\.?)?\b/i,
+  /\bSpace Mountain\b/i,
+  /\bTomorrowland\b/i,
+  /\bWorld Showcase\b/i,
+  /\bD23(?:\s+Expo)?\b/i,
+  /\bGold Theater\b/i,
+];
+
+/** Pull a concrete place override out of admin reject/redo direction text. */
+function extractPlaceFromDirection(direction = '') {
+  const text = String(direction || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const hints = [];
+  for (const re of PLACE_NAME_PATTERNS) {
+    const match = text.match(re);
+    if (match) hints.push(match[0]);
+  }
+  if (hints.length) return [...new Set(hints)].join(' ').slice(0, 120);
+  // Generic park wording from admin direction (D23 fallbacks, etc.)
+  if (/\binside\b.*\bdisney parks?\b|\bdisney parks?\b.*\binside\b|\bphoto\s*realistic\b.*\bdisney\b/i.test(text)) {
+    return 'Walt Disney World Magic Kingdom Tomorrowland';
+  }
+  if (/\bdisney parks?\b|\bwalt disney world\b/i.test(text)) {
+    return 'Walt Disney World park exterior';
+  }
+  // Short free-text direction that names a subject ("change to space mountain exterior")
+  const cleaned = text
+    .replace(/^(change\s+to|use|show|make\s+it|redo\s+as|create\s+a)\s+/i, '')
+    .replace(/\b(photo\s*realistic|cinematic|illustration|image|picture)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned.length >= 4 ? cleaned.slice(0, 120) : '';
+}
+
+function buildPlaceSearchQuery({ label = '', category = '', prompt = '', direction = '' } = {}) {
+  const directionPlace = extractPlaceFromDirection(direction);
+  const raw = `${direction} ${directionPlace} ${label} ${prompt} ${category}`.replace(/\s+/g, ' ').trim();
   const placeHints = [];
-  const patterns = [
-    /\bDisney'?s?\s+Board\s*-?\s*Walk(?:\s+Inn|\s+Villas)?\b/i,
-    /\bContemporary(?:\s+Resort)?\b/i,
-    /\bMagic Kingdom(?:\s+entrance|\s+railroad|\s+train station)?\b/i,
-    /\bCinderella Castle\b/i,
-    /\bSpaceship Earth\b/i,
-    /\bEPCOT\b/i,
-    /\bHollywood Studios\b/i,
-    /\bAnimal Kingdom\b/i,
-    /\bPandora\b/i,
-    /\bGertie\b/i,
-    /\bEcho Lake\b/i,
-    /\bDisney Springs\b/i,
-    /\bWorld of Disney\b/i,
-    /\bmonorail\b/i,
-    /\bMain Street(?:\s*,?\s*U\.?S\.?A\.?)?\b/i,
-    /\bSpace Mountain\b/i,
-    /\bTomorrowland\b/i,
-    /\bWorld Showcase\b/i,
-  ];
-  for (const re of patterns) {
+  for (const re of PLACE_NAME_PATTERNS) {
     const match = raw.match(re);
     if (match) placeHints.push(match[0]);
   }
+  // Admin direction wins — put its place first and skip story remaps that fight it.
+  if (directionPlace) {
+    placeHints.unshift(directionPlace);
+  }
+  const directionOverridesPlace = Boolean(directionPlace);
   // Prefer entrance/railroad wording when ticketing / Premier Pass is the story.
-  if (/\b(premier pass|lightning lane|ticket|ticketing|tapstile|turnstile)\b/i.test(raw)
-    && !/\bentrance|railroad|train station\b/i.test(placeHints.join(' '))) {
+  if (
+    !directionOverridesPlace
+    && /\b(premier pass|lightning lane|ticket|ticketing|tapstile|turnstile)\b/i.test(raw)
+    && !/\bentrance|railroad|train station|space mountain\b/i.test(placeHints.join(' '))
+  ) {
     placeHints.unshift('Magic Kingdom entrance railroad station');
   }
-  if (/\b(cold grocery|bell services|grocery transfer)\b/i.test(raw)) {
+  if (!directionOverridesPlace && /\b(cold grocery|bell services|grocery transfer)\b/i.test(raw)) {
     placeHints.unshift("Disney's Contemporary Resort monorail");
   }
-  if (/\b(wine\s*&\s*dine|rundisney|run disney|race weekend)\b/i.test(raw)) {
+  if (!directionOverridesPlace && /\b(wine\s*&\s*dine|rundisney|run disney|race weekend)\b/i.test(raw)) {
     placeHints.unshift('EPCOT Spaceship Earth race');
   }
-  if (/\bspirit jersey/i.test(raw)) {
+  if (!directionOverridesPlace && /\bspirit jersey/i.test(raw)) {
     placeHints.unshift('World of Disney Disney Springs');
   }
-  const labelCore = String(label || '')
-    .replace(/\$\d+(?:\.\d+)?/g, ' ')
-    .replace(/\b(premier pass|lightning lane|road closures?|wine\s*&\s*dine|rundisney|run disney|cold grocery transfers?|gold theater panels?)\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const labelCore = directionOverridesPlace
+    ? ''
+    : String(label || '')
+        .replace(/\$\d+(?:\.\d+)?/g, ' ')
+        .replace(/\b(premier pass|lightning lane|road closures?|wine\s*&\s*dine|rundisney|run disney|cold grocery transfers?|gold theater panels?)\b/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
   const parts = [...new Set([
     ...placeHints,
     labelCore,
@@ -298,13 +338,16 @@ async function findPlaceReferencePhoto({
   label = '',
   category = '',
   prompt = '',
+  direction = '',
   episodeId = null,
   store = null,
   supabase = null,
   fetchImpl = fetch,
 } = {}) {
+  const directionPlace = extractPlaceFromDirection(direction);
   // Prefer Wikimedia place photos first so we never template from panel/people article heroes.
-  const query = buildPlaceSearchQuery({ label, category, prompt });
+  // When an admin gives redo direction, search that place — not the original story article hero.
+  const query = buildPlaceSearchQuery({ label, category, prompt, direction });
   const wiki = await searchWikimediaPlacePhoto(query, { fetchImpl }).catch((err) => {
     console.warn(`[podcasts] Wikimedia place search failed: ${err.message}`);
     return null;
@@ -313,22 +356,33 @@ async function findPlaceReferencePhoto({
     return { ...wiki, subjectKind: 'place' };
   }
 
-  if (label && !query.includes(String(label).slice(0, 24))) {
+  if (directionPlace) {
+    const directed = await searchWikimediaPlacePhoto(
+      `${directionPlace} Walt Disney World`.slice(0, 160),
+      { fetchImpl }
+    ).catch(() => null);
+    if (directed) return { ...directed, subjectKind: 'place' };
+  }
+
+  if (label && !directionPlace && !query.includes(String(label).slice(0, 24))) {
     const broad = await searchWikimediaPlacePhoto(`${label} Walt Disney World`.slice(0, 160), { fetchImpl }).catch(() => null);
     if (broad) return { ...broad, subjectKind: 'place' };
   }
 
-  const articleRef = await findArticleHeroReference({
-    label,
-    episodeId,
-    store,
-    supabase,
-    fetchImpl,
-  }).catch((err) => {
-    console.warn(`[podcasts] Article reference lookup failed: ${err.message}`);
-    return null;
-  });
-  if (articleRef) return articleRef;
+  // Skip article heroes when admin explicitly asked for a different place — they pin the wrong scene.
+  if (!directionPlace) {
+    const articleRef = await findArticleHeroReference({
+      label,
+      episodeId,
+      store,
+      supabase,
+      fetchImpl,
+    }).catch((err) => {
+      console.warn(`[podcasts] Article reference lookup failed: ${err.message}`);
+      return null;
+    });
+    if (articleRef) return articleRef;
+  }
 
   return null;
 }
@@ -370,6 +424,7 @@ module.exports = {
   USER_AGENT,
   buildPlaceSearchQuery,
   creditFromMeta,
+  extractPlaceFromDirection,
   fetchImageBuffer,
   findArticleHeroReference,
   findPlaceReferencePhoto,

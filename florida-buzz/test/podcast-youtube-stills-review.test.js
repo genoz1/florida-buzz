@@ -161,6 +161,7 @@ test('publish and admin routes queue stills review instead of immediate video', 
   const auto = fs.readFileSync(path.join(__dirname, '../lib/podcasts/autoPublish.js'), 'utf8');
   const pipeline = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   const view = fs.readFileSync(path.join(__dirname, '../views/admin-podcast-episode.ejs'), 'utf8');
+  const place = fs.readFileSync(path.join(__dirname, '../lib/podcasts/placeReferencePhoto.js'), 'utf8');
 
   assert.match(admin, /youtube-stills\/prepare/);
   assert.match(admin, /youtube-stills\/create-video/);
@@ -172,7 +173,12 @@ test('publish and admin routes queue stills review instead of immediate video', 
   assert.match(pipeline, /regenerateStillForReview/);
   assert.match(pipeline, /stills_review_required/);
   assert.match(pipeline, /approvedStillsBoard/);
+  assert.match(pipeline, /direction:\s*note/);
+  assert.match(pipeline, /-r\$\{Date\.now/);
+  assert.match(place, /extractPlaceFromDirection/);
+  assert.match(place, /directionPlace/);
   assert.match(view, /YouTube stills review/);
   assert.match(view, /Reject &amp; regenerate|Reject &amp; redo/);
   assert.match(view, /Create YouTube video/);
+  assert.match(view, /\?.*v=/);
 });
