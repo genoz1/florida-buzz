@@ -69,6 +69,142 @@ function boardSummary(board) {
   return { total: items.length, ...counts, allApproved: allStillsApproved(board) };
 }
 
+/**
+ * Dashboard meter for YouTube stills → video pipeline.
+ * percent is 0–100 for the progress bar; state drives panel color.
+ */
+function describeYoutubeProgress(episode, { now = Date.now() } = {}) {
+  const board = getStillsBoard(episode);
+  const summary = boardSummary(board);
+  const updatedMs = board.updated_at ? Date.parse(board.updated_at) || 0 : 0;
+  const ageMs = updatedMs ? Math.max(0, now - updatedMs) : null;
+  const status = board.status || 'idle';
+
+  if (status === 'video_published' && board.youtube_url) {
+    return {
+      state: 'done',
+      phase: 'video_published',
+      label: 'YouTube video published',
+      detail: board.youtube_url,
+      percent: 100,
+      summary,
+      youtube_url: board.youtube_url,
+      ageMs,
+      live: false,
+    };
+  }
+
+  if (status === 'building_video') {
+    return {
+      state: 'live',
+      phase: 'building_video',
+      label: 'Building YouTube video',
+      detail:
+        'Assembling approved stills with episode audio and uploading to YouTube. This often takes 30–60+ minutes — keep this tab open or refresh later.',
+      percent: 85,
+      summary,
+      youtube_url: board.youtube_url,
+      ageMs,
+      live: true,
+    };
+  }
+
+  if (status === 'failed') {
+    return {
+      state: 'failed',
+      phase: 'failed',
+      label: 'YouTube stills / video failed',
+      detail: board.last_error || 'Check stills below, then regenerate or create video again.',
+      percent: summary.total ? Math.round((summary.approved / summary.total) * 70) : 0,
+      summary,
+      youtube_url: board.youtube_url,
+      ageMs,
+      live: false,
+    };
+  }
+
+  if (status === 'generating' || summary.regenerating > 0) {
+    const doneItems = summary.approved + summary.ready + summary.failed;
+    const denom = Math.max(summary.total, doneItems, 1);
+    const base = Math.round((doneItems / denom) * 55);
+    return {
+      state: 'live',
+      phase: summary.regenerating > 0 ? 'regenerating' : 'generating_stills',
+      label: summary.regenerating > 0 ? 'Regenerating YouTube still(s)' : 'Generating YouTube stills',
+      detail: summary.total
+        ? `${doneItems}/${summary.total} stills ready so far`
+          + (summary.regenerating ? ` · ${summary.regenerating} regenerating` : '')
+          + '. Each still can take a few minutes.'
+        : 'Planning topics and fetching place photos…',
+      percent: Math.min(70, Math.max(8, base)),
+      summary,
+      youtube_url: board.youtube_url,
+      ageMs,
+      live: true,
+    };
+  }
+
+  if (summary.allApproved || status === 'approved') {
+    return {
+      state: 'ready',
+      phase: 'approved',
+      label: 'All stills approved — ready to create video',
+      detail: board.last_error
+        || 'Click Create YouTube video. Render + upload usually takes 30–60+ minutes.',
+      percent: 75,
+      summary,
+      youtube_url: board.youtube_url,
+      ageMs,
+      live: false,
+    };
+  }
+
+  if (summary.total > 0 || status === 'ready_for_review') {
+    const pct = summary.total ? Math.round((summary.approved / summary.total) * 70) : 10;
+    return {
+      state: summary.failed ? 'uncertain' : 'ready',
+      phase: 'ready_for_review',
+      label: 'YouTube stills ready for review',
+      detail:
+        `${summary.approved}/${summary.total} approved`
+        + (summary.ready ? ` · ${summary.ready} waiting` : '')
+        + (summary.failed ? ` · ${summary.failed} failed` : '')
+        + '. Approve every still before the video can be created.',
+      percent: Math.max(15, pct),
+      summary,
+      youtube_url: board.youtube_url,
+      ageMs,
+      live: false,
+    };
+  }
+
+  if (episode?.status === 'published') {
+    return {
+      state: 'idle',
+      phase: 'idle',
+      label: 'YouTube stills not started',
+      detail: 'Click Generate stills for review (or publish queues this automatically).',
+      percent: 0,
+      summary,
+      youtube_url: null,
+      ageMs,
+      live: false,
+    };
+  }
+
+  return {
+    state: 'idle',
+    phase: 'idle',
+    label: 'YouTube pipeline idle',
+    detail: 'Publish the podcast to start YouTube stills review.',
+    percent: 0,
+    summary,
+    youtube_url: null,
+    ageMs,
+    live: false,
+  };
+}
+
 function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
   async function prepareStillsForReview(episode, { force = false } = {}) {
     if (!videoPipeline?.prepareStillsBoard) {
@@ -279,5 +415,6 @@ module.exports = {
   getStillsBoard,
   allStillsApproved,
   boardSummary,
+  describeYoutubeProgress,
   createYoutubeStillsReview,
 };
