@@ -21,7 +21,7 @@ const { EVERGREEN_TOPICS } = require('./evergreenTopics');
 const { recoverStuckPodcastWork } = require('./recoverStuck');
 const { describeAudioProgress } = require('./audioStatus');
 const { queueYouTubePublish } = require('./autoPublish');
-const { getStillsBoard, boardSummary } = require('./youtubeStillsReview');
+const { getStillsBoard, boardSummary, describeYoutubeProgress } = require('./youtubeStillsReview');
 
 function createAdminRouter({
   store,
@@ -101,9 +101,13 @@ function createAdminRouter({
       } catch (err) {
         console.warn('[podcasts] schedule tables unavailable — apply weekly schedule migration:', err.message);
       }
+      const episodeYoutube = Object.fromEntries(
+        (episodes || []).map((ep) => [ep.id, describeYoutubeProgress(ep)])
+      );
       res.render('admin-podcasts', {
         show,
         episodes,
+        episodeYoutube,
         platformLinks,
         cfg,
         schedule,
@@ -240,6 +244,7 @@ function createAdminRouter({
       const conversation = await store.latestScript(episode.id, 'conversation');
       const audioProgress = describeAudioProgress({ episode, jobs });
       const youtubeStills = getStillsBoard(episode);
+      const youtubeProgress = describeYoutubeProgress(episode);
       res.render('admin-podcast-episode', {
         show,
         episode,
@@ -250,6 +255,7 @@ function createAdminRouter({
         audioProgress,
         youtubeStills,
         youtubeStillsSummary: boardSummary(youtubeStills),
+        youtubeProgress,
         cfg,
         evergreenTopics: EVERGREEN_TOPICS,
         csrf: csrf(episode.id),
@@ -283,6 +289,26 @@ function createAdminRouter({
           heartbeat_at: job.result?.heartbeat_at || null,
           phase: job.result?.phase || null,
         })),
+      });
+    })
+  );
+
+  router.get(
+    '/episodes/:id/youtube-status',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).json({ error: 'Episode not found' });
+      const board = getStillsBoard(episode);
+      const progress = describeYoutubeProgress(episode);
+      res.json({
+        episode_id: episode.id,
+        episode_status: episode.status,
+        board_status: board.status,
+        youtube_url: board.youtube_url || null,
+        last_error: board.last_error || null,
+        updated_at: board.updated_at || null,
+        progress,
+        summary: progress.summary,
       });
     })
   );

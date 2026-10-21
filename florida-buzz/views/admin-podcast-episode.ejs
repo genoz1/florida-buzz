@@ -21,6 +21,18 @@
     #audioStatusPanel{padding:14px;margin:12px 0}
     #audioStatusPanel strong{display:block;margin-bottom:6px}
     .btn[disabled]{opacity:.65;cursor:wait}
+    .yt-live{background:#e7f7ee;border:1px solid #9dceb0}
+    .yt-stalled,.yt-failed{background:#fde8e4;border:1px solid #e2a59a}
+    .yt-done{background:#eef5f6;border:1px solid #b7c9cd}
+    .yt-ready{background:#e8f3f6;border:1px solid #9dbdca}
+    .yt-uncertain,.yt-idle{background:#fff8e8;border:1px solid #e2d2a8}
+    #youtubeStatusPanel{padding:14px;margin:0 0 16px}
+    #youtubeStatusPanel strong{display:block;margin-bottom:6px}
+    .yt-meter{height:14px;background:#d9e3e6;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+    .yt-meter > span{display:block;height:100%;background:#0e3b43;width:0%;transition:width .4s ease}
+    .yt-meter-live > span{background:#1f7a4c}
+    .yt-meter-failed > span{background:#a94442}
+    .yt-meta{font-size:13px;color:#4a5350}
   </style>
 </head>
 <body>
@@ -233,8 +245,27 @@
   <% if (episode.status === 'published') { %>
   <% const stills = typeof youtubeStills !== 'undefined' && youtubeStills ? youtubeStills : { status: 'idle', items: [], last_error: null, youtube_url: null }; %>
   <% const stillsSummary = typeof youtubeStillsSummary !== 'undefined' && youtubeStillsSummary ? youtubeStillsSummary : { total: 0, approved: 0, ready: 0, rejected: 0, failed: 0, pending: 0, regenerating: 0, allApproved: false }; %>
+  <% const ytProgress = typeof youtubeProgress !== 'undefined' && youtubeProgress ? youtubeProgress : { state: 'idle', label: 'YouTube pipeline idle', detail: '', percent: 0, phase: 'idle' }; %>
   <section class="card" id="youtube-stills-review">
     <h2>YouTube stills review</h2>
+    <div id="youtubeStatusPanel" class="yt-<%= ytProgress.state || 'idle' %>" data-episode-id="<%= episode.id %>" data-board-status="<%= stills.status || 'idle' %>">
+      <strong id="youtubeStatusLabel"><%= ytProgress.label || 'YouTube status unknown' %></strong>
+      <div class="yt-meter <%= ytProgress.live ? 'yt-meter-live' : '' %> <%= ytProgress.state === 'failed' ? 'yt-meter-failed' : '' %>" id="youtubeMeter">
+        <span id="youtubeMeterFill" style="width:<%= Math.max(0, Math.min(100, Number(ytProgress.percent) || 0)) %>%"></span>
+      </div>
+      <p id="youtubeStatusDetail" style="margin:0 0 6px"><%= ytProgress.detail || '' %></p>
+      <p class="yt-meta" style="margin:0">
+        Phase: <code id="youtubePhase"><%= ytProgress.phase || 'idle' %></code>
+        · Board: <span class="status" id="youtubeBoardStatus"><%= stills.status || 'idle' %></span>
+        · Approved: <span id="youtubeApprovedCount"><%= stillsSummary.approved || 0 %></span>/<span id="youtubeTotalCount"><%= stillsSummary.total || 0 %></span>
+        · Meter: <span id="youtubePercentLabel"><%= Math.max(0, Math.min(100, Number(ytProgress.percent) || 0)) %>%</span>
+        <% if (stills.youtube_url || ytProgress.youtube_url) { %>
+          · <a id="youtubeStatusLink" href="<%= stills.youtube_url || ytProgress.youtube_url %>" target="_blank" rel="noopener">Open on YouTube</a>
+        <% } else { %>
+          · <a id="youtubeStatusLink" href="#" target="_blank" rel="noopener" style="display:none">Open on YouTube</a>
+        <% } %>
+      </p>
+    </div>
     <p>
       After the podcast is published, story images are generated here first.
       Approve the ones that look right. Reject a still (with optional direction) to regenerate it.
@@ -334,13 +365,89 @@
         <% }) %>
       </div>
     <% } %>
-    <% if (stills.status === 'generating' || (stillsSummary.regenerating || 0) > 0) { %>
-      <meta http-equiv="refresh" content="20">
-      <p class="notice" style="margin-top:16px">Auto-refreshing while stills generate…</p>
+    <% if (stills.status === 'generating' || stills.status === 'building_video' || (stillsSummary.regenerating || 0) > 0) { %>
+      <p class="notice" style="margin-top:16px">Status meter updates automatically while YouTube work is running…</p>
     <% } %>
   </section>
   <% } %>
   <script>
+    (function () {
+      var ytPanel = document.getElementById('youtubeStatusPanel');
+      if (ytPanel) {
+        var ytEpisodeId = ytPanel.getAttribute('data-episode-id');
+        var ytStates = ['live', 'stalled', 'failed', 'done', 'ready', 'uncertain', 'idle'];
+        var lastBoardStatus = ytPanel.getAttribute('data-board-status') || '';
+        var lastPhase = '';
+        function applyYoutube(data) {
+          var p = data.progress || {};
+          var summary = data.summary || p.summary || {};
+          ytStates.forEach(function (s) { ytPanel.classList.remove('yt-' + s); });
+          ytPanel.classList.add('yt-' + (p.state || 'idle'));
+          var labelEl = document.getElementById('youtubeStatusLabel');
+          var detailEl = document.getElementById('youtubeStatusDetail');
+          var phaseEl = document.getElementById('youtubePhase');
+          var boardEl = document.getElementById('youtubeBoardStatus');
+          var approvedEl = document.getElementById('youtubeApprovedCount');
+          var totalEl = document.getElementById('youtubeTotalCount');
+          var pctEl = document.getElementById('youtubePercentLabel');
+          var fillEl = document.getElementById('youtubeMeterFill');
+          var meterEl = document.getElementById('youtubeMeter');
+          var linkEl = document.getElementById('youtubeStatusLink');
+          if (labelEl) labelEl.textContent = p.label || 'YouTube status unknown';
+          if (detailEl) {
+            detailEl.textContent = p.detail || '';
+            if (p.youtube_url && p.phase === 'video_published') {
+              detailEl.innerHTML = '<a href="' + p.youtube_url + '" target="_blank" rel="noopener">' + p.youtube_url + '</a>';
+            }
+          }
+          if (phaseEl) phaseEl.textContent = p.phase || 'idle';
+          if (boardEl) boardEl.textContent = data.board_status || p.phase || 'idle';
+          if (approvedEl) approvedEl.textContent = summary.approved != null ? summary.approved : '0';
+          if (totalEl) totalEl.textContent = summary.total != null ? summary.total : '0';
+          var pct = Math.max(0, Math.min(100, Number(p.percent) || 0));
+          if (pctEl) pctEl.textContent = pct + '%';
+          if (fillEl) fillEl.style.width = pct + '%';
+          if (meterEl) {
+            meterEl.classList.toggle('yt-meter-live', !!p.live);
+            meterEl.classList.toggle('yt-meter-failed', p.state === 'failed');
+          }
+          if (linkEl) {
+            if (p.youtube_url || data.youtube_url) {
+              linkEl.href = p.youtube_url || data.youtube_url;
+              linkEl.style.display = '';
+            } else {
+              linkEl.style.display = 'none';
+            }
+          }
+          var boardStatus = data.board_status || '';
+          var phase = p.phase || '';
+          // Reload when stills finish generating or video finishes so cards/buttons refresh.
+          if (
+            (lastBoardStatus === 'generating' && boardStatus === 'ready_for_review')
+            || (lastPhase === 'building_video' && phase === 'video_published')
+            || (lastPhase === 'regenerating' && phase === 'ready_for_review')
+          ) {
+            window.location.reload();
+            return;
+          }
+          lastBoardStatus = boardStatus;
+          lastPhase = phase;
+        }
+        async function pollYoutube() {
+          try {
+            var res = await fetch('/admin/podcasts/episodes/' + ytEpisodeId + '/youtube-status', {
+              credentials: 'same-origin',
+              headers: { Accept: 'application/json' },
+              cache: 'no-store',
+            });
+            if (!res.ok) return;
+            applyYoutube(await res.json());
+          } catch (e) { /* keep last known status */ }
+        }
+        pollYoutube();
+        setInterval(pollYoutube, 5000);
+      }
+    })();
     (function () {
       var panel = document.getElementById('audioStatusPanel');
       if (!panel) return;

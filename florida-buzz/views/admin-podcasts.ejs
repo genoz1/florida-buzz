@@ -159,14 +159,29 @@
 
     <h3>Episodes</h3>
     <table>
-      <thead><tr><th>Episode</th><th>Status</th><th>Week</th><th>Intended</th><th>Updated</th></tr></thead>
+      <thead><tr><th>Episode</th><th>Status</th><th>YouTube</th><th>Week</th><th>Intended</th><th>Updated</th></tr></thead>
       <tbody>
-        <% if (!episodes.length) { %><tr><td colspan="5">No episodes yet.</td></tr><% } %>
+        <% if (!episodes.length) { %><tr><td colspan="6">No episodes yet.</td></tr><% } %>
         <% const dayNames = typeof weekdayNames !== 'undefined' ? weekdayNames : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; %>
+        <% const ytMap = typeof episodeYoutube !== 'undefined' && episodeYoutube ? episodeYoutube : {}; %>
         <% episodes.forEach(ep => { %>
+          <% const yt = ytMap[ep.id] || null; %>
           <tr>
             <td><a href="/admin/podcasts/episodes/<%= ep.id %>"><%= ep.title %></a></td>
             <td><%= ep.status %></td>
+            <td>
+              <% if (ep.status !== 'published') { %>
+                <span class="muted">—</span>
+              <% } else if (yt && yt.youtube_url) { %>
+                <a href="<%= yt.youtube_url %>" target="_blank" rel="noopener">Live</a>
+                <span class="muted">(<%= yt.percent %>%)</span>
+              <% } else if (yt) { %>
+                <a href="/admin/podcasts/episodes/<%= ep.id %>#youtube-stills-review"><%= yt.phase || 'pending' %></a>
+                <span class="muted"><%= yt.percent %>%</span>
+              <% } else { %>
+                <span class="muted">pending</span>
+              <% } %>
+            </td>
             <td><%= ep.week_key || '—' %></td>
             <td><%= ep.intended_publish_weekday != null ? dayNames[ep.intended_publish_weekday] : (ep.outline_json && ep.outline_json.release_label) || '—' %></td>
             <td><%= ep.updated_at %></td>

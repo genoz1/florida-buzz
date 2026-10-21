@@ -9,9 +9,45 @@ const {
   getStillsBoard,
   allStillsApproved,
   boardSummary,
+  describeYoutubeProgress,
   createYoutubeStillsReview,
 } = require('../lib/podcasts/youtubeStillsReview');
 const { createMemoryStore } = require('../lib/podcasts/memoryStore');
+
+test('describeYoutubeProgress reports building and published phases', () => {
+  const building = describeYoutubeProgress({
+    status: 'published',
+    outline_json: {
+      youtube_stills: {
+        status: 'building_video',
+        items: [
+          { status: 'approved', public_url: 'https://example.com/a.png' },
+          { status: 'approved', public_url: 'https://example.com/b.png' },
+        ],
+      },
+    },
+  });
+  assert.equal(building.state, 'live');
+  assert.equal(building.phase, 'building_video');
+  assert.ok(building.percent >= 80);
+
+  const published = describeYoutubeProgress({
+    status: 'published',
+    outline_json: {
+      youtube_stills: {
+        status: 'video_published',
+        youtube_url: 'https://youtu.be/test',
+        items: [
+          { status: 'approved', public_url: 'https://example.com/a.png' },
+          { status: 'approved', public_url: 'https://example.com/b.png' },
+        ],
+      },
+    },
+  });
+  assert.equal(published.state, 'done');
+  assert.equal(published.percent, 100);
+  assert.equal(published.youtube_url, 'https://youtu.be/test');
+});
 
 test('stillKey is stable per segment and image index', () => {
   assert.equal(stillKey('story-1', 0), 'story-1-0');
@@ -165,6 +201,8 @@ test('publish and admin routes queue stills review instead of immediate video', 
 
   assert.match(admin, /youtube-stills\/prepare/);
   assert.match(admin, /youtube-stills\/create-video/);
+  assert.match(admin, /youtube-status/);
+  assert.match(admin, /describeYoutubeProgress/);
   assert.match(admin, /stillsReview/);
   assert.match(admin, /Approve every YouTube still before creating the video/);
   assert.match(auto, /queueStillsPrepare/);
@@ -178,6 +216,8 @@ test('publish and admin routes queue stills review instead of immediate video', 
   assert.match(place, /extractPlaceFromDirection/);
   assert.match(place, /directionPlace/);
   assert.match(view, /YouTube stills review/);
+  assert.match(view, /youtubeStatusPanel/);
+  assert.match(view, /youtubeMeterFill/);
   assert.match(view, /Reject &amp; regenerate|Reject &amp; redo/);
   assert.match(view, /Create YouTube video/);
   assert.match(view, /\?.*v=/);
