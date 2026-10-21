@@ -223,7 +223,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
    * Build one verified story still. Never invent geography without a real place photo.
    * Never returns a blank title card — callers must abort publish when ok=false.
    */
-  async function buildVerifiedTopicStill(scene, { episode, force = false } = {}) {
+  async function buildVerifiedTopicStill(scene, { episode, force = false, forReview = false } = {}) {
     // v5 = gated place-photo stills (Mandalorian grade, no yellow, no people-primary, no invent).
     const storagePath = `youtube-visuals/v5/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     if (!force) {
@@ -269,6 +269,21 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     const photo = await applyStillColorFix(reference.buffer);
     const verified = await reviewStillBuffer(photo, scene, reference);
     if (!verified.ok) {
+      // For the admin review board, still surface the real photo so you can approve or reject with direction.
+      if (forReview) {
+        await saveVisual(photo, storagePath);
+        console.warn(
+          `[podcasts] Review candidate (unverified reference) for ${scene.label}: ${verified.correction}`
+        );
+        return {
+          ok: true,
+          buffer: photo,
+          storagePath,
+          source: 'reference_photo_unverified',
+          reference,
+          reviewWarning: verified.correction,
+        };
+      }
       console.error(
         `[podcasts] STILL BLOCKED for ${scene.label}: reference photo failed verification — ${verified.correction}`
       );
@@ -362,7 +377,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   /**
    * Generate (or reuse) every story still for admin review. Does not assemble video.
    */
-  async function prepareStillsBoard(episode, { force = false, existingBoard = null } = {}) {
+  async function prepareStillsBoard(episode, { force = false, existingBoard = null, onProgress = null } = {}) {
     const { plan } = await buildScenePlanForEpisode(episode);
     const topicScenes = plan.scenes.filter((scene) => scene.kind === 'topic');
     const prior = new Map((existingBoard?.items || []).map((item) => [item.id, item]));
@@ -382,7 +397,11 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         });
         continue;
       }
-      const result = await buildVerifiedTopicStill(scene, { episode, force: force || Boolean(previous?.rejection_note) });
+      const result = await buildVerifiedTopicStill(scene, {
+        episode,
+        force: force || Boolean(previous?.rejection_note),
+        forReview: true,
+      });
       if (!result.ok) {
         failedCount += 1;
         items.push(
@@ -393,6 +412,10 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
             rejection_note: previous?.rejection_note || '',
           })
         );
+        // Persist partial progress so the dashboard fills in while later stories generate.
+        if (typeof onProgress === 'function') {
+          await onProgress({ items: [...items], failedCount, topicCount: topicScenes.length });
+        }
         continue;
       }
       const asset = await findAsset(result.storagePath);
@@ -405,9 +428,12 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
           source: result.source,
           reference: result.reference,
           rejection_note: '',
-          error: null,
+          error: result.reviewWarning || null,
         })
       );
+      if (typeof onProgress === 'function') {
+        await onProgress({ items: [...items], failedCount, topicCount: topicScenes.length });
+      }
     }
     return { items, failedCount, topicCount: topicScenes.length };
   }
@@ -428,7 +454,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
           prompt: `${scene.prompt}\n\nAdmin revision direction (must follow): ${note}`,
         }
       : scene;
-    const result = await buildVerifiedTopicStill(directedScene, { episode, force: true });
+    const result = await buildVerifiedTopicStill(directedScene, { episode, force: true, forReview: true });
     if (!result.ok) {
       return stillItemFromScene(scene, {
         status: 'failed',
@@ -446,7 +472,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       source: result.source,
       reference: result.reference,
       rejection_note: note,
-      error: null,
+      error: result.reviewWarning || null,
     });
   }
 

@@ -81,11 +81,25 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     });
     try {
       const fresh = await store.getEpisodeById(episode.id);
-      const result = await videoPipeline.prepareStillsBoard(fresh, { force, existingBoard: getStillsBoard(fresh) });
-      ({ board } = await saveStillsBoard(store, fresh, {
-        status: result.failedCount ? 'ready_for_review' : 'ready_for_review',
+      const result = await videoPipeline.prepareStillsBoard(fresh, {
+        force,
+        existingBoard: getStillsBoard(fresh),
+        onProgress: async ({ items, failedCount }) => {
+          const latest = await store.getEpisodeById(episode.id);
+          await saveStillsBoard(store, latest, {
+            status: 'generating',
+            items,
+            youtube_url: getStillsBoard(latest).youtube_url,
+            last_error: failedCount
+              ? `${failedCount} still(s) failed so far — others still generating`
+              : null,
+          });
+        },
+      });
+      ({ board } = await saveStillsBoard(store, await store.getEpisodeById(episode.id), {
+        status: 'ready_for_review',
         items: result.items,
-        youtube_url: getStillsBoard(fresh).youtube_url,
+        youtube_url: getStillsBoard(await store.getEpisodeById(episode.id)).youtube_url,
         last_error: result.failedCount
           ? `${result.failedCount} still(s) failed generation — reject/retry those before creating the video`
           : null,
