@@ -217,21 +217,23 @@ test('broadens specific interiors to related exteriors of the same subject', () 
   assert.match(ride, /Do not show Cinderella Castle/i);
 });
 
-test('pipeline does not fall back to episode cover art for failed topic stills', () => {
+test('pipeline gates YouTube publish on verified place-photo stills', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
-  assert.match(source, /renderTopicCard/);
   assert.equal(/Using episode cover fallback/.test(source), false);
-  assert.match(source, /still locked to this story/);
-  assert.match(source, /one real Walt Disney World place/);
-  assert.match(source, /Never mashups|never combine multiple lands|Never invent mashup/i);
-  assert.match(source, /uploadThumbnail/);
-  assert.match(source, /renderThumbnailFrame/);
-  assert.match(source, /youtube-visuals\/v4\//);
+  assert.equal(/Using story title card/.test(source), false);
+  assert.match(source, /prepareAllTopicStills/);
+  assert.match(source, /buildVerifiedTopicStill/);
+  assert.match(source, /STILLS_INCOMPLETE/);
+  assert.match(source, /stills_incomplete/);
+  assert.match(source, /youtube-visuals\/v5\//);
   assert.match(source, /findPlaceReferencePhoto/);
   assert.match(source, /editImageFromReference/);
+  assert.match(source, /maxAttempts:\s*1/);
+  assert.match(source, /applyStillColorFix/);
+  assert.match(source, /coolYellowCast/);
+  assert.match(source, /story stills verified/);
   assert.match(source, /hardenPlacePrompt/);
   assert.match(source, /PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS/);
-  assert.match(source, /Geography locks for prompts/);
   assert.match(source, /Continuing YouTube render with default story titles/);
 });
 
@@ -263,13 +265,14 @@ test('place accuracy locks BoardWalk, runDisney, Contemporary monorail, and MK m
     category: 'rundisney-events',
     level: 1,
   });
-  assert.match(runners, /No cars, buses/i);
   assert.match(runners, /park paths|race course/i);
-  assert.match(runners, /Do not show runners in automotive traffic/i);
+  assert.match(runners, /Do not show runners in automotive traffic|not car lanes beside buses/i);
+  assert.match(runners, /Mandalorian|FORBIDDEN: yellow/i);
 
   assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /BoardWalk/);
-  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /Contemporary Resort monorail/);
-  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /car traffic lanes beside buses/);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /Contemporary monorail/);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /car lanes beside buses/);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /railroad bridge/);
 });
 
 test('youtube retry force-rebuilds stills instead of reusing already_uploaded', () => {

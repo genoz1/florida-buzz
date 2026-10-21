@@ -120,17 +120,21 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
 }
 
 /** Stricter visual review for podcast YouTube stills (place honesty matters on-screen). */
-const PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS = `Review this AI-generated Florida Buzz podcast YouTube still.
-PASS only a densely detailed cinematic travel illustration of ONE real Walt Disney World place that matches the story subject.
-When a real reference photograph was used, the still must preserve that photo's real architecture and layout — reject invented neighboring buildings, impossible monorail paths, or landmarks that are not supported by the reference.
-Reject multi-land mashups, invented park geography, and material layout lies about the named place.
-Hard rejects for known Disney geography:
-- BoardWalk / BoardWalk Inn with cars, buses, or asphalt vehicle roads in front of the pedestrian boardwalk
-- runDisney / race scenes with runners in car traffic lanes beside buses
-- Contemporary Resort monorail drawn only around the outside instead of through the A-frame
-- Magic Kingdom entrance station glued against Cinderella Castle as one impossible plaza
-- Spaceship Earth / EPCOT mashed into Magic Kingdom or Contemporary Resort views
-Also reject obvious AI anatomy failures, cartoon look, wrong destination, or a subject with no credible connection to the story.
+const PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS = `Review this Florida Buzz podcast YouTube still (AI restyle of a real place photo, or the real place photo itself).
+PASS only when ALL are true:
+1) Subject is the story PLACE or product (architecture, attraction, merchandise display) — NOT a portrait/panel of unknown people as the hero.
+2) Geography matches a real Walt Disney World view — no invented mashups.
+3) Color grade matches the Mandalorian-episode cinematic look: natural daylight, cool/neutral whites, NOT yellow/amber/sepia vintage wash.
+4) When a reference photo was used, layout follows that photo (no invented ticket gates, buildings, or landmarks).
+Hard rejects:
+- Magic Kingdom ticket/tapstile machines on Main Street with Cinderella Castle behind them (gates are at the entrance before the railroad bridge)
+- BoardWalk with cars/buses/asphalt in front of the buildings
+- runDisney runners in car lanes beside buses
+- Contemporary monorail only around the hotel instead of through the A-frame
+- Spaceship Earth mashed into Magic Kingdom / Contemporary views
+- Yellow/golden-hour/sepia cast over the whole frame
+- Talk-show / D23 panel guests / two random people as the primary subject when the story is about a place or product
+- Blank title cards, empty scenes, or no credible story connection
 List only high-confidence visible defects. On acceptance return no issues and an empty correction.`;
 
 module.exports = {

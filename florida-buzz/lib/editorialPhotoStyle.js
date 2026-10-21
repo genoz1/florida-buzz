@@ -27,24 +27,22 @@ No captions, headlines, readable signs, official logos, watermarks, borders, or 
  * dense micro-detail, cool-silver materials, natural daylight (not muddy yellow wash).
  */
 const PODCAST_YOUTUBE_ILLUSTRATION_STYLE = `Create a densely detailed cinematic digital travel illustration for a Florida theme-park news podcast YouTube still.
-Match the first Florida Buzz YouTube episode look: ultra-sharp micro-detail (weathered materials, fabric weave, stone grain, pipes, lantern metalwork, individual paving stones), crowded layered depth, immersive eye-level composition, polished high-end concept-art fidelity — not soft blurry painterly wash, not flat stock photo, not sterile corporate brochure, not cartoon, not collage, not multi-land mashup.
+Match the FIRST Florida Buzz YouTube episode / Mandalorian Galaxy's Edge still: ultra-sharp micro-detail (weathered materials, fabric weave, stone grain, pipes, lantern metalwork, individual paving stones), crowded layered depth, immersive eye-level composition, polished high-end concept-art fidelity — cool silver-grey materials, crisp modern cinematic look. NOT soft blurry painterly wash, NOT vintage sepia, NOT muddy golden-hour postcard, NOT flat stock photo, NOT cartoon, NOT collage, NOT multi-land mashup.
 
-Composition: strong foreground subject, story-relevant environment filling the frame with dense midground/background activity, natural depth of field, balanced 16:9.
+Composition: strong story-relevant place filling the frame, natural depth of field, balanced 16:9. The PLACE or product is the subject — not random people, panelists, or interview guests.
 
-Lighting and color: bright directional Florida daylight with NATURAL white balance. Keep sunlight and contrast, but avoid heavy yellow/amber/orange grading washes. Metal reads cool silver-grey; skin tones natural; sky can hold true blue; foliage true green; building colors accurate. High micro-contrast and crisp edges.
+Lighting and color (CRITICAL): bright directional Florida daylight with NATURAL white balance. FORBIDDEN: yellow/amber/orange golden-hour washes, sepia, cream whites, warm vintage grading. Metal reads cool silver-grey; skin tones natural; sky true blue; foliage true green; building colors accurate. High micro-contrast and crisp edges like the Mandalorian episode still.
 
-Anonymous park visitors may appear naturally when they help the scene feel alive. Do not depict celebrities, named characters, or identifiable public figures. Anatomy must stay believable.
+A real reference photograph of the place MUST be the layout template. Preserve that photo's real architecture and spatial relationships. Do not invent buildings, ticket gates, roads, or landmarks that are not in the reference.
 
-The visual must directly represent the ONE story place being discussed — one real Walt Disney World hotel, attraction, land gateway, or construction site. Never invent mashup parkscapes or unrelated icons. Do not invent announced designs as completed attractions.
+Hard Disney World geography:
+- Magic Kingdom ticket/tapstile machines sit at the park ENTRANCE before guests walk under the railroad bridge — never place those machines on Main Street with Cinderella Castle behind them.
+- BoardWalk: pedestrian wood promenade only; no cars/buses/asphalt in front of BoardWalk buildings.
+- runDisney: runners on park paths/plazas/race courses — not car lanes beside buses.
+- Contemporary Resort: monorail THROUGH the A-frame, not only around the outside.
+- Never mash landmarks from different parks into one invented view.
 
-Hard Disney World geography (reject invented layouts):
-- Disney's BoardWalk / BoardWalk Inn / BoardWalk Villas: wooden boardwalk and lakeside promenade for pedestrians only. No cars, buses, asphalt roadways, parking lanes, or vehicle traffic in front of the BoardWalk buildings.
-- runDisney / Wine & Dine / race weekend: runners on park paths, plaza pavement, or marked race course through parks and resort walking areas — never running in car lanes beside buses or road traffic.
-- Disney's Contemporary Resort monorail: the monorail beamway runs THROUGH the A-frame hotel (the classic through-the-lobby look), never only looping around the outside of the building as a ring road.
-- Magic Kingdom: do not mash the entrance plaza train station against Cinderella Castle as if they share one continuous plaza; keep real spatial relationships.
-- Never invent a place that does not exist by combining landmarks from different parks or resorts into one impossible view.
-
-No captions, headlines, readable signs, official logos, watermarks, borders, or distorted text.`;
+No captions, headlines, readable signs, official logos, watermarks, borders, or distorted text. No portraits of unknown speakers or D23 panel guests as the hero subject.`;
 
 function applyStyleBlock(prompt, styleBlock) {
   const body = String(prompt || '').trim();

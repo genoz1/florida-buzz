@@ -12,7 +12,11 @@ const USER_AGENT = 'FloridaBuzzBot/1.0 (podcast place references; https://theflo
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 
 const REJECT_TITLE =
-  /\b(logo|map|diagram|icon|seal|flag|svg|screenshot|poster|ticket|signage mock|clip art|wordmark|emblem|coat of arms)\b/i;
+  /\b(logo|map|diagram|icon|seal|flag|svg|screenshot|poster|signage mock|clip art|wordmark|emblem|coat of arms)\b/i;
+
+/** Article heroes that are people/panels — never use these as place templates. */
+const PEOPLE_PRIMARY =
+  /\b(panel|panels|interview|speaker|speakers|host|hosts|portrait|portraits|keynote|moderator|audience seated|talk show|gold theater guests?)\b/i;
 
 const LICENSE_OK =
   /public domain|cc0|cc[- ]?by|creative commons attribution|pdm|pd[- ]old|no rights reserved/i;
@@ -28,13 +32,18 @@ function stripTracking(url) {
   }
 }
 
+function looksLikePeoplePrimaryText(...parts) {
+  const hay = parts.map((part) => String(part || '')).join(' ');
+  return PEOPLE_PRIMARY.test(hay);
+}
+
 function buildPlaceSearchQuery({ label = '', category = '', prompt = '' } = {}) {
   const raw = `${label} ${prompt} ${category}`.replace(/\s+/g, ' ').trim();
   const placeHints = [];
   const patterns = [
     /\bDisney'?s?\s+Board\s*-?\s*Walk(?:\s+Inn|\s+Villas)?\b/i,
     /\bContemporary(?:\s+Resort)?\b/i,
-    /\bMagic Kingdom\b/i,
+    /\bMagic Kingdom(?:\s+entrance|\s+railroad|\s+train station)?\b/i,
     /\bCinderella Castle\b/i,
     /\bSpaceship Earth\b/i,
     /\bEPCOT\b/i,
@@ -55,9 +64,23 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '' } = {}) 
     const match = raw.match(re);
     if (match) placeHints.push(match[0]);
   }
+  // Prefer entrance/railroad wording when ticketing / Premier Pass is the story.
+  if (/\b(premier pass|lightning lane|ticket|ticketing|tapstile|turnstile)\b/i.test(raw)
+    && !/\bentrance|railroad|train station\b/i.test(placeHints.join(' '))) {
+    placeHints.unshift('Magic Kingdom entrance railroad station');
+  }
+  if (/\b(cold grocery|bell services|grocery transfer)\b/i.test(raw)) {
+    placeHints.unshift("Disney's Contemporary Resort monorail");
+  }
+  if (/\b(wine\s*&\s*dine|rundisney|run disney|race weekend)\b/i.test(raw)) {
+    placeHints.unshift('EPCOT Spaceship Earth race');
+  }
+  if (/\bspirit jersey/i.test(raw)) {
+    placeHints.unshift('World of Disney Disney Springs');
+  }
   const labelCore = String(label || '')
     .replace(/\$\d+(?:\.\d+)?/g, ' ')
-    .replace(/\b(premier pass|lightning lane|road closures?|wine\s*&\s*dine|rundisney|run disney)\b/gi, ' ')
+    .replace(/\b(premier pass|lightning lane|road closures?|wine\s*&\s*dine|rundisney|run disney|cold grocery transfers?|gold theater panels?)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   const parts = [...new Set([
@@ -232,6 +255,10 @@ async function findArticleHeroReference({
     const slug = row.source.meta?.slug;
     let imageUrl = null;
     let title = row.source.title;
+    if (looksLikePeoplePrimaryText(row.source.title, slug, label)) {
+      console.warn(`[podcasts] Skipping people-primary article candidate for place reference: ${row.source.title}`);
+      continue;
+    }
     if (slug) {
       const { data, error } = await supabase
         .from('articles')
@@ -242,11 +269,16 @@ async function findArticleHeroReference({
       imageUrl = data?.image_url || null;
       title = data?.title || title;
     }
+    if (looksLikePeoplePrimaryText(title, slug)) {
+      console.warn(`[podcasts] Skipping people-primary article hero: ${title}`);
+      continue;
+    }
     if (!isUsableArticleImage(imageUrl)) continue;
     try {
       const downloaded = await fetchImageBuffer(imageUrl, fetchImpl);
       return {
         source: 'florida_buzz_article',
+        subjectKind: 'place',
         query: label,
         title,
         pageUrl: row.source.url || null,
@@ -271,6 +303,21 @@ async function findPlaceReferencePhoto({
   supabase = null,
   fetchImpl = fetch,
 } = {}) {
+  // Prefer Wikimedia place photos first so we never template from panel/people article heroes.
+  const query = buildPlaceSearchQuery({ label, category, prompt });
+  const wiki = await searchWikimediaPlacePhoto(query, { fetchImpl }).catch((err) => {
+    console.warn(`[podcasts] Wikimedia place search failed: ${err.message}`);
+    return null;
+  });
+  if (wiki) {
+    return { ...wiki, subjectKind: 'place' };
+  }
+
+  if (label && !query.includes(String(label).slice(0, 24))) {
+    const broad = await searchWikimediaPlacePhoto(`${label} Walt Disney World`.slice(0, 160), { fetchImpl }).catch(() => null);
+    if (broad) return { ...broad, subjectKind: 'place' };
+  }
+
   const articleRef = await findArticleHeroReference({
     label,
     episodeId,
@@ -283,17 +330,6 @@ async function findPlaceReferencePhoto({
   });
   if (articleRef) return articleRef;
 
-  const query = buildPlaceSearchQuery({ label, category, prompt });
-  const wiki = await searchWikimediaPlacePhoto(query, { fetchImpl }).catch((err) => {
-    console.warn(`[podcasts] Wikimedia place search failed: ${err.message}`);
-    return null;
-  });
-  if (wiki) return wiki;
-
-  // Broader retry with just the label + Disney World.
-  if (label && query !== `${label} Walt Disney World`) {
-    return searchWikimediaPlacePhoto(`${label} Walt Disney World`.slice(0, 160), { fetchImpl }).catch(() => null);
-  }
   return null;
 }
 
@@ -301,11 +337,12 @@ function withReferencePrompt(prompt, reference) {
   const body = String(prompt || '').trim();
   if (!reference?.buffer) return body;
   const lock =
-    'Reference photograph lock: A real photograph of this place is attached. ' +
-    'Preserve the real architecture, skyline relationships, and layout from that photo. ' +
-    'Restyle into a richly detailed cinematic digital travel illustration with bright natural Florida daylight (no yellow cast). ' +
-    'Do not invent extra buildings, roads, or landmarks that are not supported by the reference. ' +
-    'Do not mash in Spaceship Earth, Cinderella Castle, or other parks unless they are clearly in the reference.';
+    'Reference photograph lock: A real photograph of this PLACE is attached as the layout template. ' +
+    'Preserve the real architecture, skyline relationships, and layout from that photo exactly. ' +
+    'Restyle into the Mandalorian-episode Florida Buzz look: densely detailed cinematic digital travel illustration, ' +
+    'cool silver materials, NATURAL white balance daylight — NO yellow/amber/sepia wash. ' +
+    'Do not invent ticket gates, buildings, roads, or landmarks that are not in the reference. ' +
+    'Do not make unknown people or panel guests the primary subject.';
   if (body.includes('Reference photograph lock:')) return body;
   return `${body}\n\n${lock}`;
 }
@@ -317,13 +354,15 @@ function referenceReviewQuestion({ label = '', category = '', reference = null }
   if (!reference) {
     return (
       `${base}` +
-      'Is this still an accurate single-place Walt Disney World illustration for this story (no invented mashup geography)?'
+      'FAIL this still — podcast YouTube stills require a real place-photo template. ' +
+      'Is this still somehow an accurate single-place Walt Disney World view with no yellow cast and no people-primary subject?'
     );
   }
   return (
     `${base}` +
-    `A real reference photo was used (${reference.source}: ${String(reference.title || '').slice(0, 120)}).\n` +
-    'Does this still preserve that real place layout (no invented buildings/roads/landmarks), while matching the story subject?'
+    `A real place reference photo was used (${reference.source}: ${String(reference.title || '').slice(0, 120)}).\n` +
+    'Does this still (1) keep that real place layout, (2) avoid yellow/sepia grading, (3) keep the place/product as subject not random people, ' +
+    'and (4) match the Mandalorian-episode cinematic illustration style?'
   );
 }
 
@@ -335,6 +374,7 @@ module.exports = {
   findArticleHeroReference,
   findPlaceReferencePhoto,
   licenseLooksOk,
+  looksLikePeoplePrimaryText,
   overlapScore,
   referenceReviewQuestion,
   searchWikimediaPlacePhoto,
