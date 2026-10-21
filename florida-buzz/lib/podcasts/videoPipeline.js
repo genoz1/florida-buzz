@@ -223,9 +223,17 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
    * Build one verified story still. Never invent geography without a real place photo.
    * Never returns a blank title card — callers must abort publish when ok=false.
    */
-  async function buildVerifiedTopicStill(scene, { episode, force = false, forReview = false } = {}) {
+  async function buildVerifiedTopicStill(scene, {
+    episode,
+    force = false,
+    forReview = false,
+    direction = '',
+    storagePath: storagePathOverride = null,
+  } = {}) {
     // v5 = gated place-photo stills (Mandalorian grade, no yellow, no people-primary, no invent).
-    const storagePath = `youtube-visuals/v5/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
+    const storagePath =
+      storagePathOverride
+      || `youtube-visuals/v5/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     if (!force) {
       const existing = await findAsset(storagePath);
       if (existing?.public_url) {
@@ -234,11 +242,16 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       }
     }
 
-    console.log(`[podcasts] Building verified YouTube still ${storagePath} for ${scene.label}`);
+    const note = String(direction || '').trim();
+    console.log(
+      `[podcasts] Building verified YouTube still ${storagePath} for ${scene.label}`
+      + (note ? ` (admin direction: ${note.slice(0, 120)})` : '')
+    );
     const reference = await findPlaceReferencePhoto({
       label: scene.label,
       category: scene.category,
       prompt: scene.prompt,
+      direction: note,
       episodeId: episode.id,
       store,
       supabase,
@@ -440,6 +453,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
 
   /**
    * Rebuild one rejected still using optional admin direction text.
+   * Approved siblings on the board are untouched — only this stillId is rebuilt.
    */
   async function regenerateStillForReview(episode, stillId, { direction = '' } = {}) {
     const { plan } = await buildScenePlanForEpisode(episode);
@@ -451,10 +465,23 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     const directedScene = note
       ? {
           ...scene,
-          prompt: `${scene.prompt}\n\nAdmin revision direction (must follow): ${note}`,
+          // Direction becomes the visual subject; keep original label only for admin card title.
+          prompt: `Admin-requested YouTube still. Follow this direction exactly: ${note}. `
+            + `Show one real Walt Disney World place matching that direction. `
+            + `Original story context (do not override the direction): ${scene.label}.`,
         }
       : scene;
-    const result = await buildVerifiedTopicStill(directedScene, { episode, force: true, forReview: true });
+    // New storage path every regen so CDN/browser cache cannot show the previous still.
+    const storagePath =
+      `youtube-visuals/v5/episodes/${safeSlug(episode.id)}/`
+      + `${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}-r${Date.now().toString(36)}.png`;
+    const result = await buildVerifiedTopicStill(directedScene, {
+      episode,
+      force: true,
+      forReview: true,
+      direction: note,
+      storagePath,
+    });
     if (!result.ok) {
       return stillItemFromScene(scene, {
         status: 'failed',
