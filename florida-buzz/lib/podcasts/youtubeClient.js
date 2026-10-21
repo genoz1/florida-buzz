@@ -128,7 +128,14 @@ async function updateVideoSnippet({
     },
     body: JSON.stringify({ id: videoId, snippet }),
   });
-  if (!response.ok) throw await responseError(response, 'YouTube video snippet update');
+  if (!response.ok) {
+    const err = await responseError(response, 'YouTube video snippet update');
+    if (/insufficient.*scope|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(err.message)) {
+      err.message +=
+        ' Re-authorize YouTube with youtube.force-ssl (or full youtube) scope, or rebuild the video so the new description is set on upload.';
+    }
+    throw err;
+  }
   return response.json();
 }
 
