@@ -8,6 +8,7 @@ const {
   buildPlaceSearchQuery,
   findPlaceReferencePhoto,
   licenseLooksOk,
+  looksLikePeoplePrimaryText,
   overlapScore,
   withReferencePrompt,
   referenceReviewQuestion,
@@ -59,7 +60,7 @@ test('referenceReviewQuestion mentions reference source when present', () => {
   assert.match(withRef, /reference photo/i);
   assert.match(withRef, /wikimedia/i);
   const bare = referenceReviewQuestion({ label: 'BoardWalk' });
-  assert.match(bare, /no invented mashup geography/i);
+  assert.match(bare, /place-photo template|no yellow cast/i);
 });
 
 test('findPlaceReferencePhoto returns Wikimedia candidate via injected fetch', async () => {
@@ -112,17 +113,43 @@ test('findPlaceReferencePhoto returns Wikimedia candidate via injected fetch', a
   assert.ok(ref.buffer.length >= 8000);
 });
 
-test('video pipeline prefers reference-anchored v4 stills and photo fallback', () => {
+test('looksLikePeoplePrimaryText catches D23 panel / interview heroes', () => {
+  assert.equal(looksLikePeoplePrimaryText('D23 Gold Theater Panels'), true);
+  assert.equal(looksLikePeoplePrimaryText('Magic Kingdom entrance railroad station'), false);
+});
+
+test('premier pass query prefers Magic Kingdom entrance wording', () => {
+  const q = buildPlaceSearchQuery({
+    label: 'Magic Kingdom Premier Pass',
+    prompt: 'ticketing machines and Lightning Lane',
+    category: 'ticketing',
+  });
+  assert.match(q, /entrance|railroad/i);
+});
+
+test('video pipeline requires verified v5 stills and blocks incomplete publish', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
-  assert.match(source, /youtube-visuals\/v4\//);
+  assert.match(source, /youtube-visuals\/v5\//);
   assert.match(source, /findPlaceReferencePhoto/);
   assert.match(source, /editImageFromReference/);
-  assert.match(source, /Using real reference photo/);
+  assert.match(source, /prepareAllTopicStills/);
+  assert.match(source, /stills_incomplete/);
   assert.match(source, /withReferencePrompt/);
+  assert.equal(/Using story title card/.test(source), false);
 });
 
 test('openai exports editImageFromReference', () => {
   const openai = require('../lib/openai');
   assert.equal(typeof openai.editImageFromReference, 'function');
   assert.equal(typeof openai.generateImage, 'function');
+});
+
+test('Mandalorian style forbids yellow wash', () => {
+  const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('../lib/editorialPhotoStyle');
+  assert.match(PODCAST_YOUTUBE_ILLUSTRATION_STYLE, /Mandalorian/i);
+  assert.match(PODCAST_YOUTUBE_ILLUSTRATION_STYLE, /FORBIDDEN: yellow|NO yellow|avoid heavy yellow/i);
+  const { PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS } = require('../lib/podcasts/videoVisuals');
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /yellow\/amber\/sepia|Yellow\/golden-hour/i);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /unknown people|panel guests|two random people/i);
+  assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /railroad bridge/i);
 });

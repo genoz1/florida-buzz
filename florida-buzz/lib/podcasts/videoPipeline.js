@@ -19,7 +19,7 @@ const {
   referenceReviewQuestion,
   withReferencePrompt,
 } = require('./placeReferencePhoto');
-const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicCard, renderTopicFrame } = require('./videoCards');
+const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicFrame } = require('./videoCards');
 const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
 
 /** Prefer a real probed MP3 length when episode.duration_seconds is missing or tiny. */
@@ -93,8 +93,8 @@ async function planTopicVisuals({ episode, aiText }) {
   const evidence = storySegments.map((segment) => ({ slug: segment.slug, transcript: segment.text.slice(0, 900) }));
   const system = `You plan accurate cinematic illustrated visuals for the Florida Buzz Disney World news podcast YouTube episode.
 Return strict JSON only (no markdown): {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"max 5 words, under 32 characters","category":"stable-reusable-category","prompts":["prompt 1","prompt 2"]}]}.
-Keep each description to at most 5 words and 32 characters so it fits one agenda-menu line. End on a real noun or verb — never on for/to/the/a/of. Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World place from that story, with dense detail and bright natural Florida daylight (no yellow cast). Style: richly detailed cinematic digital travel illustration. Never celebrities/named characters. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.
-Geography locks for prompts: Disney's BoardWalk is pedestrian wood boardwalk only (no cars/buses/asphalt in front of it). runDisney runners stay on park paths/plazas/race courses, never car lanes beside buses. Contemporary Resort monorail goes THROUGH the A-frame hotel, not around the outside. Do not invent impossible Magic Kingdom layouts that glue the entrance station to Cinderella Castle.`;
+Keep each description to at most 5 words and 32 characters so it fits one agenda-menu line. End on a real noun or verb — never on for/to/the/a/of. Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World PLACE from that story (architecture/attraction/setting — never people panels). Style: Mandalorian-episode cinematic illustration, natural daylight, NO yellow cast. Never celebrities/named characters/unknown panelists. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.
+Geography locks: Magic Kingdom ticket machines are at the entrance before the railroad bridge — never on Main Street with the castle. BoardWalk is pedestrian wood only. runDisney on park paths only. Contemporary monorail THROUGH the A-frame.`;
   const user = JSON.stringify({ episodeTitle: episode.title, segments: evidence });
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
@@ -138,10 +138,48 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     return publicUrl;
   }
 
-  async function tryGenerateTopicStill(prompt, scene, storagePath, reference = null) {
+  async function applyStillColorFix(buffer) {
+    const { Jimp } = require('jimp');
+    const { coolYellowCast } = require('../coolYellowCast');
+    const img = await Jimp.read(buffer);
+    coolYellowCast(img, 0.72);
+    return img.getBuffer('image/png');
+  }
+
+  async function reviewStillBuffer(buffer, scene, reference) {
+    const { validateGeneratedImage, assertCompletedReview } = require('../imageValidation');
+    try {
+      const review = assertCompletedReview(
+        await validateGeneratedImage(buffer, {
+          title: scene.label,
+          subject: scene.label,
+          location: 'Walt Disney World Resort',
+          slug: scene.visualKey,
+          reviewInstructions: PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
+          reviewQuestion: referenceReviewQuestion({
+            label: scene.label,
+            category: scene.category,
+            reference,
+          }),
+        })
+      );
+      const ok = review?.acceptable === true && Array.isArray(review.issues) && review.issues.length === 0;
+      return {
+        ok,
+        correction: String(review?.correction || review?.issues?.join('; ') || '').slice(0, 500),
+      };
+    } catch (err) {
+      return { ok: false, correction: `review_unavailable: ${err.message}` };
+    }
+  }
+
+  async function tryGenerateTopicStill(prompt, scene, reference) {
+    if (!reference?.buffer) {
+      return { rejected: true, correction: 'no_place_reference' };
+    }
     let captured = null;
     const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('./videoVisuals');
-    const { generateImage, editImageFromReference } = require('../openai');
+    const { editImageFromReference } = require('../openai');
     const lockedPrompt = withReferencePrompt(
       hardenPlacePrompt(prompt, {
         label: scene.label,
@@ -149,14 +187,6 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       }),
       reference
     );
-    const generate = reference?.buffer
-      ? (text) =>
-          editImageFromReference(text, reference.buffer, {
-            quality: 'high',
-            mimeType: reference.mimeType || 'image/png',
-            inputFidelity: 'high',
-          })
-      : (text) => generateImage(text, { quality: 'high' });
     const result = await generateValidatedImageResult(
       lockedPrompt,
       { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' },
@@ -168,33 +198,42 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
           category: scene.category,
           reference,
         }),
-        generate,
-        // Keep rejected candidates out of durable storage — only persist after accept.
+        // One AI attempt only — real photo is the backup. Saves OpenAI credits.
+        maxAttempts: 1,
+        generate: (text) =>
+          editImageFromReference(text, reference.buffer, {
+            quality: 'high',
+            mimeType: reference.mimeType || 'image/png',
+            inputFidelity: 'high',
+          }),
         store: async (buffer) => {
           captured = buffer;
-          return `memory://${storagePath}`;
+          return `memory://candidate`;
         },
       }
     );
     if (result.status === 'accepted' && captured) {
-      await saveVisual(captured, storagePath);
-      return captured;
+      return { buffer: await applyStillColorFix(captured), source: 'ai_from_reference' };
     }
     return { rejected: true, correction: result.correction || result.error || result.status };
   }
 
-  async function topicImage(scene, { episode, force = false } = {}) {
-    // v4 = real place-photo reference stills (do not reuse v1–v3 invented geography).
-    const storagePath = `youtube-visuals/v4/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
+  /**
+   * Build one verified story still. Never invent geography without a real place photo.
+   * Never returns a blank title card — callers must abort publish when ok=false.
+   */
+  async function buildVerifiedTopicStill(scene, { episode, force = false } = {}) {
+    // v5 = gated place-photo stills (Mandalorian grade, no yellow, no people-primary, no invent).
+    const storagePath = `youtube-visuals/v5/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     if (!force) {
       const existing = await findAsset(storagePath);
       if (existing?.public_url) {
-        console.log(`[podcasts] Reusing YouTube still ${storagePath}`);
-        return fetchBuffer(existing.public_url);
+        console.log(`[podcasts] Reusing verified YouTube still ${storagePath}`);
+        return { ok: true, buffer: await fetchBuffer(existing.public_url), storagePath, source: 'cached' };
       }
     }
 
-    console.log(`[podcasts] Generating YouTube still ${storagePath} for ${scene.label}`);
+    console.log(`[podcasts] Building verified YouTube still ${storagePath} for ${scene.label}`);
     const reference = await findPlaceReferencePhoto({
       label: scene.label,
       category: scene.category,
@@ -203,46 +242,67 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       store,
       supabase,
     });
-    if (reference) {
-      console.log(
-        `[podcasts] Place reference for ${scene.label}: ${reference.source} — ${reference.title || reference.imageUrl} (${reference.credit})`
-      );
-    } else {
-      console.warn(`[podcasts] No place reference photo found for ${scene.label}; generating without photo anchor`);
+    if (!reference?.buffer) {
+      console.error(`[podcasts] STILL BLOCKED for ${scene.label}: no real place-photo template found`);
+      return { ok: false, reason: 'no_place_reference', label: scene.label, storagePath };
+    }
+    if (reference.subjectKind === 'people') {
+      console.error(`[podcasts] STILL BLOCKED for ${scene.label}: reference is people-primary`);
+      return { ok: false, reason: 'reference_is_people', label: scene.label, storagePath };
+    }
+    console.log(
+      `[podcasts] Place reference for ${scene.label}: ${reference.source} — ${reference.title || reference.imageUrl} (${reference.credit})`
+    );
+
+    const ai = await tryGenerateTopicStill(scene.prompt, scene, reference);
+    if (Buffer.isBuffer(ai.buffer)) {
+      await saveVisual(ai.buffer, storagePath);
+      console.log(`[podcasts] Verified AI-from-reference still for ${scene.label}`);
+      return { ok: true, buffer: ai.buffer, storagePath, source: ai.source, reference };
     }
 
-    let lastCorrection = '';
-    const first = await tryGenerateTopicStill(scene.prompt, scene, storagePath, reference);
-    if (Buffer.isBuffer(first)) return first;
-    lastCorrection = first.correction || '';
-
-    for (let level = 1; level <= 2; level += 1) {
-      const broader = broadenVisualPrompt(scene.prompt, {
+    // Fallback: real place photo itself (after color fix + review) — never invent, never title card.
+    console.warn(
+      `[podcasts] AI restyle rejected for ${scene.label}; verifying real reference photo instead (${ai.correction || 'rejected'})`
+    );
+    const photo = await applyStillColorFix(reference.buffer);
+    const verified = await reviewStillBuffer(photo, scene, reference);
+    if (!verified.ok) {
+      console.error(
+        `[podcasts] STILL BLOCKED for ${scene.label}: reference photo failed verification — ${verified.correction}`
+      );
+      return {
+        ok: false,
+        reason: 'reference_failed_verification',
         label: scene.label,
-        category: scene.category,
-        level,
-        rejection: lastCorrection,
-      });
-      console.warn(`[podcasts] Broadening YouTube visual for ${scene.label} (level ${level}) — still locked to this story`);
-      const next = await tryGenerateTopicStill(broader, scene, storagePath, reference);
-      if (Buffer.isBuffer(next)) return next;
-      lastCorrection = next.correction || lastCorrection;
+        storagePath,
+        correction: verified.correction,
+      };
     }
+    await saveVisual(photo, storagePath);
+    console.log(`[podcasts] Verified real reference photo still for ${scene.label}`);
+    return { ok: true, buffer: photo, storagePath, source: 'reference_photo', reference };
+  }
 
-    // Prefer the real reference photo over a blank title card so every story has a place image.
-    if (reference?.buffer) {
-      console.warn(
-        `[podcasts] Using real reference photo for ${scene.label} after AI review rejects: ${lastCorrection || 'no approved illustration'}`
-      );
-      await saveVisual(reference.buffer, storagePath).catch((err) => {
-        console.warn(`[podcasts] Could not persist reference photo still: ${err.message}`);
-      });
-      return reference.buffer;
+  async function prepareAllTopicStills(plan, { episode, force = false } = {}) {
+    const topicScenes = plan.scenes.filter((scene) => scene.kind === 'topic');
+    const prepared = new Map();
+    const failures = [];
+    for (const scene of topicScenes) {
+      const key = `${scene.segmentSlug}:${Number(scene.imageIndex) || 0}`;
+      const result = await buildVerifiedTopicStill(scene, { episode, force });
+      if (!result.ok) {
+        failures.push({
+          key,
+          label: scene.label,
+          reason: result.reason,
+          correction: result.correction || null,
+        });
+        continue;
+      }
+      prepared.set(key, result);
     }
-
-    // Last resort: story title card for THIS topic — never generic castle / cover art.
-    console.warn(`[podcasts] Using story title card for ${scene.label}: ${lastCorrection || 'no approved visual'}`);
-    return renderTopicCard({ label: scene.label, category: scene.category });
+    return { prepared, failures, topicCount: topicScenes.length };
   }
 
   async function runFfmpeg(args) {
@@ -284,6 +344,18 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       const agendaFooter = episode.published_at
         ? `FLORIDA BUZZ: DISNEY - ${new Date(episode.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })}`
         : 'FLORIDA BUZZ: DISNEY WORLD';
+      // Create + verify EVERY story still before assembling the video.
+      const { prepared, failures, topicCount } = await prepareAllTopicStills(plan, { episode, force });
+      if (failures.length || prepared.size < topicCount) {
+        const summary = failures.map((f) => `${f.label} (${f.reason})`).join('; ') || 'incomplete still set';
+        const err = new Error(`YouTube stills incomplete — refusing to render/publish: ${summary}`);
+        err.code = 'STILLS_INCOMPLETE';
+        err.failures = failures;
+        console.error(`[podcasts] ${err.message}`);
+        throw err;
+      }
+      console.log(`[podcasts] All ${prepared.size} story stills verified for episode ${episode.id}; assembling video`);
+
       const agendaBuffer = await renderAgendaCard({ coverBuffer, topics: plan.topics, footer: agendaFooter });
       const brandBuffer = await renderBrandCard({ coverBuffer, label: 'Florida Buzz Disney Podcast' });
       // Square podcast artwork must letterbox into 16:9 — never crop FLORIDA BUZZ off the top.
@@ -294,15 +366,21 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         const scene = plan.scenes[i];
         let imageBuffer;
         if (scene.kind === 'topic') {
-          const still = await topicImage(scene, { episode, force });
-          imageBuffer = await renderTopicFrame(still, {
+          const key = `${scene.segmentSlug}:${Number(scene.imageIndex) || 0}`;
+          const still = prepared.get(key);
+          if (!still?.buffer) {
+            const err = new Error(`Missing verified still for ${scene.label}`);
+            err.code = 'STILLS_INCOMPLETE';
+            throw err;
+          }
+          imageBuffer = await renderTopicFrame(still.buffer, {
             label: scene.label,
             category: scene.category,
             caption: scene.caption,
             aiLabel: false,
           });
           if (!thumbnailBuffer) {
-            thumbnailBuffer = await renderThumbnailFrame(still, {
+            thumbnailBuffer = await renderThumbnailFrame(still.buffer, {
               label: scene.label,
               category: scene.category,
             });
@@ -367,7 +445,21 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     console.log(`[podcasts] YouTube job started for episode ${episodeId}${force ? ' (force)' : ''}`);
     const show = await store.getShowById(episode.show_id);
     if (!show) throw new Error(`Show not found for episode ${episodeId}`);
-    const rendered = await renderVideo({ episode, show, force });
+    let rendered;
+    try {
+      rendered = await renderVideo({ episode, show, force });
+    } catch (err) {
+      if (err?.code === 'STILLS_INCOMPLETE') {
+        console.error(`[podcasts] YouTube NOT published for episode ${episodeId}: stills_incomplete`);
+        return {
+          skipped: true,
+          reason: 'stills_incomplete',
+          failures: err.failures || [],
+          error: err.message,
+        };
+      }
+      throw err;
+    }
     try {
       console.log(`[podcasts] YouTube video rendered for episode ${episodeId}; uploading`);
       const description = `${stripHtml(episode.show_notes_html || episode.description || '')}\n\nListen and read more: ${cfg.site}/podcasts/${show.slug}/${episode.slug}\n\nFlorida Buzz is not affiliated with or endorsed by Disney.`;
@@ -401,7 +493,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
   }
 
-  return { planTopicVisuals, publishEpisode, renderVideo };
+  return { planTopicVisuals, publishEpisode, renderVideo, prepareAllTopicStills, buildVerifiedTopicStill };
 }
 
 module.exports = {
