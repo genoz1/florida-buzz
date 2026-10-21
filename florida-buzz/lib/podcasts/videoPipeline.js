@@ -21,6 +21,7 @@ const {
 } = require('./placeReferencePhoto');
 const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicFrame } = require('./videoCards');
 const { uploadThumbnail, uploadVideo, youtubeConfigured } = require('./youtubeClient');
+const { stillKey } = require('./youtubeStillsReview');
 
 /** Prefer a real probed MP3 length when episode.duration_seconds is missing or tiny. */
 function resolveVideoTotalSeconds(episodeDurationSeconds, probedSeconds) {
@@ -305,11 +306,184 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     return { prepared, failures, topicCount: topicScenes.length };
   }
 
+  function stillItemFromScene(scene, result = {}) {
+    const id = stillKey(scene.segmentSlug, scene.imageIndex);
+    return {
+      id,
+      segment_slug: scene.segmentSlug,
+      image_index: Number(scene.imageIndex) || 0,
+      label: scene.label,
+      category: scene.category || '',
+      prompt: scene.prompt || '',
+      caption: scene.caption || '',
+      visual_key: scene.visualKey || '',
+      public_url: result.public_url || null,
+      storage_path: result.storagePath || result.storage_path || null,
+      source: result.source || null,
+      status: result.status || 'pending',
+      rejection_note: result.rejection_note || '',
+      error: result.error || null,
+      reference_credit: result.reference?.credit || result.reference_credit || null,
+    };
+  }
+
+  async function buildScenePlanForEpisode(episode, { forcePlan = false } = {}) {
+    if (!episode.audio_url) throw new Error('Episode has no permanent audio URL');
+    const show = await store.getShowById(episode.show_id);
+    if (!show) throw new Error(`Show not found for episode ${episode.id}`);
+    const [audioBuffer, topicMeta] = await Promise.all([
+      fetchBuffer(episode.audio_url),
+      planTopicVisuals({ episode, aiText }),
+    ]);
+    const probedSeconds = await probeMp3DurationSec(audioBuffer, ffmpegPath);
+    const totalSeconds = resolveVideoTotalSeconds(episode.duration_seconds, probedSeconds);
+    if (
+      forcePlan ||
+      !Number(episode.duration_seconds) ||
+      Math.abs(Number(episode.duration_seconds) - totalSeconds) > 1
+    ) {
+      if (typeof store.updateEpisode === 'function') {
+        await store.updateEpisode(episode.id, { duration_seconds: Math.round(totalSeconds) }).catch((err) => {
+          console.warn(`[podcasts] Could not backfill duration_seconds for ${episode.id}: ${err.message}`);
+        });
+      }
+    }
+    const plan = buildScenePlan({
+      scriptText: episode.script_text,
+      totalSeconds,
+      bumperSeconds: cfg.youtubeIntroSeconds,
+      topicMeta,
+      imagesPerTopic: cfg.youtubeImagesPerTopic,
+      episodeId: episode.id,
+    });
+    return { plan, show, totalSeconds, topicMeta };
+  }
+
+  /**
+   * Generate (or reuse) every story still for admin review. Does not assemble video.
+   */
+  async function prepareStillsBoard(episode, { force = false, existingBoard = null } = {}) {
+    const { plan } = await buildScenePlanForEpisode(episode);
+    const topicScenes = plan.scenes.filter((scene) => scene.kind === 'topic');
+    const prior = new Map((existingBoard?.items || []).map((item) => [item.id, item]));
+    const items = [];
+    let failedCount = 0;
+    for (const scene of topicScenes) {
+      const id = stillKey(scene.segmentSlug, scene.imageIndex);
+      const previous = prior.get(id);
+      if (!force && previous?.status === 'approved' && previous.public_url) {
+        items.push({
+          ...stillItemFromScene(scene, previous),
+          status: 'approved',
+          public_url: previous.public_url,
+          storage_path: previous.storage_path || previous.storagePath || null,
+          source: previous.source || 'approved',
+          rejection_note: previous.rejection_note || '',
+        });
+        continue;
+      }
+      const result = await buildVerifiedTopicStill(scene, { episode, force: force || Boolean(previous?.rejection_note) });
+      if (!result.ok) {
+        failedCount += 1;
+        items.push(
+          stillItemFromScene(scene, {
+            status: 'failed',
+            storagePath: result.storagePath,
+            error: `${result.reason}${result.correction ? `: ${result.correction}` : ''}`,
+            rejection_note: previous?.rejection_note || '',
+          })
+        );
+        continue;
+      }
+      const asset = await findAsset(result.storagePath);
+      const publicUrl = asset?.public_url || (await saveVisual(result.buffer, result.storagePath));
+      items.push(
+        stillItemFromScene(scene, {
+          status: 'ready',
+          public_url: publicUrl,
+          storagePath: result.storagePath,
+          source: result.source,
+          reference: result.reference,
+          rejection_note: '',
+          error: null,
+        })
+      );
+    }
+    return { items, failedCount, topicCount: topicScenes.length };
+  }
+
+  /**
+   * Rebuild one rejected still using optional admin direction text.
+   */
+  async function regenerateStillForReview(episode, stillId, { direction = '' } = {}) {
+    const { plan } = await buildScenePlanForEpisode(episode);
+    const scene = plan.scenes.find(
+      (entry) => entry.kind === 'topic' && stillKey(entry.segmentSlug, entry.imageIndex) === stillId
+    );
+    if (!scene) throw new Error(`Still scene not found for ${stillId}`);
+    const note = String(direction || '').trim();
+    const directedScene = note
+      ? {
+          ...scene,
+          prompt: `${scene.prompt}\n\nAdmin revision direction (must follow): ${note}`,
+        }
+      : scene;
+    const result = await buildVerifiedTopicStill(directedScene, { episode, force: true });
+    if (!result.ok) {
+      return stillItemFromScene(scene, {
+        status: 'failed',
+        storagePath: result.storagePath,
+        error: `${result.reason}${result.correction ? `: ${result.correction}` : ''}`,
+        rejection_note: note,
+      });
+    }
+    const asset = await findAsset(result.storagePath);
+    const publicUrl = asset?.public_url || (await saveVisual(result.buffer, result.storagePath));
+    return stillItemFromScene(scene, {
+      status: 'ready',
+      public_url: publicUrl,
+      storagePath: result.storagePath,
+      source: result.source,
+      reference: result.reference,
+      rejection_note: note,
+      error: null,
+    });
+  }
+
+  async function loadApprovedStillsMap(board) {
+    const prepared = new Map();
+    const failures = [];
+    for (const item of board?.items || []) {
+      const key = `${item.segment_slug}:${Number(item.image_index) || 0}`;
+      if (item.status !== 'approved' || !item.public_url) {
+        failures.push({
+          key,
+          label: item.label,
+          reason: item.status === 'failed' ? 'failed' : 'not_approved',
+          correction: item.error || item.rejection_note || null,
+        });
+        continue;
+      }
+      try {
+        const buffer = await fetchBuffer(item.public_url);
+        prepared.set(key, {
+          ok: true,
+          buffer,
+          storagePath: item.storage_path,
+          source: item.source || 'approved_board',
+        });
+      } catch (err) {
+        failures.push({ key, label: item.label, reason: 'download_failed', correction: err.message });
+      }
+    }
+    return { prepared, failures };
+  }
+
   async function runFfmpeg(args) {
     await execFileAsync(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { maxBuffer: 8 * 1024 * 1024 });
   }
 
-  async function renderVideo({ episode, show, force = false } = {}) {
+  async function renderVideo({ episode, show, force = false, approvedStillsBoard = null } = {}) {
     if (!episode.audio_url) throw new Error('Episode has no permanent audio URL');
     const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'florida-buzz-youtube-'));
     try {
@@ -344,17 +518,36 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       const agendaFooter = episode.published_at
         ? `FLORIDA BUZZ: DISNEY - ${new Date(episode.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })}`
         : 'FLORIDA BUZZ: DISNEY WORLD';
-      // Create + verify EVERY story still before assembling the video.
-      const { prepared, failures, topicCount } = await prepareAllTopicStills(plan, { episode, force });
-      if (failures.length || prepared.size < topicCount) {
-        const summary = failures.map((f) => `${f.label} (${f.reason})`).join('; ') || 'incomplete still set';
-        const err = new Error(`YouTube stills incomplete — refusing to render/publish: ${summary}`);
-        err.code = 'STILLS_INCOMPLETE';
-        err.failures = failures;
-        console.error(`[podcasts] ${err.message}`);
-        throw err;
+      const topicCount = plan.scenes.filter((scene) => scene.kind === 'topic').length;
+      let prepared;
+      let failures;
+      if (approvedStillsBoard) {
+        // Admin-approved board is the only still source when creating the video.
+        ({ prepared, failures } = await loadApprovedStillsMap(approvedStillsBoard));
+        if (failures.length || prepared.size < topicCount) {
+          const summary = failures.map((f) => `${f.label} (${f.reason})`).join('; ') || 'incomplete approved still set';
+          const err = new Error(`YouTube stills not fully approved — refusing to render/publish: ${summary}`);
+          err.code = 'STILLS_INCOMPLETE';
+          err.failures = failures;
+          console.error(`[podcasts] ${err.message}`);
+          throw err;
+        }
+        console.log(
+          `[podcasts] Using ${prepared.size} admin-approved story stills for episode ${episode.id}; assembling video`
+        );
+      } else {
+        // Legacy path: generate + verify stills inline (blocked for normal publish; admin review required).
+        ({ prepared, failures } = await prepareAllTopicStills(plan, { episode, force }));
+        if (failures.length || prepared.size < topicCount) {
+          const summary = failures.map((f) => `${f.label} (${f.reason})`).join('; ') || 'incomplete still set';
+          const err = new Error(`YouTube stills incomplete — refusing to render/publish: ${summary}`);
+          err.code = 'STILLS_INCOMPLETE';
+          err.failures = failures;
+          console.error(`[podcasts] ${err.message}`);
+          throw err;
+        }
+        console.log(`[podcasts] All ${prepared.size} story stills verified for episode ${episode.id}; assembling video`);
       }
-      console.log(`[podcasts] All ${prepared.size} story stills verified for episode ${episode.id}; assembling video`);
 
       const agendaBuffer = await renderAgendaCard({ coverBuffer, topics: plan.topics, footer: agendaFooter });
       const brandBuffer = await renderBrandCard({ coverBuffer, label: 'Florida Buzz Disney Podcast' });
@@ -418,7 +611,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
   }
 
-  async function publishEpisode(episode, { force = false } = {}) {
+  async function publishEpisode(episode, { force = false, approvedStillsBoard = null } = {}) {
     const episodeId = episode?.id || 'unknown';
     if (!cfg.youtubeEnabled) {
       console.warn(`[podcasts] YouTube skipped for episode ${episodeId}: disabled`);
@@ -427,6 +620,12 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     if (!youtubeConfigured(cfg)) {
       console.warn(`[podcasts] YouTube skipped for episode ${episodeId}: oauth_not_configured`);
       return { skipped: true, reason: 'oauth_not_configured' };
+    }
+    if (!approvedStillsBoard) {
+      console.warn(
+        `[podcasts] YouTube skipped for episode ${episodeId}: stills_review_required (approve stills on the podcast dashboard first)`
+      );
+      return { skipped: true, reason: 'stills_review_required' };
     }
     const key = `youtube/${episode.id}`;
     const existing = await findAsset(key);
@@ -442,12 +641,12 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         });
       }
     }
-    console.log(`[podcasts] YouTube job started for episode ${episodeId}${force ? ' (force)' : ''}`);
+    console.log(`[podcasts] YouTube job started for episode ${episodeId}${force ? ' (force)' : ''} (approved stills)`);
     const show = await store.getShowById(episode.show_id);
     if (!show) throw new Error(`Show not found for episode ${episodeId}`);
     let rendered;
     try {
-      rendered = await renderVideo({ episode, show, force });
+      rendered = await renderVideo({ episode, show, force, approvedStillsBoard });
     } catch (err) {
       if (err?.code === 'STILLS_INCOMPLETE') {
         console.error(`[podcasts] YouTube NOT published for episode ${episodeId}: stills_incomplete`);
@@ -493,7 +692,16 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     }
   }
 
-  return { planTopicVisuals, publishEpisode, renderVideo, prepareAllTopicStills, buildVerifiedTopicStill };
+  return {
+    planTopicVisuals,
+    publishEpisode,
+    renderVideo,
+    prepareAllTopicStills,
+    buildVerifiedTopicStill,
+    prepareStillsBoard,
+    regenerateStillForReview,
+    buildScenePlanForEpisode,
+  };
 }
 
 module.exports = {

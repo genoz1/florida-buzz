@@ -2,7 +2,8 @@
 
 /**
  * Hands-off publish after private preview audio is ready.
- * preview_ready → approved → published, then queue YouTube (same as admin Publish).
+ * preview_ready → approved → published, then queue YouTube stills for admin review
+ * (video is created only after every still is approved on the dashboard).
  */
 
 function isScaffoldEpisode(episode) {
@@ -14,33 +15,26 @@ function isScaffoldEpisode(episode) {
   return false;
 }
 
-function queueYouTubePublish({ episode, cfg, videoPipeline, force = false }) {
+/**
+ * After podcast publish: generate YouTube stills for dashboard review.
+ * Does NOT assemble or upload the YouTube video.
+ */
+function queueYouTubePublish({ episode, cfg, videoPipeline, stillsReview = null, force = false }) {
   if (!cfg?.youtubeEnabled) {
-    console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: PODCASTS_YOUTUBE_ENABLED is false`);
+    console.warn(`[podcasts] YouTube stills not queued for episode ${episode.id}: PODCASTS_YOUTUBE_ENABLED is false`);
     return { queued: false, reason: 'youtube_disabled' };
   }
-  if (!videoPipeline?.publishEpisode) {
-    console.warn(`[podcasts] YouTube not queued for episode ${episode.id}: video pipeline unavailable`);
-    return { queued: false, reason: 'pipeline_unavailable' };
+  if (stillsReview?.queueStillsPrepare) {
+    return stillsReview.queueStillsPrepare({ episode: { ...episode, status: 'published' }, force });
   }
-  setImmediate(() => {
-    Promise.resolve()
-      .then(() => videoPipeline.publishEpisode({ ...episode, status: 'published' }, { force }))
-      .then((result) => {
-        if (result?.skipped) {
-          const detail = result.reason === 'stills_incomplete' && Array.isArray(result.failures)
-            ? ` — ${result.failures.map((f) => `${f.label}:${f.reason}`).join('; ')}`
-            : '';
-          console.warn(`[podcasts] YouTube queue finished for episode ${episode.id}: skipped (${result.reason})${detail}`);
-          return;
-        }
-        console.log(`[podcasts] YouTube queue finished for episode ${episode.id}: ${result?.url || result?.id || 'ok'}`);
-      })
-      .catch((err) => {
-        console.error(`[podcasts] YouTube automation failed for episode ${episode.id}:`, err.message);
-      });
-  });
-  return { queued: true };
+  if (!videoPipeline?.prepareStillsBoard) {
+    console.warn(`[podcasts] YouTube stills not queued for episode ${episode.id}: stills board unavailable`);
+    return { queued: false, reason: 'stills_board_unavailable' };
+  }
+  console.warn(
+    `[podcasts] YouTube stills review helper missing for episode ${episode.id}; refusing automatic video publish`
+  );
+  return { queued: false, reason: 'stills_review_required' };
 }
 
 /**
@@ -52,6 +46,7 @@ async function approveAndPublishEpisode({
   episode,
   cfg,
   videoPipeline = null,
+  stillsReview = null,
   reason = 'auto_publish',
 } = {}) {
   if (!episode?.id) throw new Error('approveAndPublishEpisode requires an episode');
@@ -91,12 +86,12 @@ async function approveAndPublishEpisode({
   }
 
   const published = (await store.getEpisodeById(fresh.id)) || approved;
-  const youtube = queueYouTubePublish({ episode: published, cfg, videoPipeline });
+  const youtube = queueYouTubePublish({ episode: published, cfg, videoPipeline, stillsReview });
   return { skipped: false, episode: published, youtube, reason };
 }
 
 /** Fire-and-forget wrapper used after preview_ready. */
-function maybeAutoPublishAfterPreview({ store, episode, cfg, videoPipeline }) {
+function maybeAutoPublishAfterPreview({ store, episode, cfg, videoPipeline, stillsReview }) {
   if (!cfg?.autoPublish) return;
   setImmediate(() => {
     Promise.resolve()
@@ -106,6 +101,7 @@ function maybeAutoPublishAfterPreview({ store, episode, cfg, videoPipeline }) {
           episode,
           cfg,
           videoPipeline,
+          stillsReview,
           reason: 'preview_ready',
         })
       )

@@ -30,7 +30,7 @@ test('scaffold episodes are refused for auto-publish', () => {
   );
 });
 
-test('approveAndPublishEpisode moves preview_ready to published and queues YouTube', async () => {
+test('approveAndPublishEpisode moves preview_ready to published and queues YouTube stills', async () => {
   const store = createMemoryStore();
   const show = await store.getShow('florida-buzz-disney');
   const episode = await store.createEpisode(show.id, {
@@ -46,11 +46,19 @@ test('approveAndPublishEpisode moves preview_ready to published and queues YouTu
     outline_json: { fallback: false },
   });
 
-  let publishedCalls = 0;
+  let stillsCalls = 0;
+  let videoCalls = 0;
   const videoPipeline = {
     publishEpisode: async () => {
-      publishedCalls += 1;
+      videoCalls += 1;
       return { id: 'yt-test', url: 'https://youtu.be/yt-test' };
+    },
+  };
+  const stillsReview = {
+    queueStillsPrepare: ({ episode: ep }) => {
+      stillsCalls += 1;
+      assert.equal(ep.status, 'published');
+      return { queued: true };
     },
   };
   const cfg = config({
@@ -64,16 +72,15 @@ test('approveAndPublishEpisode moves preview_ready to published and queues YouTu
     episode: await store.getEpisodeById(episode.id),
     cfg,
     videoPipeline,
+    stillsReview,
     reason: 'test',
   });
   assert.equal(result.skipped, false);
   assert.equal(result.episode.status, 'published');
   assert.ok(result.episode.published_at);
   assert.equal(result.youtube.queued, true);
-
-  await new Promise((r) => setImmediate(r));
-  await new Promise((r) => setImmediate(r));
-  assert.equal(publishedCalls, 1);
+  assert.equal(stillsCalls, 1);
+  assert.equal(videoCalls, 0);
 });
 
 test('approveAndPublishEpisode no-ops when autoPublish is off', async () => {

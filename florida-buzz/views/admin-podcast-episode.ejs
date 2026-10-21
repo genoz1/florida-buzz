@@ -221,7 +221,7 @@
     <% if (episode.status === 'published') { %>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-retry" style="display:inline">
       <input type="hidden" name="csrf" value="<%= csrf %>">
-      <button class="btn btn-secondary" type="submit">Retry YouTube video</button>
+      <button class="btn btn-secondary" type="submit">Regenerate YouTube stills</button>
     </form>
     <% } %>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/reject-regenerate" style="margin-top:16px" onsubmit="return confirm('Reject this draft and generate a new weekly attempt?');">
@@ -229,6 +229,117 @@
       <button class="btn btn-secondary" type="submit">Reject and regenerate draft</button>
     </form>
   </section>
+
+  <% if (episode.status === 'published') { %>
+  <% const stills = typeof youtubeStills !== 'undefined' && youtubeStills ? youtubeStills : { status: 'idle', items: [], last_error: null, youtube_url: null }; %>
+  <% const stillsSummary = typeof youtubeStillsSummary !== 'undefined' && youtubeStillsSummary ? youtubeStillsSummary : { total: 0, approved: 0, ready: 0, rejected: 0, failed: 0, pending: 0, regenerating: 0, allApproved: false }; %>
+  <section class="card" id="youtube-stills-review">
+    <h2>YouTube stills review</h2>
+    <p>
+      After the podcast is published, story images are generated here first.
+      Approve the ones that look right. Reject a still (with optional direction) to regenerate it.
+      The YouTube video is created <strong>only after every still is approved</strong>.
+    </p>
+    <p>
+      Board status: <span class="status"><%= stills.status || 'idle' %></span>
+      · <%= stillsSummary.approved || 0 %>/<%= stillsSummary.total || 0 %> approved
+      <% if (stillsSummary.ready) { %> · <%= stillsSummary.ready %> ready<% } %>
+      <% if (stillsSummary.failed) { %> · <%= stillsSummary.failed %> failed<% } %>
+      <% if (stillsSummary.regenerating) { %> · <%= stillsSummary.regenerating %> regenerating<% } %>
+    </p>
+    <% if (stills.last_error) { %>
+      <p class="error"><strong>Stills error:</strong> <%= stills.last_error %></p>
+    <% } %>
+    <% if (stills.youtube_url) { %>
+      <p class="notice">YouTube video: <a href="<%= stills.youtube_url %>" target="_blank" rel="noopener"><%= stills.youtube_url %></a></p>
+    <% } %>
+
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/prepare" style="display:inline">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn" type="submit"><%= stills.items && stills.items.length ? 'Refresh stills' : 'Generate stills for review' %></button>
+    </form>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/prepare" style="display:inline">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <input type="hidden" name="force" value="true">
+      <button class="btn btn-secondary" type="submit">Force regenerate all stills</button>
+    </form>
+    <% if (stillsSummary.ready > 0 || stillsSummary.approved > 0) { %>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/approve-all" style="display:inline" onsubmit="return confirm('Approve every usable still?');">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Approve all</button>
+    </form>
+    <% } %>
+    <% if (stillsSummary.allApproved) { %>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/create-video" style="display:inline" onsubmit="return confirm('Create and upload the YouTube video from the approved stills?');">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Create YouTube video</button>
+    </form>
+    <% } else if (stills.items && stills.items.length) { %>
+      <p class="notice">Create YouTube video stays locked until every still below is approved.</p>
+    <% } %>
+
+    <% if (!stills.items || !stills.items.length) { %>
+      <p class="notice" style="margin-top:16px">
+        <% if (stills.status === 'generating') { %>
+          Generating stills — refresh this page in a minute or two.
+        <% } else { %>
+          No stills yet. Click <strong>Generate stills for review</strong> (or publish queues this automatically).
+        <% } %>
+      </p>
+    <% } else { %>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px">
+        <% stills.items.forEach(function (item) { %>
+          <article style="border:1px solid #ccd6d9;padding:12px;background:#fafcfc">
+            <p style="margin:0 0 8px;font-size:13px">
+              <span class="status"><%= item.status %></span>
+              · <%= item.label || item.id %>
+              <% if (item.source) { %> · <code><%= item.source %></code><% } %>
+            </p>
+            <% if (item.public_url) { %>
+              <a href="<%= item.public_url %>" target="_blank" rel="noopener">
+                <img src="<%= item.public_url %>" alt="<%= item.label || 'YouTube still' %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#ddd">
+              </a>
+            <% } else { %>
+              <div style="width:100%;aspect-ratio:16/9;background:#e8eef0;display:flex;align-items:center;justify-content:center;color:#5a6a70;font-size:14px">
+                <%= item.status === 'regenerating' || item.status === 'generating' ? 'Generating…' : 'No image yet' %>
+              </div>
+            <% } %>
+            <% if (item.error) { %>
+              <p class="error" style="margin:8px 0 0;font-size:13px"><%= item.error %></p>
+            <% } %>
+            <% if (item.rejection_note) { %>
+              <p style="margin:8px 0 0;font-size:13px"><strong>Direction:</strong> <%= item.rejection_note %></p>
+            <% } %>
+            <% if (item.reference_credit) { %>
+              <p style="margin:8px 0 0;font-size:12px;color:#5a6a70">Photo ref: <%= item.reference_credit %></p>
+            <% } %>
+            <div style="margin-top:10px">
+              <% if (item.public_url && item.status !== 'approved') { %>
+              <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/<%= encodeURIComponent(item.id) %>/approve" style="display:inline">
+                <input type="hidden" name="csrf" value="<%= csrf %>">
+                <button class="btn" type="submit">Approve</button>
+              </form>
+              <% } %>
+              <% if (item.status !== 'regenerating') { %>
+              <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/<%= encodeURIComponent(item.id) %>/reject" style="margin-top:8px">
+                <input type="hidden" name="csrf" value="<%= csrf %>">
+                <label style="font-size:13px">Reject &amp; redo — optional direction
+                  <textarea name="note" rows="2" placeholder="e.g. Show the BoardWalk from the lake side, no cars, cooler daylight"><%= item.rejection_note || '' %></textarea>
+                </label>
+                <button class="btn btn-secondary" type="submit">Reject &amp; regenerate</button>
+              </form>
+              <% } %>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+    <% if (stills.status === 'generating' || (stillsSummary.regenerating || 0) > 0) { %>
+      <meta http-equiv="refresh" content="20">
+      <p class="notice" style="margin-top:16px">Auto-refreshing while stills generate…</p>
+    <% } %>
+  </section>
+  <% } %>
   <script>
     (function () {
       var panel = document.getElementById('audioStatusPanel');

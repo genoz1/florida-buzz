@@ -21,8 +21,19 @@ const { EVERGREEN_TOPICS } = require('./evergreenTopics');
 const { recoverStuckPodcastWork } = require('./recoverStuck');
 const { describeAudioProgress } = require('./audioStatus');
 const { queueYouTubePublish } = require('./autoPublish');
+const { getStillsBoard, boardSummary } = require('./youtubeStillsReview');
 
-function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText, supabase = null, sendEmail = null, env = process.env }) {
+function createAdminRouter({
+  store,
+  cfg,
+  pipeline,
+  videoPipeline = null,
+  stillsReview = null,
+  aiText,
+  supabase = null,
+  sendEmail = null,
+  env = process.env,
+}) {
   const router = express.Router();
   const secret = env.ADMIN_PASSWORD;
   if (!secret || secret.length < 12) {
@@ -228,6 +239,7 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       const outline = await store.latestScript(episode.id, 'outline');
       const conversation = await store.latestScript(episode.id, 'conversation');
       const audioProgress = describeAudioProgress({ episode, jobs });
+      const youtubeStills = getStillsBoard(episode);
       res.render('admin-podcast-episode', {
         show,
         episode,
@@ -236,6 +248,8 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
         outline,
         conversation,
         audioProgress,
+        youtubeStills,
+        youtubeStillsSummary: boardSummary(youtubeStills),
         cfg,
         evergreenTopics: EVERGREEN_TOPICS,
         csrf: csrf(episode.id),
@@ -681,10 +695,113 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       }
       if (!episode.audio_url) throw new Error('Cannot publish without permanent audio URL');
       await store.setStatus(episode.id, 'published');
-      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=published`);
-      // Publishing the podcast is the trigger. Video work runs after the response and is
-      // idempotent, so a retry cannot create a duplicate YouTube upload.
-      queueYouTubePublish({ episode: { ...episode, status: 'published' }, cfg, videoPipeline });
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=published-stills-queued`);
+      // Publishing the podcast queues YouTube stills for dashboard review — not the video.
+      queueYouTubePublish({
+        episode: { ...episode, status: 'published' },
+        cfg,
+        videoPipeline,
+        stillsReview,
+      });
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/prepare',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (episode.status !== 'published') throw new Error('YouTube stills require a published episode');
+      if (!episode.audio_url) throw new Error('Cannot build YouTube stills without permanent audio URL');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      const force = req.body.force === 'true' || req.body.force === '1';
+      queueYouTubePublish({
+        episode: { ...episode, status: 'published' },
+        cfg,
+        videoPipeline,
+        stillsReview,
+        force,
+      });
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent(
+          force ? 'youtube-stills-regenerate-queued' : 'youtube-stills-queued'
+        )}`
+      );
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/:stillId/approve',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      await stillsReview.approveStill(episode, req.params.stillId);
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-approved')}`);
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/approve-all',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      await stillsReview.approveAllStills(episode);
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('all-stills-approved')}`);
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/:stillId/reject',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      const note = String(req.body.note || req.body.direction || '').trim();
+      // Reject regenerates immediately using optional direction text.
+      setImmediate(() => {
+        Promise.resolve()
+          .then(() => stillsReview.rejectStill(episode, req.params.stillId, note))
+          .then(() => {
+            console.log(`[podcasts] Regenerated rejected still ${req.params.stillId} for ${episode.id}`);
+          })
+          .catch((err) => {
+            console.error(
+              `[podcasts] Reject/regenerate still ${req.params.stillId} failed for ${episode.id}:`,
+              err.message
+            );
+          });
+      });
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-reject-regenerate-queued')}`
+      );
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/create-video',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (episode.status !== 'published') throw new Error('Create YouTube video requires a published episode');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      const board = getStillsBoard(episode);
+      if (!stillsReview.allStillsApproved(board)) {
+        throw new Error('Approve every YouTube still before creating the video');
+      }
+      stillsReview.queueCreateVideo({ episode: { ...episode, status: 'published' } });
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-video-create-queued')}`
+      );
     })
   );
 
@@ -695,11 +812,16 @@ function createAdminRouter({ store, cfg, pipeline, videoPipeline = null, aiText,
       if (!episode) return res.status(404).send('Episode not found');
       if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       if (episode.status !== 'published') throw new Error('YouTube retry requires a published episode');
-      if (!episode.audio_url) throw new Error('Cannot build YouTube video without permanent audio URL');
-      // Force rebuild: regenerate place-accurate stills and upload a fresh YouTube video.
-      // Does not change podcast publish state, script, or audio.
-      queueYouTubePublish({ episode: { ...episode, status: 'published' }, cfg, videoPipeline, force: true });
-      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-retry-queued')}`);
+      if (!episode.audio_url) throw new Error('Cannot build YouTube stills without permanent audio URL');
+      // Force regenerate stills for review — video is created only after re-approval.
+      queueYouTubePublish({
+        episode: { ...episode, status: 'published' },
+        cfg,
+        videoPipeline,
+        stillsReview,
+        force: true,
+      });
+      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-stills-regenerate-queued')}`);
     })
   );
 
