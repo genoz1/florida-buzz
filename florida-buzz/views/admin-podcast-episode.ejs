@@ -308,6 +308,12 @@
     <% } else if (stills.items && stills.items.length) { %>
       <p class="notice">Create YouTube video stays locked until every still below is approved.</p>
     <% } %>
+    <% if (stills.youtube_url) { %>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/update-description" style="display:inline" onsubmit="return confirm('Update the live YouTube description with Florida Buzz link first + episode links?');">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn btn-secondary" type="submit">Refresh YouTube description</button>
+    </form>
+    <% } %>
 
     <% if (!stills.items || !stills.items.length) { %>
       <p class="notice" style="margin-top:16px">

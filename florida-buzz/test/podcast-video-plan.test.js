@@ -70,9 +70,13 @@ test('uses the painterly podcast YouTube illustration style for broaden prompts'
   assert.match(room, /painterly/i);
 });
 
-test('podcast video scenes stay stationary without zoompan drift', () => {
+test('topic stills use scale+crop pan motion; no zoompan drift', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.equal(/zoompan\s*=/.test(source), false);
+  assert.match(source, /topicMotionFilter/);
+  assert.match(source, /scale=\$\{scaleW\}:\$\{scaleH\}|scale=2074:1166/);
+  assert.match(source, /crop=1920:1080/);
+  assert.match(source, /stationaryFilter/);
   assert.match(source, /fps=30,fade=t=in/);
   assert.match(source, /fitCoverFrame/);
   assert.match(source, /renderTopicFrame/);

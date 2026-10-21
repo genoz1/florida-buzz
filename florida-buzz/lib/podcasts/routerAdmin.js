@@ -832,6 +832,26 @@ function createAdminRouter({
   );
 
   router.post(
+    '/episodes/:id/youtube-stills/update-description',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (episode.status !== 'published') throw new Error('YouTube description update requires a published episode');
+      if (!videoPipeline?.updatePublishedDescription) {
+        throw new Error('YouTube description update is unavailable');
+      }
+      const result = await videoPipeline.updatePublishedDescription(episode);
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent(
+          `youtube-description-updated:${result.id}`
+        )}`
+      );
+    })
+  );
+
+  router.post(
     '/episodes/:id/youtube-retry',
     handle(async (req, res) => {
       const episode = await store.getEpisodeById(req.params.id);

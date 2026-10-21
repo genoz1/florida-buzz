@@ -300,12 +300,25 @@ async function renderAgendaCard({ coverBuffer, topics, footer = '' } = {}) {
   return image.getBuffer('image/png');
 }
 
-async function renderBrandCard({ coverBuffer, label }) {
+async function renderBrandCard({ coverBuffer, label, cta = 'Like & Subscribe' }) {
   const f = await fonts();
   const image = rectangle(WIDTH, HEIGHT, COLORS.teal);
   image.composite(await coverPanel(coverBuffer), 580, 80);
-  image.composite(rectangle(1200, 110, COLORS.deep), 360, 865);
-  image.print({ font: f.white32, x: 400, y: 900, text: { text: normalize(label || 'Florida Buzz Disney Podcast'), alignmentX: HorizontalAlign.CENTER }, maxWidth: 1120 });
+  image.composite(rectangle(1200, 160, COLORS.deep), 360, 820);
+  image.print({
+    font: f.white32,
+    x: 400,
+    y: 845,
+    text: { text: normalize(label || 'Florida Buzz Disney Podcast'), alignmentX: HorizontalAlign.CENTER },
+    maxWidth: 1120,
+  });
+  image.print({
+    font: f.white32,
+    x: 400,
+    y: 905,
+    text: { text: normalize(cta || 'Like & Subscribe'), alignmentX: HorizontalAlign.CENTER },
+    maxWidth: 1120,
+  });
   return image.getBuffer('image/png');
 }
 

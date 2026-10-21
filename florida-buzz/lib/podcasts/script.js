@@ -149,6 +149,7 @@ Outline rules:
 - Cover each included source topic accurately using only facts from the source notes.
 - Separate verified source facts from host opinions. Label rumors as rumors.
 - Plan 1–2 light Florida Buzz mentions total (not a tool tour) plus a brief CTA near the close.
+- REQUIRED close YouTube CTA (mark as "YouTube:"): one short natural line asking viewers to like and subscribe if they're watching on YouTube. No hard sell.
 - REQUIRED close merch beat (mark as "Merch:"): mention the merch section on The Florida Buzz with Florida Buzz merchandise, including the soon-to-be-famous “I Caught a Buzz in Florida” t-shirts. One breath, human, not a hard sell.
 - REQUIRED Partner mid-roll segment (mark as "Partner mid-roll:"): ${PODCAST_MIDROLL_DIRECTION}
 - REQUIRED Soft outro partner reminder in the close (mark as "Partner outro:"): ${PODCAST_OUTRO_DIRECTION}
@@ -237,6 +238,7 @@ Florida Buzz listener guidance (light touch):
 - Say “The Florida Buzz dot com” when speaking; never read long URLs aloud.
 - Do not interrupt a thoughtful observation with a promotion.
 - REQUIRED close merch mention: Florida Buzz merch section + “I Caught a Buzz in Florida” t-shirts (soon-to-be-famous / fun energy OK; no hard sell; once only).
+- REQUIRED close YouTube CTA: one short line asking people watching on YouTube to like and subscribe (natural, once, not pushy).
 - REQUIRED mid-episode partner mention: after a couple of stories, include one short human line about partner ${PARTNER_NAME} for Disney tickets/hotels, disclose partner/affiliate nature, point listeners to the show notes link, and note that booking there helps support the show. No hard-sell spam; do not invent prices or deals.
 - Soft outro: briefly remind that the ${PARTNER_NAME} link is in the show notes, then close.
 - Closing may briefly mention listeners can find the stories at The Florida Buzz dot com — keep it short.
