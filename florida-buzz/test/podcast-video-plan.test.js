@@ -70,18 +70,30 @@ test('uses the painterly podcast YouTube illustration style for broaden prompts'
   assert.match(room, /painterly/i);
 });
 
-test('topic stills use scale+crop pan motion; no zoompan drift', () => {
+test('topic stills use 2x work-res continuous pan; no zoompan breathing', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.equal(/zoompan\s*=/.test(source), false);
   assert.match(source, /topicMotionFilter/);
-  assert.match(source, /scale=\$\{scaleW\}:\$\{scaleH\}|scale=2074:1166/);
-  assert.match(source, /crop=1920:1080/);
+  assert.match(source, /workW = 3840|scale=3840:2160/);
+  assert.match(source, /flags=lanczos/);
+  assert.match(source, /min\(1.*,t\/\$\{dur\}\)/);
+  assert.match(source, /overscan/);
   assert.match(source, /stationaryFilter/);
   assert.match(source, /fps=30,fade=t=in/);
   assert.match(source, /fitCoverFrame/);
   assert.match(source, /renderTopicFrame/);
   assert.match(source, /probeMp3DurationSec/);
   assert.match(source, /resolveVideoTotalSeconds/);
+});
+
+test('topicMotionFilter emits a 2x pan filter string for ffmpeg', () => {
+  const { topicMotionFilter } = require('../lib/podcasts/videoPipeline');
+  const vf = topicMotionFilter({ durationSeconds: 8, sceneIndex: 0 });
+  assert.match(vf, /scale=3840:2160:flags=lanczos/);
+  assert.match(vf, /scale=1920:1080:flags=lanczos/);
+  assert.match(vf, /min\(1\\,t\/8\.000\)/);
+  assert.match(vf, /crop=\d+:\d+:/);
+  assert.equal(/zoompan/.test(vf), false);
 });
 
 test('YouTube scene timing uses probed audio when episode duration is missing', () => {

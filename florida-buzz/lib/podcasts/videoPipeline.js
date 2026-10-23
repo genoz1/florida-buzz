@@ -50,31 +50,43 @@ function stripHtml(value) {
 }
 
 /**
- * Real camera move for topic stills: upscale ~8%, then pan the 1920×1080 crop.
- * Avoids the old zoompan "breathing"/jitter look from the first episode.
+ * Slow continuous camera pan for topic stills.
+ *
+ * The previous filter cropped at output resolution with only ~8% overscan.
+ * ffmpeg crop positions are integers, so the frame held still for a few ticks
+ * then jumped a pixel — the stuttery “sickening” look on Premier Pass / similar.
+ *
+ * Fix: pan at 2× working resolution with ~12% overscan, then lanczos-downscale
+ * to 1920×1080 so each 1px crop step becomes a sub-pixel move. Drive x/y with
+ * continuous time `t` (not frame index `n`). No zoompan breathing.
  * Cover/agenda/brand stay stationary so text stays readable.
  */
 function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
   const duration = Math.max(0.8, Number(durationSeconds) || 1);
-  const frames = Math.max(2, Math.round(duration * 30));
+  const dur = duration.toFixed(3);
   const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
-  const scaleW = 2074;
-  const scaleH = 1166;
-  const maxX = scaleW - 1920;
-  const maxY = scaleH - 1080;
+  const workW = 3840;
+  const workH = 2160;
+  const overscan = 1.12;
+  const cropW = Math.round((1920 * 2) / overscan);
+  const cropH = Math.round((1080 * 2) / overscan);
+  const maxX = Math.max(1, workW - cropW);
+  const maxY = Math.max(1, workH - cropH);
   const dirs = [
-    { x0: 0, y0: Math.round(maxY * 0.15), x1: maxX, y1: Math.round(maxY * 0.85) },
-    { x0: maxX, y0: Math.round(maxY * 0.2), x1: 0, y1: Math.round(maxY * 0.8) },
-    { x0: Math.round(maxX * 0.1), y0: maxY, x1: Math.round(maxX * 0.9), y1: 0 },
-    { x0: Math.round(maxX * 0.9), y0: 0, x1: Math.round(maxX * 0.1), y1: maxY },
+    { x0: 0, y0: Math.round(maxY * 0.18), x1: maxX, y1: Math.round(maxY * 0.82) },
+    { x0: maxX, y0: Math.round(maxY * 0.22), x1: 0, y1: Math.round(maxY * 0.78) },
+    { x0: Math.round(maxX * 0.08), y0: maxY, x1: Math.round(maxX * 0.92), y1: 0 },
+    { x0: Math.round(maxX * 0.92), y0: 0, x1: Math.round(maxX * 0.08), y1: maxY },
   ];
   const dir = dirs[Math.abs(Number(sceneIndex) || 0) % dirs.length];
-  const denom = Math.max(1, frames - 1);
-  const xExpr = `${dir.x0}+(${dir.x1 - dir.x0})*n/${denom}`;
-  const yExpr = `${dir.y0}+(${dir.y1 - dir.y0})*n/${denom}`;
+  // Clamp t/dur to [0,1] so the last frames do not overshoot after short clips.
+  const progress = `min(1\\,t/${dur})`;
+  const xExpr = `${dir.x0}+(${dir.x1 - dir.x0})*${progress}`;
+  const yExpr = `${dir.y0}+(${dir.y1 - dir.y0})*${progress}`;
   return (
-    `fps=30,scale=${scaleW}:${scaleH},` +
-    `crop=1920:1080:'${xExpr}':'${yExpr}',` +
+    `fps=30,scale=${workW}:${workH}:flags=lanczos,` +
+    `crop=${cropW}:${cropH}:'${xExpr}':'${yExpr}',` +
+    `scale=1920:1080:flags=lanczos,` +
     `fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`
   );
 }
@@ -684,7 +696,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         const clipPath = path.join(workDir, `clip-${String(i).padStart(3, '0')}.mp4`);
         await fs.promises.writeFile(imagePath, imageBuffer);
         const duration = Math.max(0.8, Number(scene.durationSeconds) || 1);
-        // Topic stills get a real pan (scale+crop). Cover/agenda/brand stay still for readability.
+        // Topic stills get a slow continuous pan (2× work-res crop). Cover/agenda/brand stay still.
         const vf =
           scene.kind === 'topic'
             ? topicMotionFilter({ durationSeconds: duration, sceneIndex: topicMotionIndex++ })
