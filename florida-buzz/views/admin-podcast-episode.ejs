@@ -277,8 +277,9 @@
     </div>
     <p>
       After the podcast is published, story images are generated here first.
-      Approve the ones that look right. Check one or more stills and use <strong>Regenerate selected</strong> to redo several at once (optional shared direction).
-      Or reject a single still with its own note. The YouTube video is created <strong>only after every still is approved</strong>.
+      Check stills, then <strong>Approve selected</strong> or <strong>Regenerate selected</strong>.
+      Direction can go in the shared box or on each card — card notes are used when the shared box is empty.
+      The YouTube video is created <strong>only after every still is approved</strong>.
     </p>
     <p>
       Board status: <span class="status"><%= stills.status || 'idle' %></span>
@@ -337,24 +338,28 @@
       <form id="bulk-regenerate-stills" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/reject-bulk" style="display:none" aria-hidden="true">
         <input type="hidden" name="csrf" value="<%= csrf %>">
       </form>
+      <form id="bulk-approve-stills" method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/approve-bulk" style="display:none" aria-hidden="true">
+        <input type="hidden" name="csrf" value="<%= csrf %>">
+      </form>
       <div class="still-bulk-bar" id="stillBulkBar">
         <label class="inline">
           <input type="checkbox" id="stillSelectAll" <%= regenerableStills.length ? '' : 'disabled' %>>
           Select all
         </label>
         <span id="stillSelectedCount" style="font-size:14px;color:#4a5350">0 selected</span>
-        <label class="bulk-note" style="font-size:13px">Shared direction for selected (optional)
-          <textarea form="bulk-regenerate-stills" name="note" rows="2" placeholder="e.g. Cooler daylight, no cars, lake-side angle"></textarea>
+        <label class="bulk-note" style="font-size:13px">Shared direction for regenerate (optional)
+          <textarea id="stillBulkSharedNote" form="bulk-regenerate-stills" name="note" rows="2" placeholder="e.g. Cooler daylight, no cars, lake-side angle — or type direction on each card"></textarea>
         </label>
+        <button class="btn" type="submit" form="bulk-approve-stills" id="stillBulkApprove" disabled>Approve selected</button>
         <button class="btn btn-secondary" type="submit" form="bulk-regenerate-stills" id="stillBulkSubmit" disabled>Regenerate selected</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:12px">
         <% stills.items.forEach(function (item) { %>
           <% const canSelect = item.status !== 'regenerating' && item.status !== 'generating'; %>
-          <article class="still-card" data-still-id="<%= item.id %>">
+          <article class="still-card" data-still-id="<%= item.id %>" data-has-image="<%= item.public_url ? '1' : '0' %>">
             <% if (canSelect) { %>
             <label class="still-select">
-              <input type="checkbox" class="still-bulk-check" form="bulk-regenerate-stills" name="still_ids" value="<%= item.id %>">
+              <input type="checkbox" class="still-bulk-check" value="<%= item.id %>" data-has-image="<%= item.public_url ? '1' : '0' %>">
               Select
             </label>
             <% } %>
@@ -409,19 +414,44 @@
   <% } %>
   <script>
     (function () {
-      var form = document.getElementById('bulk-regenerate-stills');
+      var regenForm = document.getElementById('bulk-regenerate-stills');
+      var approveForm = document.getElementById('bulk-approve-stills');
       var selectAll = document.getElementById('stillSelectAll');
       var countEl = document.getElementById('stillSelectedCount');
-      var submitBtn = document.getElementById('stillBulkSubmit');
-      if (!form || !submitBtn) return;
+      var regenBtn = document.getElementById('stillBulkSubmit');
+      var approveBtn = document.getElementById('stillBulkApprove');
+      if (!regenForm || !regenBtn) return;
       function checks() {
         return Array.prototype.slice.call(document.querySelectorAll('.still-bulk-check'));
       }
+      function selectedChecks() {
+        return checks().filter(function (el) { return el.checked; });
+      }
+      function clearDynamicFields(form) {
+        Array.prototype.slice.call(form.querySelectorAll('[data-bulk-dynamic="1"]')).forEach(function (el) {
+          el.parentNode.removeChild(el);
+        });
+      }
+      function appendHidden(form, name, value) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        input.setAttribute('data-bulk-dynamic', '1');
+        form.appendChild(input);
+      }
       function syncBulkUi() {
         var boxes = checks();
-        var selected = boxes.filter(function (el) { return el.checked; });
-        if (countEl) countEl.textContent = selected.length + ' selected';
-        submitBtn.disabled = selected.length === 0;
+        var selected = selectedChecks();
+        var approvable = selected.filter(function (el) { return el.getAttribute('data-has-image') === '1'; });
+        if (countEl) {
+          countEl.textContent = selected.length
+            ? selected.length + ' selected'
+              + (approvable.length !== selected.length ? ' (' + approvable.length + ' with images)' : '')
+            : '0 selected';
+        }
+        regenBtn.disabled = selected.length === 0;
+        if (approveBtn) approveBtn.disabled = approvable.length === 0;
         boxes.forEach(function (el) {
           var card = el.closest('.still-card');
           if (card) card.classList.toggle('selected', el.checked);
@@ -439,12 +469,38 @@
           syncBulkUi();
         }
       });
-      form.addEventListener('submit', function (e) {
-        if (!checks().some(function (el) { return el.checked; })) {
+      regenForm.addEventListener('submit', function (e) {
+        var selected = selectedChecks();
+        if (!selected.length) {
           e.preventDefault();
           alert('Select at least one still to regenerate.');
+          return;
         }
+        clearDynamicFields(regenForm);
+        selected.forEach(function (el) {
+          appendHidden(regenForm, 'still_ids', el.value);
+          var card = el.closest('.still-card');
+          var ta = card && card.querySelector('textarea[name="note"]');
+          var localNote = ta ? String(ta.value || '').trim() : '';
+          if (localNote) appendHidden(regenForm, 'still_notes[' + el.value + ']', localNote);
+        });
       });
+      if (approveForm && approveBtn) {
+        approveForm.addEventListener('submit', function (e) {
+          var approvable = selectedChecks().filter(function (el) {
+            return el.getAttribute('data-has-image') === '1';
+          });
+          if (!approvable.length) {
+            e.preventDefault();
+            alert('Select at least one still that already has an image to approve.');
+            return;
+          }
+          clearDynamicFields(approveForm);
+          approvable.forEach(function (el) {
+            appendHidden(approveForm, 'still_ids', el.value);
+          });
+        });
+      }
       syncBulkUi();
     })();
     (function () {

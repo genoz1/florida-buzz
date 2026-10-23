@@ -192,6 +192,65 @@ test('createYoutubeStillsReview approve/reject/create gates video on approval', 
   assert.equal(getStillsBoard(fresh).youtube_url, 'https://youtu.be/yt-1');
 });
 
+test('approveStillsBulk approves only selected stills with images', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, {
+    title: 'Bulk approve episode',
+    description: 'Test bulk approve',
+    show_notes_html: '<p>notes</p>',
+    slug: 'bulk-approve-episode',
+  });
+  await store.updateEpisode(episode.id, {
+    status: 'published',
+    audio_url: 'https://example.com/audio.mp3',
+    outline_json: {
+      youtube_stills: {
+        status: 'ready_for_review',
+        items: [
+          {
+            id: 'story-1-0',
+            label: 'Main Street',
+            public_url: 'https://example.com/a.png',
+            status: 'ready',
+          },
+          {
+            id: 'story-1-1',
+            label: 'Castle',
+            public_url: 'https://example.com/b.png',
+            status: 'ready',
+          },
+          {
+            id: 'story-1-2',
+            label: 'Failed bag',
+            public_url: null,
+            status: 'failed',
+            error: 'no_place_reference',
+          },
+        ],
+      },
+    },
+  });
+
+  const review = createYoutubeStillsReview({
+    store,
+    cfg: { youtubeEnabled: true },
+    videoPipeline: {},
+  });
+
+  let fresh = await store.getEpisodeById(episode.id);
+  await assert.rejects(
+    () => review.approveStillsBulk(fresh, ['story-1-2']),
+    /without an image/
+  );
+  ({ episode: fresh } = await review.approveStillsBulk(fresh, ['story-1-0', 'story-1-1']));
+  const board = getStillsBoard(fresh);
+  assert.equal(board.items.find((i) => i.id === 'story-1-0').status, 'approved');
+  assert.equal(board.items.find((i) => i.id === 'story-1-1').status, 'approved');
+  assert.equal(board.items.find((i) => i.id === 'story-1-2').status, 'failed');
+  assert.equal(board.status, 'ready_for_review');
+});
+
 test('rejectStillsBulk regenerates multiple stills with shared direction', async () => {
   const store = createMemoryStore();
   const show = await store.getShow('florida-buzz-disney');
@@ -272,6 +331,50 @@ test('rejectStillsBulk regenerates multiple stills with shared direction', async
   assert.match(board.items.find((i) => i.id === 'story-1-0').rejection_note, /lake side/);
   assert.match(board.items.find((i) => i.id === 'story-1-1').rejection_note, /cooler light/);
   assert.equal(board.status, 'ready_for_review');
+
+  regeneratedIds.length = 0;
+  const directions = [];
+  // Rebind pipeline to capture per-still notes when shared note is empty.
+  review.rejectStillsBulk = createYoutubeStillsReview({
+    store,
+    cfg: { youtubeEnabled: true },
+    videoPipeline: {
+      regenerateStillForReview: async (_ep, stillId, { direction }) => {
+        regeneratedIds.push(stillId);
+        directions.push(direction);
+        return {
+          id: stillId,
+          label: stillId,
+          public_url: `https://example.com/${stillId}-per.png`,
+          status: 'ready',
+          rejection_note: direction,
+        };
+      },
+    },
+  }).rejectStillsBulk;
+  fresh = await store.getEpisodeById(episode.id);
+  await store.updateEpisode(episode.id, {
+    outline_json: {
+      youtube_stills: {
+        status: 'ready_for_review',
+        items: getStillsBoard(fresh).items.map((item) =>
+          item.id === 'story-1-0'
+            ? { ...item, rejection_note: 'saved previous note' }
+            : item
+        ),
+      },
+    },
+  });
+  fresh = await store.getEpisodeById(episode.id);
+  ({ episode: fresh } = await review.rejectStillsBulk(
+    fresh,
+    ['story-1-0', 'story-1-1'],
+    '',
+    { 'story-1-1': 'photo realistic image of main street usa' }
+  ));
+  assert.deepEqual(regeneratedIds, ['story-1-0', 'story-1-1']);
+  assert.match(directions[0], /saved previous note/);
+  assert.match(directions[1], /main street usa/i);
 });
 
 test('publish and admin routes queue stills review instead of immediate video', () => {
@@ -284,9 +387,13 @@ test('publish and admin routes queue stills review instead of immediate video', 
   assert.match(admin, /youtube-stills\/prepare/);
   assert.match(admin, /youtube-stills\/create-video/);
   assert.match(admin, /youtube-stills\/reject-bulk/);
+  assert.match(admin, /youtube-stills\/approve-bulk/);
   assert.match(admin, /rejectStillsBulk/);
+  assert.match(admin, /approveStillsBulk/);
+  assert.match(admin, /still_notes/);
   assert.match(admin, /#youtube-stills-review/);
   assert.match(admin, /still-bulk-regenerate-queued/);
+  assert.match(admin, /stills-bulk-approved/);
   assert.match(admin, /youtube-status/);
   assert.match(admin, /describeYoutubeProgress/);
   assert.match(admin, /stillsReview/);
@@ -301,15 +408,18 @@ test('publish and admin routes queue stills review instead of immediate video', 
   assert.match(pipeline, /-r\$\{Date\.now/);
   assert.match(place, /extractPlaceFromDirection/);
   assert.match(place, /directionPlace/);
+  assert.match(place, /placeSearchFallbacks|CURATED_COMMONS_FILES|Park Bag|Main Street USA entrance/);
   assert.match(view, /YouTube stills review/);
   assert.match(view, /youtubeStatusPanel/);
   assert.match(view, /youtubeMeterFill/);
   assert.match(view, /Reject &amp; regenerate|Reject &amp; redo/);
   assert.match(view, /bulk-regenerate-stills/);
+  assert.match(view, /bulk-approve-stills/);
   assert.match(view, /still-bulk-check/);
   assert.match(view, /Regenerate selected/);
+  assert.match(view, /Approve selected/);
   assert.match(view, /stillSelectAll/);
-  assert.match(view, /name="still_ids"/);
+  assert.match(view, /still_notes\[/);
   assert.match(view, /Create YouTube video/);
   assert.match(view, /\?.*v=/);
 });

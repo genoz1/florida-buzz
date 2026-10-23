@@ -52,12 +52,38 @@ const PLACE_NAME_PATTERNS = [
   /\bDisney Springs\b/i,
   /\bWorld of Disney\b/i,
   /\bmonorail\b/i,
-  /\bMain Street(?:\s*,?\s*U\.?S\.?A\.?)?\b/i,
+  /\bMain Street(?:\s*,?\s*U\.?S\.?A\.?|\s+USA)?\b/i,
   /\bSpace Mountain\b/i,
   /\bTomorrowland\b/i,
   /\bWorld Showcase\b/i,
   /\bD23(?:\s+Expo)?\b/i,
   /\bGold Theater\b/i,
+];
+
+/** Known Commons files when search misses (bag/security stories, Main Street, etc.). */
+const CURATED_COMMONS_FILES = [
+  {
+    match: /\bmain street\b/i,
+    titles: [
+      'File:Walt Disney World Railroad Main Street USA Station 01.jpg',
+      'File:Magic Kingdom - Main Street and Trolley.jpg',
+    ],
+  },
+  {
+    match: /\b(magic kingdom|cinderella castle)\b/i,
+    titles: [
+      'File:Cinderella Castle, Magic Kingdom Walt Disney World (2024).jpg',
+      'File:Magic Kingdom - Main Street and Trolley.jpg',
+    ],
+  },
+  {
+    match: /\b(spaceship earth|epcot)\b/i,
+    titles: ['File:Spaceship Earth, Epcot en janvier 2022 (4).jpg'],
+  },
+  {
+    match: /\b(board\s*-?\s*walk)\b/i,
+    titles: ["File:Disney's BoardWalk Inn, Walt Disney World Resort, Orlando, Florida (15631367141).jpg"],
+  },
 ];
 
 /** Pull a concrete place override out of admin reject/redo direction text. */
@@ -115,6 +141,14 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
   }
   if (!directionOverridesPlace && /\bspirit jersey/i.test(raw)) {
     placeHints.unshift('World of Disney Disney Springs');
+  }
+  // Bag / security / prohibited items stories → Main Street / park entrance (not abstract "restrictions").
+  if (
+    !directionOverridesPlace
+    && /\b(bag|bags|backpack|security|prohibited|restricted items?|park bag)\b/i.test(raw)
+    && !/\bmain street|entrance|railroad|magic kingdom\b/i.test(placeHints.join(' '))
+  ) {
+    placeHints.unshift('Magic Kingdom Main Street USA entrance');
   }
   const labelCore = directionOverridesPlace
     ? ''
@@ -187,6 +221,75 @@ async function fetchImageBuffer(url, fetchImpl = fetch) {
   return { buffer, mimeType: mime || 'image/jpeg' };
 }
 
+function pageToCandidate(page) {
+  const info = (page.imageinfo || [])[0] || {};
+  return {
+    title: page.title || '',
+    url: info.thumburl || info.url || '',
+    mime: String(info.mime || '').toLowerCase(),
+    width: Number(info.thumbwidth || info.width || 0),
+    height: Number(info.thumbheight || info.height || 0),
+    size: Number(info.size || 0),
+    extmetadata: info.extmetadata || {},
+  };
+}
+
+function candidateIsUsable(item) {
+  return Boolean(
+    item.url
+    && /^image\/(jpeg|jpg|png|webp)$/.test(item.mime)
+    && titleLooksUseful(item.title)
+    && licenseLooksOk(item.extmetadata)
+    && (item.width >= 800 || item.size >= 80_000)
+  );
+}
+
+async function downloadWikimediaCandidate(item, query, fetchImpl) {
+  const downloaded = await fetchImageBuffer(item.url, fetchImpl);
+  return {
+    source: 'wikimedia',
+    query: String(query || ''),
+    title: item.title,
+    pageUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
+    imageUrl: stripTracking(item.url),
+    credit: creditFromMeta(item.title, item.extmetadata),
+    buffer: downloaded.buffer,
+    mimeType: downloaded.mimeType,
+  };
+}
+
+async function fetchWikimediaFileByTitle(title, { fetchImpl = fetch, query = '' } = {}) {
+  const fileTitle = String(title || '').trim();
+  if (!fileTitle) return null;
+  const params = new URLSearchParams({
+    action: 'query',
+    titles: fileTitle,
+    prop: 'imageinfo',
+    iiprop: 'url|mime|size|extmetadata',
+    iiurlwidth: '1600',
+    format: 'json',
+    origin: '*',
+  });
+  const res = await fetchImpl(`${COMMONS_API}?${params}`, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Wikimedia file lookup HTTP ${res.status}`);
+  const data = await res.json();
+  const pages = Object.values(data?.query?.pages || {});
+  for (const page of pages) {
+    if (page.missing != null) continue;
+    const item = pageToCandidate(page);
+    if (!candidateIsUsable(item)) continue;
+    try {
+      return await downloadWikimediaCandidate(item, query || fileTitle, fetchImpl);
+    } catch (err) {
+      console.warn(`[podcasts] Curated Wikimedia file failed (${item.title}): ${err.message}`);
+    }
+  }
+  return null;
+}
+
 async function searchWikimediaPlacePhoto(query, { fetchImpl = fetch, limit = 8 } = {}) {
   const q = String(query || '').trim();
   if (q.length < 4) return null;
@@ -210,39 +313,58 @@ async function searchWikimediaPlacePhoto(query, { fetchImpl = fetch, limit = 8 }
   const data = await res.json();
   const pages = Object.values(data?.query?.pages || {});
   const ranked = pages
-    .map((page) => {
-      const info = (page.imageinfo || [])[0] || {};
-      return {
-        title: page.title || '',
-        url: info.thumburl || info.url || '',
-        mime: String(info.mime || '').toLowerCase(),
-        width: Number(info.thumbwidth || info.width || 0),
-        height: Number(info.thumbheight || info.height || 0),
-        size: Number(info.size || 0),
-        extmetadata: info.extmetadata || {},
-      };
-    })
-    .filter((item) => item.url && /^image\/(jpeg|jpg|png|webp)$/.test(item.mime))
-    .filter((item) => titleLooksUseful(item.title))
-    .filter((item) => licenseLooksOk(item.extmetadata))
-    .filter((item) => item.width >= 800 || item.size >= 80_000)
+    .map(pageToCandidate)
+    .filter(candidateIsUsable)
     .sort((a, b) => (b.width * b.height) - (a.width * a.height));
 
   for (const item of ranked.slice(0, 5)) {
     try {
-      const downloaded = await fetchImageBuffer(item.url, fetchImpl);
-      return {
-        source: 'wikimedia',
-        query: q,
-        title: item.title,
-        pageUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
-        imageUrl: stripTracking(item.url),
-        credit: creditFromMeta(item.title, item.extmetadata),
-        buffer: downloaded.buffer,
-        mimeType: downloaded.mimeType,
-      };
+      return await downloadWikimediaCandidate(item, q, fetchImpl);
     } catch (err) {
       console.warn(`[podcasts] Wikimedia candidate failed (${item.title}): ${err.message}`);
+    }
+  }
+  return null;
+}
+
+/** Extra queries when the primary search returns nothing (admin direction / thin labels). */
+function placeSearchFallbacks({ label = '', prompt = '', direction = '', primaryQuery = '' } = {}) {
+  const directionPlace = extractPlaceFromDirection(direction);
+  const hay = `${direction} ${directionPlace} ${label} ${prompt} ${primaryQuery}`;
+  const out = [];
+  const push = (q) => {
+    const cleaned = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    if (cleaned.length >= 4 && !out.includes(cleaned)) out.push(cleaned);
+  };
+  if (directionPlace) {
+    push(`${directionPlace} Walt Disney World`);
+    push(`${directionPlace} Magic Kingdom`);
+    push(directionPlace);
+  }
+  if (/\bmain street\b/i.test(hay)) {
+    push('Main Street USA Magic Kingdom');
+    push('Magic Kingdom Main Street Walt Disney World');
+  }
+  if (/\b(bag|bags|backpack|security|prohibited|restricted items?|park bag)\b/i.test(hay)) {
+    push('Magic Kingdom Main Street USA');
+    push('Magic Kingdom entrance railroad station');
+  }
+  if (!directionPlace && label) {
+    push(`${label} Walt Disney World`);
+  }
+  // Last resort so thin labels still get a real WDW place photo.
+  push('Magic Kingdom Main Street Walt Disney World');
+  push('Cinderella Castle Magic Kingdom Walt Disney World');
+  return out.filter((q) => q !== String(primaryQuery || '').trim());
+}
+
+async function curatedWikimediaFallback(hay, fetchImpl) {
+  const text = String(hay || '');
+  for (const entry of CURATED_COMMONS_FILES) {
+    if (!entry.match.test(text)) continue;
+    for (const title of entry.titles) {
+      const hit = await fetchWikimediaFileByTitle(title, { fetchImpl, query: text }).catch(() => null);
+      if (hit) return hit;
     }
   }
   return null;
@@ -348,26 +470,30 @@ async function findPlaceReferencePhoto({
   // Prefer Wikimedia place photos first so we never template from panel/people article heroes.
   // When an admin gives redo direction, search that place — not the original story article hero.
   const query = buildPlaceSearchQuery({ label, category, prompt, direction });
-  const wiki = await searchWikimediaPlacePhoto(query, { fetchImpl }).catch((err) => {
-    console.warn(`[podcasts] Wikimedia place search failed: ${err.message}`);
-    return null;
-  });
-  if (wiki) {
-    return { ...wiki, subjectKind: 'place' };
+  const tried = new Set();
+  const trySearch = async (q) => {
+    const cleaned = String(q || '').replace(/\s+/g, ' ').trim();
+    if (cleaned.length < 4 || tried.has(cleaned.toLowerCase())) return null;
+    tried.add(cleaned.toLowerCase());
+    return searchWikimediaPlacePhoto(cleaned, { fetchImpl }).catch((err) => {
+      console.warn(`[podcasts] Wikimedia place search failed (${cleaned.slice(0, 60)}): ${err.message}`);
+      return null;
+    });
+  };
+
+  let wiki = await trySearch(query);
+  if (wiki) return { ...wiki, subjectKind: 'place' };
+
+  for (const fallback of placeSearchFallbacks({ label, prompt, direction, primaryQuery: query })) {
+    wiki = await trySearch(fallback);
+    if (wiki) return { ...wiki, subjectKind: 'place' };
   }
 
-  if (directionPlace) {
-    const directed = await searchWikimediaPlacePhoto(
-      `${directionPlace} Walt Disney World`.slice(0, 160),
-      { fetchImpl }
-    ).catch(() => null);
-    if (directed) return { ...directed, subjectKind: 'place' };
-  }
-
-  if (label && !directionPlace && !query.includes(String(label).slice(0, 24))) {
-    const broad = await searchWikimediaPlacePhoto(`${label} Walt Disney World`.slice(0, 160), { fetchImpl }).catch(() => null);
-    if (broad) return { ...broad, subjectKind: 'place' };
-  }
+  const curated = await curatedWikimediaFallback(
+    `${direction} ${directionPlace} ${label} ${prompt} ${query}`,
+    fetchImpl
+  ).catch(() => null);
+  if (curated) return { ...curated, subjectKind: 'place' };
 
   // Skip article heroes when admin explicitly asked for a different place — they pin the wrong scene.
   if (!directionPlace) {
@@ -426,11 +552,13 @@ module.exports = {
   creditFromMeta,
   extractPlaceFromDirection,
   fetchImageBuffer,
+  fetchWikimediaFileByTitle,
   findArticleHeroReference,
   findPlaceReferencePhoto,
   licenseLooksOk,
   looksLikePeoplePrimaryText,
   overlapScore,
+  placeSearchFallbacks,
   referenceReviewQuestion,
   searchWikimediaPlacePhoto,
   stripTracking,

@@ -276,13 +276,31 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
   }
 
   async function approveStill(episode, stillId) {
+    return approveStillsBulk(episode, [stillId]);
+  }
+
+  async function approveStillsBulk(episode, stillIds) {
+    const ids = [
+      ...new Set(
+        (Array.isArray(stillIds) ? stillIds : [stillIds])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+    if (!ids.length) throw new Error('Select at least one still to approve');
     const board = getStillsBoard(episode);
+    const selected = new Set(ids);
+    for (const stillId of ids) {
+      const item = board.items.find((entry) => entry.id === stillId);
+      if (!item) throw new Error(`Still not found: ${stillId}`);
+      if (!item.public_url) {
+        throw new Error(`Cannot approve "${item.label || stillId}" without an image — regenerate it first`);
+      }
+    }
     const items = board.items.map((item) => {
-      if (item.id !== stillId) return item;
-      if (!item.public_url) throw new Error('Cannot approve a still without an image URL');
-      return { ...item, status: 'approved', rejection_note: item.rejection_note || '' };
+      if (!selected.has(item.id)) return item;
+      return { ...item, status: 'approved', rejection_note: item.rejection_note || '', error: null };
     });
-    if (!items.some((item) => item.id === stillId)) throw new Error('Still not found');
     const nextStatus = items.every((item) => item.status === 'approved') ? 'approved' : 'ready_for_review';
     return saveStillsBoard(store, episode, { ...board, status: nextStatus, items, last_error: null });
   }
@@ -303,7 +321,18 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     return rejectStillsBulk(episode, [stillId], note);
   }
 
-  async function rejectStillsBulk(episode, stillIds, note = '') {
+  function normalizeStillNotes(noteById = {}) {
+    if (!noteById || typeof noteById !== 'object' || Array.isArray(noteById)) return {};
+    const out = {};
+    for (const [key, value] of Object.entries(noteById)) {
+      const id = String(key || '').trim();
+      const text = String(value || '').trim().slice(0, 800);
+      if (id && text) out[id] = text;
+    }
+    return out;
+  }
+
+  async function rejectStillsBulk(episode, stillIds, note = '', noteById = {}) {
     if (!videoPipeline?.regenerateStillForReview) {
       throw new Error('Still regeneration unavailable');
     }
@@ -316,8 +345,12 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     ];
     if (!ids.length) throw new Error('Select at least one still to regenerate');
 
-    const direction = String(note || '').trim().slice(0, 800);
+    const sharedDirection = String(note || '').trim().slice(0, 800);
+    const perStillNotes = normalizeStillNotes(noteById);
     const board = getStillsBoard(episode);
+    const directionFor = (item) =>
+      sharedDirection || perStillNotes[item.id] || String(item.rejection_note || '').trim().slice(0, 800);
+
     for (const stillId of ids) {
       if (!board.items.some((item) => item.id === stillId)) {
         throw new Error(`Still not found: ${stillId}`);
@@ -330,7 +363,7 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
         ? {
             ...item,
             status: 'regenerating',
-            rejection_note: direction || item.rejection_note || '',
+            rejection_note: directionFor(item),
             error: null,
           }
         : item
@@ -344,6 +377,8 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
 
     let lastError = null;
     for (const stillId of ids) {
+      const boardItem = working.find((item) => item.id === stillId) || board.items.find((item) => item.id === stillId);
+      const direction = directionFor(boardItem || { id: stillId });
       const fresh = await store.getEpisodeById(episode.id);
       const regenerated = await videoPipeline.regenerateStillForReview(fresh, stillId, { direction });
       const latest = getStillsBoard(await store.getEpisodeById(episode.id));
@@ -436,6 +471,7 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     prepareStillsForReview,
     queueStillsPrepare,
     approveStill,
+    approveStillsBulk,
     approveAllStills,
     rejectStill,
     rejectStillsBulk,
