@@ -806,7 +806,42 @@ function createAdminRouter({
       });
       res.redirect(
         303,
-        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-reject-regenerate-queued')}`
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-reject-regenerate-queued')}#youtube-stills-review`
+      );
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/reject-bulk',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      const raw = req.body.still_ids;
+      const stillIds = (Array.isArray(raw) ? raw : raw ? [raw] : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean);
+      if (!stillIds.length) throw new Error('Select at least one still to regenerate');
+      const note = String(req.body.note || req.body.direction || '').trim();
+      setImmediate(() => {
+        Promise.resolve()
+          .then(() => stillsReview.rejectStillsBulk(episode, stillIds, note))
+          .then(() => {
+            console.log(
+              `[podcasts] Regenerated ${stillIds.length} rejected still(s) for ${episode.id}: ${stillIds.join(', ')}`
+            );
+          })
+          .catch((err) => {
+            console.error(
+              `[podcasts] Bulk reject/regenerate failed for ${episode.id}:`,
+              err.message
+            );
+          });
+      });
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-bulk-regenerate-queued')}#youtube-stills-review`
       );
     })
   );

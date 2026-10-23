@@ -300,20 +300,37 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
   }
 
   async function rejectStill(episode, stillId, note = '') {
+    return rejectStillsBulk(episode, [stillId], note);
+  }
+
+  async function rejectStillsBulk(episode, stillIds, note = '') {
     if (!videoPipeline?.regenerateStillForReview) {
       throw new Error('Still regeneration unavailable');
     }
+    const ids = [
+      ...new Set(
+        (Array.isArray(stillIds) ? stillIds : [stillIds])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+    if (!ids.length) throw new Error('Select at least one still to regenerate');
+
     const direction = String(note || '').trim().slice(0, 800);
     const board = getStillsBoard(episode);
-    const target = board.items.find((item) => item.id === stillId);
-    if (!target) throw new Error('Still not found');
+    for (const stillId of ids) {
+      if (!board.items.some((item) => item.id === stillId)) {
+        throw new Error(`Still not found: ${stillId}`);
+      }
+    }
 
+    const selected = new Set(ids);
     let working = board.items.map((item) =>
-      item.id === stillId
+      selected.has(item.id)
         ? {
             ...item,
             status: 'regenerating',
-            rejection_note: direction,
+            rejection_note: direction || item.rejection_note || '',
             error: null,
           }
         : item
@@ -325,18 +342,34 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
       last_error: null,
     });
 
-    const fresh = await store.getEpisodeById(episode.id);
-    const regenerated = await videoPipeline.regenerateStillForReview(fresh, stillId, { direction });
-    const latest = getStillsBoard(await store.getEpisodeById(episode.id));
-    working = latest.items.map((item) => (item.id === stillId ? regenerated : item));
-    const nextStatus = working.every((item) => item.status === 'approved')
+    let lastError = null;
+    for (const stillId of ids) {
+      const fresh = await store.getEpisodeById(episode.id);
+      const regenerated = await videoPipeline.regenerateStillForReview(fresh, stillId, { direction });
+      const latest = getStillsBoard(await store.getEpisodeById(episode.id));
+      working = latest.items.map((item) => (item.id === stillId ? regenerated : item));
+      if (regenerated.status === 'failed') lastError = regenerated.error || lastError;
+      const midStatus = working.every((item) => item.status === 'approved')
+        ? 'approved'
+        : working.some((item) => item.status === 'regenerating' || item.status === 'generating')
+          ? 'generating'
+          : 'ready_for_review';
+      await saveStillsBoard(store, await store.getEpisodeById(episode.id), {
+        ...latest,
+        status: midStatus,
+        items: working,
+        last_error: lastError,
+      });
+    }
+
+    const finalBoard = getStillsBoard(await store.getEpisodeById(episode.id));
+    const nextStatus = finalBoard.items.every((item) => item.status === 'approved')
       ? 'approved'
       : 'ready_for_review';
     return saveStillsBoard(store, await store.getEpisodeById(episode.id), {
-      ...latest,
+      ...finalBoard,
       status: nextStatus,
-      items: working,
-      last_error: regenerated.status === 'failed' ? regenerated.error : null,
+      last_error: lastError,
     });
   }
 
@@ -405,6 +438,7 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     approveStill,
     approveAllStills,
     rejectStill,
+    rejectStillsBulk,
     createVideoFromApprovedStills,
     queueCreateVideo,
   };

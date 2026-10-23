@@ -192,6 +192,88 @@ test('createYoutubeStillsReview approve/reject/create gates video on approval', 
   assert.equal(getStillsBoard(fresh).youtube_url, 'https://youtu.be/yt-1');
 });
 
+test('rejectStillsBulk regenerates multiple stills with shared direction', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, {
+    title: 'Bulk stills episode',
+    description: 'Test bulk reject',
+    show_notes_html: '<p>notes</p>',
+    slug: 'bulk-stills-episode',
+  });
+  await store.updateEpisode(episode.id, {
+    status: 'published',
+    audio_url: 'https://example.com/audio.mp3',
+    outline_json: {
+      youtube_stills: {
+        status: 'ready_for_review',
+        items: [
+          {
+            id: 'story-1-0',
+            label: 'Main Street',
+            public_url: 'https://example.com/a.png',
+            status: 'ready',
+          },
+          {
+            id: 'story-1-1',
+            label: 'Castle',
+            public_url: 'https://example.com/b.png',
+            status: 'ready',
+          },
+          {
+            id: 'story-1-2',
+            label: 'Lagoon',
+            public_url: 'https://example.com/c.png',
+            status: 'approved',
+          },
+        ],
+      },
+    },
+  });
+
+  const regeneratedIds = [];
+  const review = createYoutubeStillsReview({
+    store,
+    cfg: { youtubeEnabled: true },
+    videoPipeline: {
+      regenerateStillForReview: async (_ep, stillId, { direction }) => {
+        regeneratedIds.push(stillId);
+        return {
+          id: stillId,
+          label: stillId,
+          public_url: `https://example.com/${stillId}-new.png`,
+          status: 'ready',
+          rejection_note: direction,
+        };
+      },
+    },
+  });
+
+  let fresh = await store.getEpisodeById(episode.id);
+  await assert.rejects(
+    () => review.rejectStillsBulk(fresh, [], 'nope'),
+    /Select at least one still/
+  );
+  await assert.rejects(
+    () => review.rejectStillsBulk(fresh, ['missing-still'], 'nope'),
+    /Still not found/
+  );
+
+  ({ episode: fresh } = await review.rejectStillsBulk(
+    fresh,
+    ['story-1-0', 'story-1-1', 'story-1-0'],
+    'lake side, cooler light'
+  ));
+  assert.deepEqual(regeneratedIds, ['story-1-0', 'story-1-1']);
+  const board = getStillsBoard(fresh);
+  assert.equal(board.items.find((i) => i.id === 'story-1-0').status, 'ready');
+  assert.equal(board.items.find((i) => i.id === 'story-1-1').status, 'ready');
+  assert.equal(board.items.find((i) => i.id === 'story-1-2').status, 'approved');
+  assert.match(board.items.find((i) => i.id === 'story-1-0').rejection_note, /lake side/);
+  assert.match(board.items.find((i) => i.id === 'story-1-1').rejection_note, /cooler light/);
+  assert.equal(board.status, 'ready_for_review');
+});
+
 test('publish and admin routes queue stills review instead of immediate video', () => {
   const admin = fs.readFileSync(path.join(__dirname, '../lib/podcasts/routerAdmin.js'), 'utf8');
   const auto = fs.readFileSync(path.join(__dirname, '../lib/podcasts/autoPublish.js'), 'utf8');
@@ -201,6 +283,10 @@ test('publish and admin routes queue stills review instead of immediate video', 
 
   assert.match(admin, /youtube-stills\/prepare/);
   assert.match(admin, /youtube-stills\/create-video/);
+  assert.match(admin, /youtube-stills\/reject-bulk/);
+  assert.match(admin, /rejectStillsBulk/);
+  assert.match(admin, /#youtube-stills-review/);
+  assert.match(admin, /still-bulk-regenerate-queued/);
   assert.match(admin, /youtube-status/);
   assert.match(admin, /describeYoutubeProgress/);
   assert.match(admin, /stillsReview/);
@@ -219,6 +305,11 @@ test('publish and admin routes queue stills review instead of immediate video', 
   assert.match(view, /youtubeStatusPanel/);
   assert.match(view, /youtubeMeterFill/);
   assert.match(view, /Reject &amp; regenerate|Reject &amp; redo/);
+  assert.match(view, /bulk-regenerate-stills/);
+  assert.match(view, /still-bulk-check/);
+  assert.match(view, /Regenerate selected/);
+  assert.match(view, /stillSelectAll/);
+  assert.match(view, /name="still_ids"/);
   assert.match(view, /Create YouTube video/);
   assert.match(view, /\?.*v=/);
 });
