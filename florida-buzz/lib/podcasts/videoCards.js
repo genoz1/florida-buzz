@@ -8,7 +8,8 @@ const HEIGHT = 1080;
 const COLORS = {
   teal: 0x0e3b43ff,
   deep: 0x082b31ff,
-  navy: 0x0b1f33ee,
+  // Fully opaque so the subject plate stays visually pinned while the photo pans under it.
+  navy: 0x0b1f33ff,
   coral: 0xff6452ff,
   gold: 0xf5c518ff,
   white: 0xffffffff,
@@ -189,11 +190,20 @@ function roundedCard(width, height, fill, border) {
   return card;
 }
 
-async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel = false } = {}) {
-  const f = await fonts();
+/** Cover-fit the story photo to 1920×1080 with no chrome (used under the pan). */
+async function renderTopicBackground(imageBuffer) {
   const photo = await Jimp.read(imageBuffer);
   photo.cover({ w: WIDTH, h: HEIGHT });
-  const image = photo;
+  return photo.getBuffer('image/png');
+}
+
+/**
+ * Transparent 1920×1080 PNG with the fixed subject box + caption.
+ * Composited after the pan so chrome stays pinned while the photo moves.
+ */
+async function renderTopicOverlay({ label, category, caption, aiLabel = false } = {}) {
+  const f = await fonts();
+  const image = new Jimp({ width: WIDTH, height: HEIGHT, color: 0x00000000 });
 
   const eyebrow = eyebrowFromCategory(category, label);
   const title = normalize(label || 'Disney World Update');
@@ -233,6 +243,15 @@ async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel
   void aiLabel;
 
   return image.getBuffer('image/png');
+}
+
+async function renderTopicFrame(imageBuffer, { label, category, caption, aiLabel = false } = {}) {
+  const background = await Jimp.read(await renderTopicBackground(imageBuffer));
+  const overlay = await Jimp.read(
+    await renderTopicOverlay({ label, category, caption, aiLabel })
+  );
+  background.composite(overlay, 0, 0);
+  return background.getBuffer('image/png');
 }
 
 /**
@@ -367,7 +386,9 @@ module.exports = {
   renderAgendaCard,
   renderBrandCard,
   renderThumbnailFrame,
+  renderTopicBackground,
   renderTopicCard,
+  renderTopicOverlay,
   shortAgendaBlurb,
   renderTopicFrame,
   wrapWords,

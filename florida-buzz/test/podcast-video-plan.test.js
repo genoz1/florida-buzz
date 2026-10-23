@@ -83,13 +83,15 @@ test('topic stills use 2x work-res continuous pan; no zoompan breathing', () => 
   assert.match(source, /stationaryFilter/);
   assert.match(source, /fps=30,fade=t=in/);
   assert.match(source, /fitCoverFrame/);
-  assert.match(source, /renderTopicFrame/);
+  assert.match(source, /renderTopicBackground/);
+  assert.match(source, /renderTopicOverlay/);
+  assert.match(source, /topicMotionOverlayFilter/);
   assert.match(source, /probeMp3DurationSec/);
   assert.match(source, /resolveVideoTotalSeconds/);
 });
 
 test('topicMotionFilter emits a fast 2x pan filter and caps long pans', () => {
-  const { topicMotionFilter } = require('../lib/podcasts/videoPipeline');
+  const { topicMotionFilter, topicMotionOverlayFilter } = require('../lib/podcasts/videoPipeline');
   const short = topicMotionFilter({ durationSeconds: 8, sceneIndex: 0 });
   assert.match(short, /scale=3840:2160:flags=bilinear/);
   assert.match(short, /scale=1920:1080:flags=bilinear/);
@@ -98,6 +100,34 @@ test('topicMotionFilter emits a fast 2x pan filter and caps long pans', () => {
   const long = topicMotionFilter({ durationSeconds: 90, sceneIndex: 1 });
   assert.match(long, /min\(1\\,t\/24\.000\)/);
   assert.equal(/t\/90/.test(long), false);
+  const overlay = topicMotionOverlayFilter({ durationSeconds: 12, sceneIndex: 0 });
+  assert.match(overlay, /\[0:v\].*\[bg\]/);
+  assert.match(overlay, /\[bg\]\[1:v\]overlay=0:0/);
+});
+
+test('topic overlay chrome is separate from the panned photo', async () => {
+  const { Jimp } = require('jimp');
+  const {
+    renderTopicBackground,
+    renderTopicOverlay,
+    renderTopicFrame,
+  } = require('../lib/podcasts/videoCards');
+  const photo = new Jimp({ width: 1600, height: 900, color: 0x336699ff });
+  const buf = await photo.getBuffer('image/png');
+  const bg = await Jimp.read(await renderTopicBackground(buf));
+  const overlay = await Jimp.read(
+    await renderTopicOverlay({ label: 'Main Street USA', category: 'theme-parks', caption: 'Park update' })
+  );
+  // Background has no navy header plate; overlay does (top-left).
+  const bgPixel = bg.getPixelColor(80, 60);
+  const overlayPixel = overlay.getPixelColor(80, 60);
+  assert.notEqual(bgPixel, overlayPixel);
+  assert.equal(overlay.getPixelColor(1900, 1000) >>> 0 & 0xff, 0); // transparent corner
+  const framed = await Jimp.read(
+    await renderTopicFrame(buf, { label: 'Main Street USA', category: 'theme-parks' })
+  );
+  assert.equal(framed.bitmap.width, 1920);
+  assert.equal(framed.bitmap.height, 1080);
 });
 
 test('YouTube scene timing uses probed audio when episode duration is missing', () => {
