@@ -52,22 +52,20 @@ function stripHtml(value) {
 /**
  * Slow continuous camera pan for topic stills.
  *
- * The previous filter cropped at output resolution with only ~8% overscan.
- * ffmpeg crop positions are integers, so the frame held still for a few ticks
- * then jumped a pixel — the stuttery “sickening” look on Premier Pass / similar.
+ * Crop x/y are integers, so tiny travel (old ~8% overscan at 1080p) holds a few
+ * frames then jumps a pixel. Pan at 2× with ~20% overscan and bilinear downscale
+ * so each step is sub-pixel and looks smooth — without the 4K lanczos cost that
+ * stalled App Platform renders for nearly an hour.
  *
- * Fix: pan at 2× working resolution with ~12% overscan, then lanczos-downscale
- * to 1920×1080 so each 1px crop step becomes a sub-pixel move. Drive x/y with
- * continuous time `t` (not frame index `n`). No zoompan breathing.
- * Cover/agenda/brand stay stationary so text stays readable.
+ * Long story clips finish the pan in ~24s then hold; dragging a tiny pan across
+ * a full minute reintroduces stutter. No zoompan breathing.
  */
 function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
   const duration = Math.max(0.8, Number(durationSeconds) || 1);
-  const dur = duration.toFixed(3);
   const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
   const workW = 3840;
   const workH = 2160;
-  const overscan = 1.12;
+  const overscan = 1.2;
   const cropW = Math.round((1920 * 2) / overscan);
   const cropH = Math.round((1080 * 2) / overscan);
   const maxX = Math.max(1, workW - cropW);
@@ -79,14 +77,15 @@ function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
     { x0: Math.round(maxX * 0.92), y0: 0, x1: Math.round(maxX * 0.08), y1: maxY },
   ];
   const dir = dirs[Math.abs(Number(sceneIndex) || 0) % dirs.length];
-  // Clamp t/dur to [0,1] so the last frames do not overshoot after short clips.
-  const progress = `min(1\\,t/${dur})`;
+  // Keep ≥~1 work-px/frame so motion never plateaus; hold after the pan window.
+  const panSeconds = Math.min(duration, 24);
+  const progress = `min(1\\,t/${panSeconds.toFixed(3)})`;
   const xExpr = `${dir.x0}+(${dir.x1 - dir.x0})*${progress}`;
   const yExpr = `${dir.y0}+(${dir.y1 - dir.y0})*${progress}`;
   return (
-    `fps=30,scale=${workW}:${workH}:flags=lanczos,` +
+    `fps=30,scale=${workW}:${workH}:flags=bilinear,` +
     `crop=${cropW}:${cropH}:'${xExpr}':'${yExpr}',` +
-    `scale=1920:1080:flags=lanczos,` +
+    `scale=1920:1080:flags=bilinear,` +
     `fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`
   );
 }
@@ -701,11 +700,20 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
           scene.kind === 'topic'
             ? topicMotionFilter({ durationSeconds: duration, sceneIndex: topicMotionIndex++ })
             : stationaryFilter(duration);
+        const startedAt = Date.now();
+        console.log(
+          `[podcasts] Rendering YouTube clip ${i + 1}/${plan.scenes.length} kind=${scene.kind} ` +
+            `dur=${duration.toFixed(1)}s label=${String(scene.label || scene.kind).slice(0, 60)}`
+        );
         await runFfmpeg([
           '-loop', '1', '-i', imagePath,
           '-vf', vf,
-          '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
+          // ultrafast keeps App Platform under ~realtime for long still pans
+          '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
         ]);
+        console.log(
+          `[podcasts] YouTube clip ${i + 1}/${plan.scenes.length} done in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`
+        );
         sceneClips.push(clipPath);
       }
       const concatList = path.join(workDir, 'clips.txt');
