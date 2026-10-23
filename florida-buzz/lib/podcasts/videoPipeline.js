@@ -19,7 +19,14 @@ const {
   referenceReviewQuestion,
   withReferencePrompt,
 } = require('./placeReferencePhoto');
-const { fitCoverFrame, renderAgendaCard, renderBrandCard, renderThumbnailFrame, renderTopicFrame } = require('./videoCards');
+const {
+  fitCoverFrame,
+  renderAgendaCard,
+  renderBrandCard,
+  renderThumbnailFrame,
+  renderTopicBackground,
+  renderTopicOverlay,
+} = require('./videoCards');
 const { uploadThumbnail, uploadVideo, updateVideoSnippet, youtubeConfigured } = require('./youtubeClient');
 const { stillKey } = require('./youtubeStillsReview');
 const { buildYoutubeDescription } = require('./youtubeDescription');
@@ -50,19 +57,21 @@ function stripHtml(value) {
 }
 
 /**
- * Slow continuous camera pan for topic stills.
+ * Slow continuous camera pan for the topic PHOTO only.
  *
  * Crop x/y are integers, so tiny travel (old ~8% overscan at 1080p) holds a few
  * frames then jumps a pixel. Pan at 2× with ~20% overscan and bilinear downscale
  * so each step is sub-pixel and looks smooth — without the 4K lanczos cost that
  * stalled App Platform renders for nearly an hour.
  *
+ * Subject/caption chrome is a separate transparent overlay composited AFTER this
+ * pan so the top-left box stays pinned while the photo moves.
+ *
  * Long story clips finish the pan in ~24s then hold; dragging a tiny pan across
  * a full minute reintroduces stutter. No zoompan breathing.
  */
-function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
+function topicPanChain({ durationSeconds, sceneIndex = 0 } = {}) {
   const duration = Math.max(0.8, Number(durationSeconds) || 1);
-  const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
   const workW = 3840;
   const workH = 2160;
   const overscan = 1.2;
@@ -85,7 +94,28 @@ function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
   return (
     `fps=30,scale=${workW}:${workH}:flags=bilinear,` +
     `crop=${cropW}:${cropH}:'${xExpr}':'${yExpr}',` +
-    `scale=1920:1080:flags=bilinear,` +
+    `scale=1920:1080:flags=bilinear`
+  );
+}
+
+/** Single-input pan+fade (tests / fallback). Prefer topicMotionOverlayFilter in render. */
+function topicMotionFilter({ durationSeconds, sceneIndex = 0 } = {}) {
+  const duration = Math.max(0.8, Number(durationSeconds) || 1);
+  const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
+  return (
+    `${topicPanChain({ durationSeconds: duration, sceneIndex })},` +
+    `fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`
+  );
+}
+
+/** Pan input 0, then pin transparent chrome from input 1 (subject box + caption). */
+function topicMotionOverlayFilter({ durationSeconds, sceneIndex = 0 } = {}) {
+  const duration = Math.max(0.8, Number(durationSeconds) || 1);
+  const fadeOut = Math.max(0, duration - 0.35).toFixed(3);
+  const pan = topicPanChain({ durationSeconds: duration, sceneIndex });
+  return (
+    `[0:v]${pan}[bg];` +
+    `[bg][1:v]overlay=0:0:format=auto,` +
     `fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOut}:d=0.35`
   );
 }
@@ -663,7 +693,16 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       let topicMotionIndex = 0;
       for (let i = 0; i < plan.scenes.length; i += 1) {
         const scene = plan.scenes[i];
-        let imageBuffer;
+        const imagePath = path.join(workDir, `scene-${String(i).padStart(3, '0')}.png`);
+        const overlayPath = path.join(workDir, `overlay-${String(i).padStart(3, '0')}.png`);
+        const clipPath = path.join(workDir, `clip-${String(i).padStart(3, '0')}.mp4`);
+        const duration = Math.max(0.8, Number(scene.durationSeconds) || 1);
+        const startedAt = Date.now();
+        console.log(
+          `[podcasts] Rendering YouTube clip ${i + 1}/${plan.scenes.length} kind=${scene.kind} ` +
+            `dur=${duration.toFixed(1)}s label=${String(scene.label || scene.kind).slice(0, 60)}`
+        );
+
         if (scene.kind === 'topic') {
           const key = `${scene.segmentSlug}:${Number(scene.imageIndex) || 0}`;
           const still = prepared.get(key);
@@ -672,45 +711,51 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
             err.code = 'STILLS_INCOMPLETE';
             throw err;
           }
-          imageBuffer = await renderTopicFrame(still.buffer, {
-            label: scene.label,
-            category: scene.category,
-            caption: scene.caption,
-            aiLabel: false,
-          });
+          // Pan the photo only; pin subject box + caption via a transparent overlay.
+          const [background, overlay] = await Promise.all([
+            renderTopicBackground(still.buffer),
+            renderTopicOverlay({
+              label: scene.label,
+              category: scene.category,
+              caption: scene.caption,
+              aiLabel: false,
+            }),
+          ]);
+          await Promise.all([
+            fs.promises.writeFile(imagePath, background),
+            fs.promises.writeFile(overlayPath, overlay),
+          ]);
           if (!thumbnailBuffer) {
             thumbnailBuffer = await renderThumbnailFrame(still.buffer, {
               label: scene.label,
               category: scene.category,
             });
           }
-        } else if (scene.kind === 'agenda') {
-          imageBuffer = agendaBuffer;
-        } else if (scene.kind === 'brand') {
-          imageBuffer = brandBuffer;
+          await runFfmpeg([
+            '-loop', '1', '-i', imagePath,
+            '-loop', '1', '-i', overlayPath,
+            '-filter_complex', topicMotionOverlayFilter({
+              durationSeconds: duration,
+              sceneIndex: topicMotionIndex++,
+            }),
+            '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+            '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
+          ]);
         } else {
-          imageBuffer = coverFrame;
+          const imageBuffer =
+            scene.kind === 'agenda'
+              ? agendaBuffer
+              : scene.kind === 'brand'
+                ? brandBuffer
+                : coverFrame;
+          await fs.promises.writeFile(imagePath, imageBuffer);
+          await runFfmpeg([
+            '-loop', '1', '-i', imagePath,
+            '-vf', stationaryFilter(duration),
+            '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+            '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
+          ]);
         }
-        const imagePath = path.join(workDir, `scene-${String(i).padStart(3, '0')}.png`);
-        const clipPath = path.join(workDir, `clip-${String(i).padStart(3, '0')}.mp4`);
-        await fs.promises.writeFile(imagePath, imageBuffer);
-        const duration = Math.max(0.8, Number(scene.durationSeconds) || 1);
-        // Topic stills get a slow continuous pan (2× work-res crop). Cover/agenda/brand stay still.
-        const vf =
-          scene.kind === 'topic'
-            ? topicMotionFilter({ durationSeconds: duration, sceneIndex: topicMotionIndex++ })
-            : stationaryFilter(duration);
-        const startedAt = Date.now();
-        console.log(
-          `[podcasts] Rendering YouTube clip ${i + 1}/${plan.scenes.length} kind=${scene.kind} ` +
-            `dur=${duration.toFixed(1)}s label=${String(scene.label || scene.kind).slice(0, 60)}`
-        );
-        await runFfmpeg([
-          '-loop', '1', '-i', imagePath,
-          '-vf', vf,
-          // ultrafast keeps App Platform under ~realtime for long still pans
-          '-t', duration.toFixed(3), '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '30', clipPath,
-        ]);
         console.log(
           `[podcasts] YouTube clip ${i + 1}/${plan.scenes.length} done in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`
         );
@@ -880,6 +925,8 @@ module.exports = {
   resolveVideoTotalSeconds,
   stripHtml,
   topicMotionFilter,
+  topicMotionOverlayFilter,
+  topicPanChain,
   stationaryFilter,
   broadenVisualPrompt,
 };
