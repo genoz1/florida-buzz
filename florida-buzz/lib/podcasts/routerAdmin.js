@@ -766,7 +766,30 @@ function createAdminRouter({
       if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       if (!stillsReview) throw new Error('YouTube stills review is unavailable');
       await stillsReview.approveStill(episode, req.params.stillId);
-      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-approved')}`);
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('still-approved')}#youtube-stills-review`
+      );
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/approve-bulk',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (!stillsReview) throw new Error('YouTube stills review is unavailable');
+      const raw = req.body.still_ids;
+      const stillIds = (Array.isArray(raw) ? raw : raw ? [raw] : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean);
+      if (!stillIds.length) throw new Error('Select at least one still to approve');
+      await stillsReview.approveStillsBulk(episode, stillIds);
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('stills-bulk-approved')}#youtube-stills-review`
+      );
     })
   );
 
@@ -778,7 +801,10 @@ function createAdminRouter({
       if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
       if (!stillsReview) throw new Error('YouTube stills review is unavailable');
       await stillsReview.approveAllStills(episode);
-      res.redirect(303, `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('all-stills-approved')}`);
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('all-stills-approved')}#youtube-stills-review`
+      );
     })
   );
 
@@ -824,9 +850,12 @@ function createAdminRouter({
         .filter(Boolean);
       if (!stillIds.length) throw new Error('Select at least one still to regenerate');
       const note = String(req.body.note || req.body.direction || '').trim();
+      const noteById = req.body.still_notes && typeof req.body.still_notes === 'object'
+        ? req.body.still_notes
+        : {};
       setImmediate(() => {
         Promise.resolve()
-          .then(() => stillsReview.rejectStillsBulk(episode, stillIds, note))
+          .then(() => stillsReview.rejectStillsBulk(episode, stillIds, note, noteById))
           .then(() => {
             console.log(
               `[podcasts] Regenerated ${stillIds.length} rejected still(s) for ${episode.id}: ${stillIds.join(', ')}`

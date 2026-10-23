@@ -39,6 +39,21 @@ test('generic Disney Parks direction yields a searchable place for D23 failures'
   assert.equal(/\bGold Theater Panels\b/i.test(query), false);
 });
 
+test('Main Street USA direction and bag-restriction labels resolve to searchable places', () => {
+  assert.match(extractPlaceFromDirection('photo realistic image of main street usa'), /main street/i);
+  const directed = buildPlaceSearchQuery({
+    label: 'Park Bag Restrictions',
+    prompt: 'security bag check',
+    direction: 'photo realistic image of main street usa',
+  });
+  assert.match(directed, /main street/i);
+  const bare = buildPlaceSearchQuery({
+    label: 'Park Bag Restrictions',
+    prompt: 'security bag check at the park',
+  });
+  assert.match(bare, /Main Street|Magic Kingdom|entrance/i);
+});
+
 test('buildPlaceSearchQuery keeps real place names for BoardWalk and Contemporary', () => {
   const boardwalk = buildPlaceSearchQuery({
     label: 'Wine & Dine Race Weekend',
