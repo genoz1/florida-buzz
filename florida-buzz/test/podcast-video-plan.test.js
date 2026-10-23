@@ -75,9 +75,11 @@ test('topic stills use 2x work-res continuous pan; no zoompan breathing', () => 
   assert.equal(/zoompan\s*=/.test(source), false);
   assert.match(source, /topicMotionFilter/);
   assert.match(source, /workW = 3840|scale=3840:2160/);
-  assert.match(source, /flags=lanczos/);
-  assert.match(source, /min\(1.*,t\/\$\{dur\}\)/);
+  assert.match(source, /flags=bilinear/);
+  assert.match(source, /panSeconds/);
   assert.match(source, /overscan/);
+  assert.match(source, /preset', 'ultrafast'|preset', \"ultrafast\"/);
+  assert.match(source, /Rendering YouTube clip/);
   assert.match(source, /stationaryFilter/);
   assert.match(source, /fps=30,fade=t=in/);
   assert.match(source, /fitCoverFrame/);
@@ -86,14 +88,16 @@ test('topic stills use 2x work-res continuous pan; no zoompan breathing', () => 
   assert.match(source, /resolveVideoTotalSeconds/);
 });
 
-test('topicMotionFilter emits a 2x pan filter string for ffmpeg', () => {
+test('topicMotionFilter emits a fast 2x pan filter and caps long pans', () => {
   const { topicMotionFilter } = require('../lib/podcasts/videoPipeline');
-  const vf = topicMotionFilter({ durationSeconds: 8, sceneIndex: 0 });
-  assert.match(vf, /scale=3840:2160:flags=lanczos/);
-  assert.match(vf, /scale=1920:1080:flags=lanczos/);
-  assert.match(vf, /min\(1\\,t\/8\.000\)/);
-  assert.match(vf, /crop=\d+:\d+:/);
-  assert.equal(/zoompan/.test(vf), false);
+  const short = topicMotionFilter({ durationSeconds: 8, sceneIndex: 0 });
+  assert.match(short, /scale=3840:2160:flags=bilinear/);
+  assert.match(short, /scale=1920:1080:flags=bilinear/);
+  assert.match(short, /min\(1\\,t\/8\.000\)/);
+  assert.equal(/zoompan/.test(short), false);
+  const long = topicMotionFilter({ durationSeconds: 90, sceneIndex: 1 });
+  assert.match(long, /min\(1\\,t\/24\.000\)/);
+  assert.equal(/t\/90/.test(long), false);
 });
 
 test('YouTube scene timing uses probed audio when episode duration is missing', () => {
