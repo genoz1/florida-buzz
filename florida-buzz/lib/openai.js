@@ -1,7 +1,6 @@
-// Thin wrapper around OpenAI's current image generation model.
-// NOTE: DALL-E 3 was fully retired by OpenAI in May 2026 — gpt-image-1 is the
-// current model. Unlike DALL-E, it always returns base64 image data directly
-// rather than a temporary URL, which is actually simpler to work with.
+// OpenAI retired gpt-image-1 on October 23, 2026.
+// Preserve the existing prompts, quality, size, and base64 image contract.
+const IMAGE_MODEL = 'gpt-image-2.5-sunburst';
 
 async function generateImage(prompt, { quality = 'medium', size = '1536x1024' } = {}) {
   const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -11,7 +10,7 @@ async function generateImage(prompt, { quality = 'medium', size = '1536x1024' } 
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-image-1',
+      model: IMAGE_MODEL,
       prompt,
       n: 1,
       size,
@@ -38,7 +37,6 @@ async function editImageFromReference(
   {
     quality = 'high',
     size = '1536x1024',
-    inputFidelity = 'high',
     mimeType = 'image/png',
   } = {}
 ) {
@@ -48,12 +46,11 @@ async function editImageFromReference(
   const mime = String(mimeType || 'image/png').split(';')[0].trim().toLowerCase() || 'image/png';
   const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png';
   const form = new FormData();
-  form.append('model', 'gpt-image-1');
+  form.append('model', IMAGE_MODEL);
   form.append('prompt', String(prompt || '').slice(0, 32000));
   form.append('n', '1');
   form.append('size', size);
   form.append('quality', quality);
-  form.append('input_fidelity', inputFidelity);
   form.append('image', new Blob([imageBuffer], { type: mime }), `reference.${ext}`);
 
   const res = await fetch('https://api.openai.com/v1/images/edits', {

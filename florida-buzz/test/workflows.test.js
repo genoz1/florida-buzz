@@ -76,7 +76,7 @@ test('all Florida Buzz text workflows retain their existing structured contracts
   ));
 });
 
-test('the image path uses a text prompt, gpt-image-1, and a visual review before storage', async (t) => {
+test('the image path uses a text prompt, gpt-image-2.5-sunburst, and a visual review before storage', async (t) => {
   const originalFetch = global.fetch;
   t.after(() => { global.fetch = originalFetch; });
 
@@ -98,7 +98,7 @@ test('the image path uses a text prompt, gpt-image-1, and a visual review before
   assert.equal(result.status, 'accepted');
   assert.equal(requests[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(requests[1].url, 'https://api.openai.com/v1/images/generations');
-  assert.equal(requests[1].body.model, 'gpt-image-1');
+  assert.equal(requests[1].body.model, 'gpt-image-2.5-sunburst');
   assert.doesNotMatch(requests[0].body.input, /Bob Iger|public figure|unrelated business/i);
   assert.match(requests[0].body.input, /specific Florida springs landscape/);
   assert.match(requests[0].body.input, /Central Florida/);
