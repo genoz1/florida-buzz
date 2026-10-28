@@ -352,7 +352,9 @@ test('sitemap paginates past 1,000 and keeps every fixture article', async () =>
 
 test('sitemap generation failure → 503 semantics or last-known-good, never empty success', async () => {
   let calls = 0;
+  let clock = 0;
   const builder = createSitemapBuilder({
+    now: () => clock,
     siteUrl: 'https://thefloridabuzz.com',
     fetchArticles: async () => {
       calls += 1;
@@ -375,6 +377,7 @@ test('sitemap generation failure → 503 semantics or last-known-good, never emp
   assert.equal(first.ok, true);
   assert.match(first.bundle.articleXml[0], /keep-me/);
 
+  clock = 16 * 60 * 1000;
   const second = await builder.getBundle({ allowStale: true });
   assert.equal(second.ok, true);
   assert.equal(second.stale, true);
