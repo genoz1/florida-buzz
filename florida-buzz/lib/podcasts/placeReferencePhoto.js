@@ -1,12 +1,13 @@
 'use strict';
 
 /**
- * Find a real, licensed place photograph to anchor YouTube still generation.
- * Prefer Florida Buzz article heroes when the story matches; otherwise Wikimedia Commons.
+ * Find a real place photograph to anchor YouTube still generation.
+ * Prefer Florida Buzz article heroes first (AI heroes used as-is later; sourced
+ * photos used as photorealistic AI references). Wikimedia Commons is backup.
  * Never invent image URLs — only return photos actually retrieved from these sources.
  */
 
-const { isUsableArticleImage } = require('../articleImages');
+const { articleImageOrigin, isUsableArticleImage } = require('../articleImages');
 
 const USER_AGENT = 'FloridaBuzzBot/1.0 (podcast place references; https://thefloridabuzz.com)';
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -438,14 +439,17 @@ async function findArticleHeroReference({
     if (!isUsableArticleImage(imageUrl)) continue;
     try {
       const downloaded = await fetchImageBuffer(imageUrl, fetchImpl);
+      const imageOrigin = articleImageOrigin(imageUrl) || 'generated';
       return {
         source: 'florida_buzz_article',
+        imageOrigin,
+        useAsIs: imageOrigin === 'generated',
         subjectKind: 'place',
         query: label,
         title,
         pageUrl: row.source.url || null,
         imageUrl: stripTracking(imageUrl),
-        credit: `Florida Buzz article photo (${slug || title})`,
+        credit: `Florida Buzz article ${imageOrigin} photo (${slug || title})`,
         buffer: downloaded.buffer,
         mimeType: downloaded.mimeType,
       };
@@ -467,35 +471,8 @@ async function findPlaceReferencePhoto({
   fetchImpl = fetch,
 } = {}) {
   const directionPlace = extractPlaceFromDirection(direction);
-  // Prefer Wikimedia place photos first so we never template from panel/people article heroes.
-  // When an admin gives redo direction, search that place — not the original story article hero.
-  const query = buildPlaceSearchQuery({ label, category, prompt, direction });
-  const tried = new Set();
-  const trySearch = async (q) => {
-    const cleaned = String(q || '').replace(/\s+/g, ' ').trim();
-    if (cleaned.length < 4 || tried.has(cleaned.toLowerCase())) return null;
-    tried.add(cleaned.toLowerCase());
-    return searchWikimediaPlacePhoto(cleaned, { fetchImpl }).catch((err) => {
-      console.warn(`[podcasts] Wikimedia place search failed (${cleaned.slice(0, 60)}): ${err.message}`);
-      return null;
-    });
-  };
-
-  let wiki = await trySearch(query);
-  if (wiki) return { ...wiki, subjectKind: 'place' };
-
-  for (const fallback of placeSearchFallbacks({ label, prompt, direction, primaryQuery: query })) {
-    wiki = await trySearch(fallback);
-    if (wiki) return { ...wiki, subjectKind: 'place' };
-  }
-
-  const curated = await curatedWikimediaFallback(
-    `${direction} ${directionPlace} ${label} ${prompt} ${query}`,
-    fetchImpl
-  ).catch(() => null);
-  if (curated) return { ...curated, subjectKind: 'place' };
-
-  // Skip article heroes when admin explicitly asked for a different place — they pin the wrong scene.
+  // Article heroes first (skip when admin directs a different place).
+  // People-panel heroes are filtered inside findArticleHeroReference.
   if (!directionPlace) {
     const articleRef = await findArticleHeroReference({
       label,
@@ -510,6 +487,32 @@ async function findPlaceReferencePhoto({
     if (articleRef) return articleRef;
   }
 
+  const query = buildPlaceSearchQuery({ label, category, prompt, direction });
+  const tried = new Set();
+  const trySearch = async (q) => {
+    const cleaned = String(q || '').replace(/\s+/g, ' ').trim();
+    if (cleaned.length < 4 || tried.has(cleaned.toLowerCase())) return null;
+    tried.add(cleaned.toLowerCase());
+    return searchWikimediaPlacePhoto(cleaned, { fetchImpl }).catch((err) => {
+      console.warn(`[podcasts] Wikimedia place search failed (${cleaned.slice(0, 60)}): ${err.message}`);
+      return null;
+    });
+  };
+
+  let wiki = await trySearch(query);
+  if (wiki) return { ...wiki, subjectKind: 'place', imageOrigin: 'sourced', useAsIs: false };
+
+  for (const fallback of placeSearchFallbacks({ label, prompt, direction, primaryQuery: query })) {
+    wiki = await trySearch(fallback);
+    if (wiki) return { ...wiki, subjectKind: 'place', imageOrigin: 'sourced', useAsIs: false };
+  }
+
+  const curated = await curatedWikimediaFallback(
+    `${direction} ${directionPlace} ${label} ${prompt} ${query}`,
+    fetchImpl
+  ).catch(() => null);
+  if (curated) return { ...curated, subjectKind: 'place', imageOrigin: 'sourced', useAsIs: false };
+
   return null;
 }
 
@@ -518,9 +521,8 @@ function withReferencePrompt(prompt, reference) {
   if (!reference?.buffer) return body;
   const lock =
     'Reference photograph lock: A real photograph of this PLACE is attached as the layout template. ' +
-    'Preserve the real architecture, skyline relationships, and layout from that photo exactly. ' +
-    'Restyle into the Mandalorian-episode Florida Buzz look: densely detailed cinematic digital travel illustration, ' +
-    'cool silver materials, NATURAL white balance daylight — NO yellow/amber/sepia wash. ' +
+    'Preserve the real architecture, skyline relationships, and the SAME primary subject from that photo exactly — keep the subject tight in frame. ' +
+    'Create a PHOTOREALISTIC travel photograph (real camera look), NATURAL white balance daylight — NO yellow/amber/sepia wash, NOT illustration or concept art. ' +
     'Do not invent ticket gates, buildings, roads, or landmarks that are not in the reference. ' +
     'Do not make unknown people or panel guests the primary subject.';
   if (body.includes('Reference photograph lock:')) return body;
@@ -538,11 +540,18 @@ function referenceReviewQuestion({ label = '', category = '', reference = null }
       'Is this still somehow an accurate single-place Walt Disney World view with no yellow cast and no people-primary subject?'
     );
   }
+  if (reference.useAsIs) {
+    return (
+      `${base}` +
+      `Florida Buzz AI article hero used as-is (${String(reference.title || '').slice(0, 120)}).\n` +
+      'Does this still (1) show the story place/product, (2) avoid yellow/sepia grading, and (3) keep place/product as subject not random people?'
+    );
+  }
   return (
     `${base}` +
     `A real place reference photo was used (${reference.source}: ${String(reference.title || '').slice(0, 120)}).\n` +
-    'Does this still (1) keep that real place layout, (2) avoid yellow/sepia grading, (3) keep the place/product as subject not random people, ' +
-    'and (4) match the Mandalorian-episode cinematic illustration style?'
+    'Does this still (1) keep that real place layout and tight primary subject, (2) avoid yellow/sepia grading, (3) keep the place/product as subject not random people, ' +
+    'and (4) look photorealistic (photograph-like, not illustration)?'
   );
 }
 

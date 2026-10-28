@@ -194,7 +194,7 @@ async function storeGeneratedImage(imageBuffer, filename, contentType = 'image/p
 
     if (contentAddressed) {
       const fingerprint = crypto.createHash('sha256').update(finalBuffer).digest('hex');
-      finalFilename = contentAddressedName(finalFilename, fingerprint);
+      finalFilename = contentAddressedName(finalFilename, fingerprint, { origin: 'generated' });
     }
 
     const { error: uploadError } = await supabase.storage
@@ -296,7 +296,7 @@ async function storeImageFromUrl(sourceUrl, filename, { cropBottomPercent, conte
 
     if (contentAddressed) {
       const fingerprint = crypto.createHash('sha256').update(mainBuffer).digest('hex');
-      filename = contentAddressedName(filename, fingerprint);
+      filename = contentAddressedName(filename, fingerprint, { origin: 'sourced' });
     }
 
     const { error: uploadError } = await supabase.storage

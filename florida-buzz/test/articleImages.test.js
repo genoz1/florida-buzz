@@ -6,10 +6,12 @@ const test = require('node:test');
 
 const {
   ARTICLE_PLACEHOLDER_PATH,
+  articleImageOrigin,
   buildImageBrief,
   contentAddressedName,
   findDuplicateImage,
   imageIdentity,
+  isHostedArticleImage,
   isLikelyGenericSourceImage,
   isUsableArticleImage,
   requireArticleImageEnabled,
@@ -57,8 +59,26 @@ test('exact stored-image reuse is rejected while the designed fallback is intent
 
 test('content-addressed names are stable and generic publisher assets are rejected', () => {
   assert.equal(contentAddressedName('story.png', 'a'.repeat(64)), `article-${'a'.repeat(32)}.jpg`);
+  assert.equal(
+    contentAddressedName('story.png', 'a'.repeat(64), { origin: 'generated' }),
+    `ai-article-${'a'.repeat(32)}.jpg`
+  );
+  assert.equal(
+    contentAddressedName('story.jpg', 'b'.repeat(64), { origin: 'sourced' }),
+    `src-article-${'b'.repeat(32)}.jpg`
+  );
   assert.equal(isLikelyGenericSourceImage('https://publisher.test/assets/default-hero.jpg'), true);
   assert.equal(isLikelyGenericSourceImage('https://publisher.test/photos/st-augustine-lights.jpg'), false);
+});
+
+test('articleImageOrigin distinguishes AI heroes from sourced photos', () => {
+  const base = 'https://project.supabase.co/storage/v1/object/public/article-images';
+  assert.equal(articleImageOrigin(`${base}/ai-article-abcdef0123456789abcdef0123456789.jpg`), 'generated');
+  assert.equal(articleImageOrigin(`${base}/src-article-abcdef0123456789abcdef0123456789.jpg`), 'sourced');
+  assert.equal(articleImageOrigin(`${base}/article-abcdef0123456789abcdef0123456789.jpg`), 'generated');
+  assert.equal(articleImageOrigin(`${base}/magic-kingdom-premier-pass.jpg`), 'sourced');
+  assert.equal(isHostedArticleImage(`${base}/ai-article-abcdef0123456789abcdef0123456789.jpg`), true);
+  assert.equal(articleImageOrigin(ARTICLE_PLACEHOLDER_PATH), null);
 });
 
 test('the fallback is a local branded asset rather than a random remote photograph', () => {
