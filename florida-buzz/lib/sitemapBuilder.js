@@ -95,6 +95,7 @@ function createSitemapBuilder({
   now = () => Date.now(),
 } = {}) {
   let cache = null;
+  let building = null;
 
   async function buildFresh() {
     const articles = await fetchArticles();
@@ -140,8 +141,14 @@ function createSitemapBuilder({
   }
 
   async function getBundle({ allowStale = true } = {}) {
+    if (cache?.indexXml && now() < cache.expires) {
+      return { ok: true, bundle: cache, stale: false };
+    }
     try {
-      const fresh = await buildFresh();
+      // Google fetches the index and its children together. Share one database
+      // read across concurrent requests and honor the existing cache lifetime.
+      if (!building) building = buildFresh().finally(() => { building = null; });
+      const fresh = await building;
       cache = { ...fresh, expires: now() + SITEMAP_CACHE_TTL_MS };
       return { ok: true, bundle: cache, stale: false };
     } catch (err) {

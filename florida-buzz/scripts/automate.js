@@ -4,6 +4,7 @@ const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/sup
 const { generateText, generateStructuredText } = require('../lib/aiText');
 const { newsArticle: newsArticleSchema } = require('../lib/aiSchemas');
 const { validateNewsArticle } = require('../lib/contentValidation');
+const { extractSourceText, feedEvidence } = require('../lib/sourceText');
 const { createArticleRetryQueue } = require('../lib/articleRetryQueue');
 const { createImageRepairQueue } = require('../lib/imageRepairQueue');
 const { generateArticleImageResult } = require('../lib/imageGen');
@@ -205,50 +206,7 @@ async function fetchFullSourceText(url) {
     });
     if (!res.ok) return null;
 
-    const html = await res.text();
-
-    // Strip out non-content blocks first (scripts, styles, nav/header/footer
-    // chrome, etc.) so they don't pollute the extracted text.
-    let text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
-      .replace(/<header[\s\S]*?<\/header>/gi, ' ')
-      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
-      .replace(/<!--[\s\S]*?-->/g, ' ')
-      // Add a newline where block-level tags close, so paragraphs/list items
-      // don't all run together into one unreadable wall of text.
-      .replace(/<\/(p|div|li|h[1-6]|br)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&ndash;/g, '–')
-      .replace(/&mdash;/g, '—')
-      .replace(/&rsquo;/g, "'")
-      .replace(/&lsquo;/g, "'")
-      .replace(/&rdquo;/g, '"')
-      .replace(/&ldquo;/g, '"')
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n\s*\n\s*\n+/g, '\n\n')
-      .trim();
-
-    // Cap the length — this is going into an AI prompt, not being displayed,
-    // so a few thousand characters of real article text is plenty without
-    // needlessly inflating token usage on boilerplate that inevitably slips
-    // through (comment sections, related-article lists, etc. further down
-    // the page).
-    if (text.length > 8000) text = text.slice(0, 8000);
-
-    // If after all that cleanup there's barely any text, the fetch probably
-    // hit a paywall, a cookie-consent wall, or a JS-rendered page with no
-    // server-side content — not worth using over the RSS snippet.
-    if (text.length < 200) return null;
-
-    return text;
+    return extractSourceText(await res.text());
   } catch {
     return null; // network error, timeout, blocked — caller falls back to the RSS snippet
   }
@@ -367,8 +325,12 @@ Choose only context that helps this story; no mandatory sections, stock headings
 SEO stuffing or repetitive conclusions. Let length follow useful facts: a simple update may
 need 3-5 short paragraphs or fewer; a substantial story may use 6-10 concise paragraphs when
 supported. Fit the entire JSON response within the existing output budget; do not chase length.
-Limited or absent additional context is NEVER a reason to skip an otherwise factual story:
-publish the accurate rewrite normally, even if short. Do not claim additional research,
+A short factual update is acceptable when it answers the reader’s actual question.
+Never publish a vague teaser that merely announces that details exist elsewhere. If a
+headline promises a numbered list, name and explain every promised item using an HTML
+list or individual headings. If the supplied source omits those items, skip the story
+rather than padding it or keeping the unfulfilled headline. Dates and visitor procedures
+must be stated when the headline promises them and the source supports them. Do not claim additional research,
 multiple sources or additional context that was not actually used. The page supplies the linked
 staff/source credit; use in-text attribution where helpful, without a repetitive source footer.
 
@@ -789,7 +751,7 @@ async function run() {
     if (!queued) await retryQueue.recordPending(source, item);
 
     console.log(`  ${queued ? 'Retrying' : 'New item'}: "${item.title}" — checking content...`);
-    const summary = item.contentSnippet || item.content || item.title;
+    const summary = feedEvidence(item);
     let ok;
     try {
       ok = await isAppropriate(item.title, summary);

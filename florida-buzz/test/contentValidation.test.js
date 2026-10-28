@@ -55,3 +55,12 @@ test('malformed and incomplete output cannot pass publication validation', () =>
   assert.throws(() => validateReview({ title: 'Review' }), /meta_title/);
   assert.throws(() => validateDiningDirectory([]), /at least one/);
 });
+
+test('a numbered food headline must deliver the promised items, not a vague teaser', () => {
+  const article={title:'8 New Bites and Sips to Seek Out at Animal Kingdom',meta_title:'Animal Kingdom Food',category:'theme-parks',dek:'New menu additions.',body_html:'<p>There are eight new items. Korean barbecue and pasta are among the additions, with new cocktails in Pandora. Visit the park to find out more.</p>',...social,image_subject:'Animal Kingdom',image_location:'Orlando',image_entities:['Animal Kingdom']};
+  assert.throws(()=>validateNewsArticle(article),/Headline promises a list/);
+  article.body_html='<ol>'+Array.from({length:8},(_,i)=>'<li>Named item '+i+' at its supported dining location.</li>').join('')+'</ol>';
+  assert.doesNotThrow(()=>validateNewsArticle(article));
+  article.title='2027 Disney World Planning Update';article.body_html=body;
+  assert.doesNotThrow(()=>validateNewsArticle(article));
+});

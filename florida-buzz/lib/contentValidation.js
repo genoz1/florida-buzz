@@ -54,6 +54,17 @@ function validateNewsArticle(article) {
   }
   requireString(article.dek, 'dek', { max: 200 });
   requireHtml(article.body_html);
+  // Reject a concrete failure seen in the indexing audit: an "8 new bites"
+  // headline whose body names none of the eight items. Years, prices and
+  // ordinary numeric news headlines do not trigger this editorial rule.
+  const listPromise = article.title.match(/^(\d{1,2})\s+(?:(?:new|best|top|essential|free|easy|favorite|must-try)\s+)*(?:bites|sips|dishes|foods?|drinks?|restaurants?|hotels?|resorts?|tips|ways|things|places|reasons|stops|beaches|attractions|rides|events|ideas|mistakes)\b/i);
+  if (listPromise && Number(listPromise[1]) >= 2 && Number(listPromise[1]) <= 20) {
+    const items = (article.body_html.match(/<li\b/gi) || []).length;
+    const headings = (article.body_html.match(/<h[23]\b/gi) || []).length;
+    if (Math.max(items, headings) < Number(listPromise[1])) {
+      throw new ContentValidationError('Headline promises a list that body_html does not deliver.');
+    }
+  }
   requireString(article.fb_caption, 'fb_caption');
   requireString(article.pin_title, 'pin_title', { max: 140 });
   requireString(article.pin_description, 'pin_description', { max: 600 });
