@@ -257,7 +257,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       return { rejected: true, correction: 'no_place_reference' };
     }
     let captured = null;
-    const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('./videoVisuals');
+    const { PODCAST_YOUTUBE_PHOTOREAL_STYLE } = require('./videoVisuals');
     const { editImageFromReference } = require('../openai');
     const lockedPrompt = withReferencePrompt(
       hardenPlacePrompt(prompt, {
@@ -270,7 +270,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       lockedPrompt,
       { title: scene.label, slug: scene.visualKey, subject: scene.label, location: 'Walt Disney World Resort' },
       {
-        styleRequirements: PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+        styleRequirements: PODCAST_YOUTUBE_PHOTOREAL_STYLE,
         reviewInstructions: PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
         reviewQuestion: referenceReviewQuestion({
           label: scene.label,
@@ -308,10 +308,10 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     direction = '',
     storagePath: storagePathOverride = null,
   } = {}) {
-    // v5 = gated place-photo stills (Mandalorian grade, no yellow, no people-primary, no invent).
+    // v6 = article-image-first (AI heroes as-is; sourced/Wikimedia → photorealistic ref edit).
     const storagePath =
       storagePathOverride
-      || `youtube-visuals/v5/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
+      || `youtube-visuals/v6/episodes/${safeSlug(episode.id)}/${safeSlug(scene.segmentSlug)}-${Number(scene.imageIndex) || 0}.png`;
     if (!force) {
       const existing = await findAsset(storagePath);
       if (existing?.public_url) {
@@ -343,8 +343,19 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       return { ok: false, reason: 'reference_is_people', label: scene.label, storagePath };
     }
     console.log(
-      `[podcasts] Place reference for ${scene.label}: ${reference.source} — ${reference.title || reference.imageUrl} (${reference.credit})`
+      `[podcasts] Place reference for ${scene.label}: ${reference.source}`
+      + (reference.imageOrigin ? `/${reference.imageOrigin}` : '')
+      + ` — ${reference.title || reference.imageUrl} (${reference.credit})`
+      + (reference.useAsIs ? ' [use as-is]' : '')
     );
+
+    // AI article heroes: use directly (no paid restyle). Human review board still gates publish.
+    if (reference.useAsIs) {
+      const photo = await applyStillColorFix(reference.buffer);
+      await saveVisual(photo, storagePath);
+      console.log(`[podcasts] Article AI hero used as-is for ${scene.label}`);
+      return { ok: true, buffer: photo, storagePath, source: 'article_ai_as_is', reference };
+    }
 
     const ai = await tryGenerateTopicStill(scene.prompt, scene, reference);
     if (Buffer.isBuffer(ai.buffer)) {

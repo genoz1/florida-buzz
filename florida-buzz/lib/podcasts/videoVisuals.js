@@ -2,6 +2,7 @@
 
 const {
   PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+  PODCAST_YOUTUBE_PHOTOREAL_STYLE,
   withPodcastYoutubeStyle,
 } = require('../editorialPhotoStyle');
 
@@ -120,12 +121,12 @@ function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rej
 }
 
 /** Stricter visual review for podcast YouTube stills (place honesty matters on-screen). */
-const PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS = `Review this Florida Buzz podcast YouTube still (AI restyle of a real place photo, or the real place photo itself).
+const PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS = `Review this Florida Buzz podcast YouTube still (photorealistic AI restyle of a real place photo, Florida Buzz article hero used as-is, or the real place photo itself).
 PASS only when ALL are true:
 1) Subject is the story PLACE or product (architecture, attraction, merchandise display) — NOT a portrait/panel of unknown people as the hero.
 2) Geography matches a real Walt Disney World view — no invented mashups.
-3) Color grade matches the Mandalorian-episode cinematic look: natural daylight, cool/neutral whites, NOT yellow/amber/sepia vintage wash.
-4) When a reference photo was used, layout follows that photo (no invented ticket gates, buildings, or landmarks).
+3) Looks photorealistic (real photograph or photograph-like), with natural daylight and cool/neutral whites — NOT yellow/amber/sepia vintage wash, NOT cartoon/illustration stylization.
+4) When a reference photo was used, layout and primary subject follow that photo tightly (no invented ticket gates, buildings, or landmarks; no subject swap).
 Hard rejects:
 - Magic Kingdom ticket/tapstile machines on Main Street with Cinderella Castle behind them (gates are at the entrance before the railroad bridge)
 - BoardWalk with cars/buses/asphalt in front of the buildings
@@ -139,6 +140,7 @@ List only high-confidence visible defects. On acceptance return no issues and an
 
 module.exports = {
   PODCAST_YOUTUBE_ILLUSTRATION_STYLE,
+  PODCAST_YOUTUBE_PHOTOREAL_STYLE,
   PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
   broadenVisualPrompt,
   hardenPlacePrompt,

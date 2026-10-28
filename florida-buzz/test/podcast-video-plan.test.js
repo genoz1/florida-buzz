@@ -57,17 +57,17 @@ test('limits story visuals to two reusable images by default', () => {
   assert.equal(plan.scenes.some((scene) => scene.kind === 'agenda'), true);
 });
 
-test('uses the painterly podcast YouTube illustration style for broaden prompts', () => {
-  const { PODCAST_YOUTUBE_ILLUSTRATION_STYLE } = require('../lib/editorialPhotoStyle');
-  assert.match(PODCAST_YOUTUBE_ILLUSTRATION_STYLE, /digital travel illustration/i);
-  assert.match(PODCAST_YOUTUBE_ILLUSTRATION_STYLE, /painterly/i);
+test('uses the photorealistic podcast YouTube style for broaden prompts', () => {
+  const { PODCAST_YOUTUBE_PHOTOREAL_STYLE } = require('../lib/editorialPhotoStyle');
+  assert.match(PODCAST_YOUTUBE_PHOTOREAL_STYLE, /photorealistic/i);
+  assert.match(PODCAST_YOUTUBE_PHOTOREAL_STYLE, /Tight subject lock/i);
   const room = broadenVisualPrompt('photoreal BoardWalk Inn guest room beds and furnishings', {
     label: 'Refreshed BoardWalk Inn Rooms',
     category: 'resort-room-refurbishment',
     level: 1,
   });
-  assert.match(room, /digital travel illustration/i);
-  assert.match(room, /painterly/i);
+  assert.match(room, /photorealistic/i);
+  assert.match(room, /Tight subject lock/i);
 });
 
 test('topic stills use 2x work-res continuous pan; no zoompan breathing', () => {
@@ -275,7 +275,7 @@ test('pipeline gates YouTube publish on verified place-photo stills', () => {
   assert.match(source, /buildVerifiedTopicStill/);
   assert.match(source, /STILLS_INCOMPLETE/);
   assert.match(source, /stills_incomplete/);
-  assert.match(source, /youtube-visuals\/v5\//);
+  assert.match(source, /youtube-visuals\/v6\//);
   assert.match(source, /findPlaceReferencePhoto/);
   assert.match(source, /editImageFromReference/);
   assert.match(source, /maxAttempts:\s*1/);
@@ -317,7 +317,7 @@ test('place accuracy locks BoardWalk, runDisney, Contemporary monorail, and MK m
   });
   assert.match(runners, /park paths|race course/i);
   assert.match(runners, /Do not show runners in automotive traffic|not car lanes beside buses/i);
-  assert.match(runners, /Mandalorian|FORBIDDEN: yellow/i);
+  assert.match(runners, /FORBIDDEN: yellow|photorealistic/i);
 
   assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /BoardWalk/);
   assert.match(PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS, /Contemporary monorail/);

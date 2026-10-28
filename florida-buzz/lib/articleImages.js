@@ -53,6 +53,36 @@ function isUsableArticleImage(url) {
   return true;
 }
 
+/** True when the URL is a Florida Buzz Supabase article-images object. */
+function isHostedArticleImage(url) {
+  if (typeof url !== 'string' || !url.trim()) return false;
+  return /\/storage\/v1\/object\/public\/article-images\//i.test(url);
+}
+
+/**
+ * Classify whether a hosted article hero was AI-generated or rehosted from a
+ * source photo. New uploads use ai-article-* / src-article-* prefixes; legacy
+ * content-addressed article-{hash} files are treated as generated (use as-is
+ * for YouTube stills to avoid a second paid restyle).
+ */
+function articleImageOrigin(url) {
+  if (!isUsableArticleImage(url)) return null;
+  let pathname = '';
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    pathname = String(url).split('?')[0];
+  }
+  const file = pathname.split('/').pop() || '';
+  if (/^(ai-article-|generated-article-)/i.test(file)) return 'generated';
+  if (/^(src-article-|sourced-article-)/i.test(file)) return 'sourced';
+  // Legacy content-addressed AI (and older mixed) uploads.
+  if (/^article-[a-f0-9]{20,}\./i.test(file)) return 'generated';
+  // Slug-style filenames in our bucket are typically rehosted source photos.
+  if (isHostedArticleImage(url)) return 'sourced';
+  return 'generated';
+}
+
 /**
  * When enabled (default), automate refuses to publish articles that still lack
  * a usable story image. Set REQUIRE_ARTICLE_IMAGE=false only for emergency
@@ -62,17 +92,23 @@ function requireArticleImageEnabled(env = process.env) {
   return String(env.REQUIRE_ARTICLE_IMAGE || 'true').toLowerCase() !== 'false';
 }
 
-function contentAddressedName(originalFilename, fingerprint) {
+function contentAddressedName(originalFilename, fingerprint, { origin = null } = {}) {
   const ext = path.extname(originalFilename).toLowerCase() || '.jpg';
-  return `article-${fingerprint.slice(0, 32)}${ext === '.png' ? '.jpg' : ext}`;
+  const safeExt = ext === '.png' ? '.jpg' : ext;
+  const hash = String(fingerprint || '').slice(0, 32);
+  if (origin === 'sourced') return `src-article-${hash}${safeExt}`;
+  if (origin === 'generated') return `ai-article-${hash}${safeExt}`;
+  return `article-${hash}${safeExt}`;
 }
 
 module.exports = {
   ARTICLE_PLACEHOLDER_PATH,
+  articleImageOrigin,
   buildImageBrief,
   contentAddressedName,
   findDuplicateImage,
   imageIdentity,
+  isHostedArticleImage,
   isLikelyGenericSourceImage,
   isUsableArticleImage,
   normalizeEntities,
