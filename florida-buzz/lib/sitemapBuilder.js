@@ -7,7 +7,7 @@ const ARTICLE_SEGMENT_SIZE = 500;
 const SITEMAP_CACHE_TTL_MS = 15 * 60 * 1000;
 
 function lastmodForArticle(article) {
-  const raw = article.updated_at || article.published_at || article.created_at;
+  const raw = article.content_updated_at || article.updated_at || article.published_at || article.created_at;
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString().split('T')[0];
