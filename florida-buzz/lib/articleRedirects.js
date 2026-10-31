@@ -14,6 +14,10 @@ const ARTICLE_SLUG_REDIRECTS = Object.freeze({
   // Winner: key-west-sargassum-cleanup-pilot-plans
   'key-west-sargassum-cleanup-pilot-plan':
     'key-west-sargassum-cleanup-pilot-plans',
+  // The same Live Wildly fifth-anniversary announcement syndicated by two feeds.
+  // Keep the fuller July 1 article; both URLs were unindexed at review.
+  'florida-s-wildlife-corridor-marks-five-years-of-progress-mr25dbtw':
+    'florida-s-wildlife-corridor-marks-five-years-of-conservation-mr2fydey',
 });
 
 function resolveArticleRedirect(slug) {
