@@ -201,7 +201,9 @@ function createArticlesQuery({
         const to = from + PAGE_BATCH_SIZE - 1;
         const { data } = await executeWithRetry(async () =>
           applyFilters(
-            client.from('articles').select('*').order('published_at', { ascending: false })
+            client.from('articles').select('*')
+              .order('published_at', { ascending: false })
+              .order('slug', { ascending: true })
           ).range(from, to)
         );
         if (!data.length) break;

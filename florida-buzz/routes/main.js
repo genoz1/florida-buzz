@@ -605,27 +605,13 @@ router.get('/article/:slug', async (req, res) => {
   });
 });
 
-router.get('/guides', async (req, res) => {
-  let guides;
-  let ticker;
-  try {
-    guides = await getArticles({ evergreenOnly: true, limit: 50 });
-    ticker = await getArticles({ limit: 8 });
-  } catch (err) {
-    if (isUpstreamError(err)) return render503(req, res, { routeType: 'guides', error: err });
-    throw err;
-  }
-
-  res.render('guides', {
-    guides,
-    ticker,
-    categoryLabels: CATEGORY_LABELS,
-    placeholderImg,
-    thumbUrl,
-    resizeImg,
-    timeAgo,
-  });
+const { createGuidesArchiveHandler } = require('../lib/guidesArchive');
+const renderGuidesArchive = createGuidesArchiveHandler({
+  getArticles, render404, render503, isUpstreamError,
+  viewLocals: { categoryLabels: CATEGORY_LABELS, placeholderImg, thumbUrl, resizeImg, timeAgo },
 });
+router.get('/guides', renderGuidesArchive);
+router.get('/guides/page/:page', renderGuidesArchive);
 
 router.get('/guide/:pillarSlug', async (req, res) => {
   const { pillarSlug } = req.params;
