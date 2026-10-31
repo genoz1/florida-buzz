@@ -247,7 +247,7 @@ function createArticlesQuery({
       const { data } = await executeWithRetry(async () =>
         client
           .from('articles')
-          .select('slug,title,dek,category,published_at,created_at,is_evergreen,source_name,city')
+          .select('slug,title,dek,category,published_at,created_at,content_updated_at,is_evergreen,source_name,city')
           .order('published_at', { ascending: false })
           .order('slug', { ascending: true })
           .range(from, to)
