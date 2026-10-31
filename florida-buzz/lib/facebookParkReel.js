@@ -749,20 +749,25 @@ async function pickParkCruiseArticle(client, {
   return ranked[0] || null;
 }
 
-function buildReelCaption(article, mode = PARK_REEL_MODE_TIP) {
+function buildReelCaption(article, mode = PARK_REEL_MODE_TIP, siteUrl) {
   const base = toFacebookFeedCaption(
     article.fb_caption || `${article.title}. ${article.dek || ''}`.trim()
   );
+  const storyUrl = articlePermalink(article, siteUrl);
+  // Full article URL belongs in the caption (not just "thefloridabuzz.com").
+  // Instagram/YouTube often won't surface the first-comment link, so the
+  // description itself must carry the story permalink for traffic.
   if (normalizeParkReelMode(mode) === PARK_REEL_MODE_DISNEY_NEWS) {
-    return `${base}\n\nHere's the latest Disney news from The Florida Buzz — would you use this tip on your next trip?\n\nMore at thefloridabuzz.com`;
+    return `${base}\n\nHere's the latest Disney news from The Florida Buzz — would you use this tip on your next trip?\n\nFull story: ${storyUrl}`;
   }
   const { label } = parkBrandFromArticle(article);
-  return `${base}\n\nHere's another ${label} tip from The Florida Buzz — save this for your next trip.\n\nMore at thefloridabuzz.com`;
+  return `${base}\n\nHere's another ${label} tip from The Florida Buzz — save this for your next trip.\n\nFull story: ${storyUrl}`;
 }
 
 function articlePermalink(article, siteUrl = process.env.SITE_URL || 'https://thefloridabuzz.com') {
   const base = String(siteUrl || 'https://thefloridabuzz.com').replace(/\/$/, '');
-  const slug = String(article?.slug || '').replace(/^\/+/, '');
+  const slug = String(article?.slug || '').replace(/^\/+/, '').trim();
+  if (!slug) return base;
   return `${base}/article/${slug}`;
 }
 
