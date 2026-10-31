@@ -120,6 +120,21 @@ describe('facebookParkReel voice + captions', () => {
       buildReelCaption({ title: 'Disney boat tips', dek: 'Keep docks moving', category: 'theme-parks' }),
       /Here's another Disney tip from The Florida Buzz/i
     );
+    const tipCaption = buildReelCaption({
+      title: 'Single Rider queues',
+      dek: 'Shorter waits if your party splits up',
+      slug: 'disney-world-single-rider-queues',
+      category: 'theme-parks',
+    });
+    assert.match(tipCaption, /Full story:\s*https:\/\/thefloridabuzz\.com\/article\/disney-world-single-rider-queues/i);
+    assert.doesNotMatch(tipCaption, /More at thefloridabuzz\.com\s*$/i);
+    const newsCaption = buildReelCaption({
+      title: 'Lightning Lane prices',
+      dek: 'Record highs',
+      slug: 'lightning-lane-record-highs-worth-it',
+      category: 'theme-parks',
+    }, 'disney-news');
+    assert.match(newsCaption, /Full story:\s*https:\/\/thefloridabuzz\.com\/article\/lightning-lane-record-highs-worth-it/i);
   });
 
   it('ranks tip mode for guides and disney-news mode for recent Disney stories', () => {
