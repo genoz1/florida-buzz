@@ -64,3 +64,14 @@ test('a numbered food headline must deliver the promised items, not a vague teas
   article.title='2027 Disney World Planning Update';article.body_html=body;
   assert.doesNotThrow(()=>validateNewsArticle(article));
 });
+
+test('spelled-out list promises are checked in both news and guides', () => {
+  const guide = { title: 'Three Restaurants to Try in Orlando', dek: 'A specific dining shortlist.', body_html: body, ...social };
+  assert.throws(() => validateGuide(guide), /Headline promises a list/);
+  const article = { ...guide, meta_title: 'Orlando Restaurants', category: 'food', image_subject: 'Orlando restaurant', image_location: 'Orlando', image_entities: ['Orlando'] };
+  assert.throws(() => validateNewsArticle(article), /Headline promises a list/);
+  guide.body_html = '<ul><li>First supported restaurant and its details.</li><li>Second supported restaurant and its details.</li><li>Third supported restaurant and its details.</li></ul>';
+  assert.doesNotThrow(() => validateGuide(guide));
+  assert.doesNotThrow(() => validateNewsArticle({ ...article, body_html: guide.body_html }));
+  assert.doesNotThrow(() => validateGuide({ ...guide, title: 'Four Seasons Orlando Planning Guide', body_html: body }));
+});
