@@ -40,6 +40,21 @@ function requireStringArray(value, field, { maxItems = 12 } = {}) {
   }
 }
 
+function validatePromisedList(title, html) {
+  const words = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+    nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
+    fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20 };
+  const listPromise = title.match(/^(\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:(?:new|best|top|essential|free|easy|favorite|must-try)\s+)*(?:bites|sips|dishes|foods?|drinks?|restaurants?|hotels?|resorts?|tips|ways|things|places|reasons|stops|beaches|attractions|rides|events|ideas|mistakes)\b/i);
+  if (!listPromise) return;
+  const count = words[listPromise[1].toLowerCase()] || Number(listPromise[1]);
+  if (count < 2 || count > 20) return;
+  const items = (html.match(/<li\b/gi) || []).length;
+  const headings = (html.match(/<h[23]\b/gi) || []).length;
+  if (Math.max(items, headings) < count) {
+    throw new ContentValidationError('Headline promises a list that body_html does not deliver.');
+  }
+}
+
 function validateNewsArticle(article) {
   requireObject(article, 'article');
   if (article.skip === true) {
@@ -54,17 +69,7 @@ function validateNewsArticle(article) {
   }
   requireString(article.dek, 'dek', { max: 200 });
   requireHtml(article.body_html);
-  // Reject a concrete failure seen in the indexing audit: an "8 new bites"
-  // headline whose body names none of the eight items. Years, prices and
-  // ordinary numeric news headlines do not trigger this editorial rule.
-  const listPromise = article.title.match(/^(\d{1,2})\s+(?:(?:new|best|top|essential|free|easy|favorite|must-try)\s+)*(?:bites|sips|dishes|foods?|drinks?|restaurants?|hotels?|resorts?|tips|ways|things|places|reasons|stops|beaches|attractions|rides|events|ideas|mistakes)\b/i);
-  if (listPromise && Number(listPromise[1]) >= 2 && Number(listPromise[1]) <= 20) {
-    const items = (article.body_html.match(/<li\b/gi) || []).length;
-    const headings = (article.body_html.match(/<h[23]\b/gi) || []).length;
-    if (Math.max(items, headings) < Number(listPromise[1])) {
-      throw new ContentValidationError('Headline promises a list that body_html does not deliver.');
-    }
-  }
+  validatePromisedList(article.title, article.body_html);
   requireString(article.fb_caption, 'fb_caption');
   requireString(article.pin_title, 'pin_title', { max: 140 });
   requireString(article.pin_description, 'pin_description', { max: 600 });
@@ -79,6 +84,7 @@ function validateGuide(guide) {
   requireString(guide.title, 'title', { max: 100 });
   requireString(guide.dek, 'dek', { max: 200 });
   requireHtml(guide.body_html);
+  validatePromisedList(guide.title, guide.body_html);
   requireString(guide.fb_caption, 'fb_caption');
   requireString(guide.pin_title, 'pin_title', { max: 140 });
   requireString(guide.pin_description, 'pin_description', { max: 600 });
