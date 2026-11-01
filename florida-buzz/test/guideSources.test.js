@@ -19,6 +19,9 @@ test('published sources must be consulted URLs and safely rendered, with support
   assert.throws(() => appendGuideSources({ ...guide(), body_html: '<p>A rule with no supporting link.</p>' }, [{ url }]), /beside its factual claims/);
   assert.throws(() => appendGuideSources({ ...guide(), body_html: '<p><a href="https://example.com/invented">Unverified rule</a></p>' }, [{ url }]), /external link/);
   assert.throws(() => appendGuideSources({ ...guide(), sources: [{ title: 'unsafe', url: 'javascript:alert(1)' }] }, [{ url: 'javascript:alert(1)' }]), /not returned/);
+  assert.doesNotThrow(() => appendGuideSources({ ...guide(), body_html: `<p><a href=${url}>Official rules</a></p>` }, [{ url }]));
+  assert.throws(() => appendGuideSources({ ...guide(), body_html: guide().body_html + '<a href=https://example.com/invented>Unverified</a>' }, [{ url }]), /external link/);
+  assert.throws(() => appendGuideSources({ ...guide(), body_html: `<p><a data-href="${url}">Not a real source link</a></p>` }, [{ url }]), /beside its factual claims/);
 });
 
 test('tracking differences do not reject a consulted source, while meaningful query differences do', () => {

@@ -42,8 +42,8 @@ function appendGuideSources(guide, consultedSources) {
   }
 
   let inlineSources = 0;
-  for (const match of guide.body_html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1/gi)) {
-    const href = match[2].replace(/&amp;/gi, '&');
+  for (const match of guide.body_html.matchAll(/<a\b[^>]*?\s+href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\x60]+))/gi)) {
+    const href = (match[1] ?? match[2] ?? match[3]).replace(/&amp;/gi, '&');
     // Affiliate placeholders are converted separately after validation.
     if (/^(?:\/(?!\/)|#|AFFILIATE_(?:SEARCH|UT):)/i.test(href)) continue;
     const url = sourceUrl(href);
