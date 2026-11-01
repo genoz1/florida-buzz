@@ -260,6 +260,23 @@ test('persistent error never produces demo content from queryArticles', async ()
   });
 });
 
+test('public lists omit failed drafts while exact URL lookups retain their existing behavior', async () => {
+  const rows = [
+    { slug: 'insufficient-source-content', title: 'Story cannot be published' },
+    { slug: 'insufficient-source-material', title: 'Insufficient Source Material' },
+    { slug: 'different-slug', title: 'Insufficient source content' },
+    { slug: 'sample-theme-parks-0', title: 'Demo story' },
+    { slug: 'real-announcement', title: 'New park hours announced' },
+  ];
+  const query = createArticlesQuery({ client: mockClient({ rows }), env: { NODE_ENV: 'production' } });
+  for (const options of [{}, { limit: 1 }, { offset: 1, limit: 1 }]) {
+    const result = await query.queryArticles(options);
+    assert.deepEqual(result.articles.map(a => a.slug), ['real-announcement']);
+  }
+  const exact = await query.queryArticles({ slug: 'insufficient-source-content', limit: 1 });
+  assert.equal(exact.articles[0].slug, 'insufficient-source-content');
+});
+
 test('hasAnyRealArticles distinguishes query error from legitimate zero count', async () => {
   const empty = createArticlesQuery({
     client: mockClient({ rows: [] }),
