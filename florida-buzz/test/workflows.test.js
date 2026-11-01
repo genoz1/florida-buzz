@@ -22,7 +22,7 @@ const social = {
 
 function responsePayload(text, { research = false } = {}) {
   const output = [];
-  if (research) output.push({ type: 'web_search_call', action: { type: 'search' } });
+  if (research) output.push({ type: 'web_search_call', action: { type: 'search', sources: [{ type: 'url', url: 'https://example.com/official-rules' }] } });
   output.push({ type: 'message', content: [{ type: 'output_text', text }] });
   return { status: 'completed', output };
 }
@@ -48,8 +48,8 @@ test('all Florida Buzz text workflows retain their existing structured contracts
   const payloads = [
     { value: { skip: false, reason: null, title: 'Florida Attraction Announces a Helpful Update', meta_title: 'Florida Attraction Update 2026', category: 'theme-parks', dek: 'A concise explanation of what visitors should know.', body_html: body, ...social, image_subject: 'The named Florida attraction in its real park setting', image_location: 'Orlando, Florida', image_entities: ['Florida attraction', 'Orlando'], discussion_worthy: true, discussion_reason: 'Visitors can compare a meaningful planning tradeoff.', discussion_question: 'What would this attraction need to deliver for you to change an existing trip around it?', discussion_context: 'Consider the experience, time, and tradeoffs elsewhere in the day.', discussion_category: 'disney', discussion_topic: 'Trip-changing attractions', discussion_structure: 'threshold tradeoff', discussion_entities: ['Florida attraction'], discussion_confidence: 0.9 } },
     { research: true, value: { topic: 'Current Florida park entry procedures', working_title: 'Florida Park Entry Procedures Guide' } },
-    { research: true, value: { title: 'Florida Park Entry Procedures Guide', dek: 'What to know before arriving at the gate.', body_html: body, ...social, fb_caption: 'Plan your next Florida park day with current details. Full guide ↓' } },
-    { research: true, value: { title: 'Manual Florida Springs Planning Guide', dek: 'Current planning details for a Florida springs visit.', body_html: body, ...social, fb_caption: 'Plan a Florida springs day with current information. Full guide ↓' } },
+    { research: true, value: { title: 'Florida Park Entry Procedures Guide', dek: 'What to know before arriving at the gate.', body_html: body + '<p><a href="https://example.com/official-rules">Official entry rules</a></p>', sources: [{ title: 'Entry rules', url: 'https://example.com/official-rules' }], ...social, fb_caption: 'Plan your next Florida park day with current details. Full guide ↓' } },
+    { research: true, value: { title: 'Manual Florida Springs Planning Guide', dek: 'Current planning details for a Florida springs visit.', body_html: body + '<p><a href="https://example.com/official-rules">Official visit rules</a></p>', sources: [{ title: 'Visit rules', url: 'https://example.com/official-rules' }], ...social, fb_caption: 'Plan a Florida springs day with current information. Full guide ↓' } },
     { value: { title: 'My Honest Florida Restaurant Review', meta_title: 'Florida Restaurant Review', dek: 'My firsthand experience and practical verdict.', body_html: body, ...social, fb_caption: 'I reached a specific verdict about this Florida restaurant. Full review ↓' } },
     { value: { title: 'What to Do This Weekend in Orlando', meta_title: 'Orlando Events This Weekend', dek: 'A useful selection of current Orlando events.', body_html: body, fb_caption: 'Orlando has a busy weekend ahead. 🎉' } },
     { value: { topic: 'beach-vs-springs', message: '❤️ for Florida beaches or 👍 for natural springs? React with your pick!' } },
@@ -61,7 +61,10 @@ test('all Florida Buzz text workflows retain their existing structured contracts
 
   assert.equal((await writeArticle({ sourceTitle: 'Source headline', sourceSummary: 'Detailed source facts for the story.', sourceName: 'Official source', sourceUrl: 'https://example.com/story', category: 'theme-parks' })).category, 'theme-parks');
   assert.match((await pickTopic('theme-parks', [])).working_title, /Procedures/);
-  assert.match((await researchAndWriteGuide({ category: 'theme-parks', topic: 'Entry procedures', workingTitle: 'Entry guide' })).title, /Entry Procedures/);
+  const researchedGuide = await researchAndWriteGuide({ category: 'theme-parks', topic: 'Entry procedures', workingTitle: 'Entry guide' });
+  assert.match(researchedGuide.title, /Entry Procedures/);
+  assert.match(researchedGuide.body_html, /Sources used for this guide/);
+  assert.match(researchedGuide.body_html, /href="https:\/\/example.com\/official-rules"/);
   assert.match((await researchAndWriteGuide({ category: 'beaches', topic: 'Manual topic: springs planning', workingTitle: 'Springs guide' })).title, /Manual/);
   assert.match((await writeReview({ reviewType: 'restaurant', reviewerName: 'Local reviewer', reviewerBackground: 'Frequent visitor', subjectName: 'Sample Restaurant', answers: { standout: 'Friendly service' }, memory: 'A quiet lunch', rating: 4 })).title, /Review/);
   assert.match((await composeRoundup({ cityLabel: 'Orlando', mode: 'weekend', articles: [{ title: 'Local festival', dek: 'A downtown event.', slug: 'local-festival' }] })).title, /Orlando/);

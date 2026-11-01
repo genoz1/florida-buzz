@@ -14,6 +14,8 @@ const {
 } = require('../lib/facebookFeedQueue');
 const { normalizePinCopy, toFacebookFeedCaption } = require('../lib/socialCopy');
 const { notifyIndexNow } = require('../lib/indexnow');
+const { createArticlesQuery } = require('../lib/articlesQuery');
+const { appendGuideSources } = require('../lib/guideSources');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const SITE_URL = process.env.SITE_URL || 'https://thefloridabuzz.com';
@@ -83,19 +85,12 @@ function pickWeightedCategory() {
   return entries[0][0];
 }
 
-async function getExistingGuides() {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('articles')
-    .select('slug, title, dek, category')
-    .eq('is_evergreen', true)
-    .order('published_at', { ascending: false })
-    .limit(200);
-  if (error) {
-    console.error(`  [error] Could not fetch existing guides: ${error.message}`);
-    return [];
-  }
-  return data || [];
+async function getExistingGuides(client = supabase) {
+  if (!client) throw new Error('Cannot choose a new guide topic without the existing guide catalog.');
+  // Topic selection must see the entire archive, including older coverage.
+  // Database failures must not masquerade as an empty catalog.
+  const { articles } = await createArticlesQuery({ client }).queryArticles({ evergreenOnly: true });
+  return articles.map(({ slug, title, dek, category }) => ({ slug, title, dek, category }));
 }
 
 // Picks up to `count` related guides for internal linking: same-category
@@ -387,16 +382,19 @@ specific one that matches what's being discussed). Use at most 1-2 of these per 
 only where a ticket/planning mention already exists naturally — never invent a ticket
 recommendation just to place a link.
 
-CRITICAL: body_html is published directly on the site as-is. Never include 
-tags, citation indices, footnote markers, or any other research/citation annotation
-syntax — write plain narrative HTML only. Facts from your research should read as
-confident, natural prose with no visible trace of the research process itself.
+CRITICAL: body_html is published directly. Link changeable facts (prices, rules,
+eligibility and procedures) to the supporting official page beside the claim, using
+ordinary HTML anchors. Use only URLs actually returned by your live research; never
+guess a URL. Supply the supporting pages in sources. Distinguish a researched guide
+from firsthand experience; do not claim personal visits or human review. Do not include
+tool citation indices, footnote markers or raw research annotations in the HTML.
 
 Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 {
   "title": "string, under 70 characters",
   "dek": "string, one-sentence subhead, under 140 characters",
   "body_html": "string, well-structured guide as HTML using <p>, <h3>, and <ul>/<li> as needed, 500-900 words, ends with a brief practical tip or takeaway",
+  "sources": [{ "title": "supporting official page title", "url": "exact URL consulted during research" }],
   "fb_caption": "string, Facebook photo caption: 1-2 punchy sentences plus a relevant emoji, then a short genuine comment invite (e.g. 'Which tip would you use first?') — no hashtags, no URL, no 'Full guide' / link teases",
   "pin_title": "string, under 100 characters, descriptive and keyword-rich for Pinterest search/saves (place/topic + planning angle)",
   "pin_description": "string, 1-2 sentences, under 500 characters, written for Pinterest search with natural Florida + topic keywords"
@@ -406,10 +404,11 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Schema:
 Topic: ${topic}
 Working title idea: ${workingTitle}`;
 
-  const { value, searchesUsed } = await generateStructuredTextWithResearch(system, user, guideSchema, 6000, 12);
+  const { value, searchesUsed, sources } = await generateStructuredTextWithResearch(system, user, guideSchema, 6000, 12);
   console.log(`  Used ${searchesUsed} web search${searchesUsed === 1 ? '' : 'es'} while researching.`);
   const guide = validateGuide(value);
   guide.body_html = stripCitationTags(guide.body_html);
+  guide.body_html = appendGuideSources(guide, sources);
   guide.body_html = convertAffiliateLinks(guide.body_html);
   guide.body_html = convertUndercoverTouristLinks(guide.body_html);
   const contextText = `${topic} ${workingTitle} ${guide.title}`;
@@ -651,4 +650,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, pickTopic, researchAndWriteGuide, pickByline, GUIDE_BYLINE, decideFacebookDistribution };
+module.exports = { run, pickTopic, researchAndWriteGuide, getExistingGuides, pickByline, GUIDE_BYLINE, decideFacebookDistribution };

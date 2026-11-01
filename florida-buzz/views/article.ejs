@@ -1,6 +1,11 @@
 <%- include('partials/header', { pageTitle: (article.meta_title || article.title) + ' — The Florida Buzz', pageDescription: article.dek, category: article.category, tickerItems: ticker, canonicalPath: '/article/' + article.slug, pageImage: article.image_url || placeholderImg(article.category), ogType: 'article', robots: typeof robots !== 'undefined' ? robots : undefined }) %>
 
 <main class="wrap">
+  <nav aria-label="Breadcrumbs" style="margin-top:20px; font-size:14px;">
+    <a href="/">Home</a> &rsaquo;
+    <% if (article.is_evergreen) { %><a href="/guides">Guides</a>
+    <% } else { %><a href="/category/<%= article.category %>"><%= categoryLabels[article.category] %></a><% } %>
+  </nav>
   <article class="article-page">
     <span class="eyebrow"><%= categoryLabels[article.category] %></span>
     <% if (article.is_review) { %>
@@ -17,7 +22,10 @@
       <% } else { %>
         By The Florida Buzz staff
       <% } %>
-      &middot; <%= timeAgo(article.published_at) %>
+      &middot; Published <time datetime="<%= new Date(article.published_at).toISOString() %>"><%= new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/New_York' }) %></time>
+      <% if (article.content_updated_at && new Date(article.content_updated_at) > new Date(article.published_at)) { %>
+      &middot; Updated <time datetime="<%= new Date(article.content_updated_at).toISOString() %>"><%= new Date(article.content_updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/New_York' }) %></time>
+      <% } %>
     </p>
 
     <div class="hero-image" style="margin: 22px 0;">
@@ -116,7 +124,8 @@
     </p>
     <% } else if (article.is_evergreen) { %>
     <p class="source-note">
-      Written and researched by <% if (article.source_name === 'Gene Zentko') { %><a href="/gene-zentko">Gene Zentko</a><% } else { %><%= article.source_name %><% } %>.
+      Published by <% if (article.source_name === 'Gene Zentko') { %><a href="/gene-zentko">Gene Zentko</a><% } else { %><%= article.source_name %><% } %>.
+      See our <a href="/editorial-standards">editorial standards</a> for how we prepare guides.
     </p>
     <% } else { %>
     <p class="source-note">
@@ -128,7 +137,7 @@
 
   <% if (related && related.length) { %>
   <section class="section">
-    <div class="section-head"><span class="section-title">More <%= categoryLabels[article.category] %></span></div>
+    <div class="section-head"><span class="section-title"><%= article.is_evergreen ? 'More planning guides' : 'More ' + categoryLabels[article.category] %></span></div>
     <div class="grid">
       <% related.forEach(a => { %>
         <a href="/article/<%= a.slug %>" class="card">

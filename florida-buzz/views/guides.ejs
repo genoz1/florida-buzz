@@ -4,7 +4,12 @@
   <section class="section" style="border-bottom:none; padding-bottom:0;">
     <span class="eyebrow">Guides</span>
     <h1 style="font-family:var(--font-display); font-size:34px; color:var(--teal-900); margin:8px 0 0;">Florida Travel Guides</h1>
-    <p style="color:var(--ink-600); margin-top:10px; max-width:640px;">Deeper, researched guides that don't go stale — the stuff you'd actually plan a trip around.</p>
+    <p style="color:var(--ink-600); margin-top:10px; max-width:640px;">Practical guides to Florida trips, park visits, beaches and travel logistics.</p>
+    <% if (pagination.page === 1 && typeof guideHubs !== 'undefined' && guideHubs.length) { %>
+    <nav aria-label="Guide collections" style="margin-top:18px;">
+      <% guideHubs.forEach(hub => { %><p><a href="<%= hub.href %>" style="color:var(--teal-900); font-weight:600;"><%= hub.title %> →</a></p><% }) %>
+    </nav>
+    <% } %>
   </section>
 
   <section class="section">

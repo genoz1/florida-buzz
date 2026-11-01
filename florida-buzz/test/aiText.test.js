@@ -109,8 +109,10 @@ test('research requires live web search and reports normalized metadata', async 
     return response(200, {
       status: 'completed',
       output: [
-        { type: 'web_search_call', action: { type: 'search', query: 'current Florida rules' } },
-        { type: 'message', content: [{ type: 'output_text', text: '{"ok":true}' }] },
+        { type: 'web_search_call', action: { type: 'search', query: 'current Florida rules', sources: [{ url: 'https://example.com/rules', type: 'url' }] } },
+        { type: 'message', content: [{ type: 'output_text', text: '{"ok":true}', annotations: [
+          { type: 'url_citation', url: 'https://example.com/rules', title: 'Official rules' },
+        ] }] },
       ],
     });
   };
@@ -118,6 +120,8 @@ test('research requires live web search and reports normalized metadata', async 
   assert.equal(result.text, '{"ok":true}');
   assert.equal(result.searchesUsed, 1);
   assert.equal(result.provider, 'openai');
+  assert.deepEqual(result.sources, [{ url: 'https://example.com/rules', title: 'Official rules' }]);
+  assert.deepEqual(requestBody.include, ['web_search_call.action.sources']);
   assert.equal(requestBody.tools[0].type, 'web_search');
   assert.equal(requestBody.tools[0].external_web_access, true);
   assert.equal(requestBody.tool_choice, 'required');
