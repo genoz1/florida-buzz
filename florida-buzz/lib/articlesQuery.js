@@ -192,7 +192,7 @@ function createArticlesQuery({
     };
 
     // Exact slug lookups stay single-shot. Bounded lists over-fetch slightly so
-    // redirect losers can be filtered without shrinking the page. Unbounded
+    // non-public records can be filtered without shrinking the page. Unbounded
     // archive lists paginate until exhausted (Supabase caps a single response).
     if (!slug && !limit && typeof offset !== 'number') {
       const all = [];
@@ -211,7 +211,7 @@ function createArticlesQuery({
         if (data.length < PAGE_BATCH_SIZE) break;
         from += PAGE_BATCH_SIZE;
       }
-      return { ok: true, articles: filterRedirectedArticles(all), source: 'database' };
+      return { ok: true, articles: all.filter(isIndexableArticle), source: 'database' };
     }
 
     const fetchLimit = !slug && limit ? Math.min(Number(limit) + 8, 1000) : limit;
@@ -227,7 +227,7 @@ function createArticlesQuery({
       return query;
     });
 
-    const rows = slug ? data : filterRedirectedArticles(data);
+    const rows = slug ? data : data.filter(isIndexableArticle);
     const articles = limit && !slug ? rows.slice(0, limit) : rows;
     return { ok: true, articles, source: 'database' };
   }
