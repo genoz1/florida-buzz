@@ -70,6 +70,24 @@ function countSearches(data) {
   )).length;
 }
 
+function extractResearchSources(data) {
+  const sources = new Map();
+  for (const item of data?.output || []) {
+    for (const source of item.type === 'web_search_call' ? item.action?.sources || [] : []) {
+      if (typeof source.url === 'string') sources.set(source.url, { url: source.url, title: source.title || null });
+    }
+    if (item.type !== 'message') continue;
+    for (const content of item.content || []) {
+      for (const annotation of content.annotations || []) {
+        if (annotation.type === 'url_citation' && typeof annotation.url === 'string') {
+          sources.set(annotation.url, { url: annotation.url, title: annotation.title || null });
+        }
+      }
+    }
+  }
+  return [...sources.values()];
+}
+
 function stopReason(data) {
   if (data?.status === 'incomplete') {
     const reason = data?.incomplete_details?.reason;
@@ -155,6 +173,7 @@ async function openAIRequest({
   };
 
   if (withResearch) {
+    requestBody.include = ['web_search_call.action.sources'];
     requestBody.tools = [{
       type: 'web_search',
       external_web_access: true,
@@ -213,6 +232,7 @@ async function openAIRequest({
       text,
       value,
       searchesUsed: countSearches(data),
+      sources: extractResearchSources(data),
       stopReason: stopReason(data),
       provider: 'openai',
       model: modelName(withResearch),
@@ -328,6 +348,7 @@ module.exports = {
   _test: {
     extractResponseText,
     countSearches,
+    extractResearchSources,
     stopReason,
     classifyHttpError,
     requestWithRetry,

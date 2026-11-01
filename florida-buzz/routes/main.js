@@ -265,9 +265,7 @@ const CATEGORY_SEO = {
 
 // Pillar pages: hand-curated "hub" pages that round up every guide on a
 // specific subject in one place, with internal links to each. Good for SEO
-// (signals topical authority) once linked. For now these are sitemap-only —
-// not linked from anywhere in the site nav/UI — until affiliate links are
-// set up. Adding a new pillar is just a new entry here — no new routes,
+// Linked from the public guides archive. Adding a new pillar is just a new entry here — no new routes,
 // templates, or DB fields needed. `keywords` are matched case-insensitively
 // against each guide's title/dek within `category` to decide what belongs.
 const PILLARS = {
@@ -554,7 +552,8 @@ router.get('/article/:slug', async (req, res) => {
       return render404(req, res, { routeType: 'article', slug });
     }
 
-    const categoryArticles = await getArticles({ category: article.category, limit: 4 });
+    const categoryArticles = await getArticles({ category: article.category,
+      ...(article.is_evergreen ? { evergreenOnly: true } : {}), limit: 4 });
     related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
     ticker = await getArticles({ limit: 8 });
   } catch (err) {
@@ -608,7 +607,8 @@ router.get('/article/:slug', async (req, res) => {
 const { createGuidesArchiveHandler } = require('../lib/guidesArchive');
 const renderGuidesArchive = createGuidesArchiveHandler({
   getArticles, render404, render503, isUpstreamError,
-  viewLocals: { categoryLabels: CATEGORY_LABELS, placeholderImg, thumbUrl, resizeImg, timeAgo },
+  viewLocals: { categoryLabels: CATEGORY_LABELS, placeholderImg, thumbUrl, resizeImg, timeAgo,
+    guideHubs: Object.entries(PILLARS).map(([slug, pillar]) => ({ href: '/guide/' + slug, ...pillar })) },
 });
 router.get('/guides', renderGuidesArchive);
 router.get('/guides/page/:page', renderGuidesArchive);
@@ -621,7 +621,7 @@ router.get('/guide/:pillarSlug', async (req, res) => {
   let categoryGuides;
   let ticker;
   try {
-    categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true, limit: 200 });
+    categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true });
     ticker = await getArticles({ limit: 8 });
   } catch (err) {
     if (isUpstreamError(err)) return render503(req, res, { routeType: 'pillar', error: err });

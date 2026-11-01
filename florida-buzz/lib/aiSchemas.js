@@ -65,6 +65,10 @@ const guide = {
     title: { type: 'string' },
     dek: { type: 'string' },
     body_html: { type: 'string' },
+    sources: { type: 'array', minItems: 1, maxItems: 8, items: objectSchema({
+      title: { type: 'string' },
+      url: { type: 'string' },
+    }) },
     ...socialProperties,
   }),
 };
