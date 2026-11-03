@@ -6,6 +6,14 @@
  * loser here so Search Console / bookmarks don't 404.
  */
 const ARTICLE_SLUG_REDIRECTS = Object.freeze({
+  // Individually reviewed cross-feed opening/announcement duplicates, November 3.
+  'vuori-opens-at-disney-springs-town-center-2':
+    'vuori-opens-at-disney-springs-town-center',
+  'florida-fish-art-contest-2026-27-opens':
+    'florida-fish-art-contest-2026-27-entry-details',
+  'disney-destiny-enchanted-pumpkin-tree-solara-halloween-2026':
+    'disney-destiny-pumpkin-tree-halloween-on-the-high-seas-2026',
+
   // Near-identical FWC post-storm wildlife tips (KPTV vs WISTV rewrites).
   // Winner: florida-wildlife-safety-tips-after-a-major-storm
   'fwc-wildlife-safety-tips-after-major-storms':
