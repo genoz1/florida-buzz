@@ -911,8 +911,9 @@ router.get('/feed.xml', async (req, res) => {
     .map((a) => {
       const url = `${siteUrl}/article/${a.slug}`;
       const pubDate = new Date(a.published_at).toUTCString();
-      const image = resizeImg(a.image_url || placeholderImg(a.category), 1000);
-      const fullBody = image ? `<img src="${image}" alt="${escapeXml(a.title)}" />\n${a.body_html}` : a.body_html;
+      // Serve the stored image without the quota-limited transformation service.
+      const image = new URL(a.image_url || placeholderImg(a.category), siteUrl).href;
+      const fullBody = image ? `<img src="${escapeXml(image)}" alt="${escapeXml(a.title)}" />\n${a.body_html}` : a.body_html;
 
       return `  <item>
     <title>${escapeXml(a.title)}</title>
@@ -922,7 +923,7 @@ router.get('/feed.xml', async (req, res) => {
     <category>${escapeXml(CATEGORY_LABELS[a.category] || a.category)}</category>
     <description>${cdata(a.dek)}</description>
     <content:encoded>${cdata(fullBody)}</content:encoded>
-    ${image ? `<enclosure url="${image}" type="${guessImageMime(image)}" length="0" />` : ''}
+    ${image ? `<enclosure url="${escapeXml(image)}" type="${guessImageMime(image)}" length="0" />` : ''}
   </item>`;
     })
     .join('\n');
