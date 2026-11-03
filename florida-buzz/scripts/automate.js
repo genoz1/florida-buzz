@@ -4,7 +4,7 @@ const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/sup
 const { generateText, generateStructuredText } = require('../lib/aiText');
 const { newsArticle: newsArticleSchema } = require('../lib/aiSchemas');
 const { validateNewsArticle } = require('../lib/contentValidation');
-const { extractSourceText, feedEvidence } = require('../lib/sourceText');
+const { extractSourceText, feedEvidence, selectArticleEvidence } = require('../lib/sourceText');
 const { createArticleRetryQueue } = require('../lib/articleRetryQueue');
 const { createImageRepairQueue } = require('../lib/imageRepairQueue');
 const { generateArticleImageResult } = require('../lib/imageGen');
@@ -775,7 +775,14 @@ async function run() {
     }
 
     const fullSourceText = await fetchFullSourceText(item.link);
-    const summaryForWriter = fullSourceText || summary;
+    const summaryForWriter = selectArticleEvidence(item, fullSourceText);
+    if (!summaryForWriter) {
+      const error = new Error('Source has no article text beyond its headline; waiting for source evidence.');
+      error.code = 'source_evidence_missing';
+      console.log('  [retry] No source article text available. Keeping this item queued without generating an article.');
+      await retryQueue.recordFailure(source, item, error);
+      return;
+    }
     if (fullSourceText) {
       console.log(`  Fetched full source article (${fullSourceText.length} chars) instead of relying on the short RSS summary.`);
     } else {
