@@ -294,6 +294,52 @@ test('recoverStuckPodcastWork clears stale running runs and generating_audio epi
   assert.equal(freshEp.status, 'script_ready');
 });
 
+test('recoverStuckPodcastWork clears stale building_video YouTube boards', async () => {
+  const { recoverStuckPodcastWork } = require('../lib/podcasts/recoverStuck');
+  const { createMemoryStore } = require('../lib/podcasts/memoryStore');
+  const { getStillsBoard } = require('../lib/podcasts/youtubeStillsReview');
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const old = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  const episode = await store.createEpisode(show.id, {
+    title: 'Stuck YouTube build',
+    description: 'Test',
+    slug: 'stuck-youtube-build',
+    show_notes_html: '',
+  });
+  await store.updateEpisode(episode.id, {
+    status: 'published',
+    outline_json: {
+      youtube_stills: {
+        status: 'building_video',
+        updated_at: old,
+        youtube_url: null,
+        last_error: null,
+        items: [
+          {
+            id: 'story-0-0',
+            status: 'approved',
+            public_url: 'https://example.com/still.png',
+            segment_slug: 'story-0',
+            image_index: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  const recovered = await recoverStuckPodcastWork(store, {
+    showSlug: 'florida-buzz-disney',
+    now: new Date(),
+    youtubeBuildingStaleMs: 2 * 60 * 60 * 1000,
+  });
+  assert.equal(recovered.youtubeBoards, 1);
+  const board = getStillsBoard(await store.getEpisodeById(episode.id));
+  assert.equal(board.status, 'approved');
+  assert.match(board.last_error || '', /interrupted/i);
+  assert.equal(board.items[0].status, 'approved');
+});
+
 test('status transitions block illegal publish paths', () => {
   assert.equal(assertTransition('draft', 'script_ready'), 'script_ready');
   assert.throws(() => assertTransition('draft', 'published'));
