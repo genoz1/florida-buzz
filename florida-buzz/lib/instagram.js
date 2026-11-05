@@ -6,7 +6,7 @@
 // Publishing is a two-step process: create a media "container" pointing at
 // an image URL, then publish that container. Containers can take a few
 // seconds to process, so we poll their status before publishing.
-const { logPost } = require('./postLog');
+const { logPost, extractUrlFromText } = require('./postLog');
 
 const GRAPH_BASE = 'https://graph.instagram.com/v21.0';
 
@@ -106,13 +106,23 @@ async function createPost({ imageUrl, videoUrl, caption, logDetail = null }) {
       const actuallyPosted = await verifyRecentPublish(igUserId, accessToken, caption);
       if (actuallyPosted) {
         console.log('  Confirmed: it posted successfully despite the error response. Logging as success.');
-        await logPost({ platform: 'instagram', status: 'success', detail: logDetail || `${(caption || '').slice(0, 100)} (recovered after false-error response)` });
+        await logPost({
+          platform: 'instagram',
+          status: 'success',
+          detail: logDetail || `${(caption || '').slice(0, 100)} (recovered after false-error response)`,
+          link: extractUrlFromText(caption),
+        });
         return { recovered: true };
       }
       throw new Error(`Instagram publish failed: ${JSON.stringify(publishData)}`);
     }
 
-    await logPost({ platform: 'instagram', status: 'success', detail: logDetail || (caption ? caption.slice(0, 100) : null) });
+    await logPost({
+      platform: 'instagram',
+      status: 'success',
+      detail: logDetail || (caption ? caption.slice(0, 100) : null),
+      link: extractUrlFromText(caption),
+    });
     return publishData;
   } catch (err) {
     await logPost({ platform: 'instagram', status: 'failed', detail: logDetail ? `${logDetail} | ${err.message}` : err.message });

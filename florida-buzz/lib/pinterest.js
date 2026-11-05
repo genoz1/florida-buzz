@@ -157,7 +157,12 @@ async function createPin({ imageUrl, title, description, link }, { env = process
     throw new Error(`Pinterest API error ${res.status}: ${detail}`);
   }
 
-  await logPost({ platform: 'pinterest', status: 'success', detail: title ? title.slice(0, 100) : null });
+  await logPost({
+    platform: 'pinterest',
+    status: 'success',
+    detail: title ? title.slice(0, 100) : null,
+    link: link || null,
+  });
   return res.json();
 }
 
@@ -232,7 +237,12 @@ async function createVideoPin({ videoUrl, coverImageUrl, title, description, lin
     await logPost({ platform: 'pinterest', status: 'failed', detail });
     throw new Error(`Pinterest API error ${res.status}: ${detail}`);
   }
-  await logPost({ platform: 'pinterest', status: 'success', detail: title?.slice(0, 100) });
+  await logPost({
+    platform: 'pinterest',
+    status: 'success',
+    detail: title?.slice(0, 100),
+    link: link || null,
+  });
   return res.json();
 }
 

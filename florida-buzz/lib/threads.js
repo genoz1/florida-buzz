@@ -1,7 +1,7 @@
 // Thin wrapper around Meta's Threads API for publishing a text+image post.
 // Built on the same underlying Graph API infrastructure as Instagram, so it
 // uses the same two-step pattern: create a media container, then publish it.
-const { logPost } = require('./postLog');
+const { logPost, extractUrlFromText } = require('./postLog');
 
 const GRAPH_BASE = 'https://graph.threads.net/v1.0';
 
@@ -136,13 +136,23 @@ async function createPost({ text, imageUrl, videoUrl }) {
       const actuallyPosted = await verifyRecentPublish(userId, accessToken, text);
       if (actuallyPosted) {
         console.log('  Confirmed: it posted successfully despite the error response. Logging as success.');
-        await logPost({ platform: 'threads', status: 'success', detail: `${(text || '').slice(0, 100)} (recovered after false-error response)` });
+        await logPost({
+          platform: 'threads',
+          status: 'success',
+          detail: `${(text || '').slice(0, 100)} (recovered after false-error response)`,
+          link: extractUrlFromText(text),
+        });
         return { recovered: true };
       }
       throw new Error(`Threads publish failed: ${JSON.stringify(lastPublishError)}`);
     }
 
-    await logPost({ platform: 'threads', status: 'success', detail: text ? text.slice(0, 100) : null });
+    await logPost({
+      platform: 'threads',
+      status: 'success',
+      detail: text ? text.slice(0, 100) : null,
+      link: extractUrlFromText(text),
+    });
     return publishData;
   } catch (err) {
     await logPost({ platform: 'threads', status: 'failed', detail: err.message });

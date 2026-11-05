@@ -1,6 +1,6 @@
 // Shared Facebook Page posting helper, used by scripts/automate.js (article
 // posts) and scripts/generate-guide.js (evergreen guide posts).
-const { logPost } = require('./postLog');
+const { logPost, extractUrlFromText } = require('./postLog');
 
 const GRAPH_BASE = 'https://graph.facebook.com/v19.0';
 
@@ -203,7 +203,15 @@ async function postToFacebookPage({
     if (putLinkInFirstComment && postId) {
       commentId = await commentOnFacebookPost(postId, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
     }
-    await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
+    const loggedLink = putLinkInFirstComment
+      ? (commentId ? link : null)
+      : (link || extractUrlFromText(description) || null);
+    await logPost({
+      platform: 'facebook',
+      status: 'success',
+      detail: logDetail || message.slice(0, 100),
+      link: loggedLink,
+    });
     return returnResult
       ? { ok: true, postId, commentId, linkPlacement, asReel: Boolean(asReel), videoId: payload.videoId || payload.id || null }
       : true;
@@ -249,7 +257,15 @@ async function postToFacebookPage({
       commentId = await commentOnFacebookPost(postId, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
     }
 
-    await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
+    const loggedLink = putLinkInFirstComment
+      ? (commentId ? link : null)
+      : (link || extractUrlFromText(caption) || null);
+    await logPost({
+      platform: 'facebook',
+      status: 'success',
+      detail: logDetail || message.slice(0, 100),
+      link: loggedLink,
+    });
     if (!returnResult) return true;
     return {
       ok: true,
@@ -289,7 +305,15 @@ async function postToFacebookPage({
     commentId = await commentOnFacebookPost(payload.id, resolveFirstComment(), process.env.FB_PAGE_ACCESS_TOKEN);
   }
 
-  await logPost({ platform: 'facebook', status: 'success', detail: logDetail || message.slice(0, 100) });
+  const loggedLink = putLinkInFirstComment
+    ? (commentId ? link : null)
+    : (link || extractUrlFromText(body.message) || null);
+  await logPost({
+    platform: 'facebook',
+    status: 'success',
+    detail: logDetail || message.slice(0, 100),
+    link: loggedLink,
+  });
   return returnResult ? { ok: true, postId: payload.id, photoId: null, commentId, linkPlacement } : true;
 }
 

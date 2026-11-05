@@ -1,150 +1,138 @@
 require('dotenv').config();
 const { supabase } = require('../lib/supabase');
 const { sendEmail } = require('../lib/resend');
+const { isUsableArticleImage } = require('../lib/articleImages');
+const {
+  PLATFORMS,
+  buildAlertEmail,
+  buildHealthReport,
+  findArticlesMissingImages,
+  summarizePostLog,
+} = require('../lib/opsHealthCheck');
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
-const PLATFORMS = ['facebook', 'instagram', 'pinterest', 'threads'];
+const ISSUES_ONLY = process.env.OPS_HEALTH_MODE === 'issues_only'
+  || process.argv.includes('--issues-only');
+const LOOKBACK_HOURS = Math.max(1, Number(process.env.OPS_HEALTH_LOOKBACK_HOURS || 24));
+const IMAGE_LOOKBACK_HOURS = Math.max(
+  LOOKBACK_HOURS,
+  Number(process.env.OPS_HEALTH_IMAGE_LOOKBACK_HOURS || 72)
+);
 
-// Uses Resend's shared test sender by default, since ALERT emails to
-// yourself shouldn't have to wait on the thefloridabuzz.com domain
-// verification that's still blocked by the pending Wix -> Cloudflare
-// transfer. Once that domain is verified in Resend, you can set
-// ALERT_FROM_EMAIL to something like "Florida Buzz Alerts <alerts@thefloridabuzz.com>"
-// instead — everything else keeps working unchanged.
+// Uses Resend's shared test sender by default until thefloridabuzz.com is
+// verified for alerts. Override with ALERT_FROM_EMAIL when ready.
 const ALERT_FROM = process.env.ALERT_FROM_EMAIL || 'Florida Buzz Alerts <onboarding@resend.dev>';
 
-async function getLast24hSummary() {
-  const summary = {};
-  PLATFORMS.forEach((p) => { summary[p] = { success: 0, failed: 0, failures: [] }; });
-
-  if (!supabase) return summary;
-
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+async function loadRecentPostLog(hours = LOOKBACK_HOURS) {
+  if (!supabase) return [];
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('post_log')
     .select('platform, status, detail, created_at')
-    .gte('created_at', oneDayAgo)
-    .order('created_at', { ascending: false });
-
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(2000);
   if (error) {
     console.error(`  [error] Could not fetch post_log: ${error.message}`);
-    return summary;
+    return [];
   }
-
-  (data || []).forEach((row) => {
-    if (!summary[row.platform]) return;
-    if (row.status === 'success') {
-      summary[row.platform].success += 1;
-    } else {
-      summary[row.platform].failed += 1;
-      summary[row.platform].failures.push(row.detail || '(no detail)');
-    }
-  });
-
-  return summary;
+  return data || [];
 }
 
-function buildEmail(summary) {
-  const issues = PLATFORMS.filter((p) => summary[p].success === 0 || summary[p].failed > 0);
-  const allGood = issues.length === 0;
+async function loadRecentArticles(hours = IMAGE_LOOKBACK_HOURS) {
+  if (!supabase) return [];
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('articles')
+    .select('slug, title, published_at, image_url')
+    .gte('published_at', since)
+    .order('published_at', { ascending: false })
+    .limit(500);
+  if (error) {
+    console.error(`  [error] Could not fetch articles: ${error.message}`);
+    return [];
+  }
+  return data || [];
+}
 
-  const subject = allGood
-    ? '✅ Florida Buzz — all platforms posting normally'
-    : `⚠️ Florida Buzz — issue detected: ${issues.join(', ')}`;
-
-  const rows = PLATFORMS.map((p) => {
-    const s = summary[p];
-    const status = s.success === 0 ? '🔴 No successful posts' : (s.failed > 0 ? '🟡 Some failures' : '🟢 OK');
-    return `
-      <tr>
-        <td style="padding:8px 12px; text-transform:capitalize; font-weight:600;">${p}</td>
-        <td style="padding:8px 12px;">${status}</td>
-        <td style="padding:8px 12px; text-align:center;">${s.success}</td>
-        <td style="padding:8px 12px; text-align:center;">${s.failed}</td>
-      </tr>`;
-  }).join('');
-
-  const failureDetails = PLATFORMS
-    .filter((p) => summary[p].failures.length)
-    .map((p) => `<p><strong>${p} errors:</strong><br>${summary[p].failures.slice(0, 5).map((f) => `&bull; ${f}`).join('<br>')}</p>`)
-    .join('');
-
-  const pinterestAuthIssue = (summary.pinterest.failures || []).some((f) =>
-    /authentication failed|invalid.?access.?token|re-authorize at/i.test(String(f || ''))
-  );
-  const siteUrl = (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
-  const adminKey = process.env.ADMIN_PASSWORD || 'ADMIN_PASSWORD';
-  const pinterestFix = pinterestAuthIssue
-    ? `<div style="margin-top:16px; padding:12px 14px; background:#fff4e5; border:1px solid #f0c36d; border-radius:8px; font-size:13px; color:#7a4b00;">
-        <strong>Pinterest auth fix:</strong> Access token expired/invalid.
-        Open <a href="${siteUrl}/admin/pinterest-auth?key=${adminKey}">${siteUrl}/admin/pinterest-auth</a>,
-        copy the new <code>PINTEREST_ACCESS_TOKEN</code> + <code>PINTEREST_REFRESH_TOKEN</code> into DigitalOcean App env vars,
-        confirm <code>PINTEREST_APP_ID</code>/<code>PINTEREST_APP_SECRET</code>/<code>PINTEREST_BOARD_ID</code> are set,
-        leave <code>PINTEREST_USE_SANDBOX</code> unset/false, redeploy, then hit
-        <a href="${siteUrl}/admin/test-pinterest?key=${adminKey}">/admin/test-pinterest</a>.
-      </div>`
-    : '';
-
-  const html = `
-    <div style="font-family:sans-serif; max-width:520px; margin:0 auto;">
-      <h2 style="color:#0d3b3e;">Daily Posting Health Check</h2>
-      <p style="color:#555;">Last 24 hours, as of ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET</p>
-      <table style="width:100%; border-collapse:collapse; font-size:14px;">
-        <thead>
-          <tr style="background:#0d3b3e; color:white;">
-            <th style="padding:8px 12px; text-align:left;">Platform</th>
-            <th style="padding:8px 12px; text-align:left;">Status</th>
-            <th style="padding:8px 12px;">✅ Success</th>
-            <th style="padding:8px 12px;">❌ Failed</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-      ${failureDetails ? `<div style="margin-top:16px; font-size:13px; color:#b3261e;">${failureDetails}</div>` : ''}
-      ${pinterestFix}
-      <p style="margin-top:20px; font-size:12px; color:#999;">Full report: <a href="${process.env.SITE_URL || 'https://thefloridabuzz.com'}/admin/post-report?key=${process.env.ADMIN_PASSWORD || ''}">View live dashboard</a></p>
-    </div>`;
-
-  return { subject, html };
+async function buildReport() {
+  const [posts, articles] = await Promise.all([
+    loadRecentPostLog(LOOKBACK_HOURS),
+    loadRecentArticles(IMAGE_LOOKBACK_HOURS),
+  ]);
+  const platformSummary = summarizePostLog(posts);
+  const missingImages = findArticlesMissingImages(articles, { isUsableArticleImage });
+  return buildHealthReport({
+    platformSummary,
+    missingImages,
+    lookbackHours: LOOKBACK_HOURS,
+  });
 }
 
 async function run() {
-  console.log(`=== Daily post health check — ${new Date().toISOString()} ===`);
+  console.log(`=== Publishing self-check — ${new Date().toISOString()} ===`);
+  console.log(`Mode: ${ISSUES_ONLY ? 'issues_only' : 'digest'} · lookback ${LOOKBACK_HOURS}h · image lookback ${IMAGE_LOOKBACK_HOURS}h`);
 
   if (!process.env.ALERT_EMAIL_TO) {
     console.error('[error] ALERT_EMAIL_TO not set — cannot send health check email.');
     process.exit(1);
   }
 
-  const summary = await getLast24hSummary();
-  const { subject, html } = buildEmail(summary);
+  const report = await buildReport();
+  const { subject, html, allGood } = buildAlertEmail(report, {
+    siteUrl: (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
+    adminPassword: process.env.ADMIN_PASSWORD || '',
+  });
 
   console.log(`Subject: ${subject}`);
+  console.log(`Issues: ${report.issues.length} (critical=${report.criticalCount})`);
   PLATFORMS.forEach((p) => {
-    console.log(`  ${p}: ${summary[p].success} success, ${summary[p].failed} failed`);
+    const s = report.platforms[p];
+    console.log(`  ${p}: ${s.success} ok, ${s.failed} failed, ${s.missingLink || 0} missing-link`);
   });
+  if (report.missingImages.length) {
+    console.log(`  missing images: ${report.missingImages.map((a) => a.slug).join(', ')}`);
+  }
+
+  if (ISSUES_ONLY && allGood) {
+    console.log('No issues — skipping email (issues_only mode).');
+    console.log('\n=== Run complete ===');
+    return { report, emailed: false };
+  }
 
   if (DRY_RUN) {
     console.log('\n[dry-run] Would send email to:', process.env.ALERT_EMAIL_TO);
-    return;
+    return { report, emailed: false };
   }
 
   if (!process.env.RESEND_API_KEY) {
     console.log('  [skip] RESEND_API_KEY not set — skipping email send.');
-    return;
+    return { report, emailed: false };
   }
 
   try {
-    await sendEmail({ to: process.env.ALERT_EMAIL_TO, subject, html, from: ALERT_FROM });
+    await sendEmail({
+      to: process.env.ALERT_EMAIL_TO,
+      subject,
+      html,
+      from: ALERT_FROM,
+    });
     console.log('  Email sent successfully.');
   } catch (err) {
     console.error(`  [error] Could not send health check email: ${err.message}`);
+    process.exitCode = 1;
+    return { report, emailed: false };
   }
 
   console.log('\n=== Run complete ===');
+  return { report, emailed: true };
 }
 
-run().catch((err) => {
-  console.error('Fatal error in post-health-check run:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  run().catch((err) => {
+    console.error('Fatal error in post-health-check run:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { run, buildReport };

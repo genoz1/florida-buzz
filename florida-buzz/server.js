@@ -306,24 +306,25 @@ if (scheduleFlags.facebookBuzzCommentSync) {
   console.log('Facebook Buzz comment reconciliation NOT scheduled — enable it after Meta comment-read access is granted.');
 }
 
-// Sends a daily email confirming whether every platform (Facebook, Instagram,
-// Pinterest, Threads) posted successfully in the last 24 hours — a genuine
-// pass/fail confirmation, not just an alert-on-failure. Runs at 8:15am,
-// after the prior day's full posting cycle has completed. Disabled until
-// RESEND_API_KEY and ALERT_EMAIL_TO are set.
-// Sends a daily email confirming whether every platform (Facebook, Instagram,
-// Pinterest, Threads) posted successfully in the last 24 hours — a genuine
-// pass/fail confirmation, not just an alert-on-failure. Runs at 8:15am,
-// after the prior day's full posting cycle has completed. Disabled until
-// RESEND_API_KEY and ALERT_EMAIL_TO are set.
+// Publishing self-check: platform failures, missing story photos, and social
+// posts logged without a site/story URL. Daily digest at 8:15am ET, plus an
+// issues-only sweep every 4 hours so problems do not sit unnoticed all day.
+// Disabled until RESEND_API_KEY and ALERT_EMAIL_TO are set.
 if (scheduleFlags.postHealthCheck) {
   cron.schedule('15 8 * * *', () => {
-    console.log('Running scheduled post health check...');
+    console.log('Running scheduled publishing self-check (daily digest)...');
     runScheduledCommand('post health check', 'node scripts/post-health-check.js');
   }, { timezone: 'America/New_York' });
-  console.log('Post health check scheduled: 8:15am daily (Eastern time).');
+  cron.schedule('20 10,14,18,22 * * *', () => {
+    console.log('Running scheduled publishing self-check (issues only)...');
+    runScheduledCommand(
+      'post health check issues',
+      'OPS_HEALTH_MODE=issues_only node scripts/post-health-check.js'
+    );
+  }, { timezone: 'America/New_York' });
+  console.log('Publishing self-check scheduled: 8:15am digest + 10:20/2:20/6:20/10:20pm issues-only (Eastern).');
 } else {
-  console.log('Post health check NOT scheduled — set RESEND_API_KEY and ALERT_EMAIL_TO to enable.');
+  console.log('Publishing self-check NOT scheduled — set RESEND_API_KEY and ALERT_EMAIL_TO to enable.');
 }
 
 // Refreshes the dining directory (scripts/generate-dining-directory.js) once
