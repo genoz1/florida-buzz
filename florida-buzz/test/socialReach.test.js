@@ -118,13 +118,21 @@ test('Buzz Board Facebook cadence env knob selects a subset of slots', () => {
   );
 });
 
-test('article automation posts Facebook with first_comment link placement', () => {
+test('article automation posts Facebook with caption link placement', () => {
   const automate = fs.readFileSync(path.join(__dirname, '../scripts/automate.js'), 'utf8');
-  assert.match(automate, /linkPlacement:\s*'first_comment'/);
+  assert.match(automate, /linkPlacement:\s*'caption'/);
+  assert.doesNotMatch(automate, /linkPlacement:\s*'first_comment'/);
   assert.match(automate, /linkCommentKind:\s*'article'/);
   assert.match(automate, /toFacebookFeedCaption\(fb_caption\)/);
   assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*realCategory\)/);
   assert.match(automate, /normalizePinCopy/);
+
+  const drain = fs.readFileSync(path.join(__dirname, '../scripts/facebook-feed-drain.js'), 'utf8');
+  assert.match(drain, /linkPlacement:\s*'caption'/);
+  assert.doesNotMatch(drain, /linkPlacement:\s*'first_comment'/);
+
+  const guide = fs.readFileSync(path.join(__dirname, '../scripts/generate-guide.js'), 'utf8');
+  assert.match(guide, /linkPlacement:\s*'caption'/);
 });
 
 test('engagement posts stay link-free in captions and prefer first_comment if a link appears later', () => {

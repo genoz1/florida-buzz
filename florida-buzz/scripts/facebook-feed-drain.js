@@ -96,7 +96,9 @@ async function run() {
       link: `${SITE_URL}/article/${row.slug}`,
       imageUrl: row.image_url,
       dryRun: DRY_RUN,
-      linkPlacement: 'first_comment',
+      // Caption (not first comment): Page token lacks comment permission, so
+      // first_comment left every photo post without a site link.
+      linkPlacement: 'caption',
       linkCommentKind: linkKind,
     });
     if (fbOk === false) {

@@ -5,9 +5,11 @@ const { logPost } = require('./postLog');
 const GRAPH_BASE = 'https://graph.facebook.com/v19.0';
 
 /**
- * Meta downranks posts that push people off-platform in the first seconds.
- * Prefer linkPlacement: 'first_comment' for photo posts so the feed unit stays
- * a native photo + discussion prompt, with the destination URL in a comment.
+ * linkPlacement:
+ * - 'caption' — append the URL to the photo/video caption (reliable site traffic).
+ * - 'first_comment' — keep the caption link-free and post the URL as the first
+ *   comment. Only use when the Page token can create comments; otherwise the
+ *   post ships with no path back to the site.
  * @param {'caption'|'first_comment'} linkPlacement
  */
 async function commentOnFacebookPost(postId, message, accessToken) {
@@ -146,10 +148,13 @@ async function postToFacebookPage({
     return returnResult ? { ok: true, dryRun: true, linkPlacement, asReel: Boolean(asReel && videoUrl) } : true;
   }
 
+  const captionWithLink = (base) =>
+    link ? `${base}\n\n${firstCommentMessage(link, linkCommentKind)}` : base;
+
   if (videoUrl) {
     const description = putLinkInFirstComment
       ? message
-      : (link ? `${message}\n\n${link}` : message);
+      : captionWithLink(message);
 
     let payload;
     if (asReel) {
@@ -203,7 +208,7 @@ async function postToFacebookPage({
   if (imageUrl) {
     const caption = putLinkInFirstComment
       ? message
-      : (link ? `${message}\n\n${link}` : message);
+      : captionWithLink(message);
     const res = await fetch(`${GRAPH_BASE}/${process.env.FB_PAGE_ID}/photos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

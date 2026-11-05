@@ -262,7 +262,7 @@ test('dry run exercises both publishers without writing post-log state', async (
   assert.match(facebookCalls[0].message, /Which option is actually worth the tradeoff\?/);
   assert.match(facebookCalls[0].message, /Question of the Day/);
   assert.equal(facebookCalls[0].link, 'https://thefloridabuzz.com/go/buzz/sample-question');
-  assert.equal(facebookCalls[0].linkPlacement, 'first_comment');
+  assert.equal(facebookCalls[0].linkPlacement, 'caption');
   assert.equal(facebookCalls[0].linkCommentKind, 'buzz_board');
   assert.equal(facebookCalls[0].imageUrl, 'https://storage.example/facebook-photo.jpg');
 });
@@ -270,8 +270,10 @@ test('dry run exercises both publishers without writing post-log state', async (
 test('article social publishing and both Buzz Board redirect routes remain separate and unchanged', () => {
   const automate = fs.readFileSync(path.join(__dirname, '../scripts/automate.js'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../routes/main.js'), 'utf8');
-  assert.match(automate, /postToFacebook\(\{ title: article\.title, fb_caption: article\.fb_caption, slug, imageUrl: finalImage \}\)/);
-  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*article\.category\)/);
+  assert.match(automate, /attemptFacebookForContent\(\{/);
+  assert.match(automate, /fb_caption:\s*article\.fb_caption/);
+  assert.match(automate, /linkPlacement:\s*'caption'/);
+  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*realCategory\)/);
   assert.match(routes, /router\.get\('\/go\/buzz\/:slug'/);
   assert.match(routes, /router\.get\('\/go\/ig\/:slug'/);
 });

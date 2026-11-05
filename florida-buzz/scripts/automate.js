@@ -427,14 +427,15 @@ Source link (for context only, do not include in body_html): ${sourceUrl}`;
 
 async function postToFacebook({ title, fb_caption, source_url, slug, imageUrl }) {
   const articleUrl = `${process.env.SITE_URL}/article/${slug}`;
-  // Keep the feed unit as a native photo + curiosity hook. Article URL goes in
-  // the first comment so Meta is less likely to throttle distribution.
+  // Put the article URL in the caption. First-comment placement looks cleaner
+  // for reach, but our Page token cannot create comments (#200), so posts were
+  // shipping with no path back to thefloridabuzz.com.
   return postToFacebookPage({
     message: toFacebookFeedCaption(fb_caption),
     link: articleUrl,
     imageUrl,
     dryRun: DRY_RUN,
-    linkPlacement: 'first_comment',
+    linkPlacement: 'caption',
     linkCommentKind: 'article',
   });
 }
@@ -699,7 +700,7 @@ async function run() {
       link: `${process.env.SITE_URL}/article/${slug}`,
       imageUrl,
       dryRun: DRY_RUN,
-      linkPlacement: 'first_comment',
+      linkPlacement: 'caption',
       linkCommentKind,
     });
     if (fbOk !== false) {

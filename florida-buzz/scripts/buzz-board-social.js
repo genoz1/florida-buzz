@@ -191,9 +191,9 @@ async function run({
       const publishResult = await facebookPublisher({
         message: buildCopy(discussion, 'facebook'),
         link: buildShortTrackingUrl(discussion.slug),
-        // Keep the feed unit native (photo + question). Off-site link in the
-        // first comment so Meta is less likely to throttle distribution.
-        linkPlacement: 'first_comment',
+        // Caption includes the Buzz Board URL. First-comment needs comment
+        // permission our Page token currently lacks (#200).
+        linkPlacement: 'caption',
         linkCommentKind: 'buzz_board',
         imageUrl: facebookImageUrl,
         dryRun,

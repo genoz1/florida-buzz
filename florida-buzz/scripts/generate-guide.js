@@ -427,7 +427,9 @@ async function postToFacebook({ fb_caption, slug, imageUrl }) {
     link: articleUrl,
     imageUrl,
     dryRun: DRY_RUN,
-    linkPlacement: 'first_comment',
+    // Caption keeps a reliable path to the site; first_comment needs comment
+    // permission our Page token currently lacks.
+    linkPlacement: 'caption',
     linkCommentKind: 'guide',
   });
 }
