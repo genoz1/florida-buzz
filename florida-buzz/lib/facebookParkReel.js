@@ -964,7 +964,9 @@ async function publishParkReel({
     link,
     videoUrl,
     dryRun: dryRun || !publish,
-    linkPlacement: 'first_comment',
+    // Caption already includes Full story URL; do not rely on first_comment
+    // (Page token lacks comment permission — #200).
+    linkPlacement: 'caption',
     linkCommentKind: 'article',
     firstCommentText,
     logDetail: `park-reel:${reelMode}:${article.slug}`,

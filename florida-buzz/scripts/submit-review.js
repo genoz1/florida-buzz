@@ -175,7 +175,14 @@ async function run() {
 
   if (process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID && finalImage) {
     try {
-      await createInstagramPost({ imageUrl: finalImage, caption: review.fb_caption.replace(/Full review\s*↓\s*$/i, 'Full review — link in bio') });
+      const igCaption = String(review.fb_caption || '')
+        .replace(/Full review\s*(?:↓|⬇️)?\s*$/i, '')
+        .replace(/\s*Full review\s*[—-]\s*link in bio\s*$/i, '')
+        .trim();
+      await createInstagramPost({
+        imageUrl: finalImage,
+        caption: `${igCaption}\n\nFull review:\n${articleUrl}`,
+      });
     } catch (err) {
       console.error(`[error] Instagram post failed: ${err.message}`);
     }

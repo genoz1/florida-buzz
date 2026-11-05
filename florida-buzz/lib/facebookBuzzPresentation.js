@@ -215,8 +215,8 @@ function presentationFor(discussion) {
 function buildFacebookCopy(discussion) {
   const presentation = presentationFor(discussion);
   const label = discussion?.category === 'disney' ? 'Disney Question of the Day' : 'Question of the Day';
-  // Comment-first CTA: Meta rewards early replies. Destination link goes in
-  // the first comment (see linkPlacement: 'first_comment' in buzz-board-social).
+  // Comment-first CTA; Buzz Board URL is appended by postToFacebookPage
+  // (linkPlacement: 'caption' in buzz-board-social).
   return `${presentation.hook}\n\n${label} — drop your answer in the comments 👇`;
 }
 

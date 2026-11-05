@@ -52,11 +52,8 @@ Format rules:
 - End with a short reaction CTA like "React with your pick!" or "Tap ❤️ or
   👍 below!" — never engagement-bait ("comment YES", "tag a friend", "share
   if you agree", giveaways, or "algorithm" language).
-- No links, no hashtags, no mention of TheFloridaBuzz.com — this is a pure
-  engagement post, not a promotional one. Off-site URLs must never appear in
-  the caption (if a destination is ever added later, it belongs in a first
-  comment via linkPlacement, not the caption).
-- Keep it under 300 characters total
+- No hashtags. Keep the reaction CTA primary; do not bury it under promo copy.
+- Keep it under 280 characters before the site line we append after generation.
 - Do not repeat or closely overlap with any topic already used recently (listed below)
 
 Respond ONLY with valid JSON, no markdown fences, no preamble:
@@ -96,20 +93,26 @@ async function run() {
   console.log(`Topic: ${post.topic}`);
   console.log(`Message:\n${post.message}`);
 
-  // Pure engagement: no off-site link in the caption. If a destination is
-  // ever supplied, keep it out of the caption via first_comment placement.
+  const siteUrl = (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  // Every social post needs a path back to the site. Keep the reaction CTA
+  // first; append the homepage URL in the caption (first_comment is broken
+  // without comment permission).
+  const messageWithLink = post.message.includes(siteUrl)
+    ? post.message
+    : `${post.message}\n\nMore Florida news: ${siteUrl}`;
   const ok = await postToFacebookPage({
-    message: post.message,
-    link: null,
+    message: messageWithLink,
+    link: siteUrl,
     dryRun: DRY_RUN,
-    linkPlacement: 'first_comment',
+    linkPlacement: 'caption',
+    linkCommentKind: 'article',
   });
   console.log(ok ? '  Posted successfully.' : '  Post failed or was skipped — see above.');
 
   if (!DRY_RUN && ok && supabase) {
     const { error } = await supabase.from('engagement_posts').insert({
       topic: post.topic,
-      message: post.message,
+      message: messageWithLink,
     });
     if (error) console.error(`  [error] Could not save engagement post record: ${error.message}`);
   }

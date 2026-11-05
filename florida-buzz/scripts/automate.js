@@ -1031,7 +1031,11 @@ async function run() {
       title: article.title,
     });
     await postToInstagram({
-      caption: toInstagramCaption(article.fb_caption, realCategory),
+      caption: toInstagramCaption(
+        article.fb_caption,
+        realCategory,
+        `${process.env.SITE_URL}/article/${slug}`
+      ),
       imageUrl: finalImage,
     });
     await postToThreads({

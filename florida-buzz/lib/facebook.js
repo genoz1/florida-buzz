@@ -148,8 +148,24 @@ async function postToFacebookPage({
     return returnResult ? { ok: true, dryRun: true, linkPlacement, asReel: Boolean(asReel && videoUrl) } : true;
   }
 
-  const captionWithLink = (base) =>
-    link ? `${base}\n\n${firstCommentMessage(link, linkCommentKind)}` : base;
+  const captionAlreadyHasLink = (base) => {
+    if (!link || !base) return false;
+    const text = String(base);
+    if (text.includes(link)) return true;
+    try {
+      const path = new URL(link).pathname;
+      return Boolean(path && path !== '/' && text.includes(path));
+    } catch {
+      return false;
+    }
+  };
+  // Prefer a labeled link line; skip when the caller already embedded the URL
+  // (park Reels / guide Reels captions often include "Full story:" already).
+  const captionWithLink = (base) => {
+    if (!link) return base;
+    if (captionAlreadyHasLink(base)) return base;
+    return `${base}\n\n${resolveFirstComment()}`;
+  };
 
   if (videoUrl) {
     const description = putLinkInFirstComment

@@ -149,8 +149,8 @@ async function run() {
   console.log(`Message: ${caption.message}`);
 
   const facebookCaption = `${caption.message} ${pageUrl}`;
-  const instagramCaption = `${caption.message} Link in bio 🔗`;
-  const threadsCaption = `${caption.message} ${pageUrl}`;
+  const instagramCaption = `${caption.message}\n\nFull story:\n${pageUrl}`;
+  const threadsCaption = `${caption.message}\n\n${pageUrl}`;
 
   const results = {};
 

@@ -33,23 +33,24 @@ async function getRandomGuide() {
 
 async function buildPost(type) {
   if (type === 'brand') {
-    return { message: pickRandom(BRAND_MESSAGES), link: null };
+    return { message: pickRandom(BRAND_MESSAGES), link: SITE_URL };
   }
 
   if (type === 'newsletter') {
-    return { message: pickRandom(NEWSLETTER_MESSAGES), link: null };
+    return { message: pickRandom(NEWSLETTER_MESSAGES), link: `${SITE_URL}/#newsletter` };
   }
 
   if (type === 'guide') {
     const guide = await getRandomGuide();
     if (!guide) {
       console.log('  [skip] No guides available yet — falling back to a brand post.');
-      return { message: pickRandom(BRAND_MESSAGES), link: null };
+      return { message: pickRandom(BRAND_MESSAGES), link: SITE_URL };
     }
     const guideUrl = `${SITE_URL}/article/${guide.slug}`;
     return {
       message: `📖 Guide: ${guide.title}\n${guide.dek}\nRead the full guide: ${guideUrl}`,
-      link: null, // link is already inline in the message text above
+      // URL is also inline in the message; pass link for the Facebook preview card.
+      link: guideUrl,
     };
   }
 
@@ -81,7 +82,12 @@ async function run() {
     return;
   }
 
-  const ok = await postToFacebookPage({ message: post.message, link: post.link, dryRun: DRY_RUN });
+  const ok = await postToFacebookPage({
+    message: post.message,
+    link: post.link,
+    dryRun: DRY_RUN,
+    linkPlacement: 'caption',
+  });
   console.log(ok ? '  Posted successfully.' : '  Post failed or was skipped — see above.');
 
   console.log('\n=== Run complete ===');

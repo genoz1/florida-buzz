@@ -56,17 +56,26 @@ test('article Facebook captions strip Full story suffix and do not invent park-d
   assert.doesNotMatch(seasonal, /park day|tell us below/i);
 });
 
-test('Instagram captions are comment-first with a short focused hashtag set', () => {
+test('Instagram captions are comment-first and include the real story URL', () => {
+  const articleUrl = 'https://thefloridabuzz.com/article/lightning-lane';
   const caption = toInstagramCaption(
     'Disney just changed something about Lightning Lane pricing this week. Full story ↓',
-    'theme-parks'
+    'theme-parks',
+    articleUrl
   );
   assert.match(caption, /Comment below|would you do/i);
-  assert.match(caption, /link in bio/i);
+  assert.match(caption, /Full story:\nhttps:\/\/thefloridabuzz\.com\/article\/lightning-lane/);
+  assert.doesNotMatch(caption, /link in bio/i);
   assert.match(caption, /#DisneyWorld/);
   assert.match(caption, /#FloridaBuzz/);
   assert.equal((caption.match(/#/g) || []).length, 4);
   assert.doesNotMatch(caption, /Full story ↓/);
+
+  const withoutUrl = toInstagramCaption(
+    'Disney just changed something about Lightning Lane pricing this week.',
+    'theme-parks'
+  );
+  assert.match(withoutUrl, /link in bio/i);
 });
 
 test('Threads posts lead with conversation and keep the link secondary', () => {
@@ -124,7 +133,8 @@ test('article automation posts Facebook with caption link placement', () => {
   assert.doesNotMatch(automate, /linkPlacement:\s*'first_comment'/);
   assert.match(automate, /linkCommentKind:\s*'article'/);
   assert.match(automate, /toFacebookFeedCaption\(fb_caption\)/);
-  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*realCategory\)/);
+  assert.match(automate, /toInstagramCaption\(/);
+  assert.match(automate, /article\/\$\{slug\}/);
   assert.match(automate, /normalizePinCopy/);
 
   const drain = fs.readFileSync(path.join(__dirname, '../scripts/facebook-feed-drain.js'), 'utf8');
@@ -133,13 +143,15 @@ test('article automation posts Facebook with caption link placement', () => {
 
   const guide = fs.readFileSync(path.join(__dirname, '../scripts/generate-guide.js'), 'utf8');
   assert.match(guide, /linkPlacement:\s*'caption'/);
+
+  const parkReel = fs.readFileSync(path.join(__dirname, '../lib/facebookParkReel.js'), 'utf8');
+  assert.match(parkReel, /linkPlacement:\s*'caption'/);
 });
 
-test('engagement posts stay link-free in captions and prefer first_comment if a link appears later', () => {
+test('engagement posts append a site URL in the caption', () => {
   const engagement = fs.readFileSync(path.join(__dirname, '../scripts/engagement-post.js'), 'utf8');
-  assert.match(engagement, /No links/);
-  assert.match(engagement, /linkPlacement:\s*'first_comment'/);
-  assert.match(engagement, /link:\s*null/);
+  assert.match(engagement, /More Florida news:/);
+  assert.match(engagement, /linkPlacement:\s*'caption'/);
   assert.match(engagement, /strong first-line hook/);
   assert.match(engagement, /never engagement-bait/);
 });

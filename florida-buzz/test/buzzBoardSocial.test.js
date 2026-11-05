@@ -273,7 +273,10 @@ test('article social publishing and both Buzz Board redirect routes remain separ
   assert.match(automate, /attemptFacebookForContent\(\{/);
   assert.match(automate, /fb_caption:\s*article\.fb_caption/);
   assert.match(automate, /linkPlacement:\s*'caption'/);
-  assert.match(automate, /toInstagramCaption\(article\.fb_caption,\s*realCategory\)/);
+  assert.match(automate, /toInstagramCaption\(/);
+  assert.match(automate, /article\.fb_caption/);
+  assert.match(automate, /realCategory/);
+  assert.match(automate, /article\/\$\{slug\}/);
   assert.match(routes, /router\.get\('\/go\/buzz\/:slug'/);
   assert.match(routes, /router\.get\('\/go\/ig\/:slug'/);
 });

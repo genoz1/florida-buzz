@@ -43,16 +43,22 @@ function instagramHashtagsForCategory(category) {
 }
 
 /**
- * Instagram: comment-first CTA, then bio/link path, then a short hashtag set.
+ * Instagram: comment-first CTA, then the real story URL (plain text — IG does
+ * not make caption links clickable for most accounts), then a short hashtag set.
+ * Never ship "link in bio" alone when we have an article URL.
  */
-function toInstagramCaption(fbCaption, category = null) {
+function toInstagramCaption(fbCaption, category = null, articleUrl = null) {
   const core = stripStorySuffix(fbCaption);
   if (!core) return core;
   const hashtags = instagramHashtagsForCategory(category);
   const withCta = COMMENT_CTA_RE.test(core)
     ? core
     : `${core}\n\nWhat would you do? Comment below 👇`;
-  return `${withCta}\n\nFull story — link in bio\n\n${hashtags}`;
+  const url = String(articleUrl || '').trim();
+  const linkBlock = url
+    ? (url.includes(core) || withCta.includes(url) ? null : `Full story:\n${url}`)
+    : 'Full story — link in bio';
+  return linkBlock ? `${withCta}\n\n${linkBlock}\n\n${hashtags}` : `${withCta}\n\n${hashtags}`;
 }
 
 /**
