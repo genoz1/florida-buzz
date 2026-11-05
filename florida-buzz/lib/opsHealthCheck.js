@@ -136,9 +136,87 @@ function buildHealthReport({
   };
 }
 
+/**
+ * Human + auto remediation for each issue code.
+ * `auto` describes what the self-check will attempt without waiting for a reply.
+ */
+function buildRemediationSteps(report, {
+  siteUrl = 'https://thefloridabuzz.com',
+  adminPassword = '',
+  remediations = [],
+} = {}) {
+  const adminKey = adminPassword || 'ADMIN_PASSWORD';
+  const steps = [];
+  const codes = new Set((report.issues || []).map((i) => i.code));
+  const autoByCode = new Map((remediations || []).map((r) => [r.code, r]));
+
+  if (codes.has('articles_missing_images')) {
+    const auto = autoByCode.get('articles_missing_images');
+    steps.push({
+      code: 'articles_missing_images',
+      title: 'Stories missing photos',
+      auto: auto?.detail || 'Queue image repair for each affected story and kick same-day repair for the newest ones.',
+      manual: [
+        `Confirm heroes appear on ${siteUrl}/article/<slug>.`,
+        'If still blank after ~30 minutes, check article_image_repairs status in Supabase or re-run scripts/repair-article-images.js with APPLY_IMAGE_REPAIR=true.',
+      ],
+    });
+  }
+
+  for (const platform of PLATFORMS) {
+    if (codes.has(`${platform}_missing_link`)) {
+      steps.push({
+        code: `${platform}_missing_link`,
+        title: `${platform} posts without site URL`,
+        auto: 'New posts now put the URL in the caption and log [link:...]. Older live posts are not rewritten automatically.',
+        manual: [
+          `Open the latest ${platform} post and confirm a Full story / site URL is visible.`,
+          'If an old post is still link-free, add a page comment with the article URL or reshare once.',
+        ],
+      });
+    }
+    if (codes.has(`${platform}_quiet`)) {
+      const auto = autoByCode.get(`${platform}_quiet`);
+      steps.push({
+        code: `${platform}_quiet`,
+        title: `${platform} went quiet`,
+        auto: auto?.detail || null,
+        manual: [
+          platform === 'facebook'
+            ? 'Check Facebook feed drain / automate logs and FB_PAGE_ACCESS_TOKEN.'
+            : `Check ${platform} credentials and recent failed rows on the post report.`,
+          `Dashboard: ${siteUrl}/admin/post-report?key=${adminKey}`,
+        ],
+      });
+    }
+    if (codes.has(`${platform}_failures`)) {
+      const failures = (report.platforms?.[platform]?.failures || []).join(' ');
+      const pinterestAuth = platform === 'pinterest'
+        && /authentication failed|invalid.?access.?token|re-authorize/i.test(failures);
+      steps.push({
+        code: `${platform}_failures`,
+        title: `${platform} API failures`,
+        auto: null,
+        manual: pinterestAuth
+          ? [
+            `Re-authorize at ${siteUrl}/admin/pinterest-auth?key=${adminKey}`,
+            'Copy new PINTEREST_ACCESS_TOKEN + PINTEREST_REFRESH_TOKEN into DigitalOcean, redeploy, then hit /admin/test-pinterest.',
+          ]
+          : [
+            `Inspect the ${platform} error snippets below.`,
+            `Dashboard: ${siteUrl}/admin/post-report?key=${adminKey}`,
+          ],
+      });
+    }
+  }
+
+  return steps;
+}
+
 function buildAlertEmail(report, {
   siteUrl = 'https://thefloridabuzz.com',
   adminPassword = '',
+  remediations = [],
 } = {}) {
   const issues = report.issues || [];
   const allGood = issues.length === 0;
@@ -184,6 +262,26 @@ function buildAlertEmail(report, {
     .map((p) => `<p><strong>${p} missing-link samples:</strong><br>${report.platforms[p].missingLinkSamples.map((f) => `• ${String(f).slice(0, 220)}`).join('<br>')}</p>`)
     .join('');
 
+  const remediationSteps = buildRemediationSteps(report, { siteUrl, adminPassword, remediations });
+  const remediationHtml = remediationSteps.length
+    ? `<div style="margin-top:18px;padding:14px;background:#eef5f6;border-radius:8px;">
+        <strong style="color:#0d3b3e;">Fix steps</strong>
+        ${remediationSteps.map((step) => `
+          <div style="margin-top:10px;font-size:13px;">
+            <div style="font-weight:700;">${step.title}</div>
+            ${step.auto ? `<div><em>Auto:</em> ${step.auto}</div>` : '<div><em>Auto:</em> none — needs a person or token refresh.</div>'}
+            <ul style="margin:6px 0 0 18px;">${(step.manual || []).map((line) => `<li>${line}</li>`).join('')}</ul>
+          </div>`).join('')}
+      </div>`
+    : '';
+
+  const autoResultsHtml = (remediations || []).length
+    ? `<div style="margin-top:12px;padding:12px;background:#e8f5e9;border-radius:8px;font-size:13px;">
+        <strong>Auto-remediation this run</strong>
+        <ul>${remediations.map((r) => `<li>${r.ok ? '✅' : '⚠️'} ${r.detail}</li>`).join('')}</ul>
+      </div>`
+    : '';
+
   const adminKey = adminPassword || 'ADMIN_PASSWORD';
   const html = `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
@@ -203,12 +301,14 @@ function buildAlertEmail(report, {
         <tbody>${platformRows}</tbody>
       </table>
       ${missingImageHtml}
+      ${autoResultsHtml}
+      ${remediationHtml}
       ${failureDetails ? `<div style="margin-top:16px;font-size:13px;color:#b3261e;">${failureDetails}</div>` : ''}
       ${missingLinkDetails ? `<div style="margin-top:12px;font-size:13px;color:#b3261e;">${missingLinkDetails}</div>` : ''}
       <p style="margin-top:20px;font-size:12px;color:#999;">Dashboard: <a href="${siteUrl}/admin/post-report?key=${adminKey}">post report</a></p>
     </div>`;
 
-  return { subject, html, allGood };
+  return { subject, html, allGood, remediationSteps };
 }
 
 module.exports = {
@@ -216,6 +316,7 @@ module.exports = {
   LINK_MARKER_RE,
   buildAlertEmail,
   buildHealthReport,
+  buildRemediationSteps,
   collectIssues,
   emptyPlatformSummary,
   findArticlesMissingImages,

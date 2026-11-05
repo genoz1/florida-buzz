@@ -72,10 +72,21 @@ test('buildHealthReport marks missing photos and missing links as critical', () 
   assert.ok(report.criticalCount >= 2);
   assert.ok(report.issues.some((i) => i.code === 'facebook_missing_link'));
   assert.ok(report.issues.some((i) => i.code === 'articles_missing_images'));
-  const email = buildAlertEmail(report, { siteUrl: 'https://thefloridabuzz.com' });
+  const email = buildAlertEmail(report, {
+    siteUrl: 'https://thefloridabuzz.com',
+    remediations: [{
+      code: 'articles_missing_images',
+      ok: true,
+      detail: 'Queued image repair for 1/1 story; kicked 1 same-day repair job(s).',
+    }],
+  });
   assert.match(email.subject, /critical/i);
   assert.match(email.html, /no-photo/);
   assert.match(email.html, /Missing links|missing-link|🔗 miss/i);
+  assert.match(email.html, /Fix steps/i);
+  assert.match(email.html, /Auto:/i);
+  assert.match(email.html, /Queued image repair/);
+  assert.ok(email.remediationSteps.some((s) => s.code === 'articles_missing_images'));
 });
 
 test('extractUrlFromText pulls the first http(s) URL', () => {

@@ -1,7 +1,10 @@
 require('dotenv').config();
+const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { supabase } = require('../lib/supabase');
 const { sendEmail } = require('../lib/resend');
 const { isUsableArticleImage } = require('../lib/articleImages');
+const { createImageRepairQueue } = require('../lib/imageRepairQueue');
 const {
   PLATFORMS,
   buildAlertEmail,
@@ -44,7 +47,7 @@ async function loadRecentArticles(hours = IMAGE_LOOKBACK_HOURS) {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('articles')
-    .select('slug, title, published_at, image_url')
+    .select('id, slug, title, dek, category, city, published_at, image_url, source_url')
     .gte('published_at', since)
     .order('published_at', { ascending: false })
     .limit(500);
@@ -55,6 +58,99 @@ async function loadRecentArticles(hours = IMAGE_LOOKBACK_HOURS) {
   return data || [];
 }
 
+function startSameDayImageRepair(slug, {
+  spawnImpl = spawn,
+  execPath = process.execPath,
+  scriptPath = path.join(__dirname, 'repair-article-images.js'),
+  env = process.env,
+  logger = console,
+} = {}) {
+  if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return false;
+  if (env.SKIP_SAME_DAY_IMAGE_REPAIR === 'true') return false;
+  if (env.OPS_HEALTH_AUTO_FIX === 'false') return false;
+  try {
+    const child = spawnImpl(
+      execPath,
+      [scriptPath, slug],
+      {
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...env,
+          APPLY_IMAGE_REPAIR: 'true',
+          PRODUCTION_IMAGE_REPAIR_APPROVED: 'true',
+          VERIFY_IMAGE_BYTES: 'false',
+          IMAGE_REPAIR_GENERATION_LIMIT: env.SAME_DAY_IMAGE_REPAIR_LIMIT || '2',
+          IMAGE_REPAIR_SLUGS: slug,
+        },
+      }
+    );
+    child.unref?.();
+    logger.log(`  Auto-fix: started image repair for /article/${slug}.`);
+    return true;
+  } catch (error) {
+    logger.error(`  [warning] Auto image repair spawn failed (${error.message}).`);
+    return false;
+  }
+}
+
+async function applyAutoRemediations(report, articlesBySlug = new Map()) {
+  const remediations = [];
+  if (process.env.OPS_HEALTH_AUTO_FIX === 'false') {
+    return remediations;
+  }
+
+  const missingImageIssue = (report.issues || []).find((i) => i.code === 'articles_missing_images');
+  if (missingImageIssue && supabase) {
+    const queue = createImageRepairQueue(supabase);
+    let queued = 0;
+    let kicked = 0;
+    const targets = (report.missingImages || []).slice(0, 8);
+    for (const row of targets) {
+      const article = articlesBySlug.get(row.slug) || row;
+      if (!article?.id) continue;
+      const ok = await queue.enqueue(article, {
+        reason: 'ops_health_missing_image',
+        immediate: true,
+      });
+      if (ok) queued += 1;
+    }
+    for (const row of targets.slice(0, 3)) {
+      if (startSameDayImageRepair(row.slug)) kicked += 1;
+    }
+    remediations.push({
+      code: 'articles_missing_images',
+      ok: queued > 0 || kicked > 0,
+      detail: `Queued image repair for ${queued}/${targets.length} stor${targets.length === 1 ? 'y' : 'ies'}; kicked ${kicked} same-day repair job(s).`,
+    });
+  }
+
+  if ((report.issues || []).some((i) => i.code === 'facebook_quiet') && supabase) {
+    // Best-effort nudge: spawn the feed drain so deferred FB posts can clear.
+    try {
+      const child = spawn(
+        process.execPath,
+        [path.join(__dirname, 'facebook-feed-drain.js')],
+        { detached: true, stdio: 'ignore', env: { ...process.env } }
+      );
+      child.unref?.();
+      remediations.push({
+        code: 'facebook_quiet',
+        ok: true,
+        detail: 'Spawned facebook-feed-drain.js to clear any spaced/deferred Facebook queue items.',
+      });
+    } catch (error) {
+      remediations.push({
+        code: 'facebook_quiet',
+        ok: false,
+        detail: `Could not spawn Facebook feed drain: ${error.message}`,
+      });
+    }
+  }
+
+  return remediations;
+}
+
 async function buildReport() {
   const [posts, articles] = await Promise.all([
     loadRecentPostLog(LOOKBACK_HOURS),
@@ -62,11 +158,12 @@ async function buildReport() {
   ]);
   const platformSummary = summarizePostLog(posts);
   const missingImages = findArticlesMissingImages(articles, { isUsableArticleImage });
-  return buildHealthReport({
+  const report = buildHealthReport({
     platformSummary,
     missingImages,
     lookbackHours: LOOKBACK_HOURS,
   });
+  return { report, articles };
 }
 
 async function run() {
@@ -78,10 +175,18 @@ async function run() {
     process.exit(1);
   }
 
-  const report = await buildReport();
+  const { report, articles } = await buildReport();
+  const articlesBySlug = new Map((articles || []).map((a) => [a.slug, a]));
+  const remediations = report.ok ? [] : await applyAutoRemediations(report, articlesBySlug);
+  if (remediations.length) {
+    console.log('Auto-remediation:');
+    remediations.forEach((r) => console.log(`  ${r.ok ? 'ok' : 'warn'} ${r.detail}`));
+  }
+
   const { subject, html, allGood } = buildAlertEmail(report, {
     siteUrl: (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, ''),
     adminPassword: process.env.ADMIN_PASSWORD || '',
+    remediations,
   });
 
   console.log(`Subject: ${subject}`);
