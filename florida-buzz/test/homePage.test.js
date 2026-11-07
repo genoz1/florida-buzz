@@ -140,8 +140,8 @@ test('homepage renders featured lead photo above the headline', () => {
       podcastPlatformLinks: [],
       socialProfiles: [
         { id: 'facebook', label: 'Facebook', href: 'https://www.facebook.com/thefloridabuzz' },
-        { id: 'instagram', label: 'Instagram', href: 'https://www.instagram.com/thefloridabuzz/' },
-        { id: 'threads', label: 'Threads', href: 'https://www.threads.net/@thefloridabuzz' },
+        { id: 'instagram', label: 'Instagram', href: 'https://www.instagram.com/floridabuzzonline/' },
+        { id: 'threads', label: 'Threads', href: 'https://www.threads.net/@floridabuzzonline' },
         { id: 'pinterest', label: 'Pinterest', href: 'https://www.pinterest.com/floridabuzzonline/' },
         { id: 'youtube', label: 'YouTube', href: 'https://www.youtube.com/@TheFloridaBuzz' },
       ],
