@@ -43,7 +43,7 @@
        fallback keeps fonts working correctly with JS disabled. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/style.css?v=20261019-cool-yellow-1">
+  <link rel="stylesheet" href="/css/style.css?v=20261107-search-1">
   <!-- Soften AI amber/golden washes on article card + hero photos (display only). -->
   <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
     <filter id="fb-cool-yellow" color-interpolation-filters="sRGB">
@@ -72,7 +72,12 @@
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Florida Buzz",
-    "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>"
+    "url": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/search?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
   }
   </script>
 </head>
@@ -102,6 +107,25 @@
         <a href="/dining">Dining</a>
         <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
       </div>
+      <form class="nav-search" action="/search" method="get" role="search">
+        <label class="visually-hidden" for="navSearchInput">Search stories</label>
+        <input
+          id="navSearchInput"
+          class="nav-search-input"
+          type="search"
+          name="q"
+          value="<%= typeof searchQuery !== 'undefined' && searchQuery ? searchQuery : '' %>"
+          placeholder="Search stories"
+          maxlength="80"
+          autocomplete="off"
+        >
+        <button type="submit" class="nav-search-submit" aria-label="Search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"></circle>
+            <path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </form>
       <button class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <span></span><span></span><span></span>
       </button>
@@ -110,19 +134,33 @@
       <div class="wrap nav-topics-inner">
         <span class="nav-topics-label">News</span>
         <div class="nav-links nav-links-topics">
-          <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
-          <a href="/category/space" class="<%= category === 'space' ? 'active' : '' %>">Space</a>
-          <a href="/category/beaches" class="<%= category === 'beaches' ? 'active' : '' %>">Beaches</a>
-          <a href="/category/florida-living" class="<%= category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
-          <a href="/category/wildlife" class="<%= category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
-          <a href="/category/cruises" class="<%= category === 'cruises' ? 'active' : '' %>">Cruises</a>
-          <a href="/category/food" class="<%= category === 'food' ? 'active' : '' %>">Food</a>
-          <a href="/category/events" class="<%= category === 'events' ? 'active' : '' %>">Events</a>
-          <a href="/category/travel-deals" class="<%= category === 'travel-deals' ? 'active' : '' %>">Travel Deals</a>
+          <a href="/category/theme-parks" class="<%= typeof category !== 'undefined' && category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
+          <a href="/category/space" class="<%= typeof category !== 'undefined' && category === 'space' ? 'active' : '' %>">Space</a>
+          <a href="/category/beaches" class="<%= typeof category !== 'undefined' && category === 'beaches' ? 'active' : '' %>">Beaches</a>
+          <a href="/category/florida-living" class="<%= typeof category !== 'undefined' && category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
+          <a href="/category/wildlife" class="<%= typeof category !== 'undefined' && category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
+          <a href="/category/cruises" class="<%= typeof category !== 'undefined' && category === 'cruises' ? 'active' : '' %>">Cruises</a>
+          <a href="/category/food" class="<%= typeof category !== 'undefined' && category === 'food' ? 'active' : '' %>">Food</a>
+          <a href="/category/events" class="<%= typeof category !== 'undefined' && category === 'events' ? 'active' : '' %>">Events</a>
+          <a href="/category/travel-deals" class="<%= typeof category !== 'undefined' && category === 'travel-deals' ? 'active' : '' %>">Travel Deals</a>
         </div>
       </div>
     </div>
     <div class="mobile-menu" id="mobileMenu">
+      <form class="mobile-search" action="/search" method="get" role="search">
+        <label class="visually-hidden" for="mobileSearchInput">Search stories</label>
+        <input
+          id="mobileSearchInput"
+          class="mobile-search-input"
+          type="search"
+          name="q"
+          value="<%= typeof searchQuery !== 'undefined' && searchQuery ? searchQuery : '' %>"
+          placeholder="Search stories and guides"
+          maxlength="80"
+          autocomplete="off"
+        >
+        <button type="submit" class="mobile-search-submit">Search</button>
+      </form>
       <p class="mobile-menu-label">Explore</p>
       <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
       <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
@@ -133,15 +171,15 @@
       <a href="/dining">Dining</a>
       <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
       <p class="mobile-menu-label">News topics</p>
-      <a href="/category/theme-parks" class="<%= category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
-      <a href="/category/space" class="<%= category === 'space' ? 'active' : '' %>">Space</a>
-      <a href="/category/beaches" class="<%= category === 'beaches' ? 'active' : '' %>">Beaches</a>
-      <a href="/category/florida-living" class="<%= category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
-      <a href="/category/wildlife" class="<%= category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
-      <a href="/category/cruises" class="<%= category === 'cruises' ? 'active' : '' %>">Cruises</a>
-      <a href="/category/food" class="<%= category === 'food' ? 'active' : '' %>">Food</a>
-      <a href="/category/events" class="<%= category === 'events' ? 'active' : '' %>">Events</a>
-      <a href="/category/travel-deals" class="<%= category === 'travel-deals' ? 'active' : '' %>">Travel Deals</a>
+      <a href="/category/theme-parks" class="<%= typeof category !== 'undefined' && category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
+      <a href="/category/space" class="<%= typeof category !== 'undefined' && category === 'space' ? 'active' : '' %>">Space</a>
+      <a href="/category/beaches" class="<%= typeof category !== 'undefined' && category === 'beaches' ? 'active' : '' %>">Beaches</a>
+      <a href="/category/florida-living" class="<%= typeof category !== 'undefined' && category === 'florida-living' ? 'active' : '' %>">Florida Living</a>
+      <a href="/category/wildlife" class="<%= typeof category !== 'undefined' && category === 'wildlife' ? 'active' : '' %>">Wildlife</a>
+      <a href="/category/cruises" class="<%= typeof category !== 'undefined' && category === 'cruises' ? 'active' : '' %>">Cruises</a>
+      <a href="/category/food" class="<%= typeof category !== 'undefined' && category === 'food' ? 'active' : '' %>">Food</a>
+      <a href="/category/events" class="<%= typeof category !== 'undefined' && category === 'events' ? 'active' : '' %>">Events</a>
+      <a href="/category/travel-deals" class="<%= typeof category !== 'undefined' && category === 'travel-deals' ? 'active' : '' %>">Travel Deals</a>
     </div>
   </nav>
 

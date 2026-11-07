@@ -53,6 +53,7 @@ function staticSitemapUrls(siteUrl, { categoryOrder = [], cityOrder = [], pillar
   return [
     { loc: siteUrl, priority: '1.0' },
     { loc: `${siteUrl}/guides`, priority: '0.9' },
+    { loc: `${siteUrl}/search`, priority: '0.6' },
     { loc: `${siteUrl}/wait-times`, priority: '0.9' },
     { loc: `${siteUrl}/planner`, priority: '0.9' },
     { loc: `${siteUrl}/dining`, priority: '0.8' },

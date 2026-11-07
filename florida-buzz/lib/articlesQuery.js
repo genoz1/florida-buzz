@@ -1,10 +1,17 @@
 'use strict';
 
 const { filterRedirectedArticles, isRedirectedArticleSlug } = require('./articleRedirects');
+const {
+  normalizeSearchQuery,
+  tokenizeSearchQuery,
+  buildPostgrestTokenOrFilter,
+  searchArticlesInMemory,
+} = require('./siteSearch');
 
 const DEFAULT_RETRY_DELAY_MS = 800;
 const DEFAULT_MAX_RETRIES = 1;
 const PAGE_BATCH_SIZE = 500;
+const SEARCH_FETCH_CAP = 250;
 
 class UpstreamError extends Error {
   constructor(message, { category = 'supabase_query', cause = null } = {}) {
@@ -262,8 +269,55 @@ function createArticlesQuery({
     return all;
   }
 
+  /**
+   * Site search over title / dek / slug / meta_title.
+   * Seeds from the longest token via PostgREST, then applies every token in
+   * memory so multi-word queries stay precise without fragile and() filters.
+   */
+  async function searchArticles({ q, limit = 48 } = {}) {
+    const query = normalizeSearchQuery(q);
+    const tokens = tokenizeSearchQuery(query);
+    const sourceHint = client ? 'database' : 'sample';
+    if (!tokens.length) {
+      return { ok: true, query, tokens, articles: [], source: sourceHint };
+    }
+
+    if (!client) {
+      if (allowSampleArticles(env)) {
+        const found = searchArticlesInMemory(sampleFn(), query);
+        return {
+          ok: true,
+          query,
+          tokens,
+          articles: limit ? found.articles.slice(0, limit) : found.articles,
+          source: 'sample',
+        };
+      }
+      throw new UpstreamError('Supabase client is not configured', { category: 'supabase_unavailable' });
+    }
+
+    const seedToken = [...tokens].sort((a, b) => b.length - a.length)[0];
+    const orFilter = buildPostgrestTokenOrFilter(seedToken);
+    const selectCols =
+      'slug,title,dek,meta_title,category,published_at,image_url,is_evergreen,source_name,city';
+
+    const { data } = await executeWithRetry(async () =>
+      client
+        .from('articles')
+        .select(selectCols)
+        .or(orFilter)
+        .order('published_at', { ascending: false })
+        .limit(SEARCH_FETCH_CAP)
+    );
+
+    const found = searchArticlesInMemory((data || []).filter(isIndexableArticle), query);
+    const capped = Number(limit) > 0 ? found.articles.slice(0, Number(limit)) : found.articles;
+    return { ok: true, query, tokens, articles: capped, source: 'database' };
+  }
+
   return {
     queryArticles,
+    searchArticles,
     hasAnyRealArticles,
     fetchAllIndexableArticles,
     allowSampleArticles: () => allowSampleArticles(env),

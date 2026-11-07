@@ -492,6 +492,64 @@ async function renderArchivePage(req, res, {
   });
 }
 
+router.get('/search', async (req, res) => {
+  const rawQ = typeof req.query.q === 'string' ? req.query.q : '';
+  const pageRaw = Number(req.query.page || 1);
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+
+  let result;
+  let ticker;
+  try {
+    result = await articlesQuery.searchArticles({ q: rawQ, limit: 200 });
+    ticker = await getArticles({ limit: 8 });
+  } catch (err) {
+    if (isUpstreamError(err)) return render503(req, res, { routeType: 'search', error: err });
+    throw err;
+  }
+
+  const all = result.articles || [];
+  const totalPages = Math.max(1, Math.ceil(all.length / ARCHIVE_PAGE_SIZE) || 1);
+  if (result.query && page > totalPages && all.length) {
+    return render404(req, res, { routeType: 'search' });
+  }
+  if (!result.query && page > 1) {
+    return res.redirect(301, '/search');
+  }
+  if (result.query && page < 1) {
+    return res.redirect(302, `/search?q=${encodeURIComponent(result.query)}`);
+  }
+
+  const start = (page - 1) * ARCHIVE_PAGE_SIZE;
+  const articles = all.slice(start, start + ARCHIVE_PAGE_SIZE);
+  const qs = result.query ? `q=${encodeURIComponent(result.query)}` : '';
+  const pageHref = (p) => {
+    if (!qs) return '/search';
+    return p <= 1 ? `/search?${qs}` : `/search?${qs}&page=${p}`;
+  };
+
+  return res.render('search', {
+    category: null,
+    query: result.query,
+    articles,
+    ticker,
+    categoryLabels: CATEGORY_LABELS,
+    placeholderImg,
+    thumbUrl,
+    resizeImg,
+    timeAgo,
+    pagination: result.query
+      ? {
+          page,
+          totalPages: all.length ? totalPages : 1,
+          total: all.length,
+          prevHref: page <= 1 ? null : pageHref(page - 1),
+          nextHref: page >= totalPages || !all.length ? null : pageHref(page + 1),
+        }
+      : null,
+    canonicalPath: '/search',
+  });
+});
+
 router.get('/category/:cat', async (req, res) => {
   return renderArchivePage(req, res, {
     kind: 'category',
