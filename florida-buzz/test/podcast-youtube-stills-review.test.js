@@ -480,3 +480,30 @@ test('stale video recovery requeues approved images without resetting audio', as
   })).youtubeBoards, 0);
   assert.equal(queued.length, 1);
 });
+
+test('approving the final still automatically queues a published episode once', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, { title: 'Automatic', slug: 'automatic' });
+  let fresh = await store.updateEpisode(episode.id, { status: 'published', outline_json: { youtube_stills: {
+    status: 'ready_for_review', items: [
+      { id: 'a', status: 'ready', public_url: 'https://example.com/a.png' },
+      { id: 'b', status: 'ready', public_url: 'https://example.com/b.png' },
+    ],
+  } } });
+  let calls = 0;
+  let completed;
+  const done = new Promise((resolve) => { completed = resolve; });
+  const review = createYoutubeStillsReview({ store, cfg: { youtubeEnabled: true }, videoPipeline: {
+    publishEpisode: async () => { calls++; completed(); return { url: 'https://youtu.be/automatic' }; },
+  } });
+  ({ episode: fresh } = await review.approveStill(fresh, 'a'));
+  await new Promise(setImmediate);
+  assert.equal(calls, 0);
+  ({ episode: fresh } = await review.approveStill(fresh, 'b'));
+  assert.equal(review.queueCreateVideo({ episode: fresh }).queued, false);
+  await done;
+  await new Promise(setImmediate);
+  assert.equal(calls, 1);
+  assert.equal(getStillsBoard(await store.getEpisodeById(episode.id)).status, 'video_published');
+});

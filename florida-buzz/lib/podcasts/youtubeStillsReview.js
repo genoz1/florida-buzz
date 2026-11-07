@@ -150,9 +150,9 @@ function describeYoutubeProgress(episode, { now = Date.now() } = {}) {
     return {
       state: 'ready',
       phase: 'approved',
-      label: 'All stills approved — ready to create video',
+      label: board.last_error ? 'All stills approved — video needs a retry' : 'All stills approved — video queued',
       detail: board.last_error
-        || 'Click Create YouTube video. Render + upload usually takes 30–60+ minutes.',
+        || 'Approving the final image starts the video automatically. Render + upload usually takes 30–60+ minutes.',
       percent: 75,
       summary,
       youtube_url: board.youtube_url,
@@ -278,6 +278,17 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     return { queued: true };
   }
 
+  async function saveApproval(episode, board) {
+    const saved = await saveStillsBoard(store, episode, {
+      ...board,
+      status: board.youtube_url ? 'video_published' : board.status,
+    });
+    if (cfg.youtubeEnabled && !saved.board.youtube_url && saved.episode.status === 'published' && allStillsApproved(saved.board)) {
+      queueCreateVideo({ episode: saved.episode });
+    }
+    return saved;
+  }
+
   async function approveStill(episode, stillId) {
     return approveStillsBulk(episode, [stillId]);
   }
@@ -305,7 +316,7 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
       return { ...item, status: 'approved', rejection_note: item.rejection_note || '', error: null };
     });
     const nextStatus = items.every((item) => item.status === 'approved') ? 'approved' : 'ready_for_review';
-    return saveStillsBoard(store, episode, { ...board, status: nextStatus, items, last_error: null });
+    return saveApproval(episode, { ...board, status: nextStatus, items, last_error: null });
   }
 
   async function approveAllStills(episode) {
@@ -317,7 +328,7 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
       return { ...item, status: 'approved' };
     });
     if (!items.length) throw new Error('No stills to approve — prepare stills first');
-    return saveStillsBoard(store, episode, { ...board, status: 'approved', items, last_error: null });
+    return saveApproval(episode, { ...board, status: 'approved', items, last_error: null });
   }
 
   async function rejectStill(episode, stillId, note = '') {
