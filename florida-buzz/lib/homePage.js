@@ -63,9 +63,41 @@ function pickAroundFlorida(byCategory, categoryOrder, usedSlugs, perCategory = 3
   return around;
 }
 
+/**
+ * Four mockup-style explore tiles. Images come from real category stories only.
+ * @param {Record<string, object[]>} byCategory
+ * @returns {{ category: string, label: string, href: string, image_url: string, image_alt: string }[]}
+ */
+function pickExploreFloridaTiles(byCategory) {
+  const specs = [
+    { category: 'beaches', label: 'Beaches', href: '/category/beaches' },
+    { category: 'space', label: 'Space', href: '/category/space' },
+    { category: 'cruises', label: 'Cruises', href: '/category/cruises' },
+    { category: 'food', label: 'Food & Events', href: '/category/food' },
+  ];
+  const tiles = [];
+  for (const spec of specs) {
+    const pool = [
+      ...((byCategory && byCategory[spec.category]) || []),
+      ...(spec.category === 'food' ? ((byCategory && byCategory.events) || []) : []),
+    ].filter((a) => a && isUsableArticleImage(a.image_url));
+    const pick = pool[0];
+    if (!pick) continue;
+    tiles.push({
+      category: spec.category,
+      label: spec.label,
+      href: spec.href,
+      image_url: pick.image_url,
+      image_alt: `${spec.label}: ${pick.title}`,
+    });
+  }
+  return tiles;
+}
+
 module.exports = {
   rankStoriesForFeature,
   pickFeaturedThemeParkStories,
   pickMoreThemeParkStories,
   pickAroundFlorida,
+  pickExploreFloridaTiles,
 };

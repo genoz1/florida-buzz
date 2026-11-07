@@ -11,6 +11,7 @@ const {
   pickMoreThemeParkStories,
   pickAroundFlorida,
 } = require('../lib/homePage');
+const { homePlaceTag } = require('../lib/homePlaceTag');
 
 const IMG = 'https://cdn.example.com/story.jpg';
 
@@ -69,13 +70,14 @@ test('homepage template is photo-led with theme parks first and no ticker', () =
   const template = fs.readFileSync(path.join(__dirname, '../views/home.ejs'), 'utf8');
   const header = fs.readFileSync(path.join(__dirname, '../views/partials/header.ejs'), 'utf8');
   assert.match(template, /home-feature-split/);
-  assert.match(template, /Florida theme park news/);
+  assert.match(template, /The latest from the parks/);
   assert.match(template, /All theme park news/);
-  assert.match(template, /home-tools-row/);
-  assert.match(template, /Around Florida/);
+  assert.match(template, /home-plan-bar/);
+  assert.match(template, /Explore more of Florida/);
   assert.match(template, /tickerItems:\s*\[\]/);
   assert.match(header, /nav-link-emphasis/);
   assert.match(header, /Theme Parks/);
+  assert.match(header, /Explore Florida/);
   assert.doesNotMatch(header.split('nav-links-primary')[1].split('nav-search')[0], /Merch|Sponsors/);
 });
 
@@ -93,13 +95,15 @@ test('homepage renders featured lead photo above the headline', () => {
       aroundFlorida: {
         beaches: [story({ slug: 'beach-1', title: 'Quiet Beach', category: 'beaches' })],
       },
+      exploreTiles: [{
+        category: 'beaches',
+        label: 'Beaches',
+        href: '/category/beaches',
+        image_url: IMG,
+        image_alt: 'Beaches: Quiet Beach',
+      }],
       guides: [],
-      tools: [
-        { href: '/wait-times', kicker: 'Live', title: 'Wait Times', blurb: 'Waits' },
-        { href: '/planner', kicker: 'Plan', title: 'Day Planner', blurb: 'Plan' },
-        { href: '/dining', kicker: 'Eat', title: 'Dining', blurb: 'Eat' },
-        { href: '/buzz', kicker: 'Talk', title: 'Buzz Board', blurb: 'Talk' },
-      ],
+      tools: [],
       planningOffers: [],
       undercoverTouristUrl: '',
       podcastShow: null,
@@ -113,6 +117,7 @@ test('homepage renders featured lead photo above the headline', () => {
       placeholderImg: () => '/images/article-placeholder-v1.svg',
       thumbUrl: (url) => url,
       timeAgo: () => '2h ago',
+      homePlaceTag,
       include: (name) => (name.includes('header') ? '<header></header>' : name.includes('footer') ? '<footer></footer>' : ''),
     },
     { filename: path.join(__dirname, '../views/home.ejs') }
@@ -122,8 +127,8 @@ test('homepage renders featured lead photo above the headline', () => {
   assert.match(html, /Lead Park Story/);
   assert.match(html, /href="\/article\/lead"/);
   assert.match(html, /href="\/wait-times"/);
-  assert.match(html, /Around Florida/);
-  assert.match(html, /Quiet Beach/);
+  assert.match(html, /Explore more of Florida/);
+  assert.match(html, /home-explore-tile/);
   const leadBlock = html.slice(html.indexOf('home-feature-lead'), html.indexOf('home-feature-side'));
   assert.ok(leadBlock.indexOf('<img') < leadBlock.indexOf('Lead Park Story'));
 });

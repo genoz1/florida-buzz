@@ -12,7 +12,10 @@ const {
   pickFeaturedThemeParkStories,
   pickMoreThemeParkStories,
   pickAroundFlorida,
+  pickExploreFloridaTiles,
 } = require('../lib/homePage');
+const { homePlaceTag } = require('../lib/homePlaceTag');
+const { SOCIAL_PROFILES } = require('../lib/socialProfiles');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
 const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
@@ -347,7 +350,7 @@ router.get('/', async (req, res) => {
     const featured = pickFeaturedThemeParkStories(themeParkNews);
     featuredLead = featured.lead;
     featuredSide = featured.side;
-    moreThemeParks = pickMoreThemeParkStories(themeParkNews, featured.usedSlugs, 6);
+    moreThemeParks = pickMoreThemeParkStories(themeParkNews, featured.usedSlugs, 3);
 
     guides = (await getArticles({ evergreenOnly: true, author: 'Gene Zentko', limit: 6 })).slice(0, 3);
 
@@ -413,11 +416,14 @@ router.get('/', async (req, res) => {
     },
   ];
 
+  const exploreTiles = pickExploreFloridaTiles(aroundFlorida);
+
   res.render('home', {
     featuredLead,
     featuredSide,
     moreThemeParks,
     aroundFlorida,
+    exploreTiles,
     guides,
     tools,
     undercoverTouristUrl: undercoverTouristUrl(),
@@ -436,6 +442,8 @@ router.get('/', async (req, res) => {
     thumbUrl,
     resizeImg,
     timeAgo,
+    homePlaceTag,
+    socialProfiles: SOCIAL_PROFILES,
   });
 });
 
