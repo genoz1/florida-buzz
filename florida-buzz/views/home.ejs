@@ -60,13 +60,11 @@
               >
             </div>
             <div class="home-feature-copy">
-              <div class="home-story-meta">
-                <span class="home-place-tag"><%= homePlaceTag(a) %></span>
-                <% if (a.published_at && formatPubDate(a.published_at)) { %>
-                  <time class="home-pub-date" datetime="<%= new Date(a.published_at).toISOString() %>"><%= formatPubDate(a.published_at) %></time>
-                <% } %>
-              </div>
+              <span class="home-place-tag"><%= homePlaceTag(a) %></span>
               <h3 class="home-feature-side-headline"><%= a.title %></h3>
+              <% if (a.published_at && formatPubDate(a.published_at)) { %>
+                <time class="home-pub-date" datetime="<%= new Date(a.published_at).toISOString() %>"><%= formatPubDate(a.published_at) %></time>
+              <% } %>
             </div>
           </a>
         <% }) %>
@@ -135,13 +133,11 @@
               onerror="this.onerror=null;this.src='<%= placeholderImg(a.category) %>';"
             >
           </div>
-          <div class="home-story-meta">
-            <span class="home-place-tag"><%= homePlaceTag(a) %></span>
-            <% if (a.published_at && formatPubDate(a.published_at)) { %>
-              <time class="home-pub-date" datetime="<%= new Date(a.published_at).toISOString() %>"><%= formatPubDate(a.published_at) %></time>
-            <% } %>
-          </div>
+          <span class="home-place-tag"><%= homePlaceTag(a) %></span>
           <h3><%= a.title %></h3>
+          <% if (a.published_at && formatPubDate(a.published_at)) { %>
+            <time class="home-pub-date" datetime="<%= new Date(a.published_at).toISOString() %>"><%= formatPubDate(a.published_at) %></time>
+          <% } %>
         </a>
       <% }) %>
     </div>
@@ -191,7 +187,7 @@
               onerror="this.onerror=null;this.src='<%= placeholderImg(tile.category) %>';"
             >
           </span>
-          <span class="home-explore-label"><%= tile.label %> <span aria-hidden="true">&rarr;</span></span>
+          <span class="home-explore-label"><%= tile.label %></span>
         </a>
       <% }) %>
     </div>

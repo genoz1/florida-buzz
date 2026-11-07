@@ -987,11 +987,20 @@ footer a:hover { opacity: 1; }
   color: var(--ink-600);
   max-width: 46ch;
 }
-.home-story-card .home-story-meta {
+.home-story-card .home-place-tag {
+  display: inline-block;
   margin-top: 10px;
 }
 .home-story-card h3 {
   margin-top: 4px;
+  margin-bottom: 0;
+}
+.home-story-card .home-pub-date {
+  display: block;
+  margin-top: 4px;
+}
+.home-feature-side-card .home-pub-date {
+  margin-top: 2px;
 }
 .home-story-card-image {
   aspect-ratio: 16 / 9;
@@ -1111,7 +1120,6 @@ footer a:hover { opacity: 1; }
   font-weight: 600;
   line-height: 1.2;
 }
-.home-explore-label span { color: var(--coral-500); }
 .home-story-grid-3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
