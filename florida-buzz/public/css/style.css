@@ -130,6 +130,17 @@ img { max-width: 100%; display: block; }
   flex: 1 1 auto;
   min-width: 0;
 }
+.nav-compact .nav-links-primary {
+  gap: clamp(10px, 1.4vw, 18px);
+  font-size: clamp(13px, 1.15vw, 14.5px);
+}
+.nav-compact .logo {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.nav-compact .nav-search-icon {
+  margin-left: 2px;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -1582,8 +1593,12 @@ footer a:hover { opacity: 1; }
   padding-bottom: 0;
 }
 
+@media (max-width: 1180px) {
+  .nav-compact .nav-links-primary { gap: 10px; font-size: 13px; }
+}
 @media (max-width: 1100px) {
   .nav-links-primary { gap: 16px; font-size: 14px; }
+  .nav-compact .nav-links-primary { gap: 8px; font-size: 12.5px; }
   .nav-topics-inner {
     justify-content: flex-start;
   }

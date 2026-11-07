@@ -23,7 +23,7 @@ const SOCIAL_PROFILES = [
   {
     id: 'pinterest',
     label: 'Pinterest',
-    href: 'https://www.pinterest.com/thefloridabuzz/',
+    href: 'https://www.pinterest.com/floridabuzzonline/',
   },
   {
     id: 'youtube',

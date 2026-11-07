@@ -11,7 +11,7 @@ test('social profiles point at Florida Buzz accounts, not generic homepages', ()
   assert.match(byId.facebook, /facebook\.com\/thefloridabuzz/i);
   assert.match(byId.instagram, /instagram\.com\/thefloridabuzz/i);
   assert.match(byId.threads, /threads\.net\/@thefloridabuzz/i);
-  assert.match(byId.pinterest, /pinterest\.com\/thefloridabuzz/i);
+  assert.match(byId.pinterest, /pinterest\.com\/floridabuzzonline/i);
   assert.match(byId.youtube, /youtube\.com\/@TheFloridaBuzz/);
   assert.equal(socialProfileUrls().length, SOCIAL_PROFILES.length);
 });

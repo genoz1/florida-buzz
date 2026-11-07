@@ -84,7 +84,20 @@ test('homepage template is photo-led with theme parks first and no ticker', () =
   assert.match(header, /nav-link-emphasis/);
   assert.match(header, /Theme Parks/);
   assert.match(header, /Explore Florida/);
-  assert.doesNotMatch(header.split('nav-links-primary')[1].split('nav-search')[0], /Merch|Sponsors/);
+  const primaryNav = header.split('nav-links-primary')[1].split('nav-search')[0];
+  assert.match(primaryNav, /Merch/);
+  assert.match(primaryNav, /Sponsorships/);
+  assert.match(primaryNav, /href="\/merch"/);
+  assert.match(primaryNav, /href="\/sponsors"/);
+  const themeIdx = primaryNav.indexOf('Theme Parks');
+  const guidesIdx = primaryNav.indexOf('Guides');
+  const podcastsIdx = primaryNav.indexOf('Podcasts');
+  const exploreIdx = primaryNav.indexOf('Explore Florida');
+  const merchIdx = primaryNav.indexOf('Merch');
+  const sponsorshipsIdx = primaryNav.indexOf('Sponsorships');
+  assert.ok(themeIdx < guidesIdx && guidesIdx < podcastsIdx && podcastsIdx < exploreIdx);
+  assert.ok(exploreIdx < merchIdx && merchIdx < sponsorshipsIdx);
+  assert.match(header, /mobile-menu[\s\S]*Merch[\s\S]*Sponsorships/);
 });
 
 test('homepage renders featured lead photo above the headline', () => {
@@ -129,7 +142,7 @@ test('homepage renders featured lead photo above the headline', () => {
         { id: 'facebook', label: 'Facebook', href: 'https://www.facebook.com/thefloridabuzz' },
         { id: 'instagram', label: 'Instagram', href: 'https://www.instagram.com/thefloridabuzz/' },
         { id: 'threads', label: 'Threads', href: 'https://www.threads.net/@thefloridabuzz' },
-        { id: 'pinterest', label: 'Pinterest', href: 'https://www.pinterest.com/thefloridabuzz/' },
+        { id: 'pinterest', label: 'Pinterest', href: 'https://www.pinterest.com/floridabuzzonline/' },
         { id: 'youtube', label: 'YouTube', href: 'https://www.youtube.com/@TheFloridaBuzz' },
       ],
       categoryLabels: {
