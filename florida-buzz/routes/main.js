@@ -314,6 +314,19 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
+/** Calendar date for story cards (America/New_York). Empty when unavailable. */
+function formatPubDate(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'America/New_York',
+  });
+}
+
 /**
  * Public article loader. Distinguishes:
  * - successful empty result → []
@@ -442,6 +455,7 @@ router.get('/', async (req, res) => {
     thumbUrl,
     resizeImg,
     timeAgo,
+    formatPubDate,
     homePlaceTag,
     socialProfiles: SOCIAL_PROFILES,
   });

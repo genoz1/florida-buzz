@@ -13,17 +13,17 @@ const SOCIAL_PROFILES = [
   {
     id: 'instagram',
     label: 'Instagram',
-    href: 'https://www.instagram.com/thefloridabuzz/',
+    href: 'https://www.instagram.com/floridabuzzonline/',
   },
   {
     id: 'threads',
     label: 'Threads',
-    href: 'https://www.threads.net/@thefloridabuzz',
+    href: 'https://www.threads.net/@floridabuzzonline',
   },
   {
     id: 'pinterest',
     label: 'Pinterest',
-    href: 'https://www.pinterest.com/thefloridabuzz/',
+    href: 'https://www.pinterest.com/floridabuzzonline/',
   },
   {
     id: 'youtube',
