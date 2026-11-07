@@ -127,7 +127,7 @@ function stationaryFilter(durationSeconds) {
 }
 
 async function fetchBuffer(url, fetchImpl = fetch) {
-  const response = await fetchImpl(url);
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(120000) });
   if (!response.ok) throw new Error(`Could not download ${url} (${response.status})`);
   return Buffer.from(await response.arrayBuffer());
 }
@@ -622,7 +622,11 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   }
 
   async function runFfmpeg(args) {
-    await execFileAsync(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { maxBuffer: 8 * 1024 * 1024 });
+    await execFileAsync(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-filter_threads', '2', '-filter_complex_threads', '2', ...args], {
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: 20 * 60 * 1000,
+      killSignal: 'SIGKILL',
+    });
   }
 
   async function renderVideo({ episode, show, force = false, approvedStillsBoard = null } = {}) {

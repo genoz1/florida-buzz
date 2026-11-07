@@ -220,3 +220,9 @@ New, unverified Google API projects may have API uploads restricted to private v
 The upload is idempotent: an existing `podcast_assets` row at `youtube/<episode-id>` prevents duplicate uploads.
 
 Published episodes can re-queue video work without changing podcast publish state via **Retry YouTube video** in admin (`POST /admin/podcasts/episodes/:id/youtube-retry`). Job start, still reuse/generate, skips, and failures are logged under `[podcasts] YouTube…`.
+
+### Video approval and interrupted renders
+
+For a published episode, approving the last outstanding still (individually, in bulk, or with Approve all) queues video creation automatically when YouTube is enabled. The Create YouTube video button remains available for retries. Repeated clicks in the single web instance do not launch parallel renders, and an existing upload is reused.
+
+A running build refreshes its heartbeat every 30 seconds. A background check runs every minute; builds whose heartbeat is older than PODCASTS_YOUTUBE_BUILDING_STALE_MS (default two hours) are requeued with their approved stills. They re-render from the beginning. The 85% display identifies the render/upload stage, not the fraction of frames completed. A heartbeat older than two minutes is shown as uncertain. Downloads time out after two minutes and individual encoder calls after twenty minutes.

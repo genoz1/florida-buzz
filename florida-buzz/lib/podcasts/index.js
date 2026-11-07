@@ -66,6 +66,30 @@ function mount(app, env = process.env) {
   } catch {
     sendEmail = null;
   }
+  // Recovery must run without somebody opening the admin dashboard. Only interrupted
+  // builds are retried; image approval remains a required manual gate.
+  if (runtime.cfg.youtubeEnabled) {
+    let recovering = false;
+    const recoverVideos = async () => {
+      if (recovering) return;
+      recovering = true;
+      try {
+        const { recoverStuckPodcastWork } = require('./recoverStuck');
+        await recoverStuckPodcastWork(runtime.store, {
+          showSlug: runtime.cfg.defaultShowSlug,
+          recoverAudio: false,
+          onYoutubeRecovered: (episode) => runtime.stillsReview.queueCreateVideo({ episode }),
+        });
+      } catch (err) {
+        console.warn('[podcasts] background recovery failed:', err.message);
+      } finally {
+        recovering = false;
+      }
+    };
+    const recoveryTimer = setInterval(recoverVideos, 60000);
+    recoveryTimer.unref?.();
+    void recoverVideos();
+  }
   app.use('/podcasts', createPublicRouter({ store: runtime.store, cfg: runtime.cfg }));
   try {
     app.use(
