@@ -35,6 +35,9 @@ app.use((req, res, next) => {
   if (typeof res.locals.canonicalPath === 'undefined') {
     res.locals.canonicalPath = req.path || '/';
   }
+  if (typeof res.locals.socialProfiles === 'undefined') {
+    res.locals.socialProfiles = require('./lib/socialProfiles').SOCIAL_PROFILES;
+  }
   next();
 });
 

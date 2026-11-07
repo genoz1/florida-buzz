@@ -8,6 +8,14 @@ const reviewPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fi
 const { logNotFound } = require('../lib/notFoundLog');
 const { createPin } = require('../lib/pinterest');
 const { ARTICLE_PLACEHOLDER_PATH, isUsableArticleImage } = require('../lib/articleImages');
+const {
+  pickFeaturedThemeParkStories,
+  pickMoreThemeParkStories,
+  pickAroundFlorida,
+  pickExploreFloridaTiles,
+} = require('../lib/homePage');
+const { homePlaceTag } = require('../lib/homePlaceTag');
+const { SOCIAL_PROFILES } = require('../lib/socialProfiles');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
 const { processFacebookWebhook, verifyFacebookSignature } = require('../lib/facebookBuzz');
@@ -324,33 +332,36 @@ async function hasAnyRealArticles() {
 }
 
 router.get('/', async (req, res) => {
-  let news;
-  let tickerPool;
+  let themeParkNews;
   let guides;
-  let featured;
-  let secondary;
-  const byCategory = {};
+  let featuredLead = null;
+  let featuredSide = [];
+  let moreThemeParks = [];
+  let aroundFlorida = {};
   try {
-    // News feed excludes evergreen guides so the homepage can showcase guides separately.
-    news = await getArticles({ excludeEvergreen: true, limit: 30 });
-    tickerPool = await getArticles({ limit: 8 });
+    // Theme-park news drives the photo-led feature band. Evergreen guides stay
+    // in their own section. Never put a "Story image coming soon" placeholder
+    // in homepage feature slots — only stories with usable images qualify.
+    themeParkNews = await getArticles({
+      category: 'theme-parks',
+      excludeEvergreen: true,
+      limit: 24,
+    });
+    const featured = pickFeaturedThemeParkStories(themeParkNews);
+    featuredLead = featured.lead;
+    featuredSide = featured.side;
+    moreThemeParks = pickMoreThemeParkStories(themeParkNews, featured.usedSlugs, 3);
+
     guides = (await getArticles({ evergreenOnly: true, author: 'Gene Zentko', limit: 6 })).slice(0, 3);
-    // Never put a "Story image coming soon" placeholder in the homepage feature
-    // slots — prefer the next recent story that already has a real image.
-    const newsWithImages = news.filter((a) => isUsableArticleImage(a.image_url));
-    featured = newsWithImages[0] || null;
-    secondary = newsWithImages.filter((a) => a.slug !== featured?.slug).slice(0, 3);
+
+    const aroundRaw = {};
     await Promise.all(
-      CATEGORY_ORDER.map(async (cat) => {
+      CATEGORY_ORDER.filter((cat) => cat !== 'theme-parks').map(async (cat) => {
         const categoryArticles = await getArticles({ category: cat, excludeEvergreen: true, limit: 6 });
-        // Exclude anything already shown in the featured/secondary slots above,
-        // so the same article doesn't appear twice on the homepage.
-        const usedSlugs = new Set([featured, ...secondary].filter(Boolean).map((a) => a.slug));
-        byCategory[cat] = categoryArticles
-          .filter((a) => !usedSlugs.has(a.slug) && isUsableArticleImage(a.image_url))
-          .slice(0, 3);
+        aroundRaw[cat] = categoryArticles;
       })
     );
+    aroundFlorida = pickAroundFlorida(aroundRaw, CATEGORY_ORDER, featured.usedSlugs, 3);
   } catch (err) {
     if (isUpstreamError(err)) return render503(req, res, { routeType: 'home', error: err });
     throw err;
@@ -368,7 +379,7 @@ router.get('/', async (req, res) => {
       if (podcastShow) {
         const published = await store.listPublishedEpisodes(podcastShow.id);
         podcastLatest = published[0] || null;
-        podcastRecent = published.slice(0, 5);
+        podcastRecent = published.slice(0, 3);
         if (typeof store.listPlatformLinks === 'function') {
           podcastPlatformLinks = await store.listPlatformLinks(podcastShow.id);
         }
@@ -382,33 +393,37 @@ router.get('/', async (req, res) => {
     {
       href: '/wait-times',
       kicker: 'Live',
-      title: 'Wait times',
-      blurb: 'Disney World & Universal ride waits, updated every few minutes.',
+      title: 'Wait Times',
+      blurb: 'Park waits, updated often.',
     },
     {
       href: '/planner',
       kicker: 'Plan',
-      title: 'Day planner',
-      blurb: 'Build a park day around what matters for your group.',
+      title: 'Day Planner',
+      blurb: 'Build a printable park day.',
     },
     {
       href: '/dining',
       kicker: 'Eat',
-      title: 'Dining guides',
-      blurb: 'Filterable restaurant directories for Disney & Universal parks.',
+      title: 'Dining',
+      blurb: 'Disney & Universal restaurants.',
     },
     {
       href: '/buzz',
       kicker: 'Talk',
       title: 'Buzz Board',
-      blurb: 'Ask questions and share Florida park & travel tips with readers.',
+      blurb: 'Tips from fellow readers.',
     },
   ];
 
+  const exploreTiles = pickExploreFloridaTiles(aroundFlorida);
+
   res.render('home', {
-    featured,
-    secondary,
-    byCategory,
+    featuredLead,
+    featuredSide,
+    moreThemeParks,
+    aroundFlorida,
+    exploreTiles,
     guides,
     tools,
     undercoverTouristUrl: undercoverTouristUrl(),
@@ -420,12 +435,15 @@ router.get('/', async (req, res) => {
     podcastLatest,
     podcastRecent,
     podcastPlatformLinks,
-    ticker: tickerPool,
+    // Homepage drops the scrolling ticker to keep the first viewport photo-led.
+    ticker: [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
     thumbUrl,
     resizeImg,
     timeAgo,
+    homePlaceTag,
+    socialProfiles: SOCIAL_PROFILES,
   });
 });
 

@@ -43,7 +43,7 @@
        fallback keeps fonts working correctly with JS disabled. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap"></noscript>
-  <link rel="stylesheet" href="/css/style.css?v=20261107-search-1">
+  <link rel="stylesheet" href="/css/style.css?v=20261107-home-mockup-2">
   <!-- Soften AI amber/golden washes on article card + hero photos (display only). -->
   <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
     <filter id="fb-cool-yellow" color-interpolation-filters="sRGB">
@@ -77,37 +77,46 @@
       "@type": "SearchAction",
       "target": "<%= (process.env.SITE_URL || 'https://thefloridabuzz.com') %>/search?q={search_term_string}",
       "query-input": "required name=search_term_string"
-    }
+    }<% if (typeof socialProfiles !== 'undefined' && socialProfiles && socialProfiles.length) { %>,
+    "sameAs": <%- JSON.stringify(socialProfiles.map(function (p) { return p.href; })) %>
+    <% } %>
   }
   </script>
 </head>
 <body>
 
-  <div class="utility-bar">
+  <div class="utility-bar<%= typeof compactHomeNav !== 'undefined' && compactHomeNav ? ' utility-bar-compact' : '' %>">
     <div class="wrap">
-      <span><%= new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }) %> &middot; Orlando, FL</span>
+      <% if (typeof compactHomeNav !== 'undefined' && compactHomeNav) { %>
+        <span>Your daily dose of Florida</span>
+      <% } else { %>
+        <span><%= new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' }) %> &middot; Orlando, FL</span>
+      <% } %>
       <a href="/#newsletter">Get the daily roundup &rarr;</a>
     </div>
   </div>
 
-  <nav class="nav" aria-label="Site">
+  <nav class="nav<%= typeof compactHomeNav !== 'undefined' && compactHomeNav ? ' nav-compact' : '' %>" aria-label="Site">
     <div class="wrap nav-primary">
       <%# ™ is correct while the federal registration is pending. Do not use ® until the mark is registered. %>
       <a href="/" class="logo" title="Florida Buzz trademark" aria-label="Florida Buzz home">
         <img class="logo-mark" src="/images/florida-buzz-mark.svg" width="34" height="34" alt="" decoding="async">
         <span class="logo-wordmark">Florida <em>Buzz</em><span class="tm" aria-hidden="true">™</span></span>
       </a>
-      <div class="nav-links nav-links-primary" aria-label="Tools and guides">
+      <div class="nav-links nav-links-primary" aria-label="Primary">
+        <a href="/category/theme-parks" class="nav-link-emphasis <%= typeof category !== 'undefined' && category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
         <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
         <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
-        <a href="/merch" class="<%= typeof isMerchPage !== 'undefined' && isMerchPage ? 'active' : '' %>">Merch</a>
-        <a href="/sponsors" class="<%= typeof isSponsorsPage !== 'undefined' && isSponsorsPage ? 'active' : '' %>">Sponsors</a>
-        <a href="/wait-times">Wait Times</a>
-        <a href="/planner">Day Planner</a>
-        <a href="/dining">Dining</a>
-        <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
+        <% if (typeof compactHomeNav !== 'undefined' && compactHomeNav) { %>
+          <a href="#explore-florida">Explore Florida</a>
+        <% } else { %>
+          <a href="/wait-times">Wait Times</a>
+          <a href="/planner">Day Planner</a>
+          <a href="/dining">Dining</a>
+          <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
+        <% } %>
       </div>
-      <form class="nav-search" action="/search" method="get" role="search">
+      <form class="nav-search<%= typeof compactHomeNav !== 'undefined' && compactHomeNav ? ' nav-search-icon' : '' %>" action="/search" method="get" role="search">
         <label class="visually-hidden" for="navSearchInput">Search stories</label>
         <input
           id="navSearchInput"
@@ -130,6 +139,7 @@
         <span></span><span></span><span></span>
       </button>
     </div>
+    <% if (typeof compactHomeNav === 'undefined' || !compactHomeNav) { %>
     <div class="nav-topics" aria-label="News topics">
       <div class="wrap nav-topics-inner">
         <span class="nav-topics-label">News</span>
@@ -146,6 +156,7 @@
         </div>
       </div>
     </div>
+    <% } %>
     <div class="mobile-menu" id="mobileMenu">
       <form class="mobile-search" action="/search" method="get" role="search">
         <label class="visually-hidden" for="mobileSearchInput">Search stories</label>
@@ -162,14 +173,17 @@
         <button type="submit" class="mobile-search-submit">Search</button>
       </form>
       <p class="mobile-menu-label">Explore</p>
+      <a href="/category/theme-parks" class="<%= typeof category !== 'undefined' && category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
       <a href="/guides" class="<%= typeof isGuidesPage !== 'undefined' && isGuidesPage ? 'active' : '' %>">Guides</a>
       <a href="/podcasts" class="<%= typeof isPodcastsPage !== 'undefined' && isPodcastsPage ? 'active' : '' %>">Podcasts</a>
-      <a href="/merch" class="<%= typeof isMerchPage !== 'undefined' && isMerchPage ? 'active' : '' %>">Merch</a>
-      <a href="/sponsors" class="<%= typeof isSponsorsPage !== 'undefined' && isSponsorsPage ? 'active' : '' %>">Sponsors</a>
+      <a href="/#explore-florida">Explore Florida</a>
       <a href="/wait-times">Wait Times</a>
       <a href="/planner">Day Planner</a>
       <a href="/dining">Dining</a>
       <% if (process.env.BUZZ_BOARD_ENABLED === 'true') { %><a href="/buzz" class="<%= typeof isBuzzPage !== 'undefined' && isBuzzPage ? 'active' : '' %>">Buzz Board</a><% } %>
+      <p class="mobile-menu-label">More</p>
+      <a href="/merch" class="<%= typeof isMerchPage !== 'undefined' && isMerchPage ? 'active' : '' %>">Merch</a>
+      <a href="/sponsors" class="<%= typeof isSponsorsPage !== 'undefined' && isSponsorsPage ? 'active' : '' %>">Sponsors</a>
       <p class="mobile-menu-label">News topics</p>
       <a href="/category/theme-parks" class="<%= typeof category !== 'undefined' && category === 'theme-parks' ? 'active' : '' %>">Theme Parks</a>
       <a href="/category/space" class="<%= typeof category !== 'undefined' && category === 'space' ? 'active' : '' %>">Space</a>

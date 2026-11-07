@@ -27,11 +27,15 @@
         <a href="/editorial-standards">Editorial Standards</a> &middot;
         <a href="/corrections-policy">Corrections Policy</a> &middot;
         <a href="/privacy">Privacy Policy</a> &middot;
-        <a href="/terms">Terms of Service</a> &middot;
-        <a href="https://facebook.com" target="_blank">Facebook</a> &middot;
-        <a href="https://pinterest.com" target="_blank">Pinterest</a> &middot;
-        <a href="https://instagram.com" target="_blank">Instagram</a>
+        <a href="/terms">Terms of Service</a>
       </span>
+      <% if (typeof socialProfiles !== 'undefined' && socialProfiles && socialProfiles.length) { %>
+      <nav class="footer-social" aria-label="Florida Buzz on social media">
+        <% socialProfiles.forEach(function (profile, idx) { %>
+          <a href="<%= profile.href %>" target="_blank" rel="noopener noreferrer"><%= profile.label %></a><% if (idx < socialProfiles.length - 1) { %> &middot; <% } %>
+        <% }) %>
+      </nav>
+      <% } %>
     </div>
   </footer>
 

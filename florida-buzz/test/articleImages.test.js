@@ -114,9 +114,11 @@ test('automate holds publication when a usable story image is missing', () => {
 
 test('homepage feature slots skip articles without usable story images', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'routes', 'main.js'), 'utf8');
-  assert.match(main, /isUsableArticleImage/);
-  assert.match(main, /newsWithImages/);
+  const homePage = fs.readFileSync(path.join(__dirname, '..', 'lib', 'homePage.js'), 'utf8');
+  assert.match(main, /pickFeaturedThemeParkStories/);
   assert.match(main, /Never put a "Story image coming soon" placeholder/);
+  assert.match(homePage, /isUsableArticleImage/);
+  assert.match(homePage, /rankStoriesForFeature/);
 });
 
 
