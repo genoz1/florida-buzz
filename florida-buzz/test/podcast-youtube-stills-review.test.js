@@ -423,3 +423,60 @@ test('publish and admin routes queue stills review instead of immediate video', 
   assert.match(view, /Create YouTube video/);
   assert.match(view, /\?.*v=/);
 });
+
+test('duplicate create clicks run one render and reuse an upload saved before interruption', async () => {
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, { title: 'Retry', slug: 'retry' });
+  await store.updateEpisode(episode.id, { status: 'published', outline_json: { youtube_stills: {
+    status: 'approved', items: [{ id: 'story-1-0', status: 'approved', public_url: 'https://example.com/still.png' }],
+  } } });
+  let finish;
+  let started;
+  const ready = new Promise((resolve) => { started = resolve; });
+  let calls = 0;
+  const review = createYoutubeStillsReview({ store, cfg: {}, videoPipeline: {
+    publishEpisode: async (_episode, options) => {
+      calls++;
+      assert.equal(options.force, false);
+      started();
+      await new Promise((resolve) => { finish = resolve; });
+      return { skipped: true, reason: 'already_uploaded', url: 'https://youtu.be/existing' };
+    },
+  } });
+  const build = review.createVideoFromApprovedStills(episode);
+  await ready;
+  assert.equal((await review.createVideoFromApprovedStills(episode)).reason, 'already_running');
+  finish();
+  await build;
+  const saved = await store.getEpisodeById(episode.id);
+  assert.equal(getStillsBoard(saved).status, 'video_published');
+  assert.equal(getStillsBoard(saved).youtube_url, 'https://youtu.be/existing');
+  await review.createVideoFromApprovedStills(episode);
+  assert.equal(calls, 1);
+});
+
+test('stale video recovery requeues approved images without resetting audio', async () => {
+  const { recoverStuckPodcastWork } = require('../lib/podcasts/recoverStuck');
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const episode = await store.createEpisode(show.id, { title: 'Interrupted', slug: 'interrupted' });
+  await store.updateEpisode(episode.id, { status: 'published', outline_json: { youtube_stills: {
+    status: 'building_video', updated_at: '2026-11-01T00:00:00Z',
+    items: [{ status: 'approved', public_url: 'https://example.com/still.png' }],
+  } } });
+  const queued = [];
+  const result = await recoverStuckPodcastWork(store, {
+    showSlug: show.slug, now: new Date('2026-11-07T00:00:00Z'), recoverAudio: false,
+    onYoutubeRecovered: (fresh) => queued.push(fresh),
+  });
+  assert.equal(result.youtubeBoards, 1);
+  assert.equal(queued.length, 1);
+  assert.equal(getStillsBoard(queued[0]).status, 'approved');
+  assert.equal(allStillsApproved(getStillsBoard(queued[0])), true);
+  assert.equal((await recoverStuckPodcastWork(store, {
+    showSlug: show.slug, now: new Date('2026-11-07T00:01:00Z'), recoverAudio: false,
+    onYoutubeRecovered: (fresh) => queued.push(fresh),
+  })).youtubeBoards, 0);
+  assert.equal(queued.length, 1);
+});

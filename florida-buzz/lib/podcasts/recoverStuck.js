@@ -13,6 +13,8 @@ const { getStillsBoard } = require('./youtubeStillsReview');
 
 async function recoverStuckPodcastWork(store, {
   showSlug,
+  onYoutubeRecovered,
+  recoverAudio = true,
   now = new Date(),
   staleMs = Number(process.env.PODCASTS_RUNNING_STALE_MS || 15 * 60 * 1000),
   youtubeBuildingStaleMs = Number(
@@ -26,7 +28,7 @@ async function recoverStuckPodcastWork(store, {
     ? await store.listGenerationRuns(showSlug, null, 40)
     : [];
   for (const run of runs) {
-    if (run.status !== 'running') continue;
+    if (!recoverAudio || run.status !== 'running') continue;
     const startedMs = Date.parse(run.updated_at || run.created_at || '') || 0;
     if (!startedMs || now.getTime() - startedMs < staleMs) continue;
     await store.updateGenerationRun(run.id, {
@@ -42,7 +44,7 @@ async function recoverStuckPodcastWork(store, {
     ? await store.listEpisodes(show.id)
     : [];
   for (const episode of episodes) {
-    if (episode.status === 'generating_audio') {
+    if (recoverAudio && episode.status === 'generating_audio') {
       const updatedMs = Date.parse(episode.updated_at || '') || 0;
       if (updatedMs && now.getTime() - updatedMs >= staleMs) {
         // Prefer setStatus when transitions allow; fall back to patch.
@@ -83,8 +85,9 @@ async function recoverStuckPodcastWork(store, {
       last_error:
         'YouTube video build was interrupted (redeploy or process restart). Approved stills are kept — click Create YouTube video to retry.',
     };
-    await store.updateEpisode(episode.id, { outline_json: outline });
+    const updated = await store.updateEpisode(episode.id, { outline_json: outline });
     recovered.youtubeBoards += 1;
+    if (onYoutubeRecovered) await onYoutubeRecovered(updated);
   }
 
   return recovered;

@@ -82,7 +82,12 @@ function createAdminRouter({
       const show = await defaultShow();
       let recoverNotice = null;
       try {
-        const recovered = await recoverStuckPodcastWork(store, { showSlug: DISNEY_SHOW_SLUG });
+        const recovered = await recoverStuckPodcastWork(store, {
+          showSlug: DISNEY_SHOW_SLUG,
+          onYoutubeRecovered: cfg.youtubeEnabled && stillsReview
+            ? (episode) => stillsReview.queueCreateVideo({ episode })
+            : undefined,
+        });
         if (recovered.runs || recovered.episodes) {
           recoverNotice = `Recovered stuck work: ${recovered.runs} generation run(s), ${recovered.episodes} episode(s). Open a script_ready episode and click Generate private preview.`;
         }

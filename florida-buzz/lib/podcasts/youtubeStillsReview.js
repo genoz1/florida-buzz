@@ -95,17 +95,19 @@ function describeYoutubeProgress(episode, { now = Date.now() } = {}) {
   }
 
   if (status === 'building_video') {
+    const stale = ageMs != null && ageMs > 2 * 60 * 1000;
     return {
-      state: 'live',
+      state: stale ? 'uncertain' : 'live',
       phase: 'building_video',
-      label: 'Building YouTube video',
-      detail:
-        'Assembling approved stills with episode audio and uploading to YouTube. This often takes 30–60+ minutes — keep this tab open or refresh later.',
+      label: stale ? 'YouTube build heartbeat overdue' : 'Building YouTube video',
+      detail: stale
+        ? 'The renderer has stopped reporting. Interrupted builds are checked automatically and requeued after the recovery window.'
+        : 'Assembling approved stills with episode audio and uploading to YouTube. 85% identifies this stage, not frames completed. You can close this tab.',
       percent: 85,
       summary,
       youtube_url: board.youtube_url,
       ageMs,
-      live: true,
+      live: !stale,
     };
   }
 
@@ -206,6 +208,7 @@ function describeYoutubeProgress(episode, { now = Date.now() } = {}) {
 }
 
 function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
+  const activeVideos = new Set();
   async function prepareStillsForReview(episode, { force = false } = {}) {
     if (!videoPipeline?.prepareStillsBoard) {
       throw new Error('Video pipeline stills board prepare is unavailable');
@@ -409,17 +412,47 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
   }
 
   async function createVideoFromApprovedStills(episode, { force = false } = {}) {
+    if (activeVideos.has(episode.id)) return { skipped: true, reason: 'already_running' };
+    activeVideos.add(episode.id);
+    try {
+      return await buildVideo(episode, { force });
+    } finally {
+      activeVideos.delete(episode.id);
+    }
+  }
+
+  async function buildVideo(episode, { force = false } = {}) {
+    episode = await store.getEpisodeById(episode.id);
     const board = getStillsBoard(episode);
+    if (board.youtube_url) return { url: board.youtube_url };
     if (!allStillsApproved(board)) {
       throw new Error('Approve every YouTube still before creating the video');
     }
     await saveStillsBoard(store, episode, { ...board, status: 'building_video', last_error: null });
+    // Refresh the board timestamp while rendering, so recovery cannot reset a live job.
+    // Serialize writes and drain them before saving the final state.
+    let heartbeatWrite = Promise.resolve();
+    const heartbeat = setInterval(() => {
+      heartbeatWrite = heartbeatWrite.then(async () => {
+        const fresh = await store.getEpisodeById(episode.id);
+        const current = getStillsBoard(fresh);
+        if (current.status === 'building_video') {
+          await saveStillsBoard(store, fresh, current);
+        }
+      }).catch((err) => console.warn('[podcasts] YouTube heartbeat failed:', err.message));
+    }, 30000);
+    heartbeat.unref?.();
+    async function stopHeartbeat() {
+      clearInterval(heartbeat);
+      await heartbeatWrite;
+    }
     try {
       const result = await videoPipeline.publishEpisode(
         { ...episode, status: 'published' },
-        { force: true, approvedStillsBoard: board }
+        { force: false, approvedStillsBoard: board }
       );
-      if (result?.skipped) {
+      await stopHeartbeat();
+      if (result?.skipped && !(result.reason === 'already_uploaded' && result.url)) {
         await saveStillsBoard(store, await store.getEpisodeById(episode.id), {
           ...getStillsBoard(await store.getEpisodeById(episode.id)),
           status: 'approved',
@@ -436,6 +469,7 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
       });
       return result;
     } catch (err) {
+      await stopHeartbeat();
       await saveStillsBoard(store, await store.getEpisodeById(episode.id), {
         ...getStillsBoard(await store.getEpisodeById(episode.id)),
         status: 'approved',
@@ -445,7 +479,12 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     }
   }
 
+  const queuedVideos = new Set();
   function queueCreateVideo({ episode }) {
+    if (queuedVideos.has(episode.id) || activeVideos.has(episode.id)) {
+      return { queued: false, reason: 'already_running' };
+    }
+    queuedVideos.add(episode.id);
     setImmediate(() => {
       Promise.resolve()
         .then(() => createVideoFromApprovedStills(episode, { force: true }))
@@ -458,7 +497,8 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
         })
         .catch((err) => {
           console.error(`[podcasts] YouTube create-from-stills failed for ${episode.id}:`, err.message);
-        });
+        })
+        .finally(() => queuedVideos.delete(episode.id));
     });
     return { queued: true };
   }
