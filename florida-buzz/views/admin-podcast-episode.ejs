@@ -310,7 +310,15 @@
       <button class="btn" type="submit">Approve all</button>
     </form>
     <% } %>
-    <% if (stillsSummary.allApproved) { %>
+    <% if (stills.status === 'building_video' && !stills.youtube_url) { %>
+    <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/unstick-build" style="display:inline" onsubmit="return confirm('Unstick this YouTube build? Use this if a deploy or timeout killed the render. Approved stills are kept.');">
+      <input type="hidden" name="csrf" value="<%= csrf %>">
+      <button class="btn btn-secondary" type="submit">Unstick YouTube build</button>
+    </form>
+    <p class="notice" style="margin-top:10px">
+      Board is stuck/building. Healthy builds take 30–60+ minutes. If it has been longer — or a DigitalOcean deploy ran mid-build — click <strong>Unstick YouTube build</strong>, then <strong>Create YouTube video</strong>.
+    </p>
+    <% } else if (stillsSummary.allApproved) { %>
     <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/create-video" style="display:inline" onsubmit="return confirm('Create and upload the YouTube video from the approved stills?');">
       <input type="hidden" name="csrf" value="<%= csrf %>">
       <button class="btn" type="submit">Create YouTube video</button>

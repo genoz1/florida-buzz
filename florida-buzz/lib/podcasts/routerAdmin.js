@@ -83,8 +83,16 @@ function createAdminRouter({
       let recoverNotice = null;
       try {
         const recovered = await recoverStuckPodcastWork(store, { showSlug: DISNEY_SHOW_SLUG });
-        if (recovered.runs || recovered.episodes) {
-          recoverNotice = `Recovered stuck work: ${recovered.runs} generation run(s), ${recovered.episodes} episode(s). Open a script_ready episode and click Generate private preview.`;
+        const parts = [];
+        if (recovered.runs) parts.push(`${recovered.runs} generation run(s)`);
+        if (recovered.episodes) parts.push(`${recovered.episodes} episode(s)`);
+        if (recovered.youtubeBoards) {
+          parts.push(`${recovered.youtubeBoards} YouTube board(s) stuck on building_video`);
+        }
+        if (parts.length) {
+          recoverNotice = recovered.youtubeBoards && !recovered.runs && !recovered.episodes
+            ? `Recovered ${parts.join(', ')}. Open the episode and click Create YouTube video to retry.`
+            : `Recovered stuck work: ${parts.join(', ')}. Open a script_ready episode for audio retry, or Create YouTube video if a board was unstuck.`;
         }
       } catch (err) {
         console.warn('[podcasts] stuck-work recovery skipped:', err.message);
@@ -884,6 +892,11 @@ function createAdminRouter({
       if (episode.status !== 'published') throw new Error('Create YouTube video requires a published episode');
       if (!stillsReview) throw new Error('YouTube stills review is unavailable');
       const board = getStillsBoard(episode);
+      if (board.status === 'building_video' && !board.youtube_url) {
+        throw new Error(
+          'YouTube video is already building. If it has been stuck after a deploy, click Unstick YouTube build first, then Create YouTube video.'
+        );
+      }
       if (!stillsReview.allStillsApproved(board)) {
         throw new Error('Approve every YouTube still before creating the video');
       }
@@ -891,6 +904,33 @@ function createAdminRouter({
       res.redirect(
         303,
         `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent('youtube-video-create-queued')}`
+      );
+    })
+  );
+
+  router.post(
+    '/episodes/:id/youtube-stills/unstick-build',
+    handle(async (req, res) => {
+      const episode = await store.getEpisodeById(req.params.id);
+      if (!episode) return res.status(404).send('Episode not found');
+      if (!checkCsrf(episode.id, req.body.csrf)) return res.status(403).send('Expired or invalid form token');
+      if (episode.status !== 'published') throw new Error('Unstick requires a published episode');
+      const board = getStillsBoard(episode);
+      if (board.status !== 'building_video' || board.youtube_url) {
+        throw new Error('Nothing to unstick — board is not stuck in building_video');
+      }
+      const recovered = await recoverStuckPodcastWork(store, {
+        showSlug: DISNEY_SHOW_SLUG,
+        forceYoutubeBoardIds: [episode.id],
+      });
+      if (!recovered.youtubeBoards) {
+        throw new Error('Could not unstick YouTube board');
+      }
+      res.redirect(
+        303,
+        `/admin/podcasts/episodes/${episode.id}?notice=${encodeURIComponent(
+          'youtube-build-unstuck'
+        )}#youtube-stills-review`
       );
     })
   );

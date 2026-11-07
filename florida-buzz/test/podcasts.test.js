@@ -340,6 +340,56 @@ test('recoverStuckPodcastWork clears stale building_video YouTube boards', async
   assert.equal(board.items[0].status, 'approved');
 });
 
+test('recoverStuckPodcastWork can force-unstick a fresh building_video board', async () => {
+  const { recoverStuckPodcastWork } = require('../lib/podcasts/recoverStuck');
+  const { createMemoryStore } = require('../lib/podcasts/memoryStore');
+  const { getStillsBoard } = require('../lib/podcasts/youtubeStillsReview');
+  const store = createMemoryStore();
+  const show = await store.getShow('florida-buzz-disney');
+  const recent = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const episode = await store.createEpisode(show.id, {
+    title: 'Fresh stuck YouTube build',
+    description: 'Test',
+    slug: 'fresh-stuck-youtube-build',
+    show_notes_html: '',
+  });
+  await store.updateEpisode(episode.id, {
+    status: 'published',
+    outline_json: {
+      youtube_stills: {
+        status: 'building_video',
+        updated_at: recent,
+        youtube_url: null,
+        last_error: null,
+        items: [
+          {
+            id: 'story-0-0',
+            status: 'approved',
+            public_url: 'https://example.com/still.png',
+            segment_slug: 'story-0',
+            image_index: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  const skipped = await recoverStuckPodcastWork(store, {
+    showSlug: 'florida-buzz-disney',
+    youtubeBuildingStaleMs: 75 * 60 * 1000,
+  });
+  assert.equal(skipped.youtubeBoards, 0);
+
+  const forced = await recoverStuckPodcastWork(store, {
+    showSlug: 'florida-buzz-disney',
+    forceYoutubeBoardIds: [episode.id],
+  });
+  assert.equal(forced.youtubeBoards, 1);
+  const board = getStillsBoard(await store.getEpisodeById(episode.id));
+  assert.equal(board.status, 'approved');
+  assert.match(board.last_error || '', /manually unstuck/i);
+});
+
 test('status transitions block illegal publish paths', () => {
   assert.equal(assertTransition('draft', 'script_ready'), 'script_ready');
   assert.throws(() => assertTransition('draft', 'published'));

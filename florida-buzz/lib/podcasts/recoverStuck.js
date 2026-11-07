@@ -15,12 +15,20 @@ async function recoverStuckPodcastWork(store, {
   showSlug,
   now = new Date(),
   staleMs = Number(process.env.PODCASTS_RUNNING_STALE_MS || 15 * 60 * 1000),
+  // Builds often finish in 30–60+ minutes; 75m catches dead mid-render jobs
+  // from redeploys without interrupting healthy long renders.
   youtubeBuildingStaleMs = Number(
-    process.env.PODCASTS_YOUTUBE_BUILDING_STALE_MS || 2 * 60 * 60 * 1000
+    process.env.PODCASTS_YOUTUBE_BUILDING_STALE_MS || 75 * 60 * 1000
   ),
+  forceYoutubeBoardIds = null,
 } = {}) {
   const recovered = { runs: 0, episodes: 0, youtubeBoards: 0 };
   if (!store) return recovered;
+  const forceYoutube = forceYoutubeBoardIds instanceof Set
+    ? forceYoutubeBoardIds
+    : Array.isArray(forceYoutubeBoardIds)
+      ? new Set(forceYoutubeBoardIds.map(String))
+      : null;
 
   const runs = typeof store.listGenerationRuns === 'function'
     ? await store.listGenerationRuns(showSlug, null, 40)
@@ -69,8 +77,14 @@ async function recoverStuckPodcastWork(store, {
 
     const board = getStillsBoard(episode);
     if (board.status !== 'building_video' || board.youtube_url) continue;
+    const forceThis = forceYoutube && forceYoutube.has(String(episode.id));
     const boardUpdatedMs = Date.parse(board.updated_at || episode.updated_at || '') || 0;
-    if (!boardUpdatedMs || now.getTime() - boardUpdatedMs < youtubeBuildingStaleMs) continue;
+    if (
+      !forceThis
+      && (!boardUpdatedMs || now.getTime() - boardUpdatedMs < youtubeBuildingStaleMs)
+    ) {
+      continue;
+    }
 
     const outline =
       episode.outline_json && typeof episode.outline_json === 'object'
@@ -80,8 +94,9 @@ async function recoverStuckPodcastWork(store, {
       ...board,
       status: 'approved',
       updated_at: now.toISOString(),
-      last_error:
-        'YouTube video build was interrupted (redeploy or process restart). Approved stills are kept — click Create YouTube video to retry.',
+      last_error: forceThis
+        ? 'YouTube video build was manually unstuck. Approved stills are kept — click Create YouTube video to retry.'
+        : 'YouTube video build was interrupted (redeploy or process restart). Approved stills are kept — click Create YouTube video to retry.',
     };
     await store.updateEpisode(episode.id, { outline_json: outline });
     recovered.youtubeBoards += 1;

@@ -95,12 +95,17 @@ function describeYoutubeProgress(episode, { now = Date.now() } = {}) {
   }
 
   if (status === 'building_video') {
+    const staleHint =
+      ageMs != null && ageMs > 75 * 60 * 1000
+        ? ' This looks stale — use Unstick YouTube build, then Create YouTube video again (redeploys often kill mid-render jobs).'
+        : ' If a deploy happened while this was running, use Unstick YouTube build and retry Create YouTube video.';
     return {
       state: 'live',
       phase: 'building_video',
       label: 'Building YouTube video',
       detail:
-        'Assembling approved stills with episode audio and uploading to YouTube. This often takes 30–60+ minutes — keep this tab open or refresh later.',
+        'Assembling approved stills with episode audio and uploading to YouTube. This often takes 30–60+ minutes — keep this tab open or refresh later.'
+        + staleHint,
       percent: 85,
       summary,
       youtube_url: board.youtube_url,
