@@ -25,7 +25,7 @@
             src="<%= featuredLead.image_url || placeholderImg(featuredLead.category) %>"
             alt="<%= featuredLead.title %>"
             width="960"
-            height="640"
+            height="540"
             loading="eager"
             fetchpriority="high"
             decoding="async"
@@ -33,10 +33,14 @@
           >
         </div>
         <div class="home-feature-copy">
-          <span class="home-place-tag"><%= homePlaceTag(featuredLead) %></span>
+          <div class="home-story-meta">
+            <span class="home-place-tag"><%= homePlaceTag(featuredLead) %></span>
+            <% if (featuredLead.published_at && formatPubDate(featuredLead.published_at)) { %>
+              <time class="home-pub-date" datetime="<%= new Date(featuredLead.published_at).toISOString() %>"><%= formatPubDate(featuredLead.published_at) %></time>
+            <% } %>
+          </div>
           <h2 class="home-feature-headline"><%= featuredLead.title %></h2>
           <% if (featuredLead.dek) { %><p class="home-feature-dek"><%= featuredLead.dek %></p><% } %>
-          <p class="byline">Theme park news</p>
         </div>
       </a>
 
@@ -49,14 +53,19 @@
                 src="<%= thumbUrl(a.image_url) || placeholderImg(a.category) %>"
                 alt="<%= a.title %>"
                 width="480"
-                height="300"
+                height="270"
                 loading="lazy"
                 decoding="async"
                 onerror="this.onerror=null;this.src='<%= placeholderImg(a.category) %>';"
               >
             </div>
             <div class="home-feature-copy">
-              <span class="home-place-tag"><%= homePlaceTag(a) %></span>
+              <div class="home-story-meta">
+                <span class="home-place-tag"><%= homePlaceTag(a) %></span>
+                <% if (a.published_at && formatPubDate(a.published_at)) { %>
+                  <time class="home-pub-date" datetime="<%= new Date(a.published_at).toISOString() %>"><%= formatPubDate(a.published_at) %></time>
+                <% } %>
+              </div>
               <h3 class="home-feature-side-headline"><%= a.title %></h3>
             </div>
           </a>
@@ -115,21 +124,50 @@
     <div class="grid home-story-grid home-story-grid-3">
       <% moreThemeParks.forEach(a => { %>
         <a href="/article/<%= a.slug %>" class="card home-story-card">
-          <div class="card-image">
+          <div class="card-image home-story-card-image">
             <img
               src="<%= thumbUrl(a.image_url) || placeholderImg(a.category) %>"
               alt="<%= a.title %>"
               width="480"
-              height="300"
+              height="270"
               loading="lazy"
               decoding="async"
               onerror="this.onerror=null;this.src='<%= placeholderImg(a.category) %>';"
             >
           </div>
+          <div class="home-story-meta">
+            <span class="home-place-tag"><%= homePlaceTag(a) %></span>
+            <% if (a.published_at && formatPubDate(a.published_at)) { %>
+              <time class="home-pub-date" datetime="<%= new Date(a.published_at).toISOString() %>"><%= formatPubDate(a.published_at) %></time>
+            <% } %>
+          </div>
           <h3><%= a.title %></h3>
-          <% if (a.dek) { %><p class="dek-sm"><%= a.dek %></p><% } %>
         </a>
       <% }) %>
+    </div>
+  </section>
+  <% } %>
+
+  <% if (typeof socialProfiles !== 'undefined' && socialProfiles && socialProfiles.length) { %>
+  <section class="section home-social-follow" aria-labelledby="home-social-heading">
+    <div class="home-social-follow-panel">
+      <p class="home-social-kicker"><span class="home-social-kicker-bar" aria-hidden="true"></span> Stay connected</p>
+      <h2 id="home-social-heading" class="home-social-title">Follow Florida Buzz</h2>
+      <p class="home-social-lede">Keep up with Florida Buzz between visits.</p>
+      <nav class="home-social-buttons" aria-label="Follow Florida Buzz on social media">
+        <% socialProfiles.forEach(function (profile) { %>
+          <a
+            class="home-social-btn"
+            href="<%= profile.href %>"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <%- include('partials/social-platform-icon', { platformId: profile.id }) %>
+            <span class="home-social-btn-label"><%= profile.label %></span>
+            <span class="visually-hidden">(opens in a new tab)</span>
+          </a>
+        <% }) %>
+      </nav>
     </div>
   </section>
   <% } %>
@@ -142,15 +180,17 @@
     <div class="home-explore-grid">
       <% exploreTiles.forEach(tile => { %>
         <a href="<%= tile.href %>" class="home-explore-tile">
-          <img
-            src="<%= thumbUrl(tile.image_url) || placeholderImg(tile.category) %>"
-            alt="<%= tile.image_alt %>"
-            width="480"
-            height="360"
-            loading="lazy"
-            decoding="async"
-            onerror="this.onerror=null;this.src='<%= placeholderImg(tile.category) %>';"
-          >
+          <span class="home-explore-media">
+            <img
+              src="<%= thumbUrl(tile.image_url) || placeholderImg(tile.category) %>"
+              alt="<%= tile.image_alt %>"
+              width="480"
+              height="360"
+              loading="lazy"
+              decoding="async"
+              onerror="this.onerror=null;this.src='<%= placeholderImg(tile.category) %>';"
+            >
+          </span>
           <span class="home-explore-label"><%= tile.label %> <span aria-hidden="true">&rarr;</span></span>
         </a>
       <% }) %>
@@ -240,7 +280,7 @@
   </section>
   <% } %>
 
-  <section class="section home-newsletter-cta" aria-labelledby="home-newsletter-heading">
+  <section class="section home-newsletter-cta" id="newsletter" aria-labelledby="home-newsletter-heading">
     <div class="home-newsletter-panel">
       <div>
         <h2 id="home-newsletter-heading" class="home-newsletter-title">The Buzz, in your inbox</h2>
@@ -260,4 +300,4 @@
 
 </main>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { hideFooterNewsletter: true }) %>
