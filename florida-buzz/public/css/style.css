@@ -863,13 +863,20 @@ footer a:hover { opacity: 1; }
 }
 
 .home-main {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
+}
+/* Homepage sections: keep the divider line, cut the empty vertical air. */
+.home-main > .section {
+  padding: 22px 0;
+}
+.home-main > .section .section-head {
+  margin-bottom: 14px;
 }
 .home-section-lede {
   font-size: 17px;
   color: var(--ink-600);
   max-width: 62ch;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
 }
 .home-section-lede a {
   color: var(--coral-600);
@@ -902,19 +909,19 @@ footer a:hover { opacity: 1; }
   color: var(--teal-900);
 }
 .home-featured {
-  padding-top: 28px;
-  padding-bottom: 8px;
+  padding-top: 16px;
+  padding-bottom: 16px;
   border-bottom: none;
 }
 .home-featured-intro {
-  margin-bottom: 22px;
-  max-width: 34ch;
+  margin-bottom: 14px;
+  max-width: none;
 }
 .home-kicker {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
@@ -931,11 +938,12 @@ footer a:hover { opacity: 1; }
 }
 .home-featured-title {
   font-family: var(--font-display);
-  font-size: clamp(28px, 3.6vw, 40px);
-  line-height: 1.12;
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1.15;
   color: var(--teal-900);
   margin: 0;
   font-weight: 500;
+  max-width: none;
 }
 .home-place-tag {
   font-family: var(--font-mono);
@@ -969,16 +977,16 @@ footer a:hover { opacity: 1; }
   white-space: nowrap;
 }
 .home-plan-bar {
-  margin: 8px 0 10px;
-  padding: 0 0 28px;
+  margin: 0;
+  padding: 0 0 18px;
   border-bottom: 1px solid var(--line);
 }
 .home-plan-bar-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px 28px;
-  padding: 14px 18px;
+  gap: 10px 20px;
+  padding: 12px 16px;
   background: rgba(14, 59, 67, 0.04);
   border-radius: 4px;
 }
@@ -1066,7 +1074,7 @@ footer a:hover { opacity: 1; }
 .home-feature-split {
   display: grid;
   grid-template-columns: 1.45fr 1fr;
-  gap: 22px;
+  gap: 16px;
   align-items: stretch;
 }
 .home-feature-lead,
@@ -1100,10 +1108,10 @@ footer a:hover { opacity: 1; }
   aspect-ratio: 16 / 10;
 }
 .home-feature-copy {
-  padding-top: 12px;
+  padding-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .home-feature-headline {
   font-family: var(--font-display);
@@ -1115,7 +1123,7 @@ footer a:hover { opacity: 1; }
 .home-feature-side {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 .home-feature-side-headline {
   font-family: var(--font-display);
@@ -1167,14 +1175,16 @@ footer a:hover { opacity: 1; }
 }
 .home-newsletter-cta {
   border-bottom: none;
+  padding-top: 18px;
+  padding-bottom: 10px;
 }
 .home-newsletter-panel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 18px 28px;
-  padding: 22px 24px;
+  gap: 12px 20px;
+  padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: linear-gradient(120deg, #fffdf8 0%, var(--sand-100) 55%, #eef6f3 100%);
@@ -1330,15 +1340,16 @@ footer a:hover { opacity: 1; }
   font-size: 18px;
 }
 .planning-offers--home {
-  margin-top: 18px;
+  margin-top: 12px;
+  margin-bottom: 0;
 }
 .planning-offers-home-panel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px 28px;
-  padding: 20px 22px;
+  gap: 12px 20px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: linear-gradient(120deg, var(--sand-100) 0%, #fffdf8 55%, #f0f7f4 100%);
@@ -1346,8 +1357,9 @@ footer a:hover { opacity: 1; }
 .planning-offers-home-intro {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-width: 48ch;
+  gap: 4px;
+  max-width: min(56ch, 100%);
+  flex: 1 1 280px;
 }
 .planning-offers-home-title {
   display: block;
@@ -1482,7 +1494,8 @@ footer a:hover { opacity: 1; }
   .logo-mark { width: 30px; height: 30px; border-radius: 8px; }
   .logo { gap: 8px; }
   .logo-wordmark { font-size: 22px; }
-  .home-featured { padding-top: 16px; }
+  .home-featured { padding-top: 12px; padding-bottom: 12px; }
+  .home-main > .section { padding: 18px 0; }
   .home-plan-links a {
     border-right: 0;
     padding-left: 0;
