@@ -8,7 +8,8 @@ const SOCIAL_PROFILES = [
   {
     id: 'facebook',
     label: 'Facebook',
-    href: 'https://www.facebook.com/thefloridabuzz',
+    // New Pages use /p/Name-PAGEID/ until a vanity username is claimed.
+    href: 'https://www.facebook.com/p/Florida-Buzz-61591508674320/',
   },
   {
     id: 'instagram',
