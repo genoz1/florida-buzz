@@ -53,7 +53,15 @@ function render404(req, res, { routeType = 'page', slug = null } = {}) {
   if (routeType === 'article') recordArticle404();
   logRequestOutcome({ status: 404, routeType, slug });
   logNotFound(req.originalUrl, req.get('referer'));
-  return res.status(404).render('404');
+  return res.status(404).render('404', {
+    robots: 'noindex,follow',
+    omitCanonical: true,
+  });
+}
+
+function absoluteArticleUrl(slug) {
+  const siteUrl = (process.env.SITE_URL || 'https://thefloridabuzz.com').replace(/\/$/, '');
+  return `${siteUrl}/article/${slug}`;
 }
 
 function render503(req, res, { routeType = 'page', slug = null, error = null } = {}) {
@@ -621,9 +629,26 @@ router.get('/city/:city/page/:page', async (req, res) => {
 router.get('/article/:slug', async (req, res) => {
   const { slug } = req.params;
   const { resolveArticleRedirect } = require('../lib/articleRedirects');
+  const { numberedSuffix } = require('../lib/duplicateSlugs');
   const redirectTo = resolveArticleRedirect(slug);
   if (redirectTo) {
-    return res.redirect(301, `/article/${redirectTo}`);
+    return res.redirect(301, absoluteArticleUrl(redirectTo));
+  }
+
+  // Collapse serial -2/-3 collision URLs onto the bare slug when it still exists.
+  const numbered = numberedSuffix(slug);
+  if (numbered) {
+    try {
+      const bareRows = await getArticles({ slug: numbered.base, limit: 1 });
+      if (bareRows[0]) {
+        return res.redirect(301, absoluteArticleUrl(numbered.base));
+      }
+    } catch (err) {
+      if (isUpstreamError(err)) {
+        return render503(req, res, { routeType: 'article', slug, error: err });
+      }
+      throw err;
+    }
   }
 
   let article;
@@ -637,9 +662,21 @@ router.get('/article/:slug', async (req, res) => {
       return render404(req, res, { routeType: 'article', slug });
     }
 
-    const categoryArticles = await getArticles({ category: article.category,
-      ...(article.is_evergreen ? { evergreenOnly: true } : {}), limit: 4 });
-    related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
+    const categoryArticles = await getArticles({
+      category: article.category,
+      ...(article.is_evergreen ? { evergreenOnly: true } : {}),
+      limit: 24,
+    });
+    const pool = categoryArticles.filter((a) => a.slug !== slug);
+    // Spread related links across the category instead of always the newest 3,
+    // so older indexable URLs keep receiving internal PageRank.
+    related = [];
+    if (pool.length) {
+      related.push(pool[0]);
+      if (pool.length > 2) related.push(pool[Math.floor(pool.length / 2)]);
+      if (pool.length > 1) related.push(pool[pool.length - 1]);
+      related = [...new Map(related.map((a) => [a.slug, a])).values()].slice(0, 3);
+    }
   } catch (err) {
     if (isUpstreamError(err)) {
       return render503(req, res, { routeType: 'article', slug, error: err });
@@ -1076,6 +1113,10 @@ router.get('/sitemap.xml', async (req, res) => {
 
 router.get('/sitemap-static.xml', async (req, res) => {
   return sendSitemapResult(req, res, (b) => b.staticXml);
+});
+
+router.get('/sitemap-recent.xml', async (req, res) => {
+  return sendSitemapResult(req, res, (b) => b.recentXml || b.articleXml[0] || '');
 });
 
 router.get('/sitemap-articles-:n.xml', async (req, res) => {

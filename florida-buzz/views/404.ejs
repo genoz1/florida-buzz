@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: 'Page not found — The Florida Buzz', category: null, tickerItems: [] }) %>
+<%- include('partials/header', { pageTitle: 'Page not found — The Florida Buzz', category: null, tickerItems: [], robots: typeof robots !== 'undefined' ? robots : 'noindex,follow', omitCanonical: typeof omitCanonical !== 'undefined' ? omitCanonical : true }) %>
 
 <main class="wrap">
   <section class="section" style="text-align:center; padding: 80px 0;">

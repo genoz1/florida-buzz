@@ -237,14 +237,12 @@ async function generateUniqueSlug(baseTitle) {
   const base = slugify(baseTitle);
   if (!supabase) return `${base}-${Date.now().toString(36)}`;
 
-  let candidate = base;
-  let suffix = 2;
-  while (true) {
-    const { data } = await supabase.from('articles').select('slug').eq('slug', candidate).maybeSingle();
-    if (!data) return candidate;
-    candidate = `${base}-${suffix}`;
-    suffix += 1;
-  }
+  // Never mint foo-2 / foo-3 collision URLs. Those get stuck in Google as
+  // "Crawled – currently not indexed" and burn crawl budget. If the bare
+  // slug already exists, treat this as a duplicate skip upstream.
+  const { data } = await supabase.from('articles').select('slug').eq('slug', base).maybeSingle();
+  if (data) return null;
+  return base;
 }
 
 const KNOWN_SOURCE_NAMES = {
@@ -836,6 +834,11 @@ async function run() {
     }
 
     const slug = await generateUniqueSlug(article.meta_title || article.title);
+    if (!slug) {
+      console.log(`  [skip] A story with this slug already exists — refusing to mint a -2/-3 duplicate URL.`);
+      await completeItem(guid);
+      return;
+    }
     let finalImage;
     let imageResult = null;
     async function attemptGeneratedImage() {

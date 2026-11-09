@@ -79,7 +79,7 @@ async function main() {
       if (!numberedGroups.has(suf.base)) numberedGroups.set(suf.base, []);
       numberedGroups.get(suf.base).push(a);
     }
-    if (/(?:-[a-f0-9]{6,}|-\d{10,}|sample-|insufficient-source)/i.test(a.slug)) {
+    if (/(?:-m[a-z0-9]{6,}|-[a-f0-9]{6,}|-\d{10,}|sample-|insufficient-source)/i.test(a.slug)) {
       machineSuffix.push(a);
     }
   }

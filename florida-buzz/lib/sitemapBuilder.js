@@ -2,8 +2,10 @@
 
 const { isIndexableArticle } = require('./articlesQuery');
 const { isRedirectedArticleSlug } = require('./articleRedirects');
+const { filterNumberedDuplicateLosers } = require('./duplicateSlugs');
 
 const ARTICLE_SEGMENT_SIZE = 500;
+const RECENT_SITEMAP_SIZE = 200;
 const SITEMAP_CACHE_TTL_MS = 15 * 60 * 1000;
 
 function lastmodForArticle(article) {
@@ -75,13 +77,15 @@ function staticSitemapUrls(siteUrl, { categoryOrder = [], cityOrder = [], pillar
 }
 
 function articleSitemapUrls(siteUrl, articles) {
-  return (articles || [])
-    .filter((a) => isIndexableArticle(a) && !isRedirectedArticleSlug(a.slug))
-    .map((a) => ({
-      loc: `${siteUrl}/article/${a.slug}`,
-      lastmod: lastmodForArticle(a),
-      priority: '0.6',
-    }));
+  const cleaned = filterNumberedDuplicateLosers(
+    (articles || []).filter((a) => isIndexableArticle(a) && !isRedirectedArticleSlug(a.slug))
+  );
+  return cleaned.map((a) => ({
+    loc: `${siteUrl}/article/${a.slug}`,
+    lastmod: lastmodForArticle(a),
+    // Fresher stories get a slight boost so Google spends crawl budget there first.
+    priority: a.is_evergreen ? '0.7' : '0.6',
+  }));
 }
 
 function createSitemapBuilder({
@@ -113,6 +117,13 @@ function createSitemapBuilder({
     }
 
     const staticXml = renderUrlset([...staticUrls, ...podcastUrls]);
+    // Newest-first recent slice helps Google spend crawl budget on fresh URLs
+    // instead of only walking deep article segments.
+    const recentUrls = articleUrls.slice(0, RECENT_SITEMAP_SIZE).map((u) => ({
+      ...u,
+      priority: '0.8',
+    }));
+    const recentXml = renderUrlset(recentUrls);
     const segments = [];
     for (let i = 0; i < articleUrls.length; i += segmentSize) {
       segments.push(articleUrls.slice(i, i + segmentSize));
@@ -122,6 +133,7 @@ function createSitemapBuilder({
     const articleXml = segments.map((seg) => renderUrlset(seg));
     const newestLastmod = articleUrls.map((u) => u.lastmod).filter(Boolean).sort().reverse()[0] || null;
     const indexEntries = [
+      { loc: `${siteUrl}/sitemap-recent.xml`, lastmod: newestLastmod },
       { loc: `${siteUrl}/sitemap-static.xml`, lastmod: newestLastmod },
       ...articleXml.map((_, idx) => ({
         loc: `${siteUrl}/sitemap-articles-${idx + 1}.xml`,
@@ -134,9 +146,11 @@ function createSitemapBuilder({
     return {
       indexXml,
       staticXml,
+      recentXml,
       articleXml,
       urlCount,
       articleCount: articleUrls.length,
+      recentCount: recentUrls.length,
       builtAt: now(),
     };
   }
@@ -180,6 +194,7 @@ function createSitemapBuilder({
 
 module.exports = {
   ARTICLE_SEGMENT_SIZE,
+  RECENT_SITEMAP_SIZE,
   SITEMAP_CACHE_TTL_MS,
   lastmodForArticle,
   renderUrlset,
