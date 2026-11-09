@@ -15,9 +15,17 @@ Sample/demo articles are **never** rendered on production-like hosts (`NODE_ENV=
 
 ## Sitemap
 - `/sitemap.xml` — sitemap **index**
+- `/sitemap-recent.xml` — newest ~200 articles (listed first; crawl-budget hint)
 - `/sitemap-static.xml` — static pages (includes `/guides`) + podcast URLs
 - `/sitemap-articles-N.xml` — paginated article segments (500/URL set)
+- Numbered collision losers (`story-2` when `story` exists) are **omitted** from sitemaps and **301** to the bare slug
 - Fresh build failure → **503** unless a last-known-good cache exists (`X-Sitemap-Stale: 1`)
+
+## Google Search Console notes (Nov 2026)
+Typical unindexed mix on this site:
+- **Discovered – not indexed** — sitemap oversubmission / weak internal PageRank (not a robots block)
+- **Crawled – currently not indexed** — near-duplicate / collision inventory quality signal
+- Do **not** blanket-noindex the article corpus; consolidate duplicates and improve hubs/links instead
 
 ## Canonical host
 Early middleware 301s `www.thefloridabuzz.com/*` → `https://thefloridabuzz.com/*` (path + query preserved, one hop).
