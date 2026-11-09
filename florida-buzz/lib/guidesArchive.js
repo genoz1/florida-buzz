@@ -20,11 +20,10 @@ function createGuidesArchiveHandler({ getArticles, render404, render503, isUpstr
         || String(a.slug).localeCompare(String(b.slug)));
       const totalPages = Math.max(1, Math.ceil(all.length / GUIDE_PAGE_SIZE));
       if (page > totalPages) return render404(req, res, { routeType: 'guides' });
-      const ticker = await getArticles({ limit: 8 });
       return res.render('guides', {
         ...viewLocals,
         guides: all.slice((page - 1) * GUIDE_PAGE_SIZE, page * GUIDE_PAGE_SIZE),
-        ticker,
+        ticker: [],
         canonicalPath,
         pagination: {
           page, totalPages, total: all.length,
