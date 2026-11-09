@@ -448,7 +448,7 @@ router.get('/', async (req, res) => {
     podcastLatest,
     podcastRecent,
     podcastPlatformLinks,
-    // Homepage drops the scrolling ticker to keep the first viewport photo-led.
+    // Sitewide chrome no longer shows a scrolling ticker.
     ticker: [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
@@ -478,10 +478,8 @@ async function renderArchivePage(req, res, {
   }
 
   let all;
-  let ticker;
   try {
     all = await getArticles(filter);
-    ticker = await getArticles({ limit: 8 });
   } catch (err) {
     if (isUpstreamError(err)) return render503(req, res, { routeType: kind, error: err });
     throw err;
@@ -501,7 +499,7 @@ async function renderArchivePage(req, res, {
   return res.render(view, {
     [kind === 'category' ? 'category' : 'city']: key,
     articles,
-    ticker,
+    ticker: [],
     categoryLabels: CATEGORY_LABELS,
     cityLabels: kind === 'category' && key === 'events' ? CITY_LABELS : kind === 'city' ? CITY_LABELS : null,
     seoTitle: seo.title,
@@ -530,10 +528,8 @@ router.get('/search', async (req, res) => {
   const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
 
   let result;
-  let ticker;
   try {
     result = await articlesQuery.searchArticles({ q: rawQ, limit: 200 });
-    ticker = await getArticles({ limit: 8 });
   } catch (err) {
     if (isUpstreamError(err)) return render503(req, res, { routeType: 'search', error: err });
     throw err;
@@ -563,7 +559,7 @@ router.get('/search', async (req, res) => {
     category: null,
     query: result.query,
     articles,
-    ticker,
+    ticker: [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
     thumbUrl,
@@ -632,7 +628,6 @@ router.get('/article/:slug', async (req, res) => {
 
   let article;
   let related = [];
-  let ticker = [];
   try {
     // Exact slug lookup — successful empty result is a genuine 404;
     // upstream failures throw UpstreamError and become 503.
@@ -645,7 +640,6 @@ router.get('/article/:slug', async (req, res) => {
     const categoryArticles = await getArticles({ category: article.category,
       ...(article.is_evergreen ? { evergreenOnly: true } : {}), limit: 4 });
     related = categoryArticles.filter((a) => a.slug !== slug).slice(0, 3);
-    ticker = await getArticles({ limit: 8 });
   } catch (err) {
     if (isUpstreamError(err)) {
       return render503(req, res, { routeType: 'article', slug, error: err });
@@ -677,7 +671,7 @@ router.get('/article/:slug', async (req, res) => {
     article,
     buzzDiscussion,
     related,
-    ticker,
+    ticker: [],
     planningOffers: showPlanningOffers
       ? getActiveOffers(process.env, {
         placement: 'article',
@@ -709,10 +703,8 @@ router.get('/guide/:pillarSlug', async (req, res) => {
   if (!pillar) return render404(req, res);
 
   let categoryGuides;
-  let ticker;
   try {
     categoryGuides = await getArticles({ category: pillar.category, evergreenOnly: true });
-    ticker = await getArticles({ limit: 8 });
   } catch (err) {
     if (isUpstreamError(err)) return render503(req, res, { routeType: 'pillar', error: err });
     throw err;
@@ -724,7 +716,7 @@ router.get('/guide/:pillarSlug', async (req, res) => {
     pillar,
     pillarSlug,
     guides,
-    ticker,
+    ticker: [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
     thumbUrl,

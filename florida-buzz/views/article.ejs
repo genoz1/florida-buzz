@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: (article.meta_title || article.title) + ' — The Florida Buzz', pageDescription: article.dek, category: article.category, tickerItems: ticker, canonicalPath: '/article/' + article.slug, pageImage: article.image_url || placeholderImg(article.category), ogType: 'article', robots: typeof robots !== 'undefined' ? robots : undefined }) %>
+<%- include('partials/header', { pageTitle: (article.meta_title || article.title) + ' — The Florida Buzz', pageDescription: article.dek, category: article.category, tickerItems: [], canonicalPath: '/article/' + article.slug, pageImage: article.image_url || placeholderImg(article.category), ogType: 'article', robots: typeof robots !== 'undefined' ? robots : undefined }) %>
 
 <main class="wrap">
   <nav aria-label="Breadcrumbs" style="margin-top:20px; font-size:14px;">

@@ -81,14 +81,24 @@ test('homepage template is photo-led with theme parks first and no ticker', () =
   assert.match(template, /hideFooterNewsletter:\s*true/);
   assert.match(template, /tickerItems:\s*\[\]/);
   assert.match(footer, /hideFooterNewsletter/);
+  assert.match(header, /utility-bar-compact/);
+  assert.match(header, /nav-compact/);
+  assert.doesNotMatch(header, /nav-topics/);
+  assert.doesNotMatch(header, /class="ticker"/);
+  assert.match(header, /Your daily dose of Florida/);
   assert.match(header, /nav-link-emphasis/);
   assert.match(header, /Theme Parks/);
   assert.match(header, /Explore Florida/);
+  assert.match(header, /href="\/#explore-florida"/);
   const primaryNav = header.split('nav-links-primary')[1].split('nav-search')[0];
   assert.match(primaryNav, /Merch/);
   assert.match(primaryNav, /Sponsorships/);
   assert.match(primaryNav, /href="\/merch"/);
   assert.match(primaryNav, /href="\/sponsors"/);
+  assert.doesNotMatch(primaryNav, /Wait Times/);
+  assert.doesNotMatch(primaryNav, /Day Planner/);
+  assert.doesNotMatch(primaryNav, /Dining/);
+  assert.doesNotMatch(primaryNav, /Buzz Board/);
   const themeIdx = primaryNav.indexOf('Theme Parks');
   const guidesIdx = primaryNav.indexOf('Guides');
   const podcastsIdx = primaryNav.indexOf('Podcasts');
@@ -98,6 +108,7 @@ test('homepage template is photo-led with theme parks first and no ticker', () =
   assert.ok(themeIdx < guidesIdx && guidesIdx < podcastsIdx && podcastsIdx < exploreIdx);
   assert.ok(exploreIdx < merchIdx && merchIdx < sponsorshipsIdx);
   assert.match(header, /mobile-menu[\s\S]*Merch[\s\S]*Sponsorships/);
+  assert.match(header, /mobile-menu[\s\S]*Wait Times[\s\S]*Day Planner[\s\S]*Dining/);
 });
 
 test('homepage renders featured lead photo above the headline', () => {
@@ -176,7 +187,7 @@ test('homepage renders featured lead photo above the headline', () => {
   assert.match(html, /home-explore-tile/);
   assert.match(html, /home-social-follow/);
   assert.match(html, /Follow Florida Buzz/);
-  assert.match(html, /facebook\.com\/thefloridabuzz/);
+  assert.match(html, /facebook\.com\/p\/Florida-Buzz-61591508674320/);
   assert.match(html, /youtube\.com\/@TheFloridaBuzz/);
   assert.match(html, /<time class="home-pub-date"/);
   assert.match(html, /Nov 7, 2026/);

@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: (typeof seoTitle !== 'undefined' && seoTitle ? seoTitle : cityLabels[city]) + ' — The Florida Buzz', pageDescription: typeof seoDescription !== 'undefined' ? seoDescription : undefined, category: null, tickerItems: ticker, canonicalPath: typeof canonicalPath !== 'undefined' ? canonicalPath : ('/city/' + city) }) %>
+<%- include('partials/header', { pageTitle: (typeof seoTitle !== 'undefined' && seoTitle ? seoTitle : cityLabels[city]) + ' — The Florida Buzz', pageDescription: typeof seoDescription !== 'undefined' ? seoDescription : undefined, category: null, tickerItems: [], canonicalPath: typeof canonicalPath !== 'undefined' ? canonicalPath : ('/city/' + city) }) %>
 
 <main class="wrap">
   <section class="section" style="border-bottom:none; padding-bottom:0;">

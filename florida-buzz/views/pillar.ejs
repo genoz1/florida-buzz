@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: pillar.title + ' — The Florida Buzz', pageDescription: pillar.description, category: pillar.category, tickerItems: ticker, canonicalPath: '/guide/' + pillarSlug, pageImage: guides[0] ? (guides[0].image_url || placeholderImg(pillar.category)) : placeholderImg(pillar.category) }) %>
+<%- include('partials/header', { pageTitle: pillar.title + ' — The Florida Buzz', pageDescription: pillar.description, category: pillar.category, tickerItems: [], canonicalPath: '/guide/' + pillarSlug, pageImage: guides[0] ? (guides[0].image_url || placeholderImg(pillar.category)) : placeholderImg(pillar.category) }) %>
 
 <main class="wrap">
   <section class="section" style="border-bottom:none; padding-bottom:0;">
