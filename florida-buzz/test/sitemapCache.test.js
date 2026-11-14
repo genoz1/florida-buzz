@@ -7,7 +7,7 @@ test('index and concurrent child requests share a complete cached snapshot', asy
   const pending=new Promise(resolve=>{release=resolve;});
   const builder=createSitemapBuilder({now:()=>clock,fetchArticles:async()=>{
     calls++; if(calls===1)await pending;
-    return [{slug:'complete-guide',title:'Complete guide',published_at:'2026-10-01'}];
+    return [{slug:'complete-guide',title:'Complete guide',is_evergreen:true,published_at:'2026-10-01'}];
   }});
   const requests=Array.from({length:10},()=>builder.getBundle());
   release();
@@ -23,7 +23,7 @@ test('a failed cold sitemap build can recover on the next request', async () => 
   let calls=0;
   const builder=createSitemapBuilder({fetchArticles:async()=>{
     if(++calls===1)throw new Error('temporary outage');
-    return [{slug:'recovered',title:'Recovered'}];
+    return [{slug:'recovered',title:'Recovered',is_evergreen:true,published_at:'2026-11-01'}];
   }});
   assert.equal((await builder.getBundle()).ok,false);
   const recovered=await builder.getBundle();

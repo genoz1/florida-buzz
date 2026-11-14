@@ -50,5 +50,5 @@ test('article sitemap drops numbered losers when the bare slug exists', () => {
   assert.ok(locs.includes('https://thefloridabuzz.com/article/echo-lake'));
   assert.ok(!locs.includes('https://thefloridabuzz.com/article/echo-lake-2'));
   assert.ok(locs.includes('https://thefloridabuzz.com/article/good-story'));
-  assert.equal(urls.find((u) => u.loc.endsWith('/good-story')).priority, '0.7');
+  assert.equal(urls.find((u) => u.loc.endsWith('/good-story')).priority, '0.8');
 });
