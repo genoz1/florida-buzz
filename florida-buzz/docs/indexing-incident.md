@@ -27,6 +27,11 @@ Typical unindexed mix on this site:
 - **Crawled – currently not indexed** — near-duplicate / collision inventory quality signal
 - Do **not** blanket-noindex the article corpus; consolidate duplicates and improve hubs/links instead
 
+### Priority sitemap (Nov 14 follow-up)
+Article sitemap push is capped to **evergreen guides + ~45 days of news (max 350)**.
+Older news remains on the site and in category archives, but is no longer mass-submitted.
+Weekly “things to do / roundup / news recap” titles are omitted from the sitemap.
+
 ## Canonical host
 Early middleware 301s `www.thefloridabuzz.com/*` → `https://thefloridabuzz.com/*` (path + query preserved, one hop).
 

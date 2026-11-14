@@ -6,7 +6,45 @@ const { filterNumberedDuplicateLosers } = require('./duplicateSlugs');
 
 const ARTICLE_SEGMENT_SIZE = 500;
 const RECENT_SITEMAP_SIZE = 200;
+// Cap news-volume sitemap push. Submitting thousands of similar AI news URLs
+// is what left ~3k pages stuck in "Discovered – currently not indexed".
+const SITEMAP_NEWS_WINDOW_DAYS = 45;
+const SITEMAP_NEWS_CAP = 350;
 const SITEMAP_CACHE_TTL_MS = 15 * 60 * 1000;
+
+function isLowValueNewsTitle(title) {
+  const t = String(title || '').toLowerCase();
+  return (
+    /things to do this week/.test(t) ||
+    /weekend roundup/.test(t) ||
+    /weekly roundup/.test(t) ||
+    /news recap/.test(t)
+  );
+}
+
+/**
+ * Prefer evergreen guides + recent news. Older commodity news stays on-site
+ * and linked from archives, but is not pushed through the sitemap.
+ */
+function selectArticlesForSitemap(articles, { now = Date.now(), newsWindowDays = SITEMAP_NEWS_WINDOW_DAYS, newsCap = SITEMAP_NEWS_CAP } = {}) {
+  const cleaned = filterNumberedDuplicateLosers(
+    (articles || []).filter((a) => isIndexableArticle(a) && !isRedirectedArticleSlug(a.slug))
+  );
+  const cutoff = now - newsWindowDays * 86400000;
+  const evergreen = [];
+  const recentNews = [];
+  for (const a of cleaned) {
+    if (a.is_evergreen) {
+      evergreen.push(a);
+      continue;
+    }
+    if (isLowValueNewsTitle(a.title)) continue;
+    const published = Date.parse(a.published_at || a.created_at || 0);
+    if (Number.isFinite(published) && published >= cutoff) recentNews.push(a);
+  }
+  recentNews.sort((a, b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
+  return [...evergreen, ...recentNews.slice(0, newsCap)];
+}
 
 function lastmodForArticle(article) {
   const raw = article.content_updated_at || article.updated_at || article.published_at || article.created_at;
@@ -55,7 +93,6 @@ function staticSitemapUrls(siteUrl, { categoryOrder = [], cityOrder = [], pillar
   return [
     { loc: siteUrl, priority: '1.0' },
     { loc: `${siteUrl}/guides`, priority: '0.9' },
-    { loc: `${siteUrl}/search`, priority: '0.6' },
     { loc: `${siteUrl}/wait-times`, priority: '0.9' },
     { loc: `${siteUrl}/planner`, priority: '0.9' },
     { loc: `${siteUrl}/dining`, priority: '0.8' },
@@ -76,15 +113,12 @@ function staticSitemapUrls(siteUrl, { categoryOrder = [], cityOrder = [], pillar
   ];
 }
 
-function articleSitemapUrls(siteUrl, articles) {
-  const cleaned = filterNumberedDuplicateLosers(
-    (articles || []).filter((a) => isIndexableArticle(a) && !isRedirectedArticleSlug(a.slug))
-  );
-  return cleaned.map((a) => ({
+function articleSitemapUrls(siteUrl, articles, options = {}) {
+  const selected = selectArticlesForSitemap(articles, options);
+  return selected.map((a) => ({
     loc: `${siteUrl}/article/${a.slug}`,
     lastmod: lastmodForArticle(a),
-    // Fresher stories get a slight boost so Google spends crawl budget there first.
-    priority: a.is_evergreen ? '0.7' : '0.6',
+    priority: a.is_evergreen ? '0.8' : '0.7',
   }));
 }
 
@@ -195,8 +229,12 @@ function createSitemapBuilder({
 module.exports = {
   ARTICLE_SEGMENT_SIZE,
   RECENT_SITEMAP_SIZE,
+  SITEMAP_NEWS_WINDOW_DAYS,
+  SITEMAP_NEWS_CAP,
   SITEMAP_CACHE_TTL_MS,
   lastmodForArticle,
+  isLowValueNewsTitle,
+  selectArticlesForSitemap,
   renderUrlset,
   renderSitemapIndex,
   staticSitemapUrls,
