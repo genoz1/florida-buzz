@@ -222,6 +222,13 @@ test('gingerbread giraffe direction keeps specific subject — not park exterior
   });
   assert.match(specificPrompt, /gingerbread giraffe/i);
   assert.match(specificPrompt, /Do NOT show Cinderella Castle|Main Street railroad/i);
+
+  const weakChristmas = buildSpecificSubjectPrompt({
+    label: 'Gingerbread Giraffe Returns',
+    direction: 'real photo of magic kingdoms decorated for Christmas. must include disney decorations',
+  });
+  assert.match(weakChristmas, /Gingerbread Giraffe|gingerbread/i);
+  assert.equal(/exactly this subject: real photo of magic kingdoms/i.test(weakChristmas), false);
 });
 
 test('generic christmas magic kingdom direction still searchable but label-specific subject wins', () => {

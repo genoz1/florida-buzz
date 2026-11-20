@@ -72,30 +72,48 @@ function hardenPlacePrompt(prompt, { label = '', category = '' } = {}) {
   return `${body}\n\n${block}`.trim();
 }
 
+/** Vague park/Christmas directions that must not override a more specific story label. */
+function isWeakGenericDirection(direction = '') {
+  const t = String(direction || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!t) return true;
+  if (/\b(gingerbread|spirit jersey|merchandise|display|plush|ornament|cupcake|sipper|popcorn bucket)\b/.test(t)) {
+    return false;
+  }
+  return (
+    /\bmagic kingdoms?\b.*\b(christmas|decorat)/.test(t)
+    || /\b(christmas|holiday)\b.*\b(magic kingdom|disney)\b/.test(t)
+    || /^(real\s+)?photo of magic kingdoms?\b/.test(t)
+    || /\bmust include disney decorations\b/.test(t)
+  );
+}
+
 /**
  * Highly specific AI prompt when no matching stock/reference photo exists.
- * Admin direction wins; otherwise the story label/product is the hero subject.
+ * Story-specific subjects (gingerbread giraffe, etc.) beat weak generic park directions.
+ * Concrete admin direction that names the subject still wins.
  */
 function buildSpecificSubjectPrompt({ label = '', category = '', direction = '', prompt = '' } = {}) {
   const note = String(direction || '').replace(/\s+/g, ' ').trim();
-  const subject = note
-    || storySubject(label, category)
+  const story = String(label || '').replace(/\s+/g, ' ').trim();
+  const labelSubject = storySubject(label, category);
+  const weakNote = isWeakGenericDirection(note);
+  // Prefer the story's specific product/display when the typed direction is a vague MK Christmas postcard.
+  const subject = (!weakNote && note)
+    || labelSubject
     || String(prompt || '').replace(/\s+/g, ' ').trim()
     || 'the exact Walt Disney World subject from this Florida Buzz story';
-  const story = String(label || '').replace(/\s+/g, ' ').trim();
   const banGeneric =
     'Do NOT show Cinderella Castle, Magic Kingdom Main Street railroad/train station, Spaceship Earth, '
     + 'or any unrelated park icon unless that exact landmark is the story subject. '
-    + 'No generic Christmas Magic Kingdom postcard when the story is a specific display, product, food, or merchandise.';
-  const body = note
-    ? `Photorealistic editorial travel photograph of exactly this subject: ${subject}. `
-      + (story ? `Story context (do not replace the subject): ${story}. ` : '')
-      + `Show that ONE real subject clearly as the hero of a 16:9 frame at Walt Disney World. `
-      + `Natural daylight, neutral white balance, no yellow/sepia wash. No readable text. ${banGeneric}`
-    : `Photorealistic editorial travel photograph whose hero subject is: ${subject}. `
-      + `Match the Florida Buzz story "${story || subject}" — depict that specific place, product, display, or food, `
-      + `not a substitute landmark. Natural daylight, neutral white balance, no yellow/sepia wash. `
-      + `No readable text. ${banGeneric}`;
+    + 'No generic Christmas Magic Kingdom postcard when the story is a specific display, product, food, or merchandise. '
+    + 'If the subject is a gingerbread giraffe or similar holiday display/product, show THAT display/product as the hero.';
+  const body =
+    `Photorealistic editorial travel photograph whose hero subject is exactly: ${subject}. `
+    + (story ? `Florida Buzz story title: "${story}". ` : '')
+    + (!weakNote && note && note !== subject ? `Admin refinement: ${note}. ` : '')
+    + 'Show that ONE real subject clearly filling a 16:9 frame at its authentic Walt Disney World setting. '
+    + 'Natural daylight, neutral white balance, no yellow/sepia wash. No readable text. '
+    + `${banGeneric}`;
   // No reference-photo lock — this path runs when stock search missed the subject.
   return hardenPlacePrompt(body, { label, category });
 }
@@ -173,6 +191,7 @@ module.exports = {
   broadenVisualPrompt,
   buildSpecificSubjectPrompt,
   hardenPlacePrompt,
+  isWeakGenericDirection,
   placeAccuracyRules,
   storySubject,
   withPodcastYoutubeStyle,

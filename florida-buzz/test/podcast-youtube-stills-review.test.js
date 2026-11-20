@@ -373,7 +373,8 @@ test('rejectStillsBulk regenerates multiple stills with shared direction', async
     { 'story-1-1': 'photo realistic image of main street usa' }
   ));
   assert.deepEqual(regeneratedIds, ['story-1-0', 'story-1-1']);
-  assert.match(directions[0], /saved previous note/);
+  // Empty shared note must NOT reuse a previous rejection_note (that sticky Christmas MK bug).
+  assert.equal(directions[0], '');
   assert.match(directions[1], /main street usa/i);
 });
 

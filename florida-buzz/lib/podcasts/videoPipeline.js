@@ -304,19 +304,21 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
    * When stock/reference search cannot match the story subject (or admin direction),
    * generate a photoreal still from a highly specific text prompt — never a generic
    * Magic Kingdom postcard stand-in.
+   * Returns a buffer even when auto-review rejects so the admin board can show a candidate.
    */
-  async function tryGenerateSpecificSubjectStill(scene, { direction = '' } = {}) {
+  async function tryGenerateSpecificSubjectStill(scene, { direction = '', keepRejected = false } = {}) {
     let captured = null;
-    const { PODCAST_YOUTUBE_PHOTOREAL_STYLE } = require('./videoVisuals');
+    const { PODCAST_YOUTUBE_PHOTOREAL_STYLE, isWeakGenericDirection } = require('./videoVisuals');
     const { generateImage } = require('../openai');
+    const effectiveDirection = isWeakGenericDirection(direction) ? '' : String(direction || '').trim();
     const specificPrompt = buildSpecificSubjectPrompt({
       label: scene.label,
       category: scene.category,
-      direction,
+      direction: effectiveDirection,
       prompt: scene.prompt,
     });
     const subject =
-      extractSpecificSubject(direction, scene.label, scene.prompt, scene.category)
+      extractSpecificSubject(effectiveDirection, scene.label, scene.prompt, scene.category)
       || scene.label
       || 'story subject';
     const result = await generateValidatedImageResult(
@@ -334,11 +336,13 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
         reviewQuestion:
           `Podcast story title: ${String(scene.label || '').slice(0, 180)}\n`
           + `Required subject: ${String(subject).slice(0, 180)}\n`
-          + (direction ? `Admin direction: ${String(direction).slice(0, 240)}\n` : '')
+          + (effectiveDirection ? `Admin direction: ${String(effectiveDirection).slice(0, 240)}\n` : '')
           + 'PASS only if the still clearly depicts that specific subject (product/display/place/food), '
           + 'looks photorealistic with neutral daylight (no yellow wash), and is NOT a generic '
-          + 'Main Street train station / Cinderella Castle / Spaceship Earth substitute.',
-        maxAttempts: 1,
+          + 'Main Street train station / Cinderella Castle / Spaceship Earth substitute. '
+          + 'A close photoreal view of the named holiday display/product is acceptable even without a stock reference photo.',
+        // One retry with the reviewer's correction when the first draft misses the subject.
+        maxAttempts: 2,
         generate: (text) => generateImage(text, { quality: 'high' }),
         store: async (buffer) => {
           captured = buffer;
@@ -348,6 +352,13 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
     );
     if (result.status === 'accepted' && captured) {
       return { buffer: await applyStillColorFix(captured), source: 'ai_specific_subject' };
+    }
+    if (keepRejected && captured) {
+      return {
+        buffer: await applyStillColorFix(captured),
+        source: 'ai_specific_subject_unverified',
+        reviewWarning: result.correction || result.error || result.status,
+      };
     }
     return { rejected: true, correction: result.correction || result.error || result.status };
   }
@@ -410,23 +421,23 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       console.warn(
         `[podcasts] No matching place/product photo for ${scene.label}; generating specific AI still`
       );
-      const specificAi = await tryGenerateSpecificSubjectStill(scene, { direction: note });
+      const specificAi = await tryGenerateSpecificSubjectStill(scene, {
+        direction: note,
+        keepRejected: forReview,
+      });
       if (Buffer.isBuffer(specificAi.buffer)) {
         await saveVisual(specificAi.buffer, storagePath);
-        console.log(`[podcasts] Specific AI still for ${scene.label}`);
-        return { ok: true, buffer: specificAi.buffer, storagePath, source: specificAi.source, reference: null };
-      }
-      if (forReview) {
-        // Surface a failed card so admin can reject/redo with a better direction.
-        console.error(
-          `[podcasts] STILL FAILED for ${scene.label}: no matching photo and specific AI rejected (${specificAi.correction || 'rejected'})`
+        console.log(
+          `[podcasts] Specific AI still for ${scene.label}`
+          + (specificAi.reviewWarning ? ` (unverified: ${String(specificAi.reviewWarning).slice(0, 120)})` : '')
         );
         return {
-          ok: false,
-          reason: 'no_matching_subject_image',
-          label: scene.label,
+          ok: true,
+          buffer: specificAi.buffer,
           storagePath,
-          correction: specificAi.correction || null,
+          source: specificAi.source,
+          reference: null,
+          reviewWarning: specificAi.reviewWarning || null,
         };
       }
       console.error(`[podcasts] STILL BLOCKED for ${scene.label}: no matching subject image`);
@@ -475,10 +486,20 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       console.warn(
         `[podcasts] Reference restyle rejected for ${scene.label}; trying specific AI subject still (${ai.correction || 'rejected'})`
       );
-      const specificAi = await tryGenerateSpecificSubjectStill(scene, { direction: note || specific });
+      const specificAi = await tryGenerateSpecificSubjectStill(scene, {
+        direction: note || specific,
+        keepRejected: forReview,
+      });
       if (Buffer.isBuffer(specificAi.buffer)) {
         await saveVisual(specificAi.buffer, storagePath);
-        return { ok: true, buffer: specificAi.buffer, storagePath, source: specificAi.source, reference: null };
+        return {
+          ok: true,
+          buffer: specificAi.buffer,
+          storagePath,
+          source: specificAi.source,
+          reference: null,
+          reviewWarning: specificAi.reviewWarning || null,
+        };
       }
     }
 
@@ -668,13 +689,15 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       (entry) => entry.kind === 'topic' && stillKey(entry.segmentSlug, entry.imageIndex) === stillId
     );
     if (!scene) throw new Error(`Still scene not found for ${stillId}`);
-    const note = String(direction || '').trim();
+    const { isWeakGenericDirection } = require('./videoVisuals');
+    // Ignore sticky generic "Magic Kingdom Christmas" notes — use the story label instead.
+    const note = isWeakGenericDirection(direction) ? '' : String(direction || '').trim();
     const directedScene = note
       ? {
           ...scene,
           // Direction becomes the visual subject; keep original label only for admin card title.
           prompt: `Admin-requested YouTube still. Follow this direction exactly: ${note}. `
-            + `Show one real Walt Disney World place matching that direction. `
+            + `Show that subject clearly at Walt Disney World. `
             + `Original story context (do not override the direction): ${scene.label}.`,
         }
       : scene;

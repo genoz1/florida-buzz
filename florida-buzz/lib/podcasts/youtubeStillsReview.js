@@ -362,8 +362,9 @@ function createYoutubeStillsReview({ store, cfg, videoPipeline }) {
     const sharedDirection = String(note || '').trim().slice(0, 800);
     const perStillNotes = normalizeStillNotes(noteById);
     const board = getStillsBoard(episode);
+    // Empty note means "use the story title" — do NOT reuse a previous (often wrong) rejection_note.
     const directionFor = (item) =>
-      sharedDirection || perStillNotes[item.id] || String(item.rejection_note || '').trim().slice(0, 800);
+      sharedDirection || String(perStillNotes[item.id] || '').trim().slice(0, 800);
 
     for (const stillId of ids) {
       if (!board.items.some((item) => item.id === stillId)) {
