@@ -397,7 +397,7 @@
               <form method="post" action="/admin/podcasts/episodes/<%= episode.id %>/youtube-stills/<%= encodeURIComponent(item.id) %>/reject" style="margin-top:8px">
                 <input type="hidden" name="csrf" value="<%= csrf %>">
                 <label style="font-size:13px">Reject &amp; redo — optional direction
-                  <textarea name="note" rows="2" placeholder="e.g. Show the BoardWalk from the lake side, no cars, cooler daylight"><%= item.rejection_note || '' %></textarea>
+                  <textarea name="note" rows="2" placeholder="Describe the exact subject, e.g. gingerbread giraffe display at the resort — leave blank to use the story title"></textarea>
                 </label>
                 <button class="btn btn-secondary" type="submit">Reject &amp; regenerate</button>
               </form>

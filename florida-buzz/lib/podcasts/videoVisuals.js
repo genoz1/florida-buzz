@@ -72,6 +72,34 @@ function hardenPlacePrompt(prompt, { label = '', category = '' } = {}) {
   return `${body}\n\n${block}`.trim();
 }
 
+/**
+ * Highly specific AI prompt when no matching stock/reference photo exists.
+ * Admin direction wins; otherwise the story label/product is the hero subject.
+ */
+function buildSpecificSubjectPrompt({ label = '', category = '', direction = '', prompt = '' } = {}) {
+  const note = String(direction || '').replace(/\s+/g, ' ').trim();
+  const subject = note
+    || storySubject(label, category)
+    || String(prompt || '').replace(/\s+/g, ' ').trim()
+    || 'the exact Walt Disney World subject from this Florida Buzz story';
+  const story = String(label || '').replace(/\s+/g, ' ').trim();
+  const banGeneric =
+    'Do NOT show Cinderella Castle, Magic Kingdom Main Street railroad/train station, Spaceship Earth, '
+    + 'or any unrelated park icon unless that exact landmark is the story subject. '
+    + 'No generic Christmas Magic Kingdom postcard when the story is a specific display, product, food, or merchandise.';
+  const body = note
+    ? `Photorealistic editorial travel photograph of exactly this subject: ${subject}. `
+      + (story ? `Story context (do not replace the subject): ${story}. ` : '')
+      + `Show that ONE real subject clearly as the hero of a 16:9 frame at Walt Disney World. `
+      + `Natural daylight, neutral white balance, no yellow/sepia wash. No readable text. ${banGeneric}`
+    : `Photorealistic editorial travel photograph whose hero subject is: ${subject}. `
+      + `Match the Florida Buzz story "${story || subject}" — depict that specific place, product, display, or food, `
+      + `not a substitute landmark. Natural daylight, neutral white balance, no yellow/sepia wash. `
+      + `No readable text. ${banGeneric}`;
+  // No reference-photo lock — this path runs when stock search missed the subject.
+  return hardenPlacePrompt(body, { label, category });
+}
+
 function broadenVisualPrompt(prompt, { label = '', category = '', level = 1, rejection = '' } = {}) {
   const subject = storySubject(label, category);
   const evidence = `${prompt} ${label} ${category} ${rejection}`.toLowerCase();
@@ -143,6 +171,7 @@ module.exports = {
   PODCAST_YOUTUBE_PHOTOREAL_STYLE,
   PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
   broadenVisualPrompt,
+  buildSpecificSubjectPrompt,
   hardenPlacePrompt,
   placeAccuracyRules,
   storySubject,

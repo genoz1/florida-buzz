@@ -87,33 +87,85 @@ const CURATED_COMMONS_FILES = [
   },
 ];
 
-/** Pull a concrete place override out of admin reject/redo direction text. */
+/**
+ * Specific story subjects that must NOT collapse into generic Magic Kingdom /
+ * Main Street / castle stock photos (merchandise, holiday displays, food, etc.).
+ */
+const SPECIFIC_SUBJECT_RE =
+  /\b(gingerbread(?:\s+\w+){0,3}|spirit\s+jersey(?:es)?|holiday\s+sweater|merchandise\s+display|retail\s+display|dessert\s+display|food\s+display|popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|treat|cupcake|cookie|bakery|concession|snack|menu\s+item|limited[- ]edition|souvenir|gift\s+shop\s+display)\b/i;
+
+const GENERIC_LANDMARK_RE =
+  /\b(main street|cinderella castle|railroad|train station|spaceship earth|magic kingdom entrance|park exterior|tomorrowland)\b/i;
+
+function cleanSubjectPhrase(text = '') {
+  return String(text || '')
+    .replace(/^(change\s+to|use|show|make\s+it|redo\s+as|create\s+a|follow\s+this\s+direction\s+exactly:?)\s+/i, '')
+    .replace(/\b(photo\s*realistic|photorealistic|neutrally\s+graded|cinematic|illustration|image|picture|real\s+photo\s+of)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Pull a product/display/food subject that should beat generic park landmarks. */
+function extractSpecificSubject(...parts) {
+  const text = parts.map((part) => String(part || '')).join(' ').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const match = text.match(
+    /\b((?:gingerbread(?:\s+\w+){0,4})|(?:holiday\s+)?spirit\s+jersey(?:es)?|(?:merchandise|retail|dessert|food|holiday)\s+display(?:\s+of\s+[\w\s-]{2,40})?|(?:popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|cupcake|cookie)(?:\s+[\w-]{2,20}){0,3})\b/i
+  );
+  if (match) return cleanSubjectPhrase(match[0]).slice(0, 120);
+  // Label-style titles: "Gingerbread Giraffe Returns" → keep the distinctive noun phrase.
+  const labelish = cleanSubjectPhrase(text)
+    .replace(/\b(returns?|arrives?|debuts?|back|again|new|updated|refreshed)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (SPECIFIC_SUBJECT_RE.test(labelish)) {
+    return labelish.slice(0, 120);
+  }
+  return '';
+}
+
+function hasSpecificSubject(...parts) {
+  return Boolean(extractSpecificSubject(...parts));
+}
+
+/** Pull a concrete place/subject override out of admin reject/redo direction text. */
 function extractPlaceFromDirection(direction = '') {
   const text = String(direction || '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
+  // Specific merchandise / display subjects win over park-name collapse.
+  const specific = extractSpecificSubject(text);
+  if (specific) return specific;
+
   const hints = [];
   for (const re of PLACE_NAME_PATTERNS) {
     const match = text.match(re);
     if (match) hints.push(match[0]);
   }
   if (hints.length) return [...new Set(hints)].join(' ').slice(0, 120);
-  // Generic park wording from admin direction (D23 fallbacks, etc.)
-  if (/\binside\b.*\bdisney parks?\b|\bdisney parks?\b.*\binside\b|\bphoto\s*realistic\b.*\bdisney\b/i.test(text)) {
+
+  const cleaned = cleanSubjectPhrase(text);
+  // Generic park wording ONLY when the direction has no concrete subject left.
+  const genericParkDirection =
+    /\b(from\s+)?inside\b.{0,40}\bdisney parks?\b|\bdisney parks?\b.{0,40}\binside\b/i.test(text)
+    || /^(from\s+)?(inside\s+)?(one\s+of\s+the\s+)?disney parks?\b/i.test(cleaned)
+    || /^(walt\s+disney\s+world|disney\s+world)(\s+resort)?(\s+location)?$/i.test(cleaned);
+  const hasConcreteSubject = cleaned.length >= 4
+    && !genericParkDirection
+    && !/^(photo\s*realistic|cinematic|illustration)\b/i.test(cleaned);
+  if (!cleaned || (genericParkDirection && !SPECIFIC_SUBJECT_RE.test(text))) {
     return 'Walt Disney World Magic Kingdom Tomorrowland';
   }
+  // Keep free-text subjects ("gingerbread giraffe display at its actual … location")
+  // instead of collapsing any WDW mention into "park exterior".
+  if (hasConcreteSubject) return cleaned.slice(0, 120);
   if (/\bdisney parks?\b|\bwalt disney world\b/i.test(text)) {
     return 'Walt Disney World park exterior';
   }
-  // Short free-text direction that names a subject ("change to space mountain exterior")
-  const cleaned = text
-    .replace(/^(change\s+to|use|show|make\s+it|redo\s+as|create\s+a)\s+/i, '')
-    .replace(/\b(photo\s*realistic|cinematic|illustration|image|picture)\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
   return cleaned.length >= 4 ? cleaned.slice(0, 120) : '';
 }
 
 function buildPlaceSearchQuery({ label = '', category = '', prompt = '', direction = '' } = {}) {
+  const specific = extractSpecificSubject(direction, label, prompt, category);
   const directionPlace = extractPlaceFromDirection(direction);
   const raw = `${direction} ${directionPlace} ${label} ${prompt} ${category}`.replace(/\s+/g, ' ').trim();
   const placeHints = [];
@@ -121,11 +173,14 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
     const match = raw.match(re);
     if (match) placeHints.push(match[0]);
   }
-  // Admin direction wins — put its place first and skip story remaps that fight it.
+  // Admin direction / specific product subject wins — skip remaps that fight it.
   if (directionPlace) {
     placeHints.unshift(directionPlace);
   }
-  const directionOverridesPlace = Boolean(directionPlace);
+  if (specific) {
+    placeHints.unshift(specific);
+  }
+  const directionOverridesPlace = Boolean(directionPlace || specific);
   // Prefer entrance/railroad wording when ticketing / Premier Pass is the story.
   if (
     !directionOverridesPlace
@@ -141,7 +196,7 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
     placeHints.unshift('EPCOT Spaceship Earth race');
   }
   if (!directionOverridesPlace && /\bspirit jersey/i.test(raw)) {
-    placeHints.unshift('World of Disney Disney Springs');
+    placeHints.unshift('World of Disney Disney Springs spirit jersey display');
   }
   // Bag / security / prohibited items stories → Main Street / park entrance (not abstract "restrictions").
   if (
@@ -151,19 +206,49 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
   ) {
     placeHints.unshift('Magic Kingdom Main Street USA entrance');
   }
-  const labelCore = directionOverridesPlace
-    ? ''
-    : String(label || '')
-        .replace(/\$\d+(?:\.\d+)?/g, ' ')
-        .replace(/\b(premier pass|lightning lane|road closures?|wine\s*&\s*dine|rundisney|run disney|cold grocery transfers?|gold theater panels?)\b/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+  const labelCore = directionOverridesPlace && specific
+    ? specific
+    : directionOverridesPlace
+      ? ''
+      : String(label || '')
+          .replace(/\$\d+(?:\.\d+)?/g, ' ')
+          .replace(/\b(premier pass|lightning lane|road closures?|wine\s*&\s*dine|rundisney|run disney|cold grocery transfers?|gold theater panels?)\b/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
   const parts = [...new Set([
     ...placeHints,
     labelCore,
     'Walt Disney World',
   ].filter((part) => part && part.length >= 3))];
   return parts.join(' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+/**
+ * Reject stock photos that are clearly the wrong subject (e.g. Main Street train
+ * station when the story is a gingerbread giraffe display).
+ */
+function referenceMatchesSubject(reference, { label = '', prompt = '', direction = '', category = '' } = {}) {
+  if (!reference) return false;
+  const specific = extractSpecificSubject(direction, label, prompt, category);
+  if (!specific) return true;
+  const hay = [
+    reference.title,
+    reference.query,
+    reference.credit,
+    reference.pageUrl,
+    reference.imageUrl,
+  ].map((part) => String(part || '')).join(' ');
+  const score = overlapScore(specific, hay);
+  if (score >= 0.2) return true;
+  // Specific product/display stories must not accept generic landmark stock.
+  if (GENERIC_LANDMARK_RE.test(hay) && !SPECIFIC_SUBJECT_RE.test(hay)) {
+    return false;
+  }
+  // Require at least one distinctive token from the specific subject.
+  const tokens = normalizeMatchText(specific).split(' ').filter((w) => w.length > 3 && !/^(disney|world|walt|resort|display|photo|image|real)$/.test(w));
+  if (!tokens.length) return score >= 0.15;
+  const hayNorm = normalizeMatchText(hay);
+  return tokens.some((token) => hayNorm.includes(token));
 }
 
 function titleLooksUseful(title = '') {
@@ -330,6 +415,7 @@ async function searchWikimediaPlacePhoto(query, { fetchImpl = fetch, limit = 8 }
 
 /** Extra queries when the primary search returns nothing (admin direction / thin labels). */
 function placeSearchFallbacks({ label = '', prompt = '', direction = '', primaryQuery = '' } = {}) {
+  const specific = extractSpecificSubject(direction, label, prompt);
   const directionPlace = extractPlaceFromDirection(direction);
   const hay = `${direction} ${directionPlace} ${label} ${prompt} ${primaryQuery}`;
   const out = [];
@@ -337,30 +423,42 @@ function placeSearchFallbacks({ label = '', prompt = '', direction = '', primary
     const cleaned = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     if (cleaned.length >= 4 && !out.includes(cleaned)) out.push(cleaned);
   };
-  if (directionPlace) {
+  if (specific) {
+    push(`${specific} Walt Disney World`);
+    push(`${specific} Disney Springs`);
+    push(`${specific} holiday display`);
+    push(specific);
+  }
+  if (directionPlace && directionPlace !== specific) {
     push(`${directionPlace} Walt Disney World`);
-    push(`${directionPlace} Magic Kingdom`);
     push(directionPlace);
   }
-  if (/\bmain street\b/i.test(hay)) {
+  // Generic landmark fallbacks only when the story is actually about those places —
+  // never when a specific merchandise/display subject is present.
+  if (!specific && /\bmain street\b/i.test(hay)) {
     push('Main Street USA Magic Kingdom');
     push('Magic Kingdom Main Street Walt Disney World');
   }
-  if (/\b(bag|bags|backpack|security|prohibited|restricted items?|park bag)\b/i.test(hay)) {
+  if (!specific && /\b(bag|bags|backpack|security|prohibited|restricted items?|park bag)\b/i.test(hay)) {
     push('Magic Kingdom Main Street USA');
     push('Magic Kingdom entrance railroad station');
   }
-  if (!directionPlace && label) {
+  if (!directionPlace && !specific && label) {
     push(`${label} Walt Disney World`);
   }
-  // Last resort so thin labels still get a real WDW place photo.
-  push('Magic Kingdom Main Street Walt Disney World');
-  push('Cinderella Castle Magic Kingdom Walt Disney World');
+  if (!specific) {
+    // Last resort so thin labels still get a real WDW place photo.
+    push('Magic Kingdom Main Street Walt Disney World');
+    push('Cinderella Castle Magic Kingdom Walt Disney World');
+  }
   return out.filter((q) => q !== String(primaryQuery || '').trim());
 }
 
-async function curatedWikimediaFallback(hay, fetchImpl) {
+async function curatedWikimediaFallback(hay, fetchImpl, { label = '', prompt = '', direction = '' } = {}) {
   const text = String(hay || '');
+  const specific = extractSpecificSubject(direction, label, prompt, text);
+  // Never force Main Street / castle curated files onto product/display stories.
+  if (specific) return null;
   for (const entry of CURATED_COMMONS_FILES) {
     if (!entry.match.test(text)) continue;
     for (const title of entry.titles) {
@@ -470,10 +568,23 @@ async function findPlaceReferencePhoto({
   supabase = null,
   fetchImpl = fetch,
 } = {}) {
+  const subjectCtx = { label, category, prompt, direction };
   const directionPlace = extractPlaceFromDirection(direction);
-  // Article heroes first (skip when admin directs a different place).
+  const specific = extractSpecificSubject(direction, label, prompt, category);
+  const accept = (ref) => {
+    if (!ref) return null;
+    if (!referenceMatchesSubject(ref, subjectCtx)) {
+      console.warn(
+        `[podcasts] Skipping mismatched place reference for "${specific || label}": ${ref.title || ref.imageUrl}`
+      );
+      return null;
+    }
+    return { ...ref, subjectKind: 'place', imageOrigin: ref.imageOrigin || 'sourced', useAsIs: Boolean(ref.useAsIs) };
+  };
+
+  // Article heroes first (skip when admin directs a different place/subject).
   // People-panel heroes are filtered inside findArticleHeroReference.
-  if (!directionPlace) {
+  if (!directionPlace && !specific) {
     const articleRef = await findArticleHeroReference({
       label,
       episodeId,
@@ -484,7 +595,8 @@ async function findPlaceReferencePhoto({
       console.warn(`[podcasts] Article reference lookup failed: ${err.message}`);
       return null;
     });
-    if (articleRef) return articleRef;
+    const acceptedArticle = accept(articleRef);
+    if (acceptedArticle) return acceptedArticle;
   }
 
   const query = buildPlaceSearchQuery({ label, category, prompt, direction });
@@ -499,19 +611,22 @@ async function findPlaceReferencePhoto({
     });
   };
 
-  let wiki = await trySearch(query);
-  if (wiki) return { ...wiki, subjectKind: 'place', imageOrigin: 'sourced', useAsIs: false };
+  let wiki = accept(await trySearch(query));
+  if (wiki) return wiki;
 
   for (const fallback of placeSearchFallbacks({ label, prompt, direction, primaryQuery: query })) {
-    wiki = await trySearch(fallback);
-    if (wiki) return { ...wiki, subjectKind: 'place', imageOrigin: 'sourced', useAsIs: false };
+    wiki = accept(await trySearch(fallback));
+    if (wiki) return wiki;
   }
 
-  const curated = await curatedWikimediaFallback(
-    `${direction} ${directionPlace} ${label} ${prompt} ${query}`,
-    fetchImpl
-  ).catch(() => null);
-  if (curated) return { ...curated, subjectKind: 'place', imageOrigin: 'sourced', useAsIs: false };
+  const curated = accept(
+    await curatedWikimediaFallback(
+      `${direction} ${directionPlace} ${label} ${prompt} ${query}`,
+      fetchImpl,
+      { label, prompt, direction }
+    ).catch(() => null)
+  );
+  if (curated) return curated;
 
   return null;
 }
@@ -560,14 +675,17 @@ module.exports = {
   buildPlaceSearchQuery,
   creditFromMeta,
   extractPlaceFromDirection,
+  extractSpecificSubject,
   fetchImageBuffer,
   fetchWikimediaFileByTitle,
   findArticleHeroReference,
   findPlaceReferencePhoto,
+  hasSpecificSubject,
   licenseLooksOk,
   looksLikePeoplePrimaryText,
   overlapScore,
   placeSearchFallbacks,
+  referenceMatchesSubject,
   referenceReviewQuestion,
   searchWikimediaPlacePhoto,
   stripTracking,

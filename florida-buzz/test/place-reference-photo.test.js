@@ -7,13 +7,17 @@ const path = require('node:path');
 const {
   buildPlaceSearchQuery,
   extractPlaceFromDirection,
+  extractSpecificSubject,
   findPlaceReferencePhoto,
   licenseLooksOk,
   looksLikePeoplePrimaryText,
   overlapScore,
+  placeSearchFallbacks,
+  referenceMatchesSubject,
   withReferencePrompt,
   referenceReviewQuestion,
 } = require('../lib/podcasts/placeReferencePhoto');
+const { buildSpecificSubjectPrompt } = require('../lib/podcasts/videoVisuals');
 
 test('admin direction overrides Premier Pass entrance remap to Space Mountain', () => {
   assert.match(extractPlaceFromDirection('change to space mountain exterior'), /Space Mountain/i);
@@ -175,11 +179,66 @@ test('premier pass query prefers Magic Kingdom entrance wording', () => {
   assert.match(q, /entrance|railroad/i);
 });
 
+test('gingerbread giraffe direction keeps specific subject — not park exterior or Main Street', () => {
+  const direction =
+    'Use a photorealistic, neutrally graded image of the gingerbread giraffe display at its actual Walt Disney World resort location.';
+  assert.match(extractSpecificSubject(direction), /gingerbread/i);
+  assert.match(extractPlaceFromDirection(direction), /gingerbread/i);
+  assert.equal(/park exterior/i.test(extractPlaceFromDirection(direction)), false);
+
+  const query = buildPlaceSearchQuery({
+    label: 'Gingerbread Giraffe Returns',
+    prompt: 'real photo of magic kingdoms decorated for Christmas. must include disney decorations',
+    direction,
+  });
+  assert.match(query, /gingerbread/i);
+  assert.equal(/\bentrance railroad station\b/i.test(query), false);
+
+  const fallbacks = placeSearchFallbacks({
+    label: 'Gingerbread Giraffe Returns',
+    prompt: 'magic kingdom christmas',
+    direction,
+    primaryQuery: query,
+  });
+  assert.ok(fallbacks.some((q) => /gingerbread/i.test(q)));
+  assert.equal(fallbacks.some((q) => /Main Street USA Magic Kingdom/i.test(q)), false);
+  assert.equal(fallbacks.some((q) => /Cinderella Castle/i.test(q)), false);
+
+  assert.equal(
+    referenceMatchesSubject(
+      {
+        title: 'File:Walt Disney World Railroad Main Street USA Station 01.jpg',
+        query: 'Magic Kingdom Main Street Walt Disney World',
+        credit: 'Tom Arthur; CC BY-SA 2.0; via Wikimedia Commons',
+      },
+      { label: 'Gingerbread Giraffe Returns', direction }
+    ),
+    false
+  );
+
+  const specificPrompt = buildSpecificSubjectPrompt({
+    label: 'Gingerbread Giraffe Returns',
+    direction,
+  });
+  assert.match(specificPrompt, /gingerbread giraffe/i);
+  assert.match(specificPrompt, /Do NOT show Cinderella Castle|Main Street railroad/i);
+});
+
+test('generic christmas magic kingdom direction still searchable but label-specific subject wins', () => {
+  const query = buildPlaceSearchQuery({
+    label: 'Gingerbread Giraffe Returns',
+    prompt: 'real photo of magic kingdoms decorated for Christmas. must include disney decorations',
+  });
+  assert.match(query, /Gingerbread Giraffe|gingerbread/i);
+});
+
 test('video pipeline requires verified v6 article-first stills and blocks incomplete publish', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.match(source, /youtube-visuals\/v6\//);
   assert.match(source, /findPlaceReferencePhoto/);
   assert.match(source, /editImageFromReference/);
+  assert.match(source, /tryGenerateSpecificSubjectStill|ai_specific_subject/);
+  assert.match(source, /buildSpecificSubjectPrompt/);
   assert.match(source, /article_ai_as_is|useAsIs/);
   assert.match(source, /PODCAST_YOUTUBE_PHOTOREAL_STYLE/);
   assert.match(source, /prepareAllTopicStills/);

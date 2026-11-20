@@ -11,11 +11,14 @@ const { probeMp3DurationSec } = require('./audioPipeline');
 const { buildScenePlan, parseMarkedSegments } = require('./videoPlan');
 const {
   broadenVisualPrompt,
+  buildSpecificSubjectPrompt,
   hardenPlacePrompt,
   PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
 } = require('./videoVisuals');
 const {
+  extractSpecificSubject,
   findPlaceReferencePhoto,
+  referenceMatchesSubject,
   referenceReviewQuestion,
   withReferencePrompt,
 } = require('./placeReferencePhoto');
@@ -172,7 +175,7 @@ async function planTopicVisuals({ episode, aiText }) {
   const evidence = storySegments.map((segment) => ({ slug: segment.slug, transcript: segment.text.slice(0, 900) }));
   const system = `You plan accurate cinematic illustrated visuals for the Florida Buzz Disney World news podcast YouTube episode.
 Return strict JSON only (no markdown): {"topics":[{"slug":"story-1","title":"short on-screen topic title","description":"max 5 words, under 32 characters","category":"stable-reusable-category","prompts":["prompt 1","prompt 2"]}]}.
-Keep each description to at most 5 words and 32 characters so it fits one agenda-menu line. End on a real noun or verb — never on for/to/the/a/of. Use exactly two prompts per story. Each prompt is ONE sentence naming one real Walt Disney World PLACE from that story (architecture/attraction/setting — never people panels). Style: Mandalorian-episode cinematic illustration, natural daylight, NO yellow cast. Never celebrities/named characters/unknown panelists. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.
+Keep each description to at most 5 words and 32 characters so it fits one agenda-menu line. End on a real noun or verb — never on for/to/the/a/of. Use exactly two prompts per story. Each prompt is ONE sentence naming the ONE real Walt Disney World subject from that story. Prefer the story's specific product, holiday display, food, merchandise, attraction, or resort setting — never substitute a generic Magic Kingdom Christmas postcard, Main Street train station, or Cinderella Castle when the story is about something more specific (e.g. a gingerbread giraffe display). Never people panels. Style: photorealistic travel photo intent, natural daylight, NO yellow cast. Never celebrities/named characters/unknown panelists. Never mashups or invented attractions. No readable text. Escape all quotes inside strings. Use the transcript only as evidence.
 Geography locks: Magic Kingdom ticket machines are at the entrance before the railroad bridge — never on Main Street with the castle. BoardWalk is pedestrian wood only. runDisney on park paths only. Contemporary monorail THROUGH the A-frame.`;
   const user = JSON.stringify({ episodeTitle: episode.title, segments: evidence });
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -298,8 +301,61 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
   }
 
   /**
-   * Build one verified story still. Never invent geography without a real place photo.
-   * Never returns a blank title card — callers must abort publish when ok=false.
+   * When stock/reference search cannot match the story subject (or admin direction),
+   * generate a photoreal still from a highly specific text prompt — never a generic
+   * Magic Kingdom postcard stand-in.
+   */
+  async function tryGenerateSpecificSubjectStill(scene, { direction = '' } = {}) {
+    let captured = null;
+    const { PODCAST_YOUTUBE_PHOTOREAL_STYLE } = require('./videoVisuals');
+    const { generateImage } = require('../openai');
+    const specificPrompt = buildSpecificSubjectPrompt({
+      label: scene.label,
+      category: scene.category,
+      direction,
+      prompt: scene.prompt,
+    });
+    const subject =
+      extractSpecificSubject(direction, scene.label, scene.prompt, scene.category)
+      || scene.label
+      || 'story subject';
+    const result = await generateValidatedImageResult(
+      specificPrompt,
+      { title: scene.label, slug: scene.visualKey, subject, location: 'Walt Disney World Resort' },
+      {
+        // Drop the "attached reference photograph" lock — there isn't one on this path.
+        styleRequirements: String(PODCAST_YOUTUBE_PHOTOREAL_STYLE)
+          .replace(/A real reference photograph[\s\S]*?not in the reference\.\s*/i, '')
+          .replace(/Tight subject lock[\s\S]*?preserving that subject\.\s*/i, (
+            'Tight subject lock (CRITICAL): the hero must be the exact story/admin subject — '
+            + 'not a substitute landmark.\n\n'
+          )),
+        reviewInstructions: PODCAST_YOUTUBE_REVIEW_INSTRUCTIONS,
+        reviewQuestion:
+          `Podcast story title: ${String(scene.label || '').slice(0, 180)}\n`
+          + `Required subject: ${String(subject).slice(0, 180)}\n`
+          + (direction ? `Admin direction: ${String(direction).slice(0, 240)}\n` : '')
+          + 'PASS only if the still clearly depicts that specific subject (product/display/place/food), '
+          + 'looks photorealistic with neutral daylight (no yellow wash), and is NOT a generic '
+          + 'Main Street train station / Cinderella Castle / Spaceship Earth substitute.',
+        maxAttempts: 1,
+        generate: (text) => generateImage(text, { quality: 'high' }),
+        store: async (buffer) => {
+          captured = buffer;
+          return `memory://candidate`;
+        },
+      }
+    );
+    if (result.status === 'accepted' && captured) {
+      return { buffer: await applyStillColorFix(captured), source: 'ai_specific_subject' };
+    }
+    return { rejected: true, correction: result.correction || result.error || result.status };
+  }
+
+  /**
+   * Build one verified story still. Prefer a matching real place/product photo;
+   * if none matches the story/admin subject, generate a specific AI still instead of
+   * forcing a generic Magic Kingdom stock image. Never returns a blank title card.
    */
   async function buildVerifiedTopicStill(scene, {
     episode,
@@ -325,7 +381,7 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       `[podcasts] Building verified YouTube still ${storagePath} for ${scene.label}`
       + (note ? ` (admin direction: ${note.slice(0, 120)})` : '')
     );
-    const reference = await findPlaceReferencePhoto({
+    let reference = await findPlaceReferencePhoto({
       label: scene.label,
       category: scene.category,
       prompt: scene.prompt,
@@ -334,9 +390,53 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       store,
       supabase,
     });
+    if (
+      reference?.buffer
+      && !referenceMatchesSubject(reference, {
+        label: scene.label,
+        prompt: scene.prompt,
+        direction: note,
+        category: scene.category,
+      })
+    ) {
+      console.warn(
+        `[podcasts] Discarding mismatched reference for ${scene.label}: ${reference.title || reference.imageUrl}`
+      );
+      reference = null;
+    }
+
+    // No matching stock/reference → specific AI generation (direction + story subject).
     if (!reference?.buffer) {
-      console.error(`[podcasts] STILL BLOCKED for ${scene.label}: no real place-photo template found`);
-      return { ok: false, reason: 'no_place_reference', label: scene.label, storagePath };
+      console.warn(
+        `[podcasts] No matching place/product photo for ${scene.label}; generating specific AI still`
+      );
+      const specificAi = await tryGenerateSpecificSubjectStill(scene, { direction: note });
+      if (Buffer.isBuffer(specificAi.buffer)) {
+        await saveVisual(specificAi.buffer, storagePath);
+        console.log(`[podcasts] Specific AI still for ${scene.label}`);
+        return { ok: true, buffer: specificAi.buffer, storagePath, source: specificAi.source, reference: null };
+      }
+      if (forReview) {
+        // Surface a failed card so admin can reject/redo with a better direction.
+        console.error(
+          `[podcasts] STILL FAILED for ${scene.label}: no matching photo and specific AI rejected (${specificAi.correction || 'rejected'})`
+        );
+        return {
+          ok: false,
+          reason: 'no_matching_subject_image',
+          label: scene.label,
+          storagePath,
+          correction: specificAi.correction || null,
+        };
+      }
+      console.error(`[podcasts] STILL BLOCKED for ${scene.label}: no matching subject image`);
+      return {
+        ok: false,
+        reason: 'no_matching_subject_image',
+        label: scene.label,
+        storagePath,
+        correction: specificAi.correction || null,
+      };
     }
     if (reference.subjectKind === 'people') {
       console.error(`[podcasts] STILL BLOCKED for ${scene.label}: reference is people-primary`);
@@ -357,14 +457,32 @@ function createVideoPipeline({ cfg, store, supabase, aiText, ffmpegPath }) {
       return { ok: true, buffer: photo, storagePath, source: 'article_ai_as_is', reference };
     }
 
-    const ai = await tryGenerateTopicStill(scene.prompt, scene, reference);
+    const directedPrompt = note
+      ? `Admin-requested YouTube still. Follow this direction exactly: ${note}. `
+        + `Show that subject clearly. Original story context: ${scene.label}.`
+      : scene.prompt;
+    const ai = await tryGenerateTopicStill(directedPrompt, scene, reference);
     if (Buffer.isBuffer(ai.buffer)) {
       await saveVisual(ai.buffer, storagePath);
       console.log(`[podcasts] Verified AI-from-reference still for ${scene.label}`);
       return { ok: true, buffer: ai.buffer, storagePath, source: ai.source, reference };
     }
 
-    // Fallback: real place photo itself (after color fix + review) — never invent, never title card.
+    // AI restyle rejected — for specific product/display subjects, prefer another
+    // specific AI attempt over shipping a mismatched landmark stock photo.
+    const specific = extractSpecificSubject(note, scene.label, scene.prompt, scene.category);
+    if (specific || note) {
+      console.warn(
+        `[podcasts] Reference restyle rejected for ${scene.label}; trying specific AI subject still (${ai.correction || 'rejected'})`
+      );
+      const specificAi = await tryGenerateSpecificSubjectStill(scene, { direction: note || specific });
+      if (Buffer.isBuffer(specificAi.buffer)) {
+        await saveVisual(specificAi.buffer, storagePath);
+        return { ok: true, buffer: specificAi.buffer, storagePath, source: specificAi.source, reference: null };
+      }
+    }
+
+    // Fallback: real place photo itself (after color fix + review) — only when it matched the subject.
     console.warn(
       `[podcasts] AI restyle rejected for ${scene.label}; verifying real reference photo instead (${ai.correction || 'rejected'})`
     );
