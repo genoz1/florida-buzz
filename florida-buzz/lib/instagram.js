@@ -7,6 +7,12 @@
 // an image URL, then publish that container. Containers can take a few
 // seconds to process, so we poll their status before publishing.
 const { logPost, extractUrlFromText } = require('./postLog');
+const { supabase } = require('./supabase');
+const {
+  authRemediationHint,
+  getMetaAccessToken,
+  isAuthFailureMessage,
+} = require('./metaSocialTokens');
 
 const GRAPH_BASE = 'https://graph.instagram.com/v21.0';
 
@@ -63,12 +69,15 @@ async function verifyRecentPublish(igUserId, accessToken, caption) {
 }
 
 async function createPost({ imageUrl, videoUrl, caption, logDetail = null }) {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
   const igUserId = process.env.INSTAGRAM_USER_ID;
 
   try {
-    if (!accessToken || !igUserId) {
-      throw new Error('INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_USER_ID not set.');
+    if (!igUserId) {
+      throw new Error('INSTAGRAM_USER_ID not set.');
+    }
+    const accessToken = await getMetaAccessToken('instagram', { env: process.env, supabase });
+    if (!accessToken) {
+      throw new Error(authRemediationHint('instagram'));
     }
 
     // Step 1: create the media container.
@@ -80,7 +89,11 @@ async function createPost({ imageUrl, videoUrl, caption, logDetail = null }) {
     });
     const createData = await createRes.json();
     if (!createRes.ok) {
-      throw new Error(`Instagram container creation failed: ${JSON.stringify(createData)}`);
+      const raw = JSON.stringify(createData);
+      if (isAuthFailureMessage(raw)) {
+        throw new Error(`${authRemediationHint('instagram')} | ${raw}`);
+      }
+      throw new Error(`Instagram container creation failed: ${raw}`);
     }
 
     const containerId = createData.id;
@@ -114,7 +127,11 @@ async function createPost({ imageUrl, videoUrl, caption, logDetail = null }) {
         });
         return { recovered: true };
       }
-      throw new Error(`Instagram publish failed: ${JSON.stringify(publishData)}`);
+      const raw = JSON.stringify(publishData);
+      if (isAuthFailureMessage(raw)) {
+        throw new Error(`${authRemediationHint('instagram')} | ${raw}`);
+      }
+      throw new Error(`Instagram publish failed: ${raw}`);
     }
 
     await logPost({

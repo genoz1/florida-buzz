@@ -2,6 +2,12 @@
 // Built on the same underlying Graph API infrastructure as Instagram, so it
 // uses the same two-step pattern: create a media container, then publish it.
 const { logPost, extractUrlFromText } = require('./postLog');
+const { supabase } = require('./supabase');
+const {
+  authRemediationHint,
+  getMetaAccessToken,
+  isAuthFailureMessage,
+} = require('./metaSocialTokens');
 
 const GRAPH_BASE = 'https://graph.threads.net/v1.0';
 
@@ -56,12 +62,15 @@ async function verifyRecentPublish(userId, accessToken, text) {
 }
 
 async function createPost({ text, imageUrl, videoUrl }) {
-  const accessToken = process.env.THREADS_ACCESS_TOKEN;
   const userId = process.env.THREADS_USER_ID;
 
   try {
-    if (!accessToken || !userId) {
-      throw new Error('THREADS_ACCESS_TOKEN / THREADS_USER_ID not set.');
+    if (!userId) {
+      throw new Error('THREADS_USER_ID not set.');
+    }
+    const accessToken = await getMetaAccessToken('threads', { env: process.env, supabase });
+    if (!accessToken) {
+      throw new Error(authRemediationHint('threads'));
     }
 
     // Step 1: create the media container. IMAGE type if we have a photo,
@@ -80,7 +89,11 @@ async function createPost({ text, imageUrl, videoUrl }) {
     });
     const createData = await createRes.json();
     if (!createRes.ok) {
-      throw new Error(`Threads container creation failed: ${JSON.stringify(createData)}`);
+      const raw = JSON.stringify(createData);
+      if (isAuthFailureMessage(raw)) {
+        throw new Error(`${authRemediationHint('threads')} | ${raw}`);
+      }
+      throw new Error(`Threads container creation failed: ${raw}`);
     }
 
     const containerId = createData.id;
@@ -144,7 +157,11 @@ async function createPost({ text, imageUrl, videoUrl }) {
         });
         return { recovered: true };
       }
-      throw new Error(`Threads publish failed: ${JSON.stringify(lastPublishError)}`);
+      const raw = JSON.stringify(lastPublishError);
+      if (isAuthFailureMessage(raw)) {
+        throw new Error(`${authRemediationHint('threads')} | ${raw}`);
+      }
+      throw new Error(`Threads publish failed: ${raw}`);
     }
 
     await logPost({

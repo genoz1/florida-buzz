@@ -474,8 +474,8 @@ async function postToInstagram({ caption, imageUrl }) {
     console.log(`  [dry-run] Would post to Instagram: "${caption}"`);
     return true;
   }
-  if (!process.env.INSTAGRAM_ACCESS_TOKEN || !process.env.INSTAGRAM_USER_ID) {
-    console.log('  [skip] INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_USER_ID not set — skipping Instagram.');
+  if (!process.env.INSTAGRAM_USER_ID) {
+    console.log('  [skip] INSTAGRAM_USER_ID not set — skipping Instagram.');
     return false;
   }
   if (!imageUrl) {
@@ -497,8 +497,8 @@ async function postToThreads({ text, imageUrl }) {
     console.log(`  [dry-run] Would post to Threads: "${text}"`);
     return true;
   }
-  if (!process.env.THREADS_ACCESS_TOKEN || !process.env.THREADS_USER_ID) {
-    console.log('  [skip] THREADS_ACCESS_TOKEN / THREADS_USER_ID not set — skipping Threads.');
+  if (!process.env.THREADS_USER_ID) {
+    console.log('  [skip] THREADS_USER_ID not set — skipping Threads.');
     return false;
   }
 

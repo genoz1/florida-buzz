@@ -193,15 +193,26 @@ function buildRemediationSteps(report, {
       const failures = (report.platforms?.[platform]?.failures || []).join(' ');
       const pinterestAuth = platform === 'pinterest'
         && /authentication failed|invalid.?access.?token|re-authorize/i.test(failures);
+      const metaAuth = (platform === 'instagram' || platform === 'threads')
+        && /oauthexception|invalid.?oauth|access.?token|expired|mint a new long-lived token|code.?190/i.test(failures);
       steps.push({
         code: `${platform}_failures`,
         title: `${platform} API failures`,
-        auto: null,
+        auto: metaAuth
+          ? 'Runtime token refresh runs before each post when the token is still valid; fully expired tokens need a new Meta long-lived token.'
+          : null,
         manual: pinterestAuth
           ? [
             `Re-authorize at ${siteUrl}/admin/pinterest-auth?key=${adminKey}`,
             'Copy new PINTEREST_ACCESS_TOKEN + PINTEREST_REFRESH_TOKEN into DigitalOcean, redeploy, then hit /admin/test-pinterest.',
           ]
+          : metaAuth
+            ? [
+              `Mint a new long-lived ${platform} token in Meta Developer tools (Instagram Login / Threads).`,
+              `Update ${platform === 'instagram' ? 'INSTAGRAM_ACCESS_TOKEN' : 'THREADS_ACCESS_TOKEN'} in DigitalOcean App Platform env, redeploy.`,
+              `Apply supabase migration social_platform_tokens if not already applied, then run node scripts/test-${platform}.js.`,
+              `Dashboard: ${siteUrl}/admin/post-report?key=${adminKey}`,
+            ]
           : [
             `Inspect the ${platform} error snippets below.`,
             `Dashboard: ${siteUrl}/admin/post-report?key=${adminKey}`,

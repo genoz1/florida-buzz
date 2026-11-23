@@ -44,6 +44,12 @@
       "unique": [],
       "rlsEnabled": true
     },
+    "social_platform_tokens": {
+      "columns": ["platform", "access_token", "expires_at", "updated_at"],
+      "primaryKey": ["platform"],
+      "unique": [],
+      "rlsEnabled": true
+    },
     "restaurants": {
       "columns": ["id", "park", "name", "land", "service_type", "reservations", "dining_plan", "character_dining", "characters", "meal_periods", "description", "last_verified_at", "created_at"],
       "primaryKey": ["id"],
