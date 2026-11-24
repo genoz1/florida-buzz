@@ -288,6 +288,7 @@ test('video pipeline requires verified v6 article-first stills and blocks incomp
   assert.match(source, /findPlaceReferencePhoto/);
   assert.match(source, /editImageFromReference/);
   assert.match(source, /tryGenerateSpecificSubjectStill|ai_specific_subject/);
+  assert.match(source, /forceGenerateSubjectStill|mustProduce|ai_specific_subject_forced/);
   assert.match(source, /buildSpecificSubjectPrompt/);
   assert.match(source, /article_ai_as_is|useAsIs/);
   assert.match(source, /PODCAST_YOUTUBE_PHOTOREAL_STYLE/);
