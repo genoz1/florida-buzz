@@ -65,12 +65,34 @@ const PLACE_NAME_PATTERNS = [
   /\bGold Theater\b/i,
 ];
 
+/**
+ * Hard-banned Wikimedia files. These kept getting reused as lazy stand-ins
+ * (especially the Main Street railroad station) for unrelated stories.
+ */
+const BANNED_COMMONS_TITLE_RE =
+  /walt\s+disney\s+world\s+railroad\s+main\s+street\s+usa\s+station/i;
+
+function isBannedReferencePhoto(referenceOrTitle = '') {
+  if (!referenceOrTitle) return false;
+  if (typeof referenceOrTitle === 'string') {
+    return BANNED_COMMONS_TITLE_RE.test(referenceOrTitle);
+  }
+  const hay = [
+    referenceOrTitle.title,
+    referenceOrTitle.query,
+    referenceOrTitle.credit,
+    referenceOrTitle.pageUrl,
+    referenceOrTitle.imageUrl,
+  ].map((part) => String(part || '')).join(' ');
+  return BANNED_COMMONS_TITLE_RE.test(hay);
+}
+
 /** Known Commons files when search misses (bag/security stories, Main Street, etc.). */
 const CURATED_COMMONS_FILES = [
   {
+    // Never include the railroad station facade — it was overused for unrelated stories.
     match: /\bmain street\b/i,
     titles: [
-      'File:Walt Disney World Railroad Main Street USA Station 01.jpg',
       'File:Magic Kingdom - Main Street and Trolley.jpg',
     ],
   },
@@ -96,7 +118,7 @@ const CURATED_COMMONS_FILES = [
  * Main Street / castle / Spaceship Earth stock photos.
  */
 const SPECIFIC_SUBJECT_RE =
-  /\b(gingerbread(?:\s+\w+){0,3}|spirit\s+jersey(?:es)?|holiday\s+sweater|merchandise\s+display|retail\s+display|dessert\s+display|food\s+display|popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|treat|cupcake|cookie|bakery|concession|snack|menu\s+item|limited[- ]edition|souvenir|gift\s+shop\s+display|remy'?s?|ratatouille|france\s+pavilion|dining\s*plan|ticket\s+projection|premier\s+pass|blizzard\s+beach|ride\s+props?)\b/i;
+  /\b(gingerbread(?:\s+\w+){0,3}|spirit\s+jersey(?:es)?|holiday\s+sweater|merchandise\s+display|retail\s+display|dessert\s+display|food\s+display|popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|treat|cupcake|cookie|bakery|concession|snack|menu\s+item|limited[- ]edition|souvenir|gift\s+shop\s+display|remy'?s?|ratatouille|france\s+pavilion|dining\s*plan|ticket\s+projection|premier\s+pass|blizzard\s+beach|ride\s+props?|closure|closures|big\s+thunder|haunted\s+mansion)\b/i;
 
 const GENERIC_LANDMARK_RE =
   /\b(main street|cinderella castle|railroad|train station|spaceship earth|magic kingdom entrance|park exterior|tomorrowland)\b/i;
@@ -118,6 +140,10 @@ const SUBJECT_ICON_BANS = [
   {
     subject: /\bblizzard\s+beach\b/i,
     bad: /\b(cinderella\s+castle|spaceship\s+earth|main\s+street|train\s+station)\b/i,
+  },
+  {
+    subject: /\b(closure|closures|closed|refurbishment)\b/i,
+    bad: /\b(main\s+street\s+usa\s+station|railroad\s+main\s+street|train\s+station|spaceship\s+earth)\b/i,
   },
 ];
 
@@ -146,6 +172,16 @@ function extractSpecificSubject(...parts) {
   }
   if (/\bblizzard\s+beach\b/i.test(text)) {
     return 'Blizzard Beach water park Mount Gushmore';
+  }
+  if (/\b(big\s+thunder|haunted\s+mansion)\b/i.test(text)) {
+    if (/\bhaunted\s+mansion\b/i.test(text) && /\bbig\s+thunder\b/i.test(text)) {
+      return 'Magic Kingdom Big Thunder Mountain and Haunted Mansion attractions';
+    }
+    if (/\bhaunted\s+mansion\b/i.test(text)) return 'Magic Kingdom Haunted Mansion attraction exterior';
+    return 'Magic Kingdom Big Thunder Mountain Railroad attraction';
+  }
+  if (/\b(closure|closures|closed|refurbishment)\b/i.test(text) && /\bmagic kingdom\b/i.test(text)) {
+    return 'Magic Kingdom attraction entrance facade closed for refurbishment';
   }
 
   const match = text.match(
@@ -228,7 +264,7 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
     && /\b(premier pass|lightning lane|ticket|ticketing|tapstile|turnstile)\b/i.test(raw)
     && !/\bentrance|railroad|train station|space mountain\b/i.test(placeHints.join(' '))
   ) {
-    placeHints.unshift('Magic Kingdom entrance railroad station');
+    placeHints.unshift('Magic Kingdom entrance ticket gates turnstiles');
   }
   if (!directionOverridesPlace && /\b(cold grocery|bell services|grocery transfer)\b/i.test(raw)) {
     placeHints.unshift("Disney's Contemporary Resort monorail");
@@ -270,6 +306,9 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
  */
 function referenceMatchesSubject(reference, { label = '', prompt = '', direction = '', category = '' } = {}) {
   if (!reference) return false;
+  // Global ban — this railroad station file must never be a YouTube still again.
+  if (isBannedReferencePhoto(reference)) return false;
+
   const storyText = `${direction} ${label} ${prompt} ${category}`;
   const specific = extractSpecificSubject(direction, label, prompt, category);
   const hay = [
@@ -380,6 +419,7 @@ function candidateIsUsable(item) {
     item.url
     && /^image\/(jpeg|jpg|png|webp)$/.test(item.mime)
     && titleLooksUseful(item.title)
+    && !isBannedReferencePhoto(item.title)
     && licenseLooksOk(item.extmetadata)
     && (item.width >= 800 || item.size >= 80_000)
   );
@@ -511,11 +551,8 @@ function placeSearchFallbacks({ label = '', prompt = '', direction = '', primary
   if (!directionPlace && !specific && label) {
     push(`${label} Walt Disney World`);
   }
-  if (!specific) {
-    // Last resort so thin labels still get a real WDW place photo.
-    push('Magic Kingdom Main Street Walt Disney World');
-    push('Cinderella Castle Magic Kingdom Walt Disney World');
-  }
+  // No Main Street railroad-station last resort — that file became a spam stand-in.
+  // Thin labels fall through to AI subject generation instead.
   return out.filter((q) => q !== String(primaryQuery || '').trim());
 }
 
@@ -737,6 +774,7 @@ function referenceReviewQuestion({ label = '', category = '', reference = null }
 
 module.exports = {
   USER_AGENT,
+  BANNED_COMMONS_TITLE_RE,
   buildPlaceSearchQuery,
   creditFromMeta,
   extractPlaceFromDirection,
@@ -746,6 +784,7 @@ module.exports = {
   findArticleHeroReference,
   findPlaceReferencePhoto,
   hasSpecificSubject,
+  isBannedReferencePhoto,
   licenseLooksOk,
   looksLikePeoplePrimaryText,
   overlapScore,

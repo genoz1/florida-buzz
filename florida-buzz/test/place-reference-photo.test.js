@@ -9,6 +9,7 @@ const {
   extractPlaceFromDirection,
   extractSpecificSubject,
   findPlaceReferencePhoto,
+  isBannedReferencePhoto,
   licenseLooksOk,
   looksLikePeoplePrimaryText,
   overlapScore,
@@ -237,6 +238,31 @@ test('generic christmas magic kingdom direction still searchable but label-speci
     prompt: 'real photo of magic kingdoms decorated for Christmas. must include disney decorations',
   });
   assert.match(query, /Gingerbread Giraffe|gingerbread/i);
+});
+
+test('Main Street USA railroad station Wikimedia file is globally banned', () => {
+  const bannedTitle = 'File:Walt Disney World Railroad Main Street USA Station 01.jpg';
+  assert.equal(isBannedReferencePhoto(bannedTitle), true);
+  assert.equal(
+    referenceMatchesSubject(
+      { title: bannedTitle, credit: 'Tom Arthur; via Wikimedia Commons', query: 'Magic Kingdom Main Street' },
+      { label: 'Two Major Closures', prompt: 'Magic Kingdom attraction closures' }
+    ),
+    false
+  );
+  assert.equal(
+    referenceMatchesSubject(
+      { title: bannedTitle, credit: 'Tom Arthur', query: 'main street' },
+      { label: 'Main Street USA', prompt: 'photo of main street usa' }
+    ),
+    false
+  );
+  const fallbacks = placeSearchFallbacks({
+    label: 'Two Major Closures',
+    prompt: 'Magic Kingdom closures',
+    primaryQuery: 'Two Major Closures',
+  });
+  assert.equal(fallbacks.some((q) => /Main Street USA Magic Kingdom/i.test(q)), false);
 });
 
 test('Remy ride props reject Spaceship Earth; Dining Plan rejects Main Street station', () => {
