@@ -156,9 +156,13 @@ function stripAudioTags(text) {
     .trim();
 }
 
-/** Spoken + on-screen CTA — every Reel must end with the site mention. */
-const SITE_CTA_SPOKEN = 'Find this story and more at the Florida Buzz dot com.';
-const SITE_CTA_PATTERN = /florida\s*buzz\s*dot\s*com|thefloridabuzz\.com/i;
+/**
+ * Spoken + on-screen CTA — every Reel must end with the site mention.
+ * Use the real domain (TheFloridaBuzz.com) so viewers don't confuse it
+ * with floridabuzz.com when captions are burned from the spoken line.
+ */
+const SITE_CTA_SPOKEN = 'Find this story and more at TheFloridaBuzz.com.';
+const SITE_CTA_PATTERN = /florida\s*buzz\s*dot\s*com|the\s*florida\s*buzz\.com|thefloridabuzz\.com/i;
 
 function ensureSiteCtaSpoken(spoken) {
   const text = String(spoken || '').trim();

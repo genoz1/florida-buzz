@@ -81,7 +81,7 @@ describe('facebookParkReel voice + captions', () => {
     const plain = stripAudioTags(spoken);
     assert.match(plain, /^Here's another Disney tip from The Florida Buzz\./i);
     assert.match(spoken, /Lightning Lane hit record highs/i);
-    assert.match(plain, /Florida Buzz dot com/i);
+    assert.match(plain, /TheFloridaBuzz\.com/i);
     assert.match(spoken, /\[[^\]]+\]/);
     assert.equal(ensureSiteCtaSpoken(spoken), spoken);
 
@@ -101,11 +101,12 @@ describe('facebookParkReel voice + captions', () => {
     );
   });
 
-  it('always appends the Florida Buzz dot com CTA and tips-first first comment', () => {
+  it('always appends the TheFloridaBuzz.com CTA and tips-first first comment', () => {
     const withFollow = ensureSiteCtaSpoken('[curious] Lightning Lane hit highs. Follow Florida Buzz.');
-    assert.match(stripAudioTags(withFollow), /Florida Buzz dot com/i);
+    assert.match(stripAudioTags(withFollow), /TheFloridaBuzz\.com/i);
     assert.doesNotMatch(stripAudioTags(withFollow), /Follow Florida Buzz\.?\s*$/i);
-    assert.match(SITE_CTA_SPOKEN, /Florida Buzz dot com/i);
+    assert.match(SITE_CTA_SPOKEN, /TheFloridaBuzz\.com/);
+    assert.doesNotMatch(SITE_CTA_SPOKEN, /dot com/i);
 
     const comment = parkReelFirstComment({ slug: 'lightning-lane-record-highs-worth-it' });
     assert.match(comment, /thefloridabuzz\.com\/article\/lightning-lane-record-highs-worth-it/i);
@@ -230,7 +231,7 @@ describe('facebookParkReel voice + captions', () => {
     assert.match(joined, /two hundred twenty nine/);
     assert.match(joined, /wreck your morning/);
     assert.match(joined, /automatic yes/);
-    assert.match(joined, /florida buzz dot com/);
+    assert.match(joined, /thefloridabuzz\s*com/);
   });
 });
 

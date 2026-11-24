@@ -27,7 +27,7 @@ const REFS = path.join(ROOT, 'public', 'reels', 'references');
 const OUT_DIR = process.env.SAMPLE_OUT_DIR || '/opt/cursor/artifacts';
 const TMP = process.env.SAMPLE_TMP_DIR || '/tmp/fb-park-reel-sample';
 
-const SPOKEN = `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. [upbeat] Find this story and more at the Florida Buzz dot com.`;
+const SPOKEN = `[excited] Lightning Lane Single Pass just smashed new highs — we're talking up to two hundred twenty-nine dollars. [curious] Look at Seven Dwarfs — Lightning Lane on one side, standby fifty minutes on the other. So... is it worth it? Here's the rule: pay only when that wait would wreck your morning, and you're already in the park that day. [serious] A record price is not an automatic yes. [upbeat] Find this story and more at TheFloridaBuzz.com.`;
 
 const ARTICLE = {
   slug: 'lightning-lane-record-highs-worth-it',
@@ -112,9 +112,9 @@ function verifyFullScriptCaptions(spoken, captions) {
     'two hundred twenty nine',
     'wreck your morning',
     'automatic yes',
-    'florida buzz dot com',
+    'thefloridabuzz.com',
   ]) {
-    if (!joined.includes(must)) {
+    if (!joined.toLowerCase().includes(must)) {
       throw new Error(`Caption verification FAILED — missing full phrase "${must}"`);
     }
   }
@@ -160,7 +160,7 @@ async function main() {
   if (!firstComment.includes(storyLink)) {
     throw new Error(`First-comment verification FAILED — missing story link ${storyLink}`);
   }
-  if (!/florida buzz dot com/i.test(stripAudioTags(rendered.spoken))) {
+  if (!/thefloridabuzz\.com/i.test(stripAudioTags(rendered.spoken))) {
     throw new Error(`Spoken CTA verification FAILED — expected site CTA: ${SITE_CTA_SPOKEN}`);
   }
   console.log('First comment (would post on Facebook):', firstComment);
