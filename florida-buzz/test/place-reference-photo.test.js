@@ -239,6 +239,49 @@ test('generic christmas magic kingdom direction still searchable but label-speci
   assert.match(query, /Gingerbread Giraffe|gingerbread/i);
 });
 
+test('Remy ride props reject Spaceship Earth; Dining Plan rejects Main Street station', () => {
+  assert.match(extractSpecificSubject('Remy Ride Props Updated'), /Remy|Ratatouille/i);
+  assert.match(extractSpecificSubject('Dining Plan Offer Changes'), /Dining Plan/i);
+
+  assert.equal(
+    referenceMatchesSubject(
+      {
+        title: 'File:Spaceship Earth, Epcot en janvier 2022 (4).jpg',
+        query: 'EPCOT Spaceship Earth',
+        credit: 'via Wikimedia Commons',
+      },
+      { label: 'Remy Ride Props Updated', prompt: 'France pavilion queue props' }
+    ),
+    false
+  );
+
+  assert.equal(
+    referenceMatchesSubject(
+      {
+        title: 'File:Walt Disney World Railroad Main Street USA Station 01.jpg',
+        query: 'Magic Kingdom Main Street',
+        credit: 'Tom Arthur; CC BY-SA 2.0; via Wikimedia Commons',
+      },
+      { label: 'Dining Plan Offer Changes', prompt: 'Disney Dining Plan changes' }
+    ),
+    false
+  );
+
+  const remyQuery = buildPlaceSearchQuery({
+    label: 'Remy Ride Props Updated',
+    prompt: 'updated Remy queue props in France pavilion',
+  });
+  assert.match(remyQuery, /Remy|Ratatouille|France/i);
+  assert.equal(/\bSpaceship Earth\b/i.test(remyQuery), false);
+
+  const diningQuery = buildPlaceSearchQuery({
+    label: 'Dining Plan Offer Changes',
+    prompt: 'Disney Dining Plan offer updates',
+  });
+  assert.match(diningQuery, /Dining Plan/i);
+  assert.equal(/\bentrance railroad station\b/i.test(diningQuery), false);
+});
+
 test('video pipeline requires verified v6 article-first stills and blocks incomplete publish', () => {
   const source = fs.readFileSync(path.join(__dirname, '../lib/podcasts/videoPipeline.js'), 'utf8');
   assert.match(source, /youtube-visuals\/v6\//);

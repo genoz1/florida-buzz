@@ -76,7 +76,7 @@ function hardenPlacePrompt(prompt, { label = '', category = '' } = {}) {
 function isWeakGenericDirection(direction = '') {
   const t = String(direction || '').replace(/\s+/g, ' ').trim().toLowerCase();
   if (!t) return true;
-  if (/\b(gingerbread|spirit jersey|merchandise|display|plush|ornament|cupcake|sipper|popcorn bucket)\b/.test(t)) {
+  if (/\b(gingerbread|spirit jersey|merchandise|display|plush|ornament|cupcake|sipper|popcorn bucket|remy|ratatouille|dining plan|blizzard beach|france pavilion)\b/.test(t)) {
     return false;
   }
   return (
@@ -105,7 +105,9 @@ function buildSpecificSubjectPrompt({ label = '', category = '', direction = '',
   const banGeneric =
     'Do NOT show Cinderella Castle, Magic Kingdom Main Street railroad/train station, Spaceship Earth, '
     + 'or any unrelated park icon unless that exact landmark is the story subject. '
-    + 'No generic Christmas Magic Kingdom postcard when the story is a specific display, product, food, or merchandise. '
+    + 'No generic Christmas Magic Kingdom postcard when the story is a specific display, product, food, merchandise, attraction, or offer. '
+    + 'If the subject is Remy / Ratatouille / France pavilion props, show THAT queue/ride — never Spaceship Earth. '
+    + 'If the subject is Dining Plan, show a Disney restaurant dining scene — never Main Street train station. '
     + 'If the subject is a gingerbread giraffe or similar holiday display/product, show THAT display/product as the hero.';
   const body =
     `Photorealistic editorial travel photograph whose hero subject is exactly: ${subject}. `

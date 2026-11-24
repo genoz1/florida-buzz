@@ -41,6 +41,10 @@ function looksLikePeoplePrimaryText(...parts) {
 const PLACE_NAME_PATTERNS = [
   /\bDisney'?s?\s+Board\s*-?\s*Walk(?:\s+Inn|\s+Villas)?\b/i,
   /\bContemporary(?:\s+Resort)?\b/i,
+  /\bRemy'?s?\s+Ratatouille\s+Adventure\b/i,
+  /\bRatatouille\b/i,
+  /\bFrance\s+Pavilion\b/i,
+  /\bBlizzard\s+Beach\b/i,
   /\bMagic Kingdom(?:\s+entrance|\s+railroad|\s+train station)?\b/i,
   /\bCinderella Castle\b/i,
   /\bSpaceship Earth\b/i,
@@ -89,13 +93,33 @@ const CURATED_COMMONS_FILES = [
 
 /**
  * Specific story subjects that must NOT collapse into generic Magic Kingdom /
- * Main Street / castle stock photos (merchandise, holiday displays, food, etc.).
+ * Main Street / castle / Spaceship Earth stock photos.
  */
 const SPECIFIC_SUBJECT_RE =
-  /\b(gingerbread(?:\s+\w+){0,3}|spirit\s+jersey(?:es)?|holiday\s+sweater|merchandise\s+display|retail\s+display|dessert\s+display|food\s+display|popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|treat|cupcake|cookie|bakery|concession|snack|menu\s+item|limited[- ]edition|souvenir|gift\s+shop\s+display)\b/i;
+  /\b(gingerbread(?:\s+\w+){0,3}|spirit\s+jersey(?:es)?|holiday\s+sweater|merchandise\s+display|retail\s+display|dessert\s+display|food\s+display|popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|treat|cupcake|cookie|bakery|concession|snack|menu\s+item|limited[- ]edition|souvenir|gift\s+shop\s+display|remy'?s?|ratatouille|france\s+pavilion|dining\s*plan|ticket\s+projection|premier\s+pass|blizzard\s+beach|ride\s+props?)\b/i;
 
 const GENERIC_LANDMARK_RE =
   /\b(main street|cinderella castle|railroad|train station|spaceship earth|magic kingdom entrance|park exterior|tomorrowland)\b/i;
+
+/** Wrong park-icon pairs: story subject → landmarks that must never stand in for it. */
+const SUBJECT_ICON_BANS = [
+  {
+    subject: /\b(remy|ratatouille|france\s+pavilion|ride\s+props?)\b/i,
+    bad: /\b(spaceship\s+earth|cinderella\s+castle|main\s+street|train\s+station|railroad)\b/i,
+  },
+  {
+    subject: /\bdining\s*plan\b/i,
+    bad: /\b(main\s+street|train\s+station|railroad|cinderella\s+castle|spaceship\s+earth)\b/i,
+  },
+  {
+    subject: /\b(ticket|tickets|ticket\s+projection|premier\s+pass|ticketing)\b/i,
+    bad: /\b(cinderella\s+castle|spaceship\s+earth|ratatouille|remy)\b/i,
+  },
+  {
+    subject: /\bblizzard\s+beach\b/i,
+    bad: /\b(cinderella\s+castle|spaceship\s+earth|main\s+street|train\s+station)\b/i,
+  },
+];
 
 function cleanSubjectPhrase(text = '') {
   return String(text || '')
@@ -105,21 +129,38 @@ function cleanSubjectPhrase(text = '') {
     .trim();
 }
 
-/** Pull a product/display/food subject that should beat generic park landmarks. */
+/** Pull a product/attraction/offer subject that should beat generic park landmarks. */
 function extractSpecificSubject(...parts) {
   const text = parts.map((part) => String(part || '')).join(' ').replace(/\s+/g, ' ').trim();
   if (!text) return '';
+
+  // Named attractions / offers first (Remy, dining plan, tickets, etc.).
+  if (/\b(remy'?s?|ratatouille)\b/i.test(text)) {
+    return "Remy's Ratatouille Adventure France pavilion queue ride props";
+  }
+  if (/\bdining\s*plan\b/i.test(text)) {
+    return 'Disney Dining Plan restaurant table-service meal offer';
+  }
+  if (/\b(ticket\s+projection|ticket\s+prices?|premier\s+pass)\b/i.test(text)) {
+    return 'Walt Disney World ticket entrance gates turnstiles';
+  }
+  if (/\bblizzard\s+beach\b/i.test(text)) {
+    return 'Blizzard Beach water park Mount Gushmore';
+  }
+
   const match = text.match(
-    /\b((?:gingerbread(?:\s+\w+){0,4})|(?:holiday\s+)?spirit\s+jersey(?:es)?|(?:merchandise|retail|dessert|food|holiday)\s+display(?:\s+of\s+[\w\s-]{2,40})?|(?:popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|cupcake|cookie)(?:\s+[\w-]{2,20}){0,3})\b/i
+    /\b((?:gingerbread(?:\s+\w+){0,4})|(?:holiday\s+)?spirit\s+jersey(?:es)?|(?:merchandise|retail|dessert|food|holiday)\s+display(?:\s+of\s+[\w\s-]{2,40})?|(?:popcorn\s+bucket|sipper|ear\s+headband|mickey\s+ears|plush|ornament|cupcake|cookie)(?:\s+[\w-]{2,20}){0,3}|france\s+pavilion|ride\s+props?)\b/i
   );
   if (match) return cleanSubjectPhrase(match[0]).slice(0, 120);
-  // Label-style titles: "Gingerbread Giraffe Returns" → keep the distinctive noun phrase.
+
+  // Label-style titles: "Gingerbread Giraffe Returns" / "Remy Ride Props Updated".
   const labelish = cleanSubjectPhrase(text)
-    .replace(/\b(returns?|arrives?|debuts?|back|again|new|updated|refreshed)\b/gi, ' ')
+    .replace(/\b(returns?|arrives?|debuts?|back|again|new|updated|refreshed|changes?|offer)\b/gi, ' ')
+    .replace(/\$\d+(?:\.\d+)?/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (SPECIFIC_SUBJECT_RE.test(labelish)) {
-    return labelish.slice(0, 120);
+  if (SPECIFIC_SUBJECT_RE.test(labelish) || SPECIFIC_SUBJECT_RE.test(text)) {
+    return (labelish || cleanSubjectPhrase(text)).slice(0, 120);
   }
   return '';
 }
@@ -224,30 +265,44 @@ function buildPlaceSearchQuery({ label = '', category = '', prompt = '', directi
 }
 
 /**
- * Reject stock photos that are clearly the wrong subject (e.g. Main Street train
- * station when the story is a gingerbread giraffe display).
+ * Reject stock/article photos that are clearly the wrong subject
+ * (Spaceship Earth for Remy; Main Street station for Dining Plan; etc.).
  */
 function referenceMatchesSubject(reference, { label = '', prompt = '', direction = '', category = '' } = {}) {
   if (!reference) return false;
+  const storyText = `${direction} ${label} ${prompt} ${category}`;
   const specific = extractSpecificSubject(direction, label, prompt, category);
-  if (!specific) return true;
   const hay = [
     reference.title,
     reference.query,
     reference.credit,
     reference.pageUrl,
     reference.imageUrl,
+    reference.slug,
   ].map((part) => String(part || '')).join(' ');
+  const hayNorm = normalizeMatchText(hay);
+
+  // Hard bans: never let a park icon stand in for these subjects.
+  for (const rule of SUBJECT_ICON_BANS) {
+    if (rule.subject.test(storyText) && rule.bad.test(hay)) {
+      return false;
+    }
+  }
+
+  if (!specific) return true;
+
   const score = overlapScore(specific, hay);
   if (score >= 0.2) return true;
-  // Specific product/display stories must not accept generic landmark stock.
+  // Specific product/attraction/offer stories must not accept generic landmark stock.
   if (GENERIC_LANDMARK_RE.test(hay) && !SPECIFIC_SUBJECT_RE.test(hay)) {
     return false;
   }
   // Require at least one distinctive token from the specific subject.
-  const tokens = normalizeMatchText(specific).split(' ').filter((w) => w.length > 3 && !/^(disney|world|walt|resort|display|photo|image|real)$/.test(w));
+  const tokens = normalizeMatchText(specific).split(' ').filter((w) => (
+    w.length > 3
+    && !/^(disney|world|walt|resort|display|photo|image|real|offer|plan|queue|props|ride|adventure|pavilion|france|entrance|gates|turnstiles)$/.test(w)
+  ));
   if (!tokens.length) return score >= 0.15;
-  const hayNorm = normalizeMatchText(hay);
   return tokens.some((token) => hayNorm.includes(token));
 }
 
@@ -425,8 +480,18 @@ function placeSearchFallbacks({ label = '', prompt = '', direction = '', primary
   };
   if (specific) {
     push(`${specific} Walt Disney World`);
-    push(`${specific} Disney Springs`);
-    push(`${specific} holiday display`);
+    if (/\bremy|ratatouille|france\b/i.test(specific)) {
+      push("Remy's Ratatouille Adventure EPCOT France pavilion");
+      push('Ratatouille France pavilion World Showcase');
+    } else if (/\bdining\s*plan\b/i.test(specific)) {
+      push('Disney restaurant table service dining room Walt Disney World');
+      push('EPCOT World Showcase dining restaurant');
+    } else if (/\bticket|turnstile|entrance gates\b/i.test(specific)) {
+      push('Magic Kingdom entrance ticket gates turnstiles');
+    } else {
+      push(`${specific} Disney Springs`);
+      push(`${specific} holiday display`);
+    }
     push(specific);
   }
   if (directionPlace && directionPlace !== specific) {
