@@ -1,0 +1,45 @@
+name: AdSense readiness checks
+on:
+  pull_request:
+    paths:
+      - 'florida-buzz/**'
+      - '.github/workflows/adsense-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'florida-buzz/**'
+      - '.github/workflows/adsense-readiness.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: florida-buzz
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Check modified JavaScript syntax
+        run: |
+          node --check routes/main.js
+          node --check scripts/automate.js
+          node --check lib/articlePresentation.js
+          node --check lib/newsDuplicates.js
+      - name: Run content, redirect, sitemap, and template regressions
+        run: node --test test/adsenseReadiness.test.js test/adsenseArticleTemplate.test.js test/contentValidation.test.js test/title-duplicate.test.js test/article-redirects.test.js test/sitemapPriority.test.js test/sitemapCache.test.js test/articleModifiedDate.test.js
+      - name: Compile policy templates
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const ejs = require('ejs');
+          for (const file of ['views/privacy.ejs', 'views/editorial-standards.ejs']) {
+            ejs.compile(fs.readFileSync(file, 'utf8'), {filename: file});
+          }
+          NODE

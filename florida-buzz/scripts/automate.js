@@ -4,6 +4,7 @@ const { supabase, storeGeneratedImage, storeImageFromUrl } = require('../lib/sup
 const { generateText, generateStructuredText } = require('../lib/aiText');
 const { newsArticle: newsArticleSchema } = require('../lib/aiSchemas');
 const { validateNewsArticle } = require('../lib/contentValidation');
+const { titleSimilarity, contentTitleOverlap, titlesLookLikeDuplicate, findRecentNewsDuplicate } = require('../lib/newsDuplicates');
 const { extractSourceText, feedEvidence, selectArticleEvidence } = require('../lib/sourceText');
 const { createArticleRetryQueue } = require('../lib/articleRetryQueue');
 const { createImageRepairQueue } = require('../lib/imageRepairQueue');
@@ -99,87 +100,6 @@ function convertUndercoverTouristLinks(html) {
     const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
     return `href="${url}" target="_blank" rel="nofollow sponsored noopener"`;
   });
-}
-
-const UNDERCOVER_TOURIST_PARK_LABELS = {
-  'disney-world': 'Walt Disney World',
-  'universal-orlando': 'Universal Orlando',
-  'epic-universe': 'Universal Epic Universe',
-  'seaworld': 'SeaWorld Orlando',
-  'legoland': 'LEGOLAND Florida',
-  'theme-parks': 'Orlando theme park',
-};
-const UNDERCOVER_TOURIST_HOTEL_DESTINATIONS = {
-  'disney-world': 'https://www.undercovertourist.com/disney-vacation-packages',
-  'universal-orlando': 'https://www.undercovertourist.com/universal-vacation-packages/',
-  'epic-universe': 'https://www.undercovertourist.com/universal-vacation-packages/',
-};
-const UNDERCOVER_TOURIST_CAR_RENTAL_URL = 'https://www.undercovertourist.com/car-rental/';
-
-function detectParkKey(text) {
-  const t = (text || '').toLowerCase();
-  if (/epic universe/.test(t)) return 'epic-universe';
-  if (/universal|islands of adventure|volcano bay|wizarding world/.test(t)) return 'universal-orlando';
-  if (/seaworld|aquatica|discovery cove/.test(t)) return 'seaworld';
-  if (/legoland/.test(t)) return 'legoland';
-  if (/disney|magic kingdom|epcot|hollywood studios|animal kingdom|cinderella|space mountain|disney springs/.test(t)) return 'disney-world';
-  return 'theme-parks';
-}
-
-function detectBoxVariant(text) {
-  const t = (text || '').toLowerCase();
-  if (/car rental|rental car/.test(t)) return 'car-rentals';
-  if (/\bresort\b|\bhotel\b|where to stay|resort review/.test(t)) return 'hotel';
-  return 'tickets';
-}
-
-function buildUndercoverTouristBox(key, variant) {
-  const label = UNDERCOVER_TOURIST_PARK_LABELS[key] || UNDERCOVER_TOURIST_PARK_LABELS['theme-parks'];
-  let destination;
-  let ctaText;
-  let bodyText;
-  if (variant === 'car-rentals') {
-    destination = UNDERCOVER_TOURIST_CAR_RENTAL_URL;
-    ctaText = 'Compare Rental Rates';
-    bodyText = 'Undercover Tourist partners with Alamo, Avis, Budget, Enterprise, and National for discounted rates when bundled with tickets or a hotel stay.';
-  } else if (variant === 'hotel' && UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key]) {
-    destination = UNDERCOVER_TOURIST_HOTEL_DESTINATIONS[key];
-    ctaText = 'See Hotel + Ticket Deals';
-    bodyText = `Undercover Tourist is an authorized seller of ${label} hotel and ticket packages, often with savings over booking direct.`;
-  } else {
-    destination = UNDERCOVER_TOURIST_DESTINATIONS[key] || UNDERCOVER_TOURIST_DESTINATIONS['theme-parks'];
-    ctaText = 'Compare Ticket Prices';
-    bodyText = `Undercover Tourist is an authorized seller of ${label} tickets, often at a discount off gate price.`;
-  }
-  const url = `${UNDERCOVER_TOURIST_BASE}?url=${encodeURIComponent(destination)}`;
-  return `\n<div class="shop-box">\n  <div class="shop-box-text">\n    <p class="shop-box-eyebrow">Planning Your Trip</p>\n    <p>${bodyText}</p>\n  </div>\n  <a href="${url}" class="shop-box-cta" target="_blank" rel="nofollow sponsored noopener">${ctaText}</a>\n</div>\n`;
-}
-
-// Splits the article's HTML on paragraph/list boundaries and drops the box in
-// around the midpoint, rather than always at the very end — so it reads as
-// part of the piece instead of a tacked-on footer. Falls back to appending at
-// the end if the content is too short to have a clean midpoint.
-function insertBoxMidContent(html, boxHtml) {
-  const parts = html.split(/(<\/p>|<\/ul>|<\/ol>)/i);
-  const chunks = [];
-  for (let i = 0; i < parts.length; i += 2) {
-    chunks.push((parts[i] || '') + (parts[i + 1] || ''));
-  }
-  if (chunks.length < 4) return html + boxHtml;
-  const insertAfter = Math.floor(chunks.length / 2);
-  return chunks.slice(0, insertAfter + 1).join('') + boxHtml + chunks.slice(insertAfter + 1).join('');
-}
-
-// Spot-news articles are more varied than evergreen guides (a road closure or a
-// wildlife rescue shouldn't get a ticket pitch), so this only fires for the
-// theme-parks category or when a specific park is actually named in the piece.
-function appendUndercoverTouristBox(html, category, contextText) {
-  if (!html) return html;
-  const key = detectParkKey(contextText);
-  const isRelevant = category === 'theme-parks' || key !== 'theme-parks';
-  if (!isRelevant) return html;
-  const variant = detectBoxVariant(contextText);
-  return insertBoxMidContent(html, buildUndercoverTouristBox(key, variant));
 }
 
 function sleep(ms) {
@@ -323,7 +243,12 @@ Choose only context that helps this story; no mandatory sections, stock headings
 SEO stuffing or repetitive conclusions. Let length follow useful facts: a simple update may
 need 3-5 short paragraphs or fewer; a substantial story may use 6-10 concise paragraphs when
 supported. Fit the entire JSON response within the existing output budget; do not chase length.
-A short factual update is acceptable when it answers the reader’s actual question.
+A standalone news article must give readers a useful supported takeaway beyond restating
+an announcement: for example, a concrete planning choice, a clear explanation of what changed,
+or relevant limitations and background. If the available evidence supports only a brief
+rephrasing with no useful added context, set skip=true instead of creating a standalone page.
+There is no target word count. Never pad a short source, invent experience, or add generic
+advice to make it appear more substantial.
 Never publish a vague teaser that merely announces that details exist elsewhere. If a
 headline promises a numbered list, name and explain every promised item using an HTML
 list or individual headings. If the supplied source omits those items, skip the story
@@ -541,66 +466,10 @@ async function markSeen(guid) {
   return true;
 }
 
-// Catches cross-feed duplicates: the same real-world story picked up
-// independently by two different source feeds (e.g. a Disney Cruise Line item
-// and a Royal Caribbean item both covering the same port-call news). Each has
-// its own distinct RSS guid, so alreadySeen() alone won't catch this — this
-// compares the newly-written title against recently published titles in the
-// same category using simple word-overlap similarity.
-function normalizeForSimilarity(text) {
-  return (text || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
-}
-
-const TITLE_STOPWORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'for', 'of', 'to', 'in', 'on', 'at', 'from', 'with',
-  'after', 'along', 'has', 'have', 'new', 'its', 'into', 'over', 'under', 'near',
-]);
-
-function contentWords(text) {
-  return normalizeForSimilarity(text).filter((w) => w.length > 3 && !TITLE_STOPWORDS.has(w));
-}
-
-function titleSimilarity(a, b) {
-  const wordsA = new Set(normalizeForSimilarity(a));
-  const wordsB = new Set(normalizeForSimilarity(b));
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return union === 0 ? 0 : intersection / union;
-}
-
-// Overlap coefficient on content words — catches paraphrased cross-feed
-// duplicates where Jaccard stays low because filler verbs differ
-// (e.g. "Weighs … Cleanup Pilot" vs "Studies Pilot Cleanup …").
-function contentTitleOverlap(a, b) {
-  const wordsA = new Set(contentWords(a));
-  const wordsB = new Set(contentWords(b));
-  if (wordsA.size < 3 || wordsB.size < 3) return 0;
-  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
-  return intersection / Math.min(wordsA.size, wordsB.size);
-}
-
-function titlesLookLikeDuplicate(a, b) {
-  // Threshold lowered from 0.6 to 0.5, and > changed to >=, after a real duplicate
-  // pair ("Animal Kingdom's New Silverback Gorilla Has Arrived" vs "Animal Kingdom's
-  // Gorilla Troop Has a New Silverback Leader") scored exactly 0.6 and slipped through
-  // the old strict-greater-than check. Paraphrased duplicates commonly lose 40%+ of
-  // their word overlap just from natural rewording, so 0.6 was already cutting it close.
-  if (titleSimilarity(a, b) >= 0.5) return true;
-  // Key West sargassum pair scored ~0.42 on Jaccard but 0.60 on content overlap.
-  return contentTitleOverlap(a, b) >= 0.6;
-}
-
+// Query failures must defer publication, not silently permit a duplicate.
 async function isDuplicateOfRecent(title, category) {
   if (!supabase) return false;
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-  const { data } = await supabase
-    .from('articles')
-    .select('title')
-    .eq('category', category)
-    .gte('published_at', since);
-  if (!data) return false;
-  return data.some((a) => titlesLookLikeDuplicate(title, a.title));
+  return Boolean(await findRecentNewsDuplicate(supabase, title, category));
 }
 
 function startSameDayImageRepair(slug, {
@@ -825,11 +694,17 @@ async function run() {
       imageSubject: article.image_subject,
       imageEntities: article.image_entities,
     };
-    article.body_html = appendUndercoverTouristBox(article.body_html, realCategory, article.title);
+    // Disclosed partner offers are rendered after the article, not stored in its reporting.
 
-    if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
-      console.log(`  [skip] This looks like the same story as something published in the last 3 days (likely picked up from a different feed) — skipping to avoid a duplicate.`);
-      await completeItem(guid);
+    try {
+      if (!DRY_RUN && (await isDuplicateOfRecent(article.title, realCategory))) {
+        console.log('  [skip] Recent coverage already exists for this story.');
+        await completeItem(guid);
+        return;
+      }
+    } catch (err) {
+      console.warn('  [hold] Duplicate verification failed; leaving this item queued.');
+      await retryQueue.recordFailure(source, item, err);
       return;
     }
 
@@ -943,6 +818,20 @@ async function run() {
         item,
         new Error(`usable story image required before publish: ${detail}`)
       );
+      return;
+    }
+
+    // Recheck after image processing, which can take minutes. This narrows
+    // the race window; it is not a database-wide publication lock.
+    try {
+      if (await isDuplicateOfRecent(article.title, realCategory)) {
+        console.log('  [skip] Another article covered this story during image preparation.');
+        await completeItem(guid);
+        return;
+      }
+    } catch (err) {
+      console.warn('  [hold] Final duplicate verification failed; article was not published.');
+      await retryQueue.recordFailure(source, item, err);
       return;
     }
 
