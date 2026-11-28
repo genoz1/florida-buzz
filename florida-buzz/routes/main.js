@@ -15,6 +15,7 @@ const {
   pickExploreFloridaTiles,
 } = require('../lib/homePage');
 const { homePlaceTag } = require('../lib/homePlaceTag');
+const { prepareArticleForDisplay, selectArticlePlanningOffers, additionalSourcesForArticle } = require('../lib/articlePresentation');
 const { SOCIAL_PROFILES } = require('../lib/socialProfiles');
 const { loadArticleDiscussion } = require('../lib/articleDiscussion');
 const { renderBuzzSocialImage } = require('../lib/buzzSocialImage');
@@ -705,16 +706,17 @@ router.get('/article/:slug', async (req, res) => {
     || /insufficient source material/i.test(article.title || '');
 
   res.render('article', {
-    article,
+    article: prepareArticleForDisplay(article),
+    additionalSources: additionalSourcesForArticle(article.slug),
     buzzDiscussion,
     related,
     ticker: [],
     planningOffers: showPlanningOffers
-      ? getActiveOffers(process.env, {
+      ? selectArticlePlanningOffers(article, getActiveOffers(process.env, {
         placement: 'article',
         limit: hotelsComConfigured(process.env) ? 3 : 2,
         dest: hotelDest,
-      })
+      }))
       : [],
     categoryLabels: CATEGORY_LABELS,
     placeholderImg,
@@ -1032,7 +1034,7 @@ router.get('/feed.xml', async (req, res) => {
       const pubDate = new Date(a.published_at).toUTCString();
       // Serve the stored image without the quota-limited transformation service.
       const image = new URL(a.image_url || placeholderImg(a.category), siteUrl).href;
-      const fullBody = image ? `<img src="${escapeXml(image)}" alt="${escapeXml(a.title)}" />\n${a.body_html}` : a.body_html;
+      const fullBody = image ? `<img src="${escapeXml(image)}" alt="${escapeXml(a.title)}" />\n${prepareArticleForDisplay(a).body_html}` : prepareArticleForDisplay(a).body_html;
 
       return `  <item>
     <title>${escapeXml(a.title)}</title>

@@ -6,6 +6,9 @@
  * loser here so Search Console / bookmarks don't 404.
  */
 const ARTICLE_SLUG_REDIRECTS = Object.freeze({
+  // Reviewed November 27: retain the fuller Fab 50 report and both source credits.
+  'magic-kingdom-fab-50-statues-removed':
+    'disney-world-fab-50-statues-being-removed',
   // Individually reviewed cross-feed opening/announcement duplicates, November 3.
   'vuori-opens-at-disney-springs-town-center-2':
     'vuori-opens-at-disney-springs-town-center',

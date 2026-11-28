@@ -130,7 +130,8 @@
     <% } else { %>
     <p class="source-note">
       Written by Florida Buzz Staff. Information for this article was sourced from
-      <a href="<%= article.source_url %>" target="_blank" rel="noopener"><%= article.source_name %></a>.
+      <a href="<%= article.source_url %>" target="_blank" rel="noopener"><%= article.source_name %></a><% if (typeof additionalSources !== 'undefined') { additionalSources.forEach(function (source) { %>
+      and <a href="<%= source.url %>" target="_blank" rel="noopener"><%= source.name %></a><% }); } %>.
     </p>
     <% } %>
   </article>
