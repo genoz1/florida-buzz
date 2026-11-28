@@ -1,0 +1,57 @@
+name: Verify AdSense live revision
+on:
+  pull_request:
+    paths: ['.github/workflows/verify-adsense-live.yml']
+permissions:
+  contents: read
+jobs:
+  live-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify live public pages after deployment
+        run: |
+          node - <<'NODE'
+          const root = 'https://thefloridabuzz.com';
+          const winner = '/article/disney-world-fab-50-statues-being-removed';
+          async function get(path, manual = false) {
+            const response = await fetch(root + path, {
+              redirect: manual ? 'manual' : 'follow',
+              headers: {'Cache-Control': 'no-cache', 'User-Agent': 'FloridaBuzzDeploymentCheck/1.0'},
+              signal: AbortSignal.timeout(15000),
+            });
+            return {status: response.status, location: response.headers.get('location'), text: await response.text()};
+          }
+          for (let attempt = 1; attempt <= 8; attempt++) {
+            try {
+              const [privacy, duplicate, article, home, ads, guides] = await Promise.all([
+                get('/privacy'),
+                get('/article/magic-kingdom-fab-50-statues-removed', true),
+                get(winner), get('/'), get('/ads.txt'), get('/guides'),
+              ]);
+              const offerCount = (article.text.match(/<div class="planning-offer /g) || []).length;
+              const checks = {
+                privacy: privacy.status === 200 && privacy.text.includes('Google advertising and your choices') && privacy.text.includes('https://myadcenter.google.com/') && privacy.text.includes('https://optout.aboutads.info/'),
+                duplicateRedirect: duplicate.status === 301 && new URL(duplicate.location, root).pathname === winner,
+                combinedSources: article.status === 200 && article.text.includes('disneytouristblog.com/disney-world-removing-magicband-character-statues/') && article.text.includes('wdwmagic.com/events/the-worlds-most-magical-celebration/'),
+                promotions: !/<div\b[^>]*class=["']shop-box["']/.test(article.text) && offerCount === 1,
+                home: home.status === 200 && home.text.includes('ca-pub-5880246851333230'),
+                adsTxt: ads.status === 200 && ads.text.includes('google.com, pub-5880246851333230, DIRECT, f08c47fec0942fa0'),
+                guides: guides.status === 200 && guides.text.includes('Florida Travel Guides'),
+              };
+              console.log(JSON.stringify({attempt, checks, offerCount, statuses:{privacy:privacy.status,duplicate:duplicate.status,article:article.status,home:home.status,ads:ads.status,guides:guides.status}}));
+              if (Object.values(checks).every(Boolean)) {
+                console.log('LIVE_ADSENSE_REVISION_VERIFIED');
+                process.exit(0);
+              }
+            } catch (error) {
+              console.log(JSON.stringify({attempt, error:error.message}));
+            }
+            if (attempt < 8) await new Promise(resolve => setTimeout(resolve, 15000));
+          }
+          throw new Error('Live revision did not pass all checks within the verification window.');
+          NODE
